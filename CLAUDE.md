@@ -22,7 +22,7 @@ Practical implication for how work should be sequenced: don't let more than one 
 
 ## Architecture — read this before touching the build
 
-**This is not built with a real bundler.** No webpack, no esbuild, no Vite, no ES module imports/exports anywhere. It's 31 plain JavaScript files, concatenated in a specific order into one giant inline `<script>` block inside `shell.html`, producing `electron/rxnpv.html` — the single file the Electron shell actually loads.
+**This is not built with a real bundler.** No webpack, no esbuild, no Vite, no ES module imports/exports anywhere. It's 33 plain JavaScript files, concatenated in a specific order into one giant inline `<script>` block inside `shell.html`, producing `electron/rxnpv.html` — the single file the Electron shell actually loads.
 
 This was a pragmatic choice made out of necessity: the app was originally built entirely inside a Claude chat conversation, in a sandboxed environment with no real bundler tooling available. It works, it's been thoroughly tested in that form, and **changing it is a legitimate future improvement but a real, deliberate architecture decision** — not something to fix in passing while doing something else. If you do it, do it as its own isolated change with full re-verification, not bundled into a feature or bug fix.
 
@@ -51,7 +51,7 @@ Quit the running app first if using `--install` — it overwrites the app bundle
 ### Project layout
 
 ```
-src/            31 source modules — see MODULE_ORDER in build.js for the authoritative list/order
+src/            33 source modules — see MODULE_ORDER in build.js for the authoritative list/order
 shell.html      HTML template with a __SCRIPT__ placeholder
 build.js        reassembles src/ into electron/rxnpv.html
 electron/       main.js, preload.js, package.json (electron-builder config), icon.icns/icon.svg, vendor/ (React UMD builds, committed)
@@ -71,8 +71,8 @@ docs/           design-decision history and feature documentation — see below
 
 **Top-level views:**
 - **Workspace** — the DCF/valuation sandbox itself.
-- **Reference Sheet** (8 tabs: How This Works, Revenue Build, Cost Structure, R&D & Timeline, Probability of Success, Discount Rate, Valuation & Dilution, M&A Comps) — every benchmark the app uses, sourced, with a comprehensive "How This Works" guide covering every feature across all five views, including export/pinning, storage protection, and delete safety.
-- **Tools** (13 tabs across 3 groups — *Benchmarks*: M&A Premium, Peak Sales Comps, Licensing Comps; *Your Case*: Diluted Market Cap, Cash Runway, Runway vs. Catalyst, Binary Event, Sensitivity; *Live Research*: Company Lookup, Catalyst Calendar, Trial Explorer, FDA Lookup, Exclusivity/LOE).
+- **Reference Sheet** (9 tabs: How This Works, Revenue Build, Cost Structure, R&D & Timeline, Probability of Success, Discount Rate, Valuation & Dilution, M&A Comps, **Trial Glossary**) — every benchmark the app uses, sourced, with a comprehensive "How This Works" guide covering every feature across all five views, including export/pinning, storage protection, and delete safety.
+- **Tools** (15 tabs across 3 groups — *Benchmarks*: M&A Premium, Peak Sales Comps, Licensing Comps; *Your Case*: Diluted Market Cap, Cash Runway, Runway vs. Catalyst, Binary Event, Sensitivity; *Live Research*: Company Lookup, Catalyst Calendar, **Trial Decoder**, Trial Explorer, FDA Lookup, Exclusivity/LOE, **Target Dossier**).
 - **Simulation** (6 top-level tabs: Trial Outcome/PoS assurance — including drawn survival curves for time-to-event endpoints, not just the hazard ratio number; Phase 2→3 Translator; Trial Statistics, itself 7 sub-tools — Fragility Index, Sample Size/Power, P-value↔CI, Single-Arm CI, 2×2 Outcome Analysis, Non-Inferiority, Multiplicity Adjustment; Meta-Analysis; Peak Sales Monte Carlo; PK/PD, which also carries a standalone Receptor Occupancy Calculator for when you already have a concentration in hand and don't need the full dosing simulation). Chemistry/RDKit was built, then removed entirely after the user judged it not worth keeping — no trace of it remains in `src/` or `electron/`, and it should not be treated as a gap to fill back in.
 - **Portfolio** — cross-case aggregation.
 - **Report** — PDF export with a section picker, now including a "Pinned Analyses" section: Simulation and Tools results are computed on demand and have no persistent model to re-render from, so results can be explicitly pinned (capturing the rendered panel) onto a case so they travel with that case's report.
@@ -86,6 +86,25 @@ docs/           design-decision history and feature documentation — see below
 **Cross-feature connections:** Partnership Economics → Licensing Comps, Company Lookup → Trial Watch, Peak Sales Monte Carlo → case export, any Simulation/Tools result → Pin to a case's PDF report — all explicit, one-click, never automatic.
 
 **Resilience and data safety:** two-layer error boundary (a crash in one view degrades gracefully instead of white-screening the whole app — confirmed live, not just designed, when a real bug crashed one Tools view and the rest of the app kept working); every destructive action requires confirmation (a modal for deleting a whole case or program, an inline two-step "click again to confirm" for smaller removals like a custom comp or a log entry — nothing destructive fires on a single click); a proactive storage-headroom banner that warns before `localStorage` fills up, splitting usage into the user's own irreplaceable data versus disposable re-fetchable API caches, with a one-click way to clear just the caches; the EDGAR/CIK caches are byte-capped (not just entry-count-capped) so a single large API response can't crowd out the user's own saved cases.
+
+## Conviction tools — the half of the app that is not valuation
+
+A deliberate product decision made in September 2026: **not every feature has to feed the DCF.** The app is a conviction sandbox, and a tool that helps a retail investor understand the science or the trial earns its place whether or not a number flows from it into a valuation. Several of these deliberately do not.
+
+- **Trial Decoder** (Tools → Live research). Paste an NCT; get the design in plain English — allocation, masking, comparator, arms, primary endpoint — plus what the architecture can and cannot establish, and design red flags. Filled a real hole: the app could already *search* trials and *watch* them for changes but could never *explain* one. All derived from registered CT.gov fields that were already arriving in every response and being discarded; where CT.gov is silent it says "not stated" rather than defaulting, so an unregistered masking field never reads as open label. Engine in `trialDecoder.js`, pure and unit-tested.
+- **Trial-design red flags**, inside the decoder. Note these are *separate from* `computeRedFlags()`, which checks the user's own modelling inputs and says nothing about the study. Don't merge them.
+- **Target Dossier** (Open Targets). Human genetic support for a target, disease associations split by whether the evidence is genetic or inferred, and what drugs already exist against it. **Deliberately not wired into PoS** — an Open Targets association score is a weighted aggregate over very heterogeneous evidence, and presenting it as a probability input would be exactly the false precision this project avoids. If that ever changes it should be a deliberate decision, not a drift.
+- **Analog effect-size board** (inside Trial Explorer). What effect sizes actually got *posted* in an indication — the reference class a modelled hazard ratio should be read against. Always reports its own denominators ("17 extractable of 50 with results") because a board that quietly drops what it cannot parse reads as the whole landscape.
+- **Trial Glossary** (Reference Sheet). The vocabulary the decoder assumes, each term with a "why it matters" line, plus what each phase can and cannot establish.
+
+### Two API lessons worth not relearning
+
+Both new integrations were written against assumed API shapes and **both were wrong in ways the unit tests could not catch**, because the fixtures encoded the same wrong assumptions as the code. Only calling the live services exposed them.
+
+1. **Open Targets v4 has moved.** `knownDrugs` no longer exists (it is `drugAndClinicalCandidates`), a clinical row's `diseases` are wrapper objects with no `name`, and stages arrive as `"PHASE_3"`. Introspect the live schema before trusting any query here.
+2. **CT.gov's `paramType` is free text, not an enum.** Real values include `"Hazard Ratio (HR)"` and `"CMH ESTIMATE OF COMMON ODDS RATIO"`. It must be pattern-matched — and narrowly: anything on a transformed scale (a log hazard ratio) is refused outright, because its null value is 0 rather than 1 and mixing the two would corrupt every summary on the board.
+
+Corollary, learned the same way: **test a new CT.gov feature against a real mega-trial.** NCT04368728 registers 64 primary endpoints and 20 arms, which broke the decoder's rendering and made its co-primary red flag produce nonsense. No synthetic fixture would have suggested those numbers were possible.
 
 ## Deliberately not built — do not "fix" these as if they were oversights
 
