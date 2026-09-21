@@ -102,7 +102,15 @@ function renderHistogram(values, opts = {}) {
   }
 
   const axisLine = `<line x1="${marginLeft}" y1="${marginTop + plotH}" x2="${marginLeft + plotW}" y2="${marginTop + plotH}" stroke="var(--ink-2)" stroke-width="1" opacity="0.5" />`;
-  const xTicks = [min, min + range / 2, max].map((v, i) => {
+  // When every value is identical, `range` falls back to 1 purely to keep the
+  // binning arithmetic from dividing by zero — but using that fallback for the
+  // labels too printed a midpoint half a unit above a max equal to the min
+  // ("100, 100.5, 100"), a non-monotonic axis implying a spread that does not
+  // exist. Label the single real value instead.
+  const xTicks = (max === min
+    ? [{ v: min, i: 1 }]
+    : [min, min + range / 2, max].map((v, i) => ({ v, i }))
+  ).map(({ v, i }) => {
     const x = marginLeft + (i / 2) * plotW;
     return `<text x="${x.toFixed(1)}" y="${marginTop + plotH + 18}" fill="var(--ink-2)" font-size="10" text-anchor="middle">${fmt(v)}</text>`;
   }).join('');
@@ -128,7 +136,14 @@ function renderLineChart(series, opts = {}) {
   const allY = series.flatMap(s => s.points.map(p => p.y));
   if (!allX.length) return '<svg></svg>';
   const xMin = Math.min(...allX), xMax = Math.max(...allX);
-  const yMin = 0, yMax = Math.max(...allY) * 1.1 || 1;
+  // yMin was hard-coded to 0, so any negative value mapped below the plot area
+  // — clipped by the SVG bounds and invisible, with the axis giving no hint it
+  // had gone off the bottom. chart.js's revenueChartYScale already handles this
+  // by flooring at min(0, ...) rather than assuming non-negative data.
+  const yLo = Math.min(0, ...allY), yHi = Math.max(...allY);
+  const ySpan = yHi - yLo;
+  const yMin = yLo;
+  const yMax = yHi + (ySpan > 0 ? ySpan * 0.1 : Math.max(Math.abs(yHi) * 0.1, 1));
 
   const sx = x => marginLeft + ((x - xMin) / ((xMax - xMin) || 1)) * plotW;
   const sy = y => marginTop + plotH - ((y - yMin) / ((yMax - yMin) || 1)) * plotH;
@@ -154,6 +169,14 @@ function renderLineChart(series, opts = {}) {
 
   let paths = '';
   for (const s of series) {
+    // A one-point series is just "M x y" with nothing to draw to, so the path
+    // renders as literally nothing and the series looks like missing data.
+    // Draw the point itself instead.
+    if (s.points.length === 1) {
+      const p = s.points[0];
+      paths += `<circle cx="${sx(p.x).toFixed(1)}" cy="${sy(p.y).toFixed(1)}" r="3.5" fill="${s.color}" />`;
+      continue;
+    }
     const d = s.points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${sx(p.x).toFixed(1)} ${sy(p.y).toFixed(1)}`).join(' ');
     paths += `<path d="${d}" fill="none" stroke="${s.color}" stroke-width="2" />`;
   }
@@ -312,7 +335,16 @@ function renderForestPlot(rows, opts = {}) {
     marginZone = null, title = '', xLabel = '', labelWidth = 150
   } = opts;
 
-  const allRows = pooled ? rows.concat([{ ...pooled, isPooled: true }]) : rows;
+  // With no rows and no reference line or margin zone to anchor a domain,
+  // Math.min/max of an empty list give Infinity/-Infinity, the pad computes to
+  // -Infinity (which is truthy, so the `|| 0.1` fallback never fires), and
+  // every axis tick ends up with x="NaN" — invalid SVG the browser silently
+  // drops, plus literal "NaN"/"Infinity" label text. Not reachable from any
+  // current caller, but this is an exported shared primitive.
+  const hasAnchor = (rows && rows.length) || pooled || referenceLine != null || marginZone;
+  if (!hasAnchor) return '<svg></svg>';
+
+  const allRows = pooled ? (rows || []).concat([{ ...pooled, isPooled: true }]) : (rows || []);
   const rowHeight = 34;
   const marginTop = title ? 34 : 14;
   const marginBottom = xLabel ? 40 : 26;
@@ -349,7 +381,12 @@ function renderForestPlot(rows, opts = {}) {
   let rowsSvg = '';
   allRows.forEach((r, i) => {
     const cy = marginTop + i * rowHeight + rowHeight / 2;
-    const x1 = sx(r.lower), x2 = sx(r.upper), xEst = sx(r.estimate);
+    // A malformed row with lower > upper is harmless for a plain whisker (an
+    // SVG line doesn't care which end is which) but turns the pooled diamond
+    // into a self-intersecting bowtie, since the polygon assumes x1 is left of
+    // x2. Order the endpoints so the glyph stays a diamond either way.
+    const xa = sx(r.lower), xb = sx(r.upper);
+    const x1 = Math.min(xa, xb), x2 = Math.max(xa, xb), xEst = sx(r.estimate);
     const label = `<text x="${(labelWidth - 10).toFixed(1)}" y="${(cy + 4).toFixed(1)}" fill="var(--ink-1)" font-size="11" text-anchor="end">${escapeXml(r.label)}</text>`;
     // Zero-width rows (a bare point estimate with no interval, e.g. the
     // Phase 2->3 before/after comparison) shouldn't claim a confidence

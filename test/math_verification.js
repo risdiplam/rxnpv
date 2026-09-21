@@ -70,7 +70,7 @@ const EXPORTS = [
   "COGS_BENCHMARKS", "EXCLUSIVITY_BENCHMARKS",
   "samplePrior", "priorQuantile", "simulateTimeToEventReplicate", "runAssuranceSimulation",
   "runPeakSalesSimulation", "driverSensitivity",
-  "niceTicks", "formatTick",
+  "niceTicks", "formatTick", "renderLineChart", "renderHistogram", "renderForestPlot",
   "treasuryMethodShares", "ifConvertedShares", "computeEquityValue", "applyFutureRaise",
   "classifyCatalystFunding", "monthsUntil", "parseCatalystDate", "RUNWAY_CUSHION_MONTHS_DEFAULT",
   "summarizeOrangeBookPatents", "isPediatricExtension", "parseFdaYyyymmdd",
@@ -1863,6 +1863,68 @@ report();
 // bugs in them. Fixtures below are shaped like genuine companyfacts responses
 // and are the exact cases that reproduced each bug.
 // ════════════════════════════════════════════════════════════════════════════
+section("Charts stay valid at data extremes");
+{
+  // An SVG attribute of "NaN" or "Infinity" is silently dropped by the
+  // browser, so these render as missing elements rather than as an error —
+  // which is exactly why they went unnoticed. Assert on the markup.
+  const clean = (svg) => svg.indexOf("NaN") === -1 && svg.indexOf("Infinity") === -1;
+
+  // renderLineChart hard-coded yMin to 0, so negatives mapped below the plot
+  // area and were clipped out of sight with nothing on the axis to show it.
+  const negSeries = [{ name: "n", color: "var(--teal)", points: [{ x: 0, y: -50 }, { x: 1, y: -20 }, { x: 2, y: 10 }] }];
+  const negSvg = api.renderLineChart(negSeries, { title: "t" });
+  ok("a line chart with negative values renders without NaN", clean(negSvg));
+  ok("and its y-axis actually reaches below zero", negSvg.indexOf("-50") !== -1 || negSvg.indexOf("−50") !== -1);
+
+  // A single-point series was "M x y" with nothing to draw to — an invisible
+  // chart that looked like missing data.
+  const onePoint = api.renderLineChart([{ name: "one", color: "var(--teal)", points: [{ x: 1, y: 5 }] }], {});
+  ok("a single-point series draws something visible", onePoint.indexOf("<circle") !== -1);
+  ok("and does so without NaN coordinates", clean(onePoint));
+
+  // Identical values collapse the domain; the guard kept the maths safe but
+  // the axis labels still read "100, 100.5, 100".
+  const flatHist = api.renderHistogram([100, 100, 100, 100], { title: "flat" });
+  ok("an all-identical histogram renders without NaN", clean(flatHist));
+  {
+    // Check the rendered LABELS, not the raw markup — pixel coordinates in the
+    // attributes contain decimals of their own and would match anything.
+    const labels = [...flatHist.matchAll(/<text[^>]*>([^<]*)<\/text>/g)].map(m => m[1]);
+    const numeric = labels.filter(t => /^[\d.]+$/.test(t)).map(parseFloat);
+    // The value axis should show 100 and nothing above it — never a 100.5
+    // midpoint implying a spread that doesn't exist.
+    ok("no axis label sits above the single real value", numeric.every(v => v <= 100));
+    ok("and the real value is labelled", labels.some(t => parseFloat(t) === 100));
+  }
+
+  ok("an empty histogram is an empty svg, not a crash", api.renderHistogram([], {}) === "<svg></svg>");
+  ok("an empty line chart is an empty svg", api.renderLineChart([{ name: "e", color: "c", points: [] }], {}) === "<svg></svg>");
+
+  // Forest plot: no rows and nothing to anchor a domain produced Infinity
+  // domain bounds and x="NaN" tick labels.
+  ok("a forest plot with nothing to anchor it returns an empty svg",
+    api.renderForestPlot([], {}) === "<svg></svg>");
+  ok("a forest plot with only a reference line still renders cleanly",
+    clean(api.renderForestPlot([], { referenceLine: 1 })));
+
+  // A zero-width CI is a legitimate input (a bare point estimate).
+  ok("a zero-width interval renders cleanly",
+    clean(api.renderForestPlot([{ label: "a", estimate: 1, lower: 1, upper: 1 }], {})));
+
+  // A malformed pooled row (lower > upper) drew a self-intersecting bowtie
+  // instead of a diamond. The polygon's first and third points must now be
+  // ordered left-to-right.
+  const bowtie = api.renderForestPlot([{ label: "s", estimate: 1, lower: 0.8, upper: 1.2 }],
+    { pooled: { label: "Pooled", estimate: 1.0, lower: 1.2, upper: 0.8 } });
+  ok("a reversed pooled interval still renders cleanly", clean(bowtie));
+  {
+    const m = bowtie.match(/<polygon points="([\d.]+),[\d.]+ ([\d.]+),[\d.]+ ([\d.]+),/);
+    ok("and its diamond is not inverted", !!m && parseFloat(m[1]) <= parseFloat(m[3]));
+  }
+}
+report();
+
 section("R&D cost is never silently dropped or dumped into one year");
 {
   const items = [

@@ -131,8 +131,20 @@ function ScatterChart({ points, highlightPoint, xLabel, yLabel, xFmt, yFmt, heig
   }
 
   const xVals = allPoints.map(p => p.x), yVals = allPoints.map(p => p.y);
-  const maxX = Math.max(...xVals) * 1.15 || 1, minX = Math.min(0, ...xVals);
-  const maxY = Math.max(...yVals) * 1.15 || 1, minY = Math.min(0, ...yVals);
+  // The 15% headroom has to be added ABOVE the max, not multiplied into it. On
+  // an all-negative axis — a deal struck at a negative premium is unusual but
+  // real — multiplying a negative max by 1.15 pushes it further negative, so
+  // the computed max ends up BELOW the min: the axis silently inverts, and a
+  // point past the (wrong) max plots outside the chart entirely. RevenueChart
+  // in this same file already floors its domain at zero for the same reason.
+  const padAxis = (vals) => {
+    const lo = Math.min(0, ...vals), hi = Math.max(...vals);
+    const span = hi - lo;
+    return { lo, hi: hi + (span > 0 ? span * 0.15 : Math.max(Math.abs(hi) * 0.15, 1)) };
+  };
+  const xAxis = padAxis(xVals), yAxis = padAxis(yVals);
+  const maxX = xAxis.hi, minX = xAxis.lo;
+  const maxY = yAxis.hi, minY = yAxis.lo;
   const toX = v => padL + ((v - minX) / (maxX - minX || 1)) * plotW;
   const toY = v => padT + plotH - ((v - minY) / (maxY - minY || 1)) * plotH;
 
