@@ -28,6 +28,9 @@
 const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
+// Explicitly node:crypto — on Node 18+ a global `crypto` exists (WebCrypto),
+// and it has no createHash, so relying on the global fails at build time.
+const crypto = require('node:crypto');
 
 const MODULE_ORDER = [
   // Core valuation engine — order matters (see header comment)
@@ -99,7 +102,37 @@ function reassemble() {
   // middle of a source file. A replacer function's return value is always
   // inserted verbatim, with no such reinterpretation. Caught this exact
   // corruption during testing before it ever reached a delivered build.
-  const final = shell.replace('__SCRIPT__', () => combined);
+  let final = shell.replace('__SCRIPT__', () => combined);
+
+  // The app's entire bundle is ONE inline <script>, and a Content-Security-
+  // Policy blocks inline script unless it is explicitly allowed. Allowing it
+  // wholesale with 'unsafe-inline' would defeat most of the point of having a
+  // script-src at all, so the policy instead carries the sha256 of exactly
+  // this build's script content — nothing else can execute, not even another
+  // inline block. The hash must be of the script's exact bytes, so it is
+  // computed here, after substitution, and injected last.
+  if (final.includes('__SCRIPT_HASH__')) {
+    // Hash the script element's EXACT text content, extracted from the output
+    // rather than reconstructed. A browser hashes every byte between the tags,
+    // including the newline after `<script>` — hashing `combined` alone is off
+    // by that one character, which silently blocks the bundle and yields a
+    // blank window. Tests can't catch this (jsdom does not enforce CSP), so
+    // the hash is taken from the real artifact to remove the guesswork.
+    const open = final.indexOf('<script>\n' + combined.slice(0, 40));
+    const scriptOpen = final.indexOf('>', open) + 1;
+    const scriptClose = final.indexOf('</script>', scriptOpen);
+    if (open === -1 || scriptClose === -1) {
+      console.error('❌ Could not locate the inline bundle to hash for the CSP. Refusing to write a build that would be blocked.');
+      process.exit(1);
+    }
+    const scriptText = final.slice(scriptOpen, scriptClose);
+    const hash = crypto.createHash('sha256').update(scriptText, 'utf8').digest('base64');
+    final = final.replace('__SCRIPT_HASH__', () => "'sha256-" + hash + "'");
+  } else {
+    console.error("❌ shell.html has no __SCRIPT_HASH__ placeholder — the CSP would block the app's own bundle. Refusing to write a build that won't start.");
+    process.exit(1);
+  }
+
   fs.writeFileSync(OUTPUT_PATH, final);
   console.log(`✅ Reassembled ${MODULE_ORDER.length} modules → electron/rxnpv.html (${(final.length / 1024).toFixed(0)} KB)`);
 }

@@ -3,6 +3,17 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- Everything this app runs is local: the page is loaded from disk via
+     loadFile, React is vendored alongside it, and the whole application
+     bundle is inlined below. The only outbound traffic is to the three data
+     sources the research tools actually query. Locking connect-src to exactly
+     those means that if an injection point ever did appear, it could not
+     exfiltrate a user's cases to an arbitrary host. 'unsafe-inline' is
+     required for style-src because the UI styles elements inline throughout;
+     script-src deliberately does NOT allow it, so only the bundled scripts
+     can execute. EDGAR is absent on purpose — it is proxied through the main
+     process rather than fetched from the renderer. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' file: __SCRIPT_HASH__; style-src 'self' file: 'unsafe-inline'; img-src 'self' file: data: blob:; font-src 'self' file: data:; connect-src 'self' https://clinicaltrials.gov https://api.fda.gov https://data.sec.gov; form-action 'none'; base-uri 'none'; object-src 'none'">
 <title>RxNPV — Biotech Valuation Sandbox</title>
 <style>
 /* Fonts embedded locally (base64 woff2) so the desktop app always renders
