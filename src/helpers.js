@@ -26,20 +26,63 @@ function fmtShare(v) {
   return (v < 0 ? "-$" : "$") + Math.abs(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+// The three benchmark tables were sourced from different papers and don't
+// share one taxonomy: PoS data is filed under "Neurology"/"Autoimmune"/
+// "Infectious disease"/"Urology", while the trial cost and duration tables use
+// "CNS"/"Immunomodulation"/"Anti-infective"/"Genitourinary" for the same
+// diseases. THERAPEUTIC_AREAS is the union of both, so the dropdown offers
+// each pair as if they were separate choices — and picking the term that
+// happens to be missing from a given table silently fell through to a generic
+// weighted average, even though a perfectly good area-specific number existed
+// under the other name. Rather than restate any benchmark, map the synonyms
+// onto whatever each table actually calls them.
+const AREA_ALIASES = {
+  "Neurology": ["CNS"],
+  "CNS": ["Neurology"],
+  "Psychiatry": ["CNS", "Neurology"],
+  "Autoimmune": ["Immunomodulation"],
+  "Immunomodulation": ["Autoimmune"],
+  "Infectious disease": ["Anti-infective"],
+  "Anti-infective": ["Infectious disease"],
+  "Urology": ["Genitourinary", "Renal"],
+  "Genitourinary": ["Urology"],
+  "Renal": ["Genitourinary", "Urology"],
+  "Metabolic": ["Endocrine"],
+  "Endocrine": ["Metabolic"],
+  "Musculoskeletal": ["Other"]
+};
+
+// Returns the row plus the name it was actually found under, so a caller can
+// be honest about having resolved a synonym rather than pretending the user's
+// own choice was in the table.
+function lookupAreaRow(byArea, area) {
+  if (byArea[area]) return { row: byArea[area], via: null };
+  for (const alt of (AREA_ALIASES[area] || [])) {
+    if (byArea[alt]) return { row: byArea[alt], via: alt };
+  }
+  return { row: null, via: null };
+}
+
 // Look up PoS for a therapeutic area / phase, falling back to all-indications baseline
 function getPosForArea(area, phaseKey) {
-  const row = POS_BY_AREA.byArea[area];
-  if (row && row[phaseKey] != null) return { value: row[phaseKey], source: POS_BY_AREA.source, matched: true };
+  const { row, via } = lookupAreaRow(POS_BY_AREA.byArea, area);
+  if (row && row[phaseKey] != null) {
+    return { value: row[phaseKey], source: POS_BY_AREA.source + (via ? " — " + via + " data (this source's name for " + area + ")" : ""), matched: true, via };
+  }
   return { value: POS_BY_AREA.allIndications[phaseKey], source: POS_BY_AREA.source + " (all-indications baseline — no specific data for this area)", matched: false };
 }
 function getTrialCostForArea(area, phaseKey) {
-  const row = TRIAL_COST_BY_AREA.byArea[area];
-  if (row && row[phaseKey] != null) return { value: row[phaseKey], source: TRIAL_COST_BY_AREA.source, matched: true };
+  const { row, via } = lookupAreaRow(TRIAL_COST_BY_AREA.byArea, area);
+  if (row && row[phaseKey] != null) {
+    return { value: row[phaseKey], source: TRIAL_COST_BY_AREA.source + (via ? " — " + via + " data (this source's name for " + area + ")" : ""), matched: true, via };
+  }
   return { value: TRIAL_COST_BY_AREA.weightedAvg[phaseKey], source: TRIAL_COST_BY_AREA.source + " (weighted avg — no specific data for this area)", matched: false };
 }
 function getTrialDurationForArea(area, phaseKey) {
-  const row = TRIAL_DURATION_BY_AREA.byArea[area];
-  if (row && row[phaseKey] != null) return { value: row[phaseKey], source: TRIAL_DURATION_BY_AREA.source, matched: true };
+  const { row, via } = lookupAreaRow(TRIAL_DURATION_BY_AREA.byArea, area);
+  if (row && row[phaseKey] != null) {
+    return { value: row[phaseKey], source: TRIAL_DURATION_BY_AREA.source + (via ? " — " + via + " data (this source's name for " + area + ")" : ""), matched: true, via };
+  }
   return { value: TRIAL_DURATION_BY_AREA.weightedAvg[phaseKey], source: TRIAL_DURATION_BY_AREA.source + " (weighted avg)", matched: false };
 }
 
@@ -430,6 +473,16 @@ function CustomCompForm({ fields, onSave, onCancel, initialValues, saveLabel }) 
   const empty = {}; fields.forEach(f => { empty[f.key] = (initialValues && initialValues[f.key] != null) ? String(initialValues[f.key]) : ""; });
   const [vals, setVals] = React.useState(empty);
   const requiredKey = fields[0].key;
+  // Only the first field used to be required, so a numeric field left blank
+  // was silently saved as a real 0 (parseFloat("") || 0) and merged into the
+  // same array as the built-in, source-verified comps — quietly dragging down
+  // any average or multiple computed from that table, with nothing to show the
+  // entry was incomplete. A numeric field that is filled in must parse, and
+  // fields marked required must be present. MilestoneEntryForm already worked
+  // this way; this brings the shared form in line with it.
+  const numericProblem = fields.find(f => f.numeric && vals[f.key] !== "" && vals[f.key] != null && !isFinite(Number(vals[f.key])));
+  const missingRequired = fields.find(f => (f.required || f.key === requiredKey) && (!vals[f.key] || !String(vals[f.key]).trim()));
+  const canSave = !numericProblem && !missingRequired;
   const inputStyle = { width: "100%", padding: "5px 8px", borderRadius: 5, border: "1px solid var(--rule)", background: "var(--surface)", color: "var(--ink-1)", fontFamily: "var(--mono)", fontSize: 11 };
 
   return h("div", { style: { padding: "12px 14px", borderRadius: 8, background: "var(--surface-2)", marginTop: 8 } },
@@ -443,10 +496,15 @@ function CustomCompForm({ fields, onSave, onCancel, initialValues, saveLabel }) 
         })
       ))
     ),
+    // Name the specific problem rather than just disabling the button, so it's
+    // obvious which field is holding the save back.
+    (numericProblem || missingRequired) && h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--amber)", marginBottom: 8 } },
+      numericProblem ? ("“" + numericProblem.label + "” must be a number.")
+        : ("“" + missingRequired.label + "” is required.")),
     h("div", { style: { display: "flex", gap: 8 } },
       h("button", {
-        onClick: () => { if (!vals[requiredKey] || !vals[requiredKey].trim()) return; onSave(vals); },
-        style: { padding: "6px 16px", borderRadius: 6, border: "none", background: (vals[requiredKey] && vals[requiredKey].trim()) ? "var(--teal-fill)" : "var(--rule)", color: "#101414", fontFamily: "var(--mono)", fontSize: 11, fontWeight: 700, cursor: "pointer" }
+        onClick: () => { if (!canSave) return; onSave(vals); },
+        style: { padding: "6px 16px", borderRadius: 6, border: "none", background: canSave ? "var(--teal-fill)" : "var(--rule)", color: "#101414", fontFamily: "var(--mono)", fontSize: 11, fontWeight: 700, cursor: canSave ? "pointer" : "default" }
       }, saveLabel || "Add"),
       h("button", { onClick: onCancel, style: { padding: "6px 14px", borderRadius: 6, border: "1px solid var(--rule)", background: "transparent", color: "var(--ink-2)", fontFamily: "var(--mono)", fontSize: 11, cursor: "pointer" } }, "Cancel")
     )

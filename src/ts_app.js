@@ -1679,6 +1679,34 @@ function runReceptorOccupancyCalculator() {
 
 function runPkpd() {
   const route = val('route');
+  const resultsEl = document.getElementById('pkpdResults');
+
+  // Every Trial Statistics tool validates before computing; PK/PD was the one
+  // that validated nothing, so a blank or nonsensical parameter produced a
+  // confidently-rendered garbage profile rather than a "check your inputs"
+  // message. Ke = 0 stays legal — a drug with no modelled elimination is a
+  // real thing to want to look at — but a zero dose or volume is not.
+  const required = [
+    { id: 'dose', label: 'Dose', positive: true },
+    { id: 'Vd', label: 'Vd (volume of distribution)', positive: true },
+    { id: 'ke', label: 'Ke (elimination rate)', positive: false },
+    { id: 'tEnd', label: 'Simulation window', positive: true }
+  ];
+  if (route !== 'iv') {
+    required.push({ id: 'ka', label: 'Ka (absorption rate)', positive: true });
+    required.push({ id: 'F', label: 'F (bioavailability)', positive: true });
+  }
+  const bad = required.find(f => {
+    const v = numVal(f.id);
+    return !isFinite(v) || (f.positive ? v <= 0 : v < 0);
+  });
+  if (bad && resultsEl) {
+    resultsEl.innerHTML = '';
+    resultsEl.appendChild(el('p', { class: 'error' },
+      `Check the inputs — ${bad.label} must be a ${bad.positive ? 'number greater than zero' : 'number of zero or more'}.`));
+    return;
+  }
+
   const config = {
     route, dose: numVal('dose'), ka: numVal('ka'), ke: numVal('ke'), Vd: numVal('Vd'), F: numVal('F'),
     tau: numVal('tau'), numDoses: Math.max(1, Math.round(numVal('numDoses'))), tEnd: numVal('tEnd'), dt: Math.max(0.01, numVal('tEnd') / 500)

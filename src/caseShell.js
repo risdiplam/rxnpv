@@ -61,13 +61,19 @@ function CaseView({ theCase, onChange, onDelete, onNavigateToTools }) {
   const updateCorpGA = (patch) => update({ corporateGA: { ...corpGA, ...patch } });
 
   // Compute all program results + aggregate
-  const programResults = theCase.programs.map(p => {
+  const allProgramAttempts = theCase.programs.map(p => {
     let rev = null;
     const resolvedOffset = resolveLaunchYearOffset(p);
     const projYears = Math.max(20, COMPANY_CALENDAR_YEARS - resolvedOffset + 2);
     try { rev = getProgramRevenueResult(p, projYears); } catch (e) {}
     return { id: p.id, name: p.drugName || p.name, launchYearOffset: resolvedOffset, revenueResult: rev, program: p };
-  }).filter(p => p.revenueResult);
+  });
+  const programResults = allProgramAttempts.filter(p => p.revenueResult);
+  // Dropping a program that fails to compute is the right behaviour — one
+  // half-filled program shouldn't take the whole company rollup down with it.
+  // Doing it SILENTLY is not: the headline valuation just came out lower, with
+  // nothing on screen to say a program was left out of it.
+  const excludedPrograms = allProgramAttempts.filter(p => !p.revenueResult).map(p => p.name || "Unnamed program");
 
   const calendar = programResults.length ? aggregateCompanyRevenue(programResults, COMPANY_CALENDAR_YEARS) : [];
   const peakCalendarYear = calendar.length ? calendar.reduce((best, c) => c.totalRevenue > best.totalRevenue ? c : best, calendar[0]) : null;
@@ -239,6 +245,10 @@ function CaseView({ theCase, onChange, onDelete, onNavigateToTools }) {
         peakCalendarYear && h("div", { style: { fontSize: 12, fontFamily: "var(--mono)", color: "var(--ink-2)" } },
           "Peak: ", h("b", { style: { color: "var(--amber)" } }, fmtMoney(peakCalendarYear.totalRevenue)), " in year ", peakCalendarYear.calendarYear)
       ),
+      excludedPrograms.length > 0 && h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--amber)", background: "var(--amber-bg, transparent)", border: "1px solid var(--amber)", borderRadius: 6, padding: "8px 10px", marginBottom: 10, lineHeight: 1.6 } },
+        (excludedPrograms.length === 1 ? "“" + excludedPrograms[0] + "” is" : excludedPrograms.length + " programs are")
+        + " not included in this rollup or in any valuation below — their revenue build couldn't be computed, usually because a required field is still blank. "
+        + "Every total on this page excludes " + (excludedPrograms.length === 1 ? "it" : "them") + "."),
       h(ExportableBlock, { name: (theCase.name || "case") + "-revenue-rollup", showPanelCapture: true },
         h(RevenueChart, { series: totalSeries.concat(aggChartSeries.length > 1 ? aggChartSeries : []), showLegend: theCase.programs.length > 1, height: 200 }))
     ),
