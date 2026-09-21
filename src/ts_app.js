@@ -59,10 +59,6 @@ function field(labelText, inputEl) {
 function fieldGrid(fields) {
   return el('div', { class: 'fieldgrid' }, fields.filter(Boolean));
 }
-function wideField(labelText, inputEl) {
-  return el('label', { class: 'field field-wide' }, [el('span', {}, labelText), inputEl]);
-}
-
 // Collapsed-by-default explanatory note — see the details.note styles for why
 // these aren't just inline paragraphs.
 function note(summaryText, bodyText) {
