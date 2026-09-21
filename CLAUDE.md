@@ -10,6 +10,16 @@ This line should govern every future decision about what to build. It has alread
 
 macOS (Apple Silicon / arm64) only. Not tested on Intel. Not signed or notarized — deliberately deferred; see "Known limitations" below for why and what it would take.
 
+## Standing instruction: push to GitHub continuously, not in batches
+
+This repo previously lived only on the user's local machine for the entire build history, under an earlier project name tied to a pseudonym the user has since moved away from. That entire history was deliberately squashed into a single clean commit and force-pushed as a fresh start when the repo went public under the user's real GitHub account (`risdiplam`) — see the bottom of `docs/RxNPV_External_Suggestions_Tracker.md` for the full account of that rename and scrub.
+
+The user has explicitly stated a standing preference, not a one-time request: **work continues to happen locally on this Mac (required — see "macOS only" above, this is a real Electron app that needs a real Mac to build/package/verify), but every meaningful unit of work gets committed and pushed to `github.com/risdiplam/rxnpv` before moving to the next thing.** The stated reason is a real, previously-articulated fear of catastrophic local data loss — losing the project entirely if something happens to this machine — and the fix is keeping GitHub continuously current rather than treating a push as an occasional, separate "let's back things up now" event.
+
+This is durable authorization for routine commits and pushes on this project specifically (not a license to push other repos, and never a license to force-push over the public history again without being asked) — a future session does not need to re-ask before pushing ordinary work here. Still stop and ask before anything unusual: a force-push, rewriting history again, changing repo visibility, or anything that isn't just "commit and push what was just built."
+
+Practical implication for how work should be sequenced: don't let more than one meaningful change sit uncommitted/unpushed. Build → verify → commit → push, then move to the next thing, rather than accumulating a long list of local-only changes to push at the end of a session.
+
 ## Architecture — read this before touching the build
 
 **This is not built with a real bundler.** No webpack, no esbuild, no Vite, no ES module imports/exports anywhere. It's 32 plain JavaScript files, concatenated in a specific order into one giant inline `<script>` block inside `shell.html`, producing `electron/rxnpv.html` — the single file the Electron shell actually loads.
