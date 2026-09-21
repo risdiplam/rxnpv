@@ -84,7 +84,7 @@ const EXPORTS = [
   "computeCOGS", "computeSalesForceCost", "computeMarketingCost", "computeCorporateGA",
   "SALES_REP_COST", "SGA_BENCHMARKS", "SALES_FORCE_COMP_GROWTH_PCT",
   "tsFdaQueryString", "computeDilutionPath",
-  "applyPartnershipToRevenue", "getProgramRevenueResult", "computePartnershipContribution",
+  "applyPartnershipToRevenue", "getProgramRevenueResult", "computePartnershipContribution", "distributeRnDCostByYear",
   "computeSimpleMultipleValuation", "computeSOTPBreakdown",
   "periodMonths", "sumTranchesAtLatestDate", "calcRunwayFromFacts", "extractDebt",
   "extractSharesOutstanding", "extractDilutedShares", "extractOptions", "extractWarrants",
@@ -1863,6 +1863,50 @@ report();
 // bugs in them. Fixtures below are shaped like genuine companyfacts responses
 // and are the exact cases that reproduced each bug.
 // ════════════════════════════════════════════════════════════════════════════
+section("R&D cost is never silently dropped or dumped into one year");
+{
+  const items = [
+    { key: "phase2", years: 3.3, riskAdjCostM: 13 },
+    { key: "phase3", years: 3.6, riskAdjCostM: 40 },
+    { key: "regulatory", years: 1.25, riskAdjCostM: 2.6 }
+  ];
+  const totalUSD = 55.6e6;
+  const sum = (a) => a.reduce((s, v) => s + v, 0);
+
+  // Baseline: a window that matches the real timeline still allocates evenly
+  // and loses nothing.
+  const normal = api.distributeRnDCostByYear(items, 8);
+  near("a matched window distributes the full $55.6M", sum(normal), totalUSD, 1);
+
+  // THE BUG: launchYearOffset 0 on a program that still has remaining R&D
+  // returned an empty array, so the whole spend vanished from the calendar.
+  const atZero = api.distributeRnDCostByYear(items, 0);
+  ok("a launch year of 0 still produces a cost row", atZero.length >= 1);
+  near("and the full $55.6M is still accounted for", sum(atZero), totalUSD, 1);
+
+  // A window far shorter than the timeline used to leave ~$47.7M of the
+  // $55.6M piled into the single final year by shortfall recovery.
+  const squeezed = api.distributeRnDCostByYear(items, 2);
+  near("a 2-year window still totals $55.6M", sum(squeezed), totalUSD, 1);
+  ok("no single year absorbs almost the entire programme cost",
+    Math.max(...squeezed) < totalUSD * 0.85);
+  ok("cost is spread across the whole window, not just the last year",
+    squeezed[0] > 0 && squeezed[1] > 0);
+
+  // Ordering must survive compression: Phase 3 is the expensive stage and
+  // comes second, so the later year should carry more than the first.
+  ok("stage ordering survives compression", squeezed[1] > squeezed[0]);
+
+  // Degenerate input must not produce Infinity.
+  const zeroSpan = api.distributeRnDCostByYear([{ key: "x", years: 0, riskAdjCostM: 10 }], 3);
+  ok("a zero-duration stage does not produce Infinity", zeroSpan.every(v => isFinite(v)));
+  near("and its cost is still counted", sum(zeroSpan), 10e6, 1);
+
+  // No items at all is still a no-op of the requested length.
+  ok("no R&D items yields an all-zero window", sum(api.distributeRnDCostByYear([], 5)) === 0);
+}
+report();
+
 section("Partnership royalty applies in Quick mode, not just Full");
 {
   // Quick mode puts 100% of revenue in usRevenue and never shows the territory

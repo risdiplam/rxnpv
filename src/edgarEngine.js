@@ -212,7 +212,15 @@ async function findCIK(companyName, force) {
     }
     if (match) _cikCache.set(cacheKey, match);
     return match;
-  } catch (e) { console.warn("findCIK failed:", e.message); return null; }
+  } catch (e) {
+    // "We couldn't reach SEC" and "no such company" used to collapse into the
+    // same null, so an outage told the user to check their spelling. Mark the
+    // transport failure so callers can say which one actually happened.
+    console.warn("findCIK failed:", e.message);
+    const err = new Error(e.message || "SEC lookup failed");
+    err.isTransportError = true;
+    throw err;
+  }
 }
 
 async function fetchSubmissions(cik, force) {
@@ -494,10 +502,18 @@ function extractConvertibleNotes(facts) {
 // ── Top-level orchestrator: everything the Capital Structure "Pull from EDGAR"
 // button needs, in one call. ──
 async function pullEdgarFinancials(companyName, force) {
-  const cikInfo = await findCIK(companyName, force);
+  let cikInfo;
+  try {
+    cikInfo = await findCIK(companyName, force);
+  } catch (e) {
+    // A reachability problem is not a "we looked and it isn't there" answer,
+    // and telling the user to re-check the spelling of a perfectly correct
+    // name because SEC happened to be down is actively misleading.
+    return { ok: false, unreachable: true, error: "Couldn't reach SEC EDGAR (" + e.message + "). This is a connection problem, not a result — the company may well exist. Try again in a moment." };
+  }
   if (!cikInfo) return { ok: false, error: "Could not find a CIK for \"" + companyName + "\". Try the exact legal name, ticker, or enter a CIK manually." };
   const [subs, facts] = await Promise.all([fetchSubmissions(cikInfo.cik, force), fetchCompanyFacts(cikInfo.cik, force)]);
-  if (!facts) return { ok: false, error: "Found CIK " + cikInfo.cik + " but couldn't retrieve financial data (XBRL facts)." };
+  if (!facts) return { ok: false, unreachable: true, error: "Found CIK " + cikInfo.cik + ", but couldn't retrieve its XBRL financial data from SEC. That's usually a temporary SEC-side problem rather than missing data — try again in a moment." };
   const shares = extractSharesOutstanding(facts);
   const diluted = extractDilutedShares(facts);
   const runway = calcRunwayFromFacts(facts);

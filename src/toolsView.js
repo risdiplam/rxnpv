@@ -266,13 +266,21 @@ function CompanyLookupTool({ cases, updateCase, activeCase, onWatchTrial }) {
   const [insiderLoading, setInsiderLoading] = React.useState(false);
   const isDesktop = typeof window !== "undefined" && window.electronAPI && window.electronAPI.isDesktop;
 
+  // Without these, correcting a search mid-flight ("Moderna" -> "Merck") let
+  // whichever response happened to land last win, so the screen could show one
+  // company's data under another company's name with nothing to indicate it.
+  const searchSeq = React.useRef(0);
+  const compSeq = React.useRef(0);
+
   const search = async () => {
     if (!query.trim()) return;
+    const myReq = ++searchSeq.current;
     setLoading(true); setEdgarError(null); setTrialsError(null); setEdgarResult(null); setTrialsResult(null); setExportMsg(null);
     const [edgarR, trialsR] = await Promise.all([
       isDesktop ? pullEdgarFinancials(query.trim(), false) : Promise.resolve({ ok: false, error: "EDGAR requires the desktop app." }),
       searchTrialsBySponsor(query.trim(), 20)
     ]);
+    if (myReq !== searchSeq.current) return; // a newer search is already in flight
     if (edgarR.ok) setEdgarResult(edgarR); else setEdgarError(edgarR.error);
     if (trialsR.ok) setTrialsResult(trialsR); else setTrialsError(trialsR.error);
     setLoading(false);
@@ -280,10 +288,13 @@ function CompanyLookupTool({ cases, updateCase, activeCase, onWatchTrial }) {
 
   const searchCompetitors = async () => {
     if (!condQuery.trim()) { setCompetitorsError("Enter an indication or condition."); return; }
+    const myReq = ++compSeq.current;
     setCompetitorsLoading(true); setCompetitorsError(null);
     const r = await searchCompetitorLandscape(condQuery.trim(), null, 15);
+    if (myReq !== compSeq.current) return;
     if (!r.ok) { setCompetitorsError(r.error); setCompetitors(null); setCompetitorsLoading(false); return; }
     if (isDesktop) { try { r.studies = await enrichSponsorsWithPublicStatus(r.studies); } catch (e) {} }
+    if (myReq !== compSeq.current) return; // enrichment is a second await point
     setCompetitors(r);
     setCompetitorsLoading(false);
   };
@@ -365,7 +376,13 @@ function CompanyLookupTool({ cases, updateCase, activeCase, onWatchTrial }) {
         insiderResult && h("div", { style: { padding: "10px 14px", borderRadius: 8, background: "var(--surface-2)", marginTop: 6 } },
           h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", fontWeight: 700, color: "var(--ink-2)", marginBottom: 6 } },
             "Insider transactions (" + insiderResult.transactions.length + " from last " + insiderResult.filingsChecked + " Form 4 filings)"),
-          insiderResult.transactions.length === 0 && h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-3)" } }, "No transactions found in the filings checked."),
+          // Worded carefully: this tool only parses NON-derivative Form 4
+          // activity (direct buys and sells). Option grants and RSU vesting
+          // are filed as derivative transactions and are not read at all, so a
+          // bare "no transactions found" could mean a CEO's large option grant
+          // happened the same week and simply isn't shown.
+          insiderResult.transactions.length === 0 && h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-3)", lineHeight: 1.6 } },
+            "No direct buy/sell transactions in the filings checked. Note this covers non-derivative Form 4 activity only — option grants and RSU vesting aren't parsed yet, so they wouldn't appear here even if they happened."),
           h("div", { style: { display: "flex", flexDirection: "column", gap: 6, maxHeight: 340, overflowY: "auto" } },
             insiderResult.transactions.map((t, i) => h("div", { key: i, style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-2)", padding: "6px 0", borderBottom: "1px solid var(--rule)" } },
               h("div", { style: { display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" } },
@@ -1557,26 +1574,38 @@ function CatalystCalendarTool({ cases, updateCase, activeCase }) {
   const [recentFilings, setRecentFilings] = React.useState(null);
   const [catalystFilings, setCatalystFilings] = React.useState(null);
   const [error, setError] = React.useState(null);
+  const reqSeq = React.useRef(0);
   const isDesktop = typeof window !== "undefined" && window.electronAPI && window.electronAPI.isDesktop;
 
   const toggleCase = (id) => setSelectedIds(prev => { const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next; });
 
   const pullEvents = async () => {
+    const myReq = ++reqSeq.current;
     setLoading(true); setError(null); setUpcomingEvents(null); setRecentFilings(null); setCatalystFilings(null);
     const selectedCases = cases.filter(c => selectedIds.has(c.id));
     const today = new Date();
+    // Per-source failure counts. Every one of these used to be dropped on the
+    // floor, so a total outage produced "No future-dated trial completion
+    // estimates found" — visually identical to a genuinely quiet calendar.
+    let ctTried = 0, ctFailed = 0, edgarTried = 0, edgarFailed = 0;
 
     // CT.gov: upcoming trial completion estimates, per program
     const trialPromises = [];
     selectedCases.forEach(c => c.programs.forEach(p => {
       if (p.drugName && p.drugName.trim()) {
-        trialPromises.push(searchTrialsForDrug(p.drugName, 5).then(r => ({ caseName: c.name, progName: p.drugName, result: r })));
+        ctTried++;
+        trialPromises.push(
+          searchTrialsForDrug(p.drugName, 5)
+            .then(r => ({ caseName: c.name, progName: p.drugName, result: r }))
+            .catch(e => ({ caseName: c.name, progName: p.drugName, result: { ok: false, error: e && e.message } }))
+        );
       }
     }));
     const trialResults = await Promise.all(trialPromises);
+    if (myReq !== reqSeq.current) return; // superseded by a newer pull
     const events = [];
     trialResults.forEach(({ caseName, progName, result }) => {
-      if (!result.ok) return;
+      if (!result.ok) { ctFailed++; return; }
       result.studies.forEach(s => {
         const dateStr = s.primaryCompletionDate || s.completionDate;
         if (!dateStr) return;
@@ -1590,13 +1619,19 @@ function CatalystCalendarTool({ cases, updateCase, activeCase }) {
 
     // EDGAR: recent filings + catalyst-keyword full-text search, per case (desktop only)
     if (isDesktop) {
-      const filingPromises = selectedCases.filter(c => c.ticker || c.name).map(c =>
-        pullEdgarFinancials(c.ticker || c.name, false).then(r => ({ caseName: c.name, result: r }))
-      );
+      const filingPromises = selectedCases.filter(c => c.ticker || c.name).map(c => {
+        edgarTried++;
+        return pullEdgarFinancials(c.ticker || c.name, false)
+          .then(r => ({ caseName: c.name, result: r }))
+          .catch(e => ({ caseName: c.name, result: { ok: false, error: e && e.message } }));
+      });
       const filingResults = await Promise.all(filingPromises);
+      if (myReq !== reqSeq.current) return;
       const filings = [];
       filingResults.forEach(({ caseName, result }) => {
-        if (!result.ok) return;
+        // Only a reachability failure counts against us here — a company that
+        // genuinely has no CIK is a real answer, not an outage.
+        if (!result.ok) { if (result.unreachable) edgarFailed++; return; }
         (result.recentFilings || []).forEach(f => filings.push({ caseName, ...f }));
       });
       filings.sort((a, b) => new Date(b.date) - new Date(a.date));
@@ -1610,15 +1645,30 @@ function CatalystCalendarTool({ cases, updateCase, activeCase }) {
           const cikInfo = await findCIK(c.ticker || c.name);
           if (!cikInfo || !cikInfo.cik) return { caseName: c.name, hits: [] };
           const r = await searchCatalystFilings(cikInfo.cik, 12);
-          return { caseName: c.name, hits: r.ok ? r.hits : [] };
-        } catch (e) { return { caseName: c.name, hits: [] }; }
+          return { caseName: c.name, hits: r.ok ? r.hits : [], failed: !r.ok };
+        } catch (e) { return { caseName: c.name, hits: [], failed: true }; }
       });
       const catalystResults = await Promise.all(catalystPromises);
+      if (myReq !== reqSeq.current) return;
       const catalystHits = [];
-      catalystResults.forEach(({ caseName, hits }) => hits.forEach(h => catalystHits.push({ caseName, ...h })));
+      catalystResults.forEach(({ caseName, hits, failed }) => {
+        if (failed) edgarFailed++;
+        hits.forEach(h => catalystHits.push({ caseName, ...h }));
+      });
       catalystHits.sort((a, b) => new Date(b.fileDate) - new Date(a.fileDate));
       setCatalystFilings(catalystHits);
     }
+
+    // Say so when the empty result below is actually a failed lookup. Without
+    // this, an outage and a genuinely quiet calendar render identically.
+    const parts = [];
+    if (ctTried && ctFailed) parts.push(ctFailed === ctTried
+      ? "none of the " + ctTried + " ClinicalTrials.gov lookups succeeded"
+      : ctFailed + " of " + ctTried + " ClinicalTrials.gov lookups failed");
+    if (edgarTried && edgarFailed) parts.push(edgarFailed >= edgarTried
+      ? "SEC EDGAR could not be reached"
+      : "some SEC EDGAR lookups failed");
+    if (parts.length) setError("Incomplete results — " + parts.join(", ") + ". Anything missing below may be a connection problem rather than a genuinely empty calendar.");
 
     setLoading(false);
   };
@@ -1711,27 +1761,48 @@ function FdaLookupTool() {
   const [label, setLabel] = React.useState(null);
   const [adverseEvents, setAdverseEvents] = React.useState(null);
   const [searched, setSearched] = React.useState(false);
+  const [error, setError] = React.useState(null);
+  // Guards against an earlier, slower search overwriting a newer one: search
+  // "Keytruda", correct yourself to "Opdivo", and whichever response happened
+  // to land last used to win regardless of which you actually asked for.
+  const reqSeq = React.useRef(0);
 
   const search = async () => {
     const name = drugName.trim();
     if (!name) return;
-    setLoading(true); setSearched(true);
+    const myReq = ++reqSeq.current;
+    setLoading(true); setSearched(true); setError(null);
     setApproval(null); setLabel(null); setAdverseEvents(null);
     const [approvalR, labelR, aeR] = await Promise.allSettled([
       fetchApprovalHistory(name),
       fetchDrugLabel(name),
       fetchAdverseEventSummary(name, { limit: 25 })
     ]);
+    if (myReq !== reqSeq.current) return; // a newer search has already started
     if (approvalR.status === "fulfilled") setApproval(approvalR.value);
     if (labelR.status === "fulfilled") setLabel(labelR.value);
     if (aeR.status === "fulfilled") setAdverseEvents(aeR.value);
+    // Every one of these throws on a real failure rather than returning a
+    // falsy result, and only the fulfilled branch was ever read — so an
+    // openFDA outage left all three null and rendered the identical "no data
+    // found" message a genuinely unknown drug gets. For an investing tool
+    // that is a meaningful difference: "this drug has no FDA record" and "we
+    // could not reach the FDA" should never look the same.
+    const failures = [approvalR, labelR, aeR].filter(x => x.status === "rejected");
+    if (failures.length) {
+      const detail = (failures[0].reason && failures[0].reason.message) || "request failed";
+      setError(failures.length === 3
+        ? "Couldn't reach openFDA — " + detail + ". This is a connection problem, not a result: try again in a moment."
+        : "Partial result — " + failures.length + " of 3 openFDA queries failed (" + detail + "). What's shown below is incomplete.");
+    }
     setLoading(false);
   };
 
   const hasApproval = approval && approval.matches;
   const hasLabel = label && label.found;
   const hasAE = adverseEvents && adverseEvents.topReportedReactions.length > 0;
-  const noResults = searched && !loading && !hasApproval && !hasLabel && !hasAE;
+  // Only a genuine zero-result response counts as "not found" — never a failure.
+  const noResults = searched && !loading && !error && !hasApproval && !hasLabel && !hasAE;
 
   return h("div", null,
     toolCard(h, [
@@ -1747,6 +1818,8 @@ function FdaLookupTool() {
         }, loading ? "Searching…" : "Search openFDA")
       )
     ]),
+
+    error && toolCard(h, h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--amber)", lineHeight: 1.6 } }, error)),
 
     noResults && toolCard(h, h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-3)" } }, "No openFDA data found for that name. Try the exact brand or generic name.")),
 
@@ -1812,12 +1885,19 @@ function TrialWatchTool({ initialNctId, onConsumedInitialNctId }) {
   const [ctSummary, setCtSummary] = React.useState(null);
   const [ctError, setCtError] = React.useState(null);
 
+  // Same out-of-order-response guard as Company Lookup: a slower earlier
+  // search must not overwrite the results of a newer one.
+  const compsSeq = React.useRef(0);
+
   const searchComps = async () => {
+    const myReq = ++compsSeq.current;
     setCtLoading(true); setCtError(null); setCtSummary(null);
     try {
       const summary = await fetchHistoricalComps(ctCondition, ctPhase, { intervention: ctIntervention.trim() || undefined, pageSize: 100 });
+      if (myReq !== compsSeq.current) return;
       setCtSummary(summary);
     } catch (e) {
+      if (myReq !== compsSeq.current) return;
       setCtError("ClinicalTrials.gov request failed: " + e.message);
     }
     setCtLoading(false);
@@ -1831,11 +1911,15 @@ function TrialWatchTool({ initialNctId, onConsumedInitialNctId }) {
 
   const refreshWatchlist = () => setWatchlist(listWatchedTrials());
 
+  const checkSeq = React.useRef(0);
+
   const check = async (nctId) => {
     const id = (nctId || nctInput).trim();
     if (!id) return;
+    const myReq = ++checkSeq.current;
     setChecking(true); setError(null); setResult(null);
     const r = await checkTrialForChanges(id);
+    if (myReq !== checkSeq.current) return; // a newer check has superseded this
     if (r.ok) { setResult({ ...r, nctId: id.toUpperCase() }); refreshWatchlist(); } else { setError(r.error); }
     setChecking(false);
   };

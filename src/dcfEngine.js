@@ -19,15 +19,47 @@
 // it occupies before launch. Returns an array of length launchYearOffset
 // (index 0 = the first pre-launch year), in dollars (not $M).
 function distributeRnDCostByYear(riskAdjItems, launchYearOffset) {
-  const years = Math.max(0, Math.round(launchYearOffset));
+  const requested = Math.max(0, Math.round(launchYearOffset));
+  if (!riskAdjItems.length) return new Array(requested).fill(0);
+
+  // A program can still carry real remaining R&D cost while the user has typed
+  // a launch year of 0 — which the field's own placeholder text explicitly
+  // invites for "launches immediately". That used to hit an early return
+  // before any allocation ran, so the entire remaining R&D spend dropped out
+  // of the cash-flow calendar with no warning and NPV was overstated by its
+  // full value. Cost that exists has to land somewhere: give it the current
+  // year at minimum.
+  const years = Math.max(1, requested);
   const out = new Array(years).fill(0);
-  if (!riskAdjItems.length) return out;
   const totalCost = riskAdjItems.reduce((s, i) => s + i.riskAdjCostM, 0) * 1e6;
-  if (!years) return out; // nothing to distribute into — caller should ensure launchYearOffset > 0 if there's R&D cost
+
+  // The R&D breakdown and the launch-year field are set independently of each
+  // other — nothing keeps them in sync — so the stage timeline can run well
+  // past the launch window (a Phase 2 program with an 8-year remaining
+  // timeline against a typed launch year of 2). Distributing on the raw
+  // timeline left every later stage with no overlap at all, and the shortfall
+  // recovery below then dumped its entire cost into one year. Total dollars
+  // survived that, but a DCF discounts each year separately, so the present
+  // value and the cash-flow shape were both wrong. Compressing preserves each
+  // stage's relative share and ordering, which is what the typed launch year
+  // actually implies: if launch really is that soon, the same work has to fit
+  // into the time available.
+  const timelineYears = riskAdjItems.reduce((s, i) => s + i.years, 0);
+  const squeeze = timelineYears > years ? years / timelineYears : 1;
+
   let cursor = 0, allocated = 0;
   riskAdjItems.forEach(it => {
-    const start = cursor, end = cursor + it.years;
-    const costPerYear = (it.riskAdjCostM * 1e6) / it.years;
+    const cost = it.riskAdjCostM * 1e6;
+    const span = it.years * squeeze;
+    if (!(span > 0)) {
+      // A zero-duration stage would divide by zero; bill it to the year it
+      // starts in instead of producing Infinity.
+      const y = Math.min(years - 1, Math.max(0, Math.floor(cursor)));
+      out[y] += cost; allocated += cost;
+      return;
+    }
+    const start = cursor, end = cursor + span;
+    const costPerYear = cost / span;
     for (let y = 0; y < years; y++) {
       const overlap = Math.max(0, Math.min(end, y + 1) - Math.max(start, y));
       if (overlap > 0) { out[y] += costPerYear * overlap; allocated += costPerYear * overlap; }
