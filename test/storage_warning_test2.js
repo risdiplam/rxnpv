@@ -1,0 +1,56 @@
+const { JSDOM } = require("jsdom");
+const html = require("fs").readFileSync("test_desktop.html","utf8");
+const errors=[];
+const dom = new JSDOM(html,{runScripts:"dangerously",pretendToBeVisual:true,url:"https://localhost/",
+  beforeParse(w){w.matchMedia=()=>({matches:false,addEventListener(){},removeEventListener(){}});
+  w.console.warn=()=>{};w.console.error=(...a)=>errors.push("ERROR: "+a.join(" ").slice(0,250));
+  w.addEventListener("error",e=>errors.push("UNCAUGHT: "+(e.error&&e.error.stack||e.message).slice(0,350)));
+  w.fetch=async()=>({ok:false,status:404});
+  }});
+function wait(ms){return new Promise(r=>setTimeout(r,ms));}
+function findLeafInput(container, labelText) {
+  const labelDiv = [...container.querySelectorAll("div")].find(dv => dv.children.length === 0 && dv.textContent.trim().replace(" *","") === labelText);
+  return labelDiv ? labelDiv.nextElementSibling : null;
+}
+(async()=>{
+  const w=dom.window,d=w.document;await wait(1500);
+  const root=d.getElementById("root");
+  const click=(el)=>el&&el.dispatchEvent(new w.MouseEvent("click",{bubbles:true}));
+  const btn=(t)=>[...d.querySelectorAll("button")].find(b=>b.textContent.trim()===t);
+  const setVal=(el,v)=>{const s=Object.getOwnPropertyDescriptor(w.HTMLInputElement.prototype,"value").set;s.call(el,v);el.dispatchEvent(new w.Event("input",{bubbles:true}));};
+
+  console.log("saveCustomComps is a global function:", typeof w.saveCustomComps);
+
+  click(btn("+ New case")); await wait(400);
+  click(btn("Tools")); await wait(400);
+  click([...d.querySelectorAll("button")].find(b=>b.textContent.trim()==="Licensing Comps")); await wait(400);
+
+  // Override MY OWN global function directly, not the native Storage API
+  w.saveCustomComps = () => false;
+
+  click(btn("+ Add custom deal")); await wait(300);
+  const form = d;
+  setVal(findLeafInput(form,"Licensor"),"Test Co");
+  setVal(findLeafInput(form,"Licensee"),"Test Pharma");
+  await wait(200);
+  click(btn("Add")); await wait(400);
+
+  let t = root.textContent;
+  console.log("Entry still appears in UI:", t.includes("Test Co"));
+  console.log("Warning now shown:", t.includes("Couldn't save that"));
+
+  console.log("\n=== Restore, add another, confirm warning clears ===");
+  w.saveCustomComps = (key, arr) => { try { w.localStorage.setItem(key, JSON.stringify(arr)); return true; } catch(e) { return false; } };
+  click(btn("+ Add custom deal")); await wait(300);
+  setVal(findLeafInput(form,"Licensor"),"Second Co");
+  setVal(findLeafInput(form,"Licensee"),"Second Pharma");
+  await wait(200);
+  click(btn("Add")); await wait(400);
+  t = root.textContent;
+  console.log("Warning cleared:", !t.includes("Couldn't save that"));
+  console.log("Second entry saved:", t.includes("Second Co"));
+
+  console.log("\nErrors:", errors.length);
+  [...new Set(errors)].forEach(e=>console.log("  "+e));
+  process.exit(0);
+})();

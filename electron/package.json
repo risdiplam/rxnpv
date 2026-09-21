@@ -1,0 +1,35 @@
+{
+  "name": "rxnpv",
+  "version": "1.0.0",
+  "description": "RxNPV biotech valuation sandbox",
+  "author": "RxNPV",
+  "main": "main.js",
+  "scripts": {
+    "build": "electron-builder --mac --arm64"
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.0.0"
+  },
+  "build": {
+    "appId": "com.rxnpv.app",
+    "productName": "RxNPV",
+    "icon": "icon.icns",
+    "files": [
+      "main.js",
+      "preload.js",
+      "rxnpv.html"
+    ],
+    "mac": {
+      "target": [
+        {
+          "target": "zip",
+          "arch": [
+            "arm64"
+          ]
+        }
+      ],
+      "category": "public.app-category.finance"
+    }
+  }
+}
