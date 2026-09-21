@@ -161,6 +161,7 @@ function ReferenceSheet({ activeCase }) {
     card([
       label("Exact published curve for any ramp length (3-10yr)"),
       h("select", {
+        "aria-label": "Ramp length in years",
         value: rampYears, onChange: e => setRampYears(Number(e.target.value)),
         style: { padding: "6px 10px", borderRadius: 6, border: "1px solid var(--rule)", background: "var(--surface)", color: "var(--ink-1)", fontFamily: "var(--mono)", fontSize: 12, marginBottom: 12 }
       }, [3,4,5,6,7,8,9,10].map(n => h("option", { key: n, value: n }, n + "-year ramp"))),

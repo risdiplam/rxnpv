@@ -198,7 +198,7 @@ function MaPremiumTool({ cases, updateCase, activeCase }) {
       ),
       h("div", { style: { marginBottom: 4 } },
         h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-2)", marginBottom: 5 } }, "Or use a specific deal's premium"),
-        h("select", { value: selectedDealIdx, onChange: e => useDealPremium(e.target.value),
+        h("select", { "aria-label": "Or use a specific deal's premium", value: selectedDealIdx, onChange: e => useDealPremium(e.target.value),
           style: { width: "100%", padding: "6px 10px", borderRadius: 6, border: "1.5px solid var(--rule)", background: "var(--surface)", color: "var(--ink-1)", fontFamily: "var(--mono)", fontSize: 12 } },
           h("option", { value: "" }, "— pick a comparable deal —"),
           dealsWithPremium.map((d, i) => h("option", { key: i, value: i }, d.acquirer + " → " + d.target + " (" + d.premiumPct + "%, " + d.area + ")"))
@@ -404,7 +404,10 @@ function CompanyLookupTool({ cases, updateCase, activeCase, onWatchTrial }) {
             h("div", { style: { display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" } },
               h("span", { style: { color: "var(--ink-1)" } }, s.nctId + " · " + s.phase + " · " + s.status),
               s.hasResults && h(ExternalLink, { href: "https://clinicaltrials.gov/study/" + s.nctId + "?tab=results", style: { fontSize: 9, color: "var(--teal)", fontWeight: 700 } }, "✓ Results posted →"),
-              onWatchTrial && h("span", { onClick: () => onWatchTrial(s.nctId), style: { fontSize: 9, color: "var(--ink-3)", cursor: "pointer", textDecoration: "underline" } }, "Watch this trial →")),
+              onWatchTrial && h("span", { onClick: () => onWatchTrial(s.nctId),
+                role: "button", tabIndex: 0,
+                onKeyDown: (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onWatchTrial(s.nctId); } },
+                style: { fontSize: 9, color: "var(--ink-3)", cursor: "pointer", textDecoration: "underline" } }, "Watch this trial →")),
             h("div", null, (s.interventions[0] || s.title) + " — " + (s.conditions[0] || ""))
           ))
         )
@@ -990,7 +993,7 @@ function BinaryEventTool({ cases, activeCase }) {
         "Given what it's worth if the trial works, what it's worth if it doesn't, and today's price, the probability the market is pricing follows exactly. The useful output is the gap between that and your own estimate."),
       h("div", { style: { display: "flex", gap: 8, alignItems: "center", marginBottom: 12 } },
         h("span", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)" } }, "Values are:"),
-        h("select", { value: unit, onChange: e => setUnit(e.target.value),
+        h("select", { "aria-label": "Value units", value: unit, onChange: e => setUnit(e.target.value),
           style: { padding: "6px 10px", borderRadius: 6, border: "1.5px solid var(--rule)", background: "var(--surface)", color: "var(--ink-1)", fontFamily: "var(--mono)", fontSize: 12 } },
           h("option", { value: "perShare" }, "per share"),
           h("option", { value: "marketCap" }, "market cap ($M)"))
@@ -1304,7 +1307,7 @@ function PeakSalesCompsTool({ cases, updateCase, activeCase }) {
         h("span", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)" } }, "Export target:"),
         h(CasePicker, { cases, selectedId: exportCaseId, onChange: id => { setExportCaseId(id); setExportMsg(null); } }),
         exportCase && h(IncludeInReportToggle, { theCase: exportCase, updateCase, reportKey: "peakSalesComps", label: "Include comp chart in PDF report" }),
-        exportCase && h("select", { value: exportProgramId, onChange: e => setExportProgramId(e.target.value),
+        exportCase && h("select", { "aria-label": "Program to export to", value: exportProgramId, onChange: e => setExportProgramId(e.target.value),
           style: { padding: "6px 10px", borderRadius: 6, border: "1.5px solid var(--rule)", background: "var(--surface)", color: "var(--ink-1)", fontFamily: "var(--mono)", fontSize: 12 } },
           exportCase.programs.map(p => h("option", { key: p.id, value: p.id }, p.drugName || p.name))
         )
@@ -1477,7 +1480,7 @@ function LicensingCompsTool({ cases, updateCase, activeCase }) {
 
       h("div", { style: { display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 14 } },
         h(CasePicker, { cases, selectedId: exportCaseId, onChange: setExportCaseId }),
-        exportCase && exportCase.programs.length > 0 && h("select", { value: exportProgramId, onChange: e => setExportProgramId(e.target.value),
+        exportCase && exportCase.programs.length > 0 && h("select", { "aria-label": "Program to export to", value: exportProgramId, onChange: e => setExportProgramId(e.target.value),
           style: { padding: "6px 10px", borderRadius: 6, border: "1.5px solid var(--rule)", background: "var(--surface)", color: "var(--ink-1)", fontFamily: "var(--mono)", fontSize: 12 } },
           exportCase.programs.map(p => h("option", { key: p.id, value: p.id }, p.drugName || p.name))),
         exportMsg && h("span", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--teal)" } }, exportMsg)
@@ -1982,7 +1985,10 @@ function TrialWatchTool({ initialNctId, onConsumedInitialNctId }) {
                 h("span", { style: { color: "var(--ink-1)" } }, (s.nctId || "—") + " · " + (s.phase || "—") + " · " + (s.status || "—")),
                 s.hasResults && h(ExternalLink, { href: "https://clinicaltrials.gov/study/" + s.nctId + "?tab=results", style: { fontSize: 9, color: "var(--teal)", fontWeight: 700 } }, "✓ Results posted →"),
                 s.nctId && h(ExternalLink, { href: "https://clinicaltrials.gov/study/" + s.nctId, style: { fontSize: 9 } }, "→ View on ClinicalTrials.gov"),
-                s.nctId && h("span", { onClick: () => { setNctInput(s.nctId); check(s.nctId); }, style: { fontSize: 9, color: "var(--ink-3)", cursor: "pointer", textDecoration: "underline" } }, "Watch this trial →")
+                s.nctId && h("span", { onClick: () => { setNctInput(s.nctId); check(s.nctId); },
+                  role: "button", tabIndex: 0,
+                  onKeyDown: (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setNctInput(s.nctId); check(s.nctId); } },
+                  style: { fontSize: 9, color: "var(--ink-3)", cursor: "pointer", textDecoration: "underline" } }, "Watch this trial →")
               ),
               h("div", null, (s.title || "untitled") + (s.sponsor ? " — " + s.sponsor : "") + (s.enrollment ? " · n=" + s.enrollment : ""))
             ))

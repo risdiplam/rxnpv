@@ -187,7 +187,7 @@ function PinToReportButton({ targetRef, title, source, note, cases, updateCase, 
         background: "transparent", color: busy ? "var(--teal)" : "var(--ink-3)",
         fontFamily: "var(--mono)", fontSize: compact ? 9 : 10, cursor: busy ? "default" : "pointer" } },
       busy ? "…" : "📌 Pin to report"),
-    list.length > 1 && h("select", { value: caseId, onChange: e => setCaseId(e.target.value),
+    list.length > 1 && h("select", { "aria-label": "Case to pin this result to", value: caseId, onChange: e => setCaseId(e.target.value),
       style: { padding: "3px 6px", borderRadius: 5, border: "1px solid var(--rule)", background: "var(--surface)", color: "var(--ink-3)", fontFamily: "var(--mono)", fontSize: 9 } },
       list.map(c => h("option", { key: c.id, value: c.id }, c.name || "Untitled"))),
     msg && h("span", { style: { fontSize: 9, fontFamily: "var(--mono)", color: msg.tone === "ok" ? "var(--teal)" : "var(--red)" } }, msg.text)
@@ -294,6 +294,11 @@ function ConfirmXButton({ onConfirm, title, label, armedLabel, style }) {
   return h("button", {
     title: armed ? "Click again to confirm — or press Escape to cancel" : (title || "Delete"),
     "aria-label": armed ? "Confirm delete" : (title || "Delete"),
+    // The armed state is conveyed only by the accessible name changing in
+    // place. Most screen readers re-announce that for a focused element, but
+    // it isn't guaranteed the way a live region is — and "this click deletes
+    // something" is exactly the state worth guaranteeing.
+    "aria-live": "polite",
     onClick: (e) => { e.stopPropagation(); if (armed) { setArmed(false); onConfirm(); } else setArmed(true); },
     style: Object.assign(base, style || {})
   }, armed ? (armedLabel || "Sure?") : (label || "×"));
@@ -301,10 +306,30 @@ function ConfirmXButton({ onConfirm, title, label, armedLabel, style }) {
 
 function ConfirmDialog({ title, message, confirmLabel, onConfirm, onCancel }) {
   const h = React.createElement;
+  const panelRef = React.useRef(null);
   React.useEffect(() => {
-    const onKey = (e) => { if (e.key === "Escape") onCancel(); };
+    // Remember where focus came from so it can go back — otherwise closing the
+    // dialog drops focus onto <body> and a keyboard user has to tab in from
+    // the top of the page to get back to where they were.
+    const opener = typeof document !== "undefined" ? document.activeElement : null;
+    const onKey = (e) => {
+      if (e.key === "Escape") { onCancel(); return; }
+      // Without containment, Tab walks straight out of the dialog and into the
+      // editor behind the dimmed overlay — a keyboard user can start editing
+      // fields they can't see while a delete confirmation is still open.
+      if (e.key !== "Tab" || !panelRef.current) return;
+      const focusable = panelRef.current.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+      if (!focusable.length) return;
+      const first = focusable[0], last = focusable[focusable.length - 1];
+      const active = document.activeElement;
+      if (e.shiftKey && (active === first || !panelRef.current.contains(active))) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && (active === last || !panelRef.current.contains(active))) { e.preventDefault(); first.focus(); }
+    };
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      if (opener && typeof opener.focus === "function") { try { opener.focus(); } catch (e) {} }
+    };
   }, [onCancel]);
 
   return h("div", {
@@ -312,6 +337,8 @@ function ConfirmDialog({ title, message, confirmLabel, onConfirm, onCancel }) {
     onClick: onCancel
   },
     h("div", {
+      ref: panelRef,
+      role: "dialog", "aria-modal": "true", "aria-label": title,
       style: { background: "var(--surface)", border: "1px solid var(--rule)", borderRadius: 10, padding: "22px 24px", width: "min(420px, 90vw)", boxShadow: "0 12px 40px rgba(0,0,0,0.35)" },
       onClick: e => e.stopPropagation()
     },
@@ -540,7 +567,7 @@ function MilestoneEntryForm({ onSave, onCancel, initialValues, saveLabel }) {
       h("div", null, h("div", { style: fieldLabelStyle }, "Milestone *"),
         h("input", { type: "text", value: label, placeholder: "e.g. Phase 3 initiation", onChange: e => setLabel(e.target.value), style: inputStyle })),
       h("div", null, h("div", { style: fieldLabelStyle }, "Paid on reaching"),
-        h("select", { value: gate, onChange: e => setGate(e.target.value), style: inputStyle },
+        h("select", { "aria-label": "Paid on reaching", value: gate, onChange: e => setGate(e.target.value), style: inputStyle },
           h("option", { value: "phase1" }, "Phase 1"),
           h("option", { value: "phase2" }, "Phase 2"),
           h("option", { value: "phase3" }, "Phase 3"),
@@ -579,7 +606,7 @@ function CalibrationEntryForm({ onSave, onCancel, initialValues, saveLabel }) {
       h("div", null, h("div", { style: fieldLabelStyle }, "Date"),
         h("input", { type: "text", value: catalystDate, placeholder: "e.g. 2026-Q4", onChange: e => setCatalystDate(e.target.value), style: inputStyle })),
       h("div", null, h("div", { style: fieldLabelStyle }, "Outcome"),
-        h("select", { value: outcome, onChange: e => setOutcome(e.target.value), style: inputStyle },
+        h("select", { "aria-label": "Outcome", value: outcome, onChange: e => setOutcome(e.target.value), style: inputStyle },
           h("option", { value: "pending" }, "Pending"),
           h("option", { value: "success" }, "Success"),
           h("option", { value: "failure" }, "Failure"))),
@@ -631,12 +658,12 @@ function EvidenceEntryForm({ onSave, onCancel, initialValues, saveLabel }) {
       h("div", null, h("div", { style: fieldLabelStyle }, "What this justifies *"),
         h("input", { type: "text", value: label, placeholder: "e.g. PoS override, peak share", onChange: e => setLabel(e.target.value), style: inputStyle })),
       h("div", null, h("div", { style: fieldLabelStyle }, "Classification"),
-        h("select", { value: classification, onChange: e => setClassification(e.target.value), style: inputStyle },
+        h("select", { "aria-label": "Classification", value: classification, onChange: e => setClassification(e.target.value), style: inputStyle },
           h("option", { value: "fact" }, "Fact"),
           h("option", { value: "inference" }, "Inference"),
           h("option", { value: "speculation" }, "Speculation"))),
       h("div", null, h("div", { style: fieldLabelStyle }, "Confidence"),
-        h("select", { value: confidence, onChange: e => setConfidence(e.target.value), style: inputStyle },
+        h("select", { "aria-label": "Confidence", value: confidence, onChange: e => setConfidence(e.target.value), style: inputStyle },
           h("option", { value: "high" }, "High"),
           h("option", { value: "moderate" }, "Moderate"),
           h("option", { value: "low" }, "Low"))),
