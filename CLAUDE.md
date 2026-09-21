@@ -12,7 +12,7 @@ macOS (Apple Silicon / arm64) only. Not tested on Intel. Not signed or notarized
 
 ## Standing instruction: push to GitHub continuously, not in batches
 
-This repo previously lived only on the user's local machine for the entire build history, under an earlier project name tied to a pseudonym the user has since moved away from. That entire history was deliberately squashed into a single clean commit and force-pushed as a fresh start when the repo went public under the user's real GitHub account (`risdiplam`) — see the bottom of `docs/RxNPV_External_Suggestions_Tracker.md` for the full account of that rename and scrub.
+This repo previously lived only on the user's local machine for the entire build history, under an earlier project name tied to a pseudonym the user has since moved away from. That entire history was deliberately squashed into a single clean commit (old commit objects actually garbage-collected locally, not just superseded by a new branch) and pushed as a fresh start into a brand-new empty GitHub repo under the user's real account (`risdiplam`) — an ordinary push, not a force-push, since there was nothing on the remote yet to conflict with — see the bottom of `docs/RxNPV_External_Suggestions_Tracker.md` for the full account of that rename and scrub.
 
 The user has explicitly stated a standing preference, not a one-time request: **work continues to happen locally on this Mac (required — see "macOS only" above, this is a real Electron app that needs a real Mac to build/package/verify), but every meaningful unit of work gets committed and pushed to `github.com/risdiplam/rxnpv` before moving to the next thing.** The stated reason is a real, previously-articulated fear of catastrophic local data loss — losing the project entirely if something happens to this machine — and the fix is keeping GitHub continuously current rather than treating a push as an occasional, separate "let's back things up now" event.
 
@@ -33,7 +33,10 @@ Because there's no module system, every file relies on the global scope and on `
 ```bash
 node build.js              # reassemble only -> electron/rxnpv.html
 node build.js --package    # reassemble + full electron-builder package -> electron/dist/mac-arm64/RxNPV.app
+node build.js --install    # --package, then also copies the result into /Applications/RxNPV.app
 ```
+
+Quit the running app first if using `--install` — it overwrites the app bundle you're launching.
 
 `build.js` syntax-checks every source file individually before concatenating — a broken file gives a clear, isolated error here instead of an unreadable failure somewhere inside a 900KB combined blob.
 
@@ -47,7 +50,7 @@ node build.js --package    # reassemble + full electron-builder package -> elect
 src/            32 source modules — see MODULE_ORDER in build.js for the authoritative list/order
 shell.html      HTML template with a __SCRIPT__ placeholder
 build.js        reassembles src/ into electron/rxnpv.html
-electron/       main.js, preload.js, package.json (electron-builder config), RDKit_minimal.js/.wasm
+electron/       main.js, preload.js, package.json (electron-builder config), icon.icns/icon.svg
 test/           jsdom-based functional tests — see test/README.md, read it before trusting what these do and don't verify
 docs/           design-decision history and feature documentation — see below
 ```
@@ -58,19 +61,25 @@ docs/           design-decision history and feature documentation — see below
 
 `docs/RxNPV_External_Suggestions_Tracker.md` is the authoritative, detailed build log — every feature, what was verified, and every bug found and fixed along the way, in the actual words used when each was built. Read it before assuming something is or isn't implemented. Summary:
 
-**Core engine:** bottoms-up rNPV valuation (Quick and Detailed/Full revenue modes), Bear/Base/Bull scenarios (customizable per case), two valuation methods (full DCF and Simple Multiple), PRV, capital structure/dilution bridge, Partnership Economics (royalty/milestone/upfront/cost-sharing overlay), Dilution-Path Financing (projects future raises from cash runway), full-case Monte Carlo (3,000-trial fair-value distribution).
+**Core engine:** bottoms-up rNPV valuation (Quick and Detailed/Full revenue modes, with mode-appropriate input gating — Simple Multiple hides/marks the DCF-only inputs it never reads, rather than showing controls that silently do nothing), Bear/Base/Bull scenarios (customizable per case), two valuation methods (full DCF and Simple Multiple, with a one-click "Napkin" / "Full model" preset pairing revenue mode + valuation method to the two coherent combinations), PRV, capital structure/dilution bridge (including Dilution-Path Financing correctly composing with a manually configured future raise — the two used to silently conflict), Partnership Economics (royalty/milestone/upfront/cost-sharing overlay), full-case Monte Carlo (3,000-trial fair-value distribution).
 
-**Workspace tools:** Evidence Log, structured red-flag checks, Reverse-Solve (implied peak revenue/share/timing), Calibration Log with Brier scoring, Receptor Occupancy Bridge.
+**Workspace tools:** Evidence Log, structured red-flag checks (including a stage-aware warning when a Simple Multiple pulled from post-approval M&A comps is applied to a pre-approval program), Reverse-Solve (implied peak revenue/share/timing), Calibration Log with Brier scoring, Runway vs. Catalyst crossover (does the case's own modeled runway actually reach its next dated catalyst, or does it force a raise first).
 
-**Top-level views:** Workspace, Reference Sheet (8 tabs, "How This Works" guide plus benchmarks), Tools (9 tabs, grouped into Benchmarks / Your Case / Live Research), Simulation (6 tabs — Trial Outcome/PoS assurance, Peak Sales Monte Carlo, PK/PD, Chemistry via RDKit WASM, Historical Comps, FDA Lookup), Portfolio (cross-case aggregation), Report (PDF-style export).
+**Top-level views:**
+- **Workspace** — the DCF/valuation sandbox itself.
+- **Reference Sheet** (8 tabs: How This Works, Revenue Build, Cost Structure, R&D & Timeline, Probability of Success, Discount Rate, Valuation & Dilution, M&A Comps) — every benchmark the app uses, sourced, with a comprehensive "How This Works" guide covering every feature across all five views, including export/pinning, storage protection, and delete safety.
+- **Tools** (13 tabs across 3 groups — *Benchmarks*: M&A Premium, Peak Sales Comps, Licensing Comps; *Your Case*: Diluted Market Cap, Cash Runway, Runway vs. Catalyst, Binary Event, Sensitivity; *Live Research*: Company Lookup, Catalyst Calendar, Trial Explorer, FDA Lookup, Exclusivity/LOE).
+- **Simulation** (6 top-level tabs: Trial Outcome/PoS assurance — including drawn survival curves for time-to-event endpoints, not just the hazard ratio number; Phase 2→3 Translator; Trial Statistics, itself 7 sub-tools — Fragility Index, Sample Size/Power, P-value↔CI, Single-Arm CI, 2×2 Outcome Analysis, Non-Inferiority, Multiplicity Adjustment; Meta-Analysis; Peak Sales Monte Carlo; PK/PD, which also carries a standalone Receptor Occupancy Calculator for when you already have a concentration in hand and don't need the full dosing simulation). Chemistry/RDKit was built, then removed entirely after the user judged it not worth keeping — no trace of it remains in `src/` or `electron/`, and it should not be treated as a gap to fill back in.
+- **Portfolio** — cross-case aggregation.
+- **Report** — PDF export with a section picker, now including a "Pinned Analyses" section: Simulation and Tools results are computed on demand and have no persistent model to re-render from, so results can be explicitly pinned (capturing the rendered panel) onto a case so they travel with that case's report.
 
-**Comps databases (all with custom add/edit/delete):** M&A (65 deals), Peak Sales (37 drugs), Licensing/royalty (11 deals) — all dated "as of August 2026," each entry multi-source-verified against primary filings/press releases, not a third-party tracker.
+**Comps databases (all with custom add/edit/delete):** M&A (75 deals), Peak Sales (38 drugs), Licensing/royalty (15 deals) — all dated "as of August 2026," each entry multi-source-verified against primary filings/press releases, not a third-party tracker. Counts drift upward over time as the user feeds in new research; check `data.js` directly rather than trust a specific number for long.
 
-**External data integrations:** SEC EDGAR (company financials, full-text search, Form 4 insider transactions), ClinicalTrials.gov (search + Trial Watch snapshot-and-diff), openFDA (approvals, labels, adverse events).
+**External data integrations, all live-verified against the real APIs (not just parsing logic checked against a fetched sample):** SEC EDGAR (company financials, full-text search, Form 4 insider transactions), ClinicalTrials.gov (search, competitor landscape, Trial Watch snapshot-and-diff, historical comps), openFDA (Drugs@FDA approval history, drug labels, FAERS adverse events, Orange Book patent/exclusivity data).
 
-**Cross-feature connections:** Partnership Economics → Licensing Comps, Company Lookup → Trial Watch, Peak Sales Monte Carlo → case export — all explicit, one-click, never automatic.
+**Cross-feature connections:** Partnership Economics → Licensing Comps, Company Lookup → Trial Watch, Peak Sales Monte Carlo → case export, any Simulation/Tools result → Pin to a case's PDF report — all explicit, one-click, never automatic.
 
-**Resilience:** two-layer error boundary (a crash in one view degrades gracefully instead of white-screening the whole app), storage-failure warnings on every custom-comp save path (a failed `localStorage` write used to fail silently and lose data with zero indication — fixed).
+**Resilience and data safety:** two-layer error boundary (a crash in one view degrades gracefully instead of white-screening the whole app — confirmed live, not just designed, when a real bug crashed one Tools view and the rest of the app kept working); every destructive action requires confirmation (a modal for deleting a whole case or program, an inline two-step "click again to confirm" for smaller removals like a custom comp or a log entry — nothing destructive fires on a single click); a proactive storage-headroom banner that warns before `localStorage` fills up, splitting usage into the user's own irreplaceable data versus disposable re-fetchable API caches, with a one-click way to clear just the caches; the EDGAR/CIK caches are byte-capped (not just entry-count-capped) so a single large API response can't crowd out the user's own saved cases.
 
 ## Deliberately not built — do not "fix" these as if they were oversights
 
@@ -87,15 +96,9 @@ If a future request seems to want one of these, say so plainly and ask before bu
 
 ## Known limitations — real gaps, not modesty
 
-- **Code signing / notarization never done.** This requires an Apple Developer account (the user's own) and macOS-native tools (`codesign`, `notarytool`) that were never available during chat-based development. **This is likely the highest-value thing Claude Code can newly do** — it runs on real macOS with real tools. Confirm with the user whether/when they want this before doing it; it has cost and account implications that aren't a code change.
-- **No feature has ever executed against a real, live external API call.** Every EDGAR/ClinicalTrials.gov/openFDA test in this entire project used mocked responses. The parsing logic for each was verified against real responses fetched via web search during development, but the actual `fetch()` calls inside the running app have never fired for real in a test. **Also newly possible on a real Mac** — run the packaged app and click through Company Lookup, Trial Watch, and FDA Lookup with a real company/trial for the first genuine end-to-end verification.
-- **Chemistry (RDKit WASM) has never been confirmed to actually execute.** The binary is confirmed byte-correct inside every packaged build; whether it successfully loads and analyzes a real SMILES string at runtime has never been verified — jsdom has no real WebAssembly runtime. Same story: verifiable now, wasn't before.
-- **A UI/UX pass has never been done.** All prior verification is functional (does it crash, does the right value appear) — never visual (does it look right, is it well-organized, is it intuitive). This is a real, acknowledged gap, not an oversight being hidden.
-- **The original 38-check core-engine regression suite did not survive a sandbox reset during development** and was never fully rebuilt — see `test/README.md`. `test/final_regression_pass.js` is a leaner replacement, not equivalent depth.
-
-## In-flight / proposed, not yet built
-
-- **Fragility Index** — proposed by the user, not yet built. A real, established clinical-trial statistic (Walsh et al. 2014): the minimum number of patients whose outcome would need to flip to turn a statistically significant trial result non-significant. Computable via Fisher's exact test on a 2×2 outcome table, iteratively flipping the minimum patients needed. Deliberately complementary to the existing Trial Outcome/PoS tab, not a duplicate — that tool is forward-looking (will a future trial succeed), this is backward-looking (how robust is a result that already read out). Current design lean: a clearly-separated section within the existing Trial Outcome tab rather than a new tab, but this was left as an open design question, not decided.
+- **Code signing / notarization never done.** This requires an Apple Developer account (the user's own) and macOS-native tools (`codesign`, `notarytool`). **This is likely the highest-value thing left to do** — it runs on real macOS with real tools, so it's genuinely possible now, unlike during the original chat-based build. Confirm with the user whether/when they want this before doing it; it has cost ($99/yr) and account implications that aren't a code change. As of the public-GitHub rename, still not done.
+- **The original 38-check core-engine regression suite from the earliest build sessions did not survive a sandbox reset** and was never reconstructed as such — but treat this as closed, not open: `test/math_verification.js` is not a "leaner replacement," it now independently verifies 568 hand-derived checks across the full engine (revenue build, cost chain, capital structure, every trial-statistics formula, chart axis logic, storage accounting), each checked against a value worked out longhand in its own comment rather than recorded from the app's own output. Read `test/README.md` for the exact scope/rules of what this suite does and doesn't claim.
+- **No formal accessibility audit** (screen reader support, keyboard-only navigation) has been done. Contrast has been checked rigorously (WCAG relative-luminance, both themes) but that is a different, narrower claim than full accessibility.
 
 ## Coding conventions actually followed throughout this build
 
@@ -107,4 +110,4 @@ If a future request seems to want one of these, say so plainly and ask before bu
 
 ## Where the rest of the documentation lives
 
-`docs/` contains the full design-decision history: `RxNPV_External_Suggestions_Tracker.md` (the authoritative build log, read this first of the docs), `RxNPV_Feature_Overview.md`, `RxNPV_Field_Reference.md`, `RxNPV_Human_Test_Checklist.md`, and the biotech-research-agent-system docs (a separate, related tool this user also uses — not part of this codebase, included for context only).
+`docs/` contains the full design-decision history: `RxNPV_External_Suggestions_Tracker.md` (the authoritative build log, read this first of the docs — 16 phases as of this writing, in the actual voice used when each was built, including the rename/history-scrub/GitHub-setup work), `RxNPV_Feature_Overview.md`, `RxNPV_Field_Reference.md`, `RxNPV_Human_Test_Checklist.md`, `RxNPV_Interaction_Request.md`, and the biotech-research-agent-system docs (`BiotechAgent.md` and others — a separate, related tool this user also uses for external research, not part of this codebase, included for context only since the Evidence Log and Field Reference are built to match its output format).
