@@ -1478,7 +1478,11 @@ function runPeakSales() {
     peakShare: readDistInput('share'),
     annualPriceUSD: readDistInput('price')
   };
-  const iterations = Math.max(1000, Math.round(numVal('peakIterations')));
+  // Math.max(1000, NaN) is NaN, not 1000 — a NaN operand poisons Math.max in
+  // JS, so a blank Iterations field used to hand a NaN trial count straight to
+  // the simulator, which then ran zero trials and rendered "$NaN".
+  const iterRaw = numVal('peakIterations');
+  const iterations = isFinite(iterRaw) ? Math.max(1000, Math.round(iterRaw)) : 10000;
   const result = runPeakSalesSimulation(inputs, iterations);
   const drivers = driverSensitivity(result);
 
@@ -1692,7 +1696,7 @@ function runPkpd() {
   resultsDiv.innerHTML = '';
   resultsDiv.appendChild(el('div', { class: 'headline' }, [
     el('span', { class: 'bignum' }, metrics.cMax.toFixed(2) + ' mg/L'),
-    el('span', { class: 'sublabel' }, `Cmax at t=${metrics.tMax.toFixed(2)}hr  \u2022  half-life ${halfLife(numVal('ke')).toFixed(2)}hr  \u2022  AUC (window) ${metrics.aucLastWindow.toFixed(1)} mg\u00B7hr/L`
+    el('span', { class: 'sublabel' }, `Cmax at t=${metrics.tMax.toFixed(2)}hr  \u2022  half-life ${formatHalfLife(numVal('ke'))}  \u2022  AUC (window) ${metrics.aucLastWindow.toFixed(1)} mg\u00B7hr/L`
       + (hasRO ? `  \u2022  receptor occupancy at Cmax ${receptorOccupancy(metrics.cMax, kd, roHill).toFixed(1)}%` : ''))
   ]));
   const concChart = renderLineChart([{ name: 'Concentration', color: 'var(--teal)', points: profile.map(p => ({ x: p.t, y: p.c })) }], {

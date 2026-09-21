@@ -8,7 +8,7 @@
 // distribution driven by which assumptions are shakiest.
 // ════════════════════════════════════════════════════════════════════════════
 
-const PEAK_STATS = (typeof module !== 'undefined' && module.exports) ? require('./statsEngine.js') : this;
+const PEAK_STATS = (typeof module !== 'undefined' && module.exports) ? require('./ts_statsEngine.js') : this;
 
 // input = { type: 'point', value } | { type: 'normal', mean, sd }
 //       | { type: 'uniform', low, high } | { type: 'triangular', low, mode, high }

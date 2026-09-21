@@ -6,7 +6,7 @@
 // being loaded first (plain-script concatenation, same as RxNPV).
 // ════════════════════════════════════════════════════════════════════════════
 
-const STATS = (typeof module !== 'undefined' && module.exports) ? require('./statsEngine.js') : this;
+const STATS = (typeof module !== 'undefined' && module.exports) ? require('./ts_statsEngine.js') : this;
 
 // ── Effect-size prior sampling ──────────────────────────────────────────────
 // prior = { type: 'point', value } or { type: 'normal', mean, sd }

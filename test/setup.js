@@ -1,8 +1,9 @@
 #!/usr/bin/env node
-// Generates test_desktop.html from the built electron/rxnpv.html by
-// substituting the CDN-hosted React <script src> tags for the local,
-// npm-installed React build — so the test scripts (which run entirely
-// through jsdom, with no network access) actually have React available.
+// Generates test_desktop.html from the built electron/rxnpv.html by inlining
+// the npm-installed React build in place of the app's own <script src> tags —
+// so the test scripts (which run entirely through jsdom, with no network
+// access and no path resolution relative to electron/) actually have React
+// available. The app itself vendors React locally under electron/vendor/.
 //
 // Run `node build.js` from the project root FIRST — this script reads
 // electron/rxnpv.html, which build.js produces.
@@ -53,14 +54,27 @@ const reactDom = fs.readFileSync(reactDomPath, 'utf8');
 // same issue for the full story).
 const escapeForInlineScript = (code) => code.replace(/<\/script/gi, '<\\/script');
 
+// These used to match the app's CDN <script src> tags. React is now vendored
+// locally (electron/vendor/), so the tags are relative paths instead — but the
+// substitution is still needed, because jsdom loads test_desktop.html from
+// test/, where "vendor/..." would not resolve. Inlining the npm-installed copy
+// keeps the tests hermetic either way, and also lets --dev swap in React's
+// development build, which the shipped app never uses.
 let out = html.replace(
-  /<script[^>]*src="https:\/\/unpkg\.com\/react@18[^"]*"[^>]*><\/script>/,
+  /<script[^>]*src="(?:[^"]*\/)?vendor\/react\.production\.min\.js"[^>]*><\/script>/,
   () => `<script>${escapeForInlineScript(react)}</script>`
 );
 out = out.replace(
-  /<script[^>]*src="https:\/\/unpkg\.com\/react-dom@18[^"]*"[^>]*><\/script>/,
+  /<script[^>]*src="(?:[^"]*\/)?vendor\/react-dom\.production\.min\.js"[^>]*><\/script>/,
   () => `<script>${escapeForInlineScript(reactDom)}</script>`
 );
+
+// A silent no-match here would produce a test_desktop.html with no React at
+// all, and every test would fail in a confusing way far from the cause.
+if (out.indexOf('ReactDOM') === -1 || /src="[^"]*vendor\/react/.test(out)) {
+  console.error('❌ React <script> substitution did not match — shell.html\'s script tags may have changed shape. Fix the regexes above before trusting any test run.');
+  process.exit(1);
+}
 
 fs.writeFileSync(path.join(__dirname, 'test_desktop.html'), out);
 console.log(`✅ test_desktop.html generated (React ${variant} build)`);

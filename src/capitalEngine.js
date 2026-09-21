@@ -11,7 +11,15 @@
 function treasuryMethodShares(count, strike, currentPrice) {
   const n = numOr(count, 0), k = numOr(strike, 0), p = numOr(currentPrice, 0);
   if (n <= 0 || p <= 0 || k >= p) return 0; // out of the money or no price to test against
-  const proceeds = n * k;
+  // A negative strike is not a real instrument, but nothing upstream rejects
+  // one (the strike inputs are bare number fields, and an EDGAR-pulled value
+  // isn't sanitised either). Left unguarded it inverts the arithmetic below:
+  // negative proceeds mean a negative buyback, so the function would return
+  // MORE net new shares than the option pool even contains, silently
+  // overstating dilution. Treat it as "no exercise proceeds" — full dilution,
+  // capped at the pool size — matching how ifConvertedShares already guards
+  // its own equivalent case.
+  const proceeds = n * Math.max(0, k);
   const buybackShares = proceeds / p;
   return Math.max(0, n - buybackShares);
 }

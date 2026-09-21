@@ -18,7 +18,8 @@
     "files": [
       "main.js",
       "preload.js",
-      "rxnpv.html"
+      "rxnpv.html",
+      "vendor/**"
     ],
     "mac": {
       "target": [

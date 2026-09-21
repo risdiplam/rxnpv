@@ -216,8 +216,19 @@
      just console noise for a finished build, not a signal of anything
      actually wrong — production builds don't do this, and are smaller and
      faster besides. -->
-<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<!-- React is VENDORED LOCALLY (electron/vendor/, committed to the repo), not
+     loaded from a CDN. It used to come from unpkg at runtime, which meant the
+     app could not start at all without an internet connection: the scripts
+     would fail, React/ReactDOM would be undefined, and the entire inline
+     bundle below — including ErrorBoundary itself, which is a React component
+     — could never run, leaving a blank window with nothing on screen to
+     explain it. For a local-first desktop tool whose whole point is working
+     on your own machine with your own saved cases, that was the wrong
+     dependency to have. Pinned to the exact 18.3.1 build rather than a
+     floating "@18" range, so the version that ships is the version that was
+     tested. -->
+<script src="vendor/react.production.min.js"></script>
+<script src="vendor/react-dom.production.min.js"></script>
 <script>
 __SCRIPT__</script>
 </body>

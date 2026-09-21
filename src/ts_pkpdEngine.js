@@ -70,6 +70,17 @@ function halfLife(ke) {
   return Math.log(2) / ke;
 }
 
+// Ke = 0 (a drug with literally no elimination) is a legitimate input, and
+// ln(2)/0 = Infinity is the mathematically correct answer — but string-
+// concatenating that raw value printed "half-life Infinityhr". Formatting
+// lives here rather than at the call site so the degenerate case can't be
+// reintroduced by a future caller doing its own .toFixed().
+function formatHalfLife(ke) {
+  const t = halfLife(ke);
+  if (!isFinite(t)) return 'none (Ke = 0, no elimination modelled)';
+  return t.toFixed(2) + 'hr';
+}
+
 function keFromClearance(clearance, Vd) {
   return clearance / Vd;
 }
@@ -121,7 +132,7 @@ function simulateDoseResponseCurve(doses, pkConfigTemplate, pdParams, metric = '
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     concIVBolus, concOralFirstOrder, simulateProfile, computePKMetrics,
-    halfLife, keFromClearance, analyticalAUC_IV, analyticalAUC_Oral,
+    halfLife, formatHalfLife, keFromClearance, analyticalAUC_IV, analyticalAUC_Oral,
     emaxEffect, simulateDoseResponseCurve, receptorOccupancy
   };
 }
