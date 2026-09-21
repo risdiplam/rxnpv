@@ -96,13 +96,12 @@ Explicit, discussed, scope-line decisions, not gaps:
 - Regulatory precedent library
 - Group-sequential trial modeling
 - QED/PAINS/SA-score molecular metrics (also: confirmed not available in the RDKit WASM build in use — a real technical constraint, not just a scope call)
-- Code signing / notarization — see "Known limitations"
+- **Code signing / notarization.** Decided against, with reasons, not deferred. It costs $99/yr for an Apple Developer account and buys exactly one thing: removing the Gatekeeper prompt for someone who *downloads* the app. It does nothing for the user's own use — a locally built app never gets a `com.apple.quarantine` flag, which is why it already opens with no warning. This is a personal tool; paying an annual fee to smooth a one-time click for other people is not worth it. Anyone the user shares it with can still run it via the manual override in System Settings → Privacy & Security. **Do not re-raise this as a gap.** It would only become worth revisiting if Apple removed the manual override entirely, or if the app were ever distributed at scale.
 
 If a future request seems to want one of these, say so plainly and ask before building — don't silently reopen a closed scope decision.
 
 ## Known limitations — real gaps, not modesty
 
-- **Code signing / notarization never done.** This requires an Apple Developer account (the user's own) and macOS-native tools (`codesign`, `notarytool`). **This is likely the highest-value thing left to do** — it runs on real macOS with real tools, so it's genuinely possible now, unlike during the original chat-based build. Confirm with the user whether/when they want this before doing it; it has cost ($99/yr) and account implications that aren't a code change. As of the public-GitHub rename, still not done.
 - **The original 38-check core-engine regression suite from the earliest build sessions did not survive a sandbox reset** and was never reconstructed as such — but treat this as closed, not open: `test/math_verification.js` is not a "leaner replacement," it now independently verifies 568 hand-derived checks across the full engine (revenue build, cost chain, capital structure, every trial-statistics formula, chart axis logic, storage accounting), each checked against a value worked out longhand in its own comment rather than recorded from the app's own output. Read `test/README.md` for the exact scope/rules of what this suite does and doesn't claim.
 - **No formal accessibility audit** (screen reader support, keyboard-only navigation) has been done. Contrast has been checked rigorously (WCAG relative-luminance, both themes) but that is a different, narrower claim than full accessibility.
 

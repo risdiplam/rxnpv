@@ -14,7 +14,11 @@ The app is already installed at **`/Applications/RxNPV.app`**. Launch it the sam
 
 Right-click → **Keep in Dock** if you want it permanently to hand.
 
-It opens on a normal double-click — no Gatekeeper warning. The app isn't code-signed, but macOS only blocks *downloaded* apps (those carry a `com.apple.quarantine` flag); one built locally on this machine doesn't have it. If you ever copy the app to a **different** Mac it will be quarantined there, and that copy needs right-click → **Open** once, after which it opens normally.
+It opens on a normal double-click — no Gatekeeper warning. The app isn't code-signed, but macOS only blocks apps that arrive with a `com.apple.quarantine` flag, which is attached by browsers and mail clients on download. One built locally on this machine never gets that flag, which is why it just opens. (Confirmed: `xattr -p com.apple.quarantine /Applications/RxNPV.app` returns nothing.)
+
+**Giving it to someone else is a different story.** A copy they download *is* quarantined, and because the app carries only Electron's default ad-hoc signature — no Developer ID, no notarization — Gatekeeper will refuse it. They can still run it: macOS keeps a manual override under **System Settings → Privacy & Security**, where a blocked app appears with an "Open Anyway" button shortly after the first attempt to launch it. The exact wording and the number of steps have moved between macOS releases (the old Control-click → **Open** shortcut no longer works on current versions), so treat this as "there is an override in Privacy & Security" rather than a fixed click path.
+
+This is a deliberate trade, not an oversight — see "Code signing" in `CLAUDE.md` for the reasoning.
 
 Your saved cases live in the app's own local storage, not in the project folder, so rebuilding never touches them.
 

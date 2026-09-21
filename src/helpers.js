@@ -205,7 +205,7 @@ function PinToReportButton({ targetRef, title, source, note, cases, updateCase, 
 const STORAGE_ASSUMED_QUOTA_BYTES = 5_000_000;
 const STORAGE_WARN_FRACTION = 0.6;
 const STORAGE_CRITICAL_FRACTION = 0.85;
-const STORAGE_CACHE_KEYS = ["pdcf_edgar_cache", "pdcf_cik_cache"];
+const STORAGE_CACHE_KEYS = ["rxnpv_edgar_cache", "rxnpv_cik_cache"];
 
 function measureStorage() {
   let userBytes = 0, cacheBytes = 0, keys = 0;
@@ -487,9 +487,9 @@ function saveCustomComps(key, arr) {
   try { localStorage.setItem(key, JSON.stringify(arr)); return true; }
   catch (e) { return false; }
 }
-const CUSTOM_MA_KEY = "pdcf_custom_ma";
-const CUSTOM_PEAKSALES_KEY = "pdcf_custom_peaksales";
-const CUSTOM_LICENSING_KEY = "pdcf_custom_licensing";
+const CUSTOM_MA_KEY = "rxnpv_custom_ma";
+const CUSTOM_PEAKSALES_KEY = "rxnpv_custom_peaksales";
+const CUSTOM_LICENSING_KEY = "rxnpv_custom_licensing";
 
 // Generic add-custom-comp form — same shape used for both M&A deals and
 // Peak Sales drugs, just with a different field spec. First field in the

@@ -24,7 +24,7 @@ function SimulationView({ cases, updateCase }) {
   const containerRef = React.useRef(null);
   const bootedRef = React.useRef(false);
 
-  window.pdcfSimBridge = { cases, updateCase };
+  window.rxnpvSimBridge = { cases, updateCase };
 
   React.useEffect(() => {
     if (bootedRef.current) return; // guard against any double-invoke (e.g. StrictMode-style double effects)

@@ -90,8 +90,8 @@ const _edgarLimit = new RateLimiter(8);
 
 // ~1.5MB and ~400KB budgets: comfortably inside a 5MB origin quota even
 // together, leaving the large majority of it for the user's own cases.
-const _edgarCache = new TTLCache({ max: 200, maxBytes: 1_500_000, ttl: 24*3600_000, persistKey: "pdcf_edgar_cache" });
-const _cikCache = new TTLCache({ max: 500, maxBytes: 400_000, ttl: 30*24*3600_000, persistKey: "pdcf_cik_cache" });
+const _edgarCache = new TTLCache({ max: 200, maxBytes: 1_500_000, ttl: 24*3600_000, persistKey: "rxnpv_edgar_cache" });
+const _cikCache = new TTLCache({ max: 500, maxBytes: 400_000, ttl: 30*24*3600_000, persistKey: "rxnpv_cik_cache" });
 
 // ── The only network primitive: routes through the Electron bridge, which has
 // no CORS restriction and sets a proper SEC-compliant User-Agent server-side.
@@ -206,7 +206,7 @@ async function findCIK(companyName, force) {
     // this time) — useful when fuzzy name matching just doesn't find the right company.
     if (!match) {
       try {
-        const manCIK = localStorage.getItem("pdcf_cik_" + companyName.toLowerCase().trim());
+        const manCIK = localStorage.getItem("rxnpv_cik_" + companyName.toLowerCase().trim());
         if (manCIK && /^\d+$/.test(manCIK.trim())) match = { cik: manCIK.trim().padStart(10, "0"), name: companyName, ticker: "" };
       } catch (e3) {}
     }

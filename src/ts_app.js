@@ -209,7 +209,7 @@ function appendChartWithExport(parent, chartHtml, exportName) {
 // here. Previously these results had no export path at all — computed,
 // then only ever visible on screen, unlike every chart-bearing tool.
 // Vanilla-DOM twin of the React PinToReportButton. Simulation has no React,
-// so it reads the same window.pdcfSimBridge the Peak Sales export already uses
+// so it reads the same window.rxnpvSimBridge the Peak Sales export already uses
 // to reach the case list. Appended to the existing export row rather than
 // given its own control block — exporting a file and pinning to a report are
 // the same "get this out of here" moment.
@@ -225,7 +225,7 @@ function humanizeExportName(slug) {
 }
 
 function appendPinToReport(row, resultsDiv, meta) {
-  const bridge = window.pdcfSimBridge;
+  const bridge = window.rxnpvSimBridge;
   if (!bridge || !bridge.cases || !bridge.cases.length) return;
   const wrap = el('span', { style: 'display:inline-flex;align-items:center;gap:6px;margin-left:8px' });
   const sel = bridge.cases.length > 1
@@ -236,7 +236,7 @@ function appendPinToReport(row, resultsDiv, meta) {
   const status = el('span', { class: 'chart-export-status' });
   const btn = el('button', { class: 'chart-export-btn', title: 'Attach this result to a case so it appears in that case’s PDF report' }, '📌 Pin to report');
   btn.addEventListener('click', async () => {
-    const live = window.pdcfSimBridge;
+    const live = window.rxnpvSimBridge;
     const id = sel ? sel.value : live.cases[0].id;
     const target = live.cases.find(c => c.id === id);
     if (!target) return;
@@ -1580,7 +1580,7 @@ function runPeakSales() {
   appendExportToCaseSection(resultsDiv, result.summary.p50);
 }
 
-// Export section — reads window.pdcfSimBridge, set by SimulationView (the
+// Export section — reads window.rxnpvSimBridge, set by SimulationView (the
 // React wrapper) on every render, since this file has no React access of
 // its own. Same explicit, one-click export pattern as the Tools tab's
 // comps, never automatic. Deliberately exports only the P50 (median) —
@@ -1589,7 +1589,7 @@ function runPeakSales() {
 // sane, sourced starting point the user can then adjust.
 function appendExportToCaseSection(resultsDiv, p50Value) {
   resultsDiv.appendChild(el('h3', {}, 'Export to a case'));
-  const bridge = window.pdcfSimBridge;
+  const bridge = window.rxnpvSimBridge;
   if (!bridge || !bridge.cases || bridge.cases.length === 0) {
     resultsDiv.appendChild(el('p', { class: 'subtle' }, 'No cases yet \u2014 create one in Workspace first.'));
     return;
@@ -1612,7 +1612,7 @@ function appendExportToCaseSection(resultsDiv, p50Value) {
 
   const exportMsg = el('p', { class: 'subtle', id: 'simExportMsg' }, '');
   const doExport = () => {
-    const liveBridge = window.pdcfSimBridge; // re-read, not the closed-over one — cases may have changed since this section rendered
+    const liveBridge = window.rxnpvSimBridge; // re-read, not the closed-over one — cases may have changed since this section rendered
     const caseId = val('simExportCaseId');
     const programId = document.getElementById('simExportProgramId') ? val('simExportProgramId') : null;
     const targetCase = liveBridge.cases.find(c => c.id === caseId);

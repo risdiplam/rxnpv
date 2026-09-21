@@ -161,7 +161,7 @@ async function fetchStudyByNctId(nctId) {
   }
 }
 
-const CTGOV_SNAPSHOT_PREFIX = "pdcf_ctgov_snapshot_";
+const CTGOV_SNAPSHOT_PREFIX = "rxnpv_ctgov_snapshot_";
 
 function loadTrialSnapshot(nctId) {
   try {

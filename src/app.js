@@ -1,7 +1,66 @@
 // ════════════════════════════════════════════════════════════════════════════
 // App shell — case list, persistence, top nav
 // ════════════════════════════════════════════════════════════════════════════
-const STORAGE_KEY = "pdcf_cases_v1";
+const STORAGE_KEY = "rxnpv_cases_v1";
+
+// ── One-time migration of persisted keys from this project's earlier name ───
+// Every localStorage key used to be prefixed "pdcf_", after an earlier name
+// for this project. The prefix was invisible to users but sat in plain sight
+// in the public repo, where it is a fairly guessable contraction of that name
+// — the last breadcrumb left after the rename work.
+//
+// Renaming the keys alone would have silently orphaned every saved case behind
+// a key nothing reads any more: the data would still be on disk, but the app
+// would start up looking empty. So each old key is copied forward first, and
+// the original is removed ONLY after the copy has been read back and confirmed
+// byte-identical. If anything fails, the original is left exactly where it is
+// and the next launch simply tries again.
+//
+// Caches are deliberately discarded rather than migrated — they re-fetch in
+// seconds, and copying them forward would waste quota the real cases need.
+// This must run before anything reads storage, so it is called at the bottom
+// of this file, immediately before the app mounts.
+function migrateLegacyStorageKeys() {
+  const EXACT = [
+    ["pdcf_cases_v1", "rxnpv_cases_v1"],
+    ["pdcf_theme", "rxnpv_theme"],
+    ["pdcf_custom_ma", "rxnpv_custom_ma"],
+    ["pdcf_custom_peaksales", "rxnpv_custom_peaksales"],
+    ["pdcf_custom_licensing", "rxnpv_custom_licensing"]
+  ];
+  const PREFIXES = [
+    ["pdcf_ctgov_snapshot_", "rxnpv_ctgov_snapshot_"],
+    ["pdcf_cik_", "rxnpv_cik_"]
+  ];
+  // Note "pdcf_cik_cache" also starts with the "pdcf_cik_" prefix above, so it
+  // is excluded explicitly rather than being migrated as a manual CIK override.
+  const DISCARD = ["pdcf_edgar_cache", "pdcf_cik_cache"];
+
+  const carryForward = (oldK, newK) => {
+    const oldV = localStorage.getItem(oldK);
+    if (oldV == null || localStorage.getItem(newK) != null) return;
+    localStorage.setItem(newK, oldV);
+    if (localStorage.getItem(newK) === oldV) localStorage.removeItem(oldK);
+  };
+
+  try {
+    EXACT.forEach(([o, n]) => carryForward(o, n));
+    // Snapshot the key list first — the loop mutates storage as it goes, and
+    // localStorage.key(i) is index-based, so removing while iterating skips entries.
+    const keys = [];
+    for (let i = 0; i < localStorage.length; i++) keys.push(localStorage.key(i));
+    keys.forEach(k => {
+      if (k == null || DISCARD.indexOf(k) !== -1) return;
+      PREFIXES.forEach(([oldP, newP]) => {
+        if (k.indexOf(oldP) === 0) carryForward(k, newP + k.slice(oldP.length));
+      });
+    });
+    DISCARD.forEach(k => { try { localStorage.removeItem(k); } catch (e) {} });
+  } catch (e) {
+    // Storage unavailable or full — the app still runs, and the migration
+    // simply retries on the next launch rather than failing the boot.
+  }
+}
 
 function loadCases() {
   try { const raw = localStorage.getItem(STORAGE_KEY); return raw ? JSON.parse(raw) : []; }
@@ -17,8 +76,8 @@ function saveCases(cases) {
   try { localStorage.setItem(STORAGE_KEY, payload); return true; }
   catch (e) {
     try {
-      localStorage.removeItem("pdcf_edgar_cache");
-      localStorage.removeItem("pdcf_cik_cache");
+      localStorage.removeItem("rxnpv_edgar_cache");
+      localStorage.removeItem("rxnpv_cik_cache");
       localStorage.setItem(STORAGE_KEY, payload);
       return true;
     } catch (e2) { return false; }
@@ -30,7 +89,7 @@ function App() {
   const [cases, setCases] = React.useState(loadCases);
   const [activeCaseId, setActiveCaseId] = React.useState(() => { const c = loadCases(); return c[0] && c[0].id; });
   const [view, setView] = React.useState("workspace"); // 'workspace' | 'reference' | 'tools' | 'simulation' | 'portfolio' | 'report'
-  const [dark, setDark] = React.useState(() => { try { return localStorage.getItem("pdcf_theme") !== "light"; } catch(e) { return true; } });
+  const [dark, setDark] = React.useState(() => { try { return localStorage.getItem("rxnpv_theme") !== "light"; } catch(e) { return true; } });
   const [saveFailed, setSaveFailed] = React.useState(false);
   // Cross-view navigation request — set by a "see also" link elsewhere (e.g.
   // Partnership Economics -> Licensing Comps) and consumed once by ToolsView.
@@ -42,7 +101,7 @@ function App() {
   React.useEffect(() => { setSaveFailed(!saveCases(cases)); }, [cases]);
   React.useEffect(() => {
     document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
-    try { localStorage.setItem("pdcf_theme", dark ? "dark" : "light"); } catch(e) {}
+    try { localStorage.setItem("rxnpv_theme", dark ? "dark" : "light"); } catch(e) {}
   }, [dark]);
 
   const activeCase = cases.find(c => c.id === activeCaseId);
@@ -180,4 +239,6 @@ function smallBtnStyle() {
 // crash inside a specific view's own component — while preserving the nav
 // bar, which this outer one can't do (it replaces literally everything on
 // a catch, nav included, since App itself is what threw).
+migrateLegacyStorageKeys();
+
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(ErrorBoundary, { mode: "outer" }, React.createElement(App)));
