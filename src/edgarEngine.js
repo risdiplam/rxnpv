@@ -241,6 +241,42 @@ async function fetchCompanyFacts(cik, force) {
   } catch (e) { console.warn("fetchCompanyFacts failed for", cik, ":", e.message); return null; }
 }
 
+// An XBRL duration fact carries both a start and an end date, and a single
+// 10-Q reports the SAME income-statement tag for two different periods at
+// once: the standalone quarter and the year-to-date span, both ending on the
+// same date. Sorting only by `end` therefore left the choice between them to
+// whatever order EDGAR happened to return, and treating a year-to-date figure
+// as one quarter's burn understated runway by 2x in Q2 or 3x in Q3 — silently,
+// with no flag. Classify by the span the fact actually covers instead of
+// assuming, and refuse to guess at an unrecognised one.
+function periodMonths(p) {
+  if (!p || !p.start || !p.end) return null;
+  const days = (Date.parse(p.end) - Date.parse(p.start)) / 86400000;
+  if (!isFinite(days) || days <= 0) return null;
+  if (days >= 80 && days <= 100) return 3;
+  if (days >= 170 && days <= 195) return 6;
+  if (days >= 260 && days <= 285) return 9;
+  if (days >= 350 && days <= 380) return 12;
+  return null;
+}
+
+// Same reporting date can legitimately carry more than one row: separate
+// tranches of the same instrument (a de-SPAC's public and private warrants
+// both tagged ClassOfWarrantOrRightOutstanding), which must be SUMMED, or the
+// same fact restated by an amended filing, which must NOT be. Identical
+// values on the same date are treated as the restatement case and collapsed;
+// distinct values are treated as real tranches and added. Returns how many
+// rows survived so a caller can show that a figure was combined rather than
+// read straight off one line.
+function sumTranchesAtLatestDate(rows) {
+  if (!rows.length) return null;
+  const latest = rows[0].end;
+  const sameDate = rows.filter(r => r.end === latest);
+  const distinct = [...new Map(sameDate.map(r => [String(r.val), r])).values()];
+  const total = distinct.reduce((s, r) => s + r.val, 0);
+  return { value: total, asOf: latest, form: rows[0].form, tranches: distinct.length };
+}
+
 function calcRunwayFromFacts(facts) {
   if (!facts || !facts.facts || !facts.facts["us-gaap"]) return null;
   const ug = facts.facts["us-gaap"];
@@ -264,16 +300,28 @@ function calcRunwayFromFacts(facts) {
   for (const t of opLossTags) {
     const fact = ug[t];
     if (!fact || !fact.units?.USD) continue;
-    const quarterly = fact.units.USD.filter(p => p.form === "10-Q" && p.fp && p.fp.startsWith("Q"));
-    if (!quarterly.length) continue;
-    quarterly.sort((a, b) => (b.end || "").localeCompare(a.end || ""));
-    opLoss = { value: quarterly[0].val, end: quarterly[0].end };
+    const spans = fact.units.USD
+      .filter(p => (p.form === "10-Q" || p.form === "10-K") && p.val != null)
+      .map(p => ({ p, months: periodMonths(p) }))
+      .filter(x => x.months != null);
+    if (!spans.length) continue;
+    // Most recent period end first; on a TIE, prefer the shortest span. That
+    // tie is the whole point of this sort: see periodMonths' comment — one
+    // filing reports the same tag for both the standalone quarter and the
+    // year-to-date span, ending on the same date.
+    spans.sort((a, b) => (b.p.end || "").localeCompare(a.p.end || "") || (a.months - b.months));
+    opLoss = { value: spans[0].p.val, end: spans[0].p.end, months: spans[0].months };
     break;
   }
   if (!opLoss || opLoss.value >= 0) return { cashUSD: totalCash, debtUSD: extractDebt(ug), runwayMonths: null, asOf: cash?.end || invest?.end, note: "operating loss not available" };
-  const quarterlyBurn = Math.abs(opLoss.value);
-  const monthlyBurn = quarterlyBurn / 3;
-  return { cashUSD: totalCash, debtUSD: extractDebt(ug), quarterlyBurnUSD: quarterlyBurn, runwayMonths: totalCash / monthlyBurn, asOf: cash?.end || invest?.end };
+  const monthlyBurn = Math.abs(opLoss.value) / opLoss.months;
+  return {
+    cashUSD: totalCash, debtUSD: extractDebt(ug),
+    quarterlyBurnUSD: monthlyBurn * 3,          // normalised, whatever span was reported
+    burnPeriodMonths: opLoss.months,            // what the filing actually reported
+    runwayMonths: totalCash / monthlyBurn,
+    asOf: cash?.end || invest?.end
+  };
 }
 
 // New for RxNPV: total debt, to auto-fill the Capital Structure panel's debt field
@@ -284,7 +332,11 @@ function extractDebt(ug) {
     const fact = ug[t];
     if (!fact || !fact.units?.USD) continue;
     const sorted = [...fact.units.USD].filter(p => (p.form === "10-Q" || p.form === "10-K") && p.val > 0).sort((a,b) => (b.end||"").localeCompare(a.end||""));
-    if (sorted.length) { total += sorted[0].val; found = true; }
+    // Summed across same-date rows for the same reason as warrants/options:
+    // layered facilities (a senior term loan plus a separate equipment note)
+    // can land under one tag, and taking only the first row dropped the rest.
+    const part = sumTranchesAtLatestDate(sorted);
+    if (part) { total += part.value; found = true; }
   }
   return found ? total : null;
 }
@@ -307,21 +359,38 @@ function extractSharesOutstanding(facts) {
   if (!facts || !facts.facts) return null;
   const ug = facts.facts["us-gaap"] || {};
   const dei = facts.facts["dei"] || {};
+  // Order matters, and it used to be wrong. The two WeightedAverage* tags are
+  // EPS denominators — time-weighted AVERAGES over a reporting period, not a
+  // share count as of a date — and they were ranked above CommonStockSharesIssued,
+  // which is a genuine point-in-time balance. For a company that doubled its
+  // share count mid-quarter in a raise, that returned the average (say 26.5M)
+  // instead of the actual current count (40M): a ~34% understatement feeding
+  // straight into per-share value, in exactly the situation (a recent raise)
+  // where getting it right matters most. Point-in-time tags now come first,
+  // and the period-average ones are a last resort rather than a preference.
   const shareTags = [
     { src: dei, tag: "EntityCommonStockSharesOutstanding" },
     { src: ug, tag: "CommonStockSharesOutstanding" },
-    { src: ug, tag: "WeightedAverageNumberOfShareOutstandingBasicAndDiluted" },
-    { src: ug, tag: "WeightedAverageNumberDilutedSharesOutstanding" },
-    { src: ug, tag: "CommonStockSharesIssued" }
+    { src: ug, tag: "CommonStockSharesIssued" },
+    { src: ug, tag: "WeightedAverageNumberOfShareOutstandingBasicAndDiluted", periodAverage: true },
+    { src: ug, tag: "WeightedAverageNumberDilutedSharesOutstanding", periodAverage: true }
   ];
-  for (const { src, tag } of shareTags) {
+  for (const { src, tag, periodAverage } of shareTags) {
     const fact = src[tag];
     if (!fact || !fact.units) continue;
-    const units = fact.units.shares || fact.units.USD;
+    // Only ever a share unit. Falling back to `units.USD` here (as this did)
+    // would return a dollar amount as a share count.
+    const units = fact.units.shares;
     if (!units || !units.length) continue;
-    const sorted = [...units].filter(u => u.val > 0).sort((a, b) => (b.end || "").localeCompare(a.end || ""));
-    if (!sorted.length) continue;
-    return { shares: sorted[0].val, asOf: sorted[0].end, form: sorted[0].form, tag };
+    const positive = units.filter(u => u.val > 0);
+    // Prefer periodic filings, like every sibling extractor does — but if a
+    // tag only appears on another form, still use it rather than returning
+    // nothing at all.
+    const periodic = positive.filter(u => isFilingForm(u.form));
+    const pool = periodic.length ? periodic : positive;
+    if (!pool.length) continue;
+    const sorted = [...pool].sort((a, b) => (b.end || "").localeCompare(a.end || ""));
+    return { shares: sorted[0].val, asOf: sorted[0].end, form: sorted[0].form, tag, periodAverage: !!periodAverage };
   }
   return null;
 }
@@ -353,39 +422,69 @@ function extractDilutedShares(facts) {
 // tags; every result is labeled with what was actually found so nothing is
 // silently guessed. Always worth checking against the filing's own
 // "Stockholders' Equity" / "Capitalization" note.
-function pickLatestUnit(fact, formOk) {
+// `sumTranches` is for COUNTS and FACE VALUES, where two tranches reported on
+// the same date genuinely add up. It must never be used for a per-share price:
+// summing two $25 exercise prices into $50 would be nonsense, so the price
+// lookups below deliberately leave it off and take the single latest row.
+function pickLatestUnit(fact, formOk, opts) {
   if (!fact || !fact.units) return null;
   const units = fact.units.shares || fact.units.USD || fact.units["USD/shares"] || fact.units.pure;
   if (!units || !units.length) return null;
   const sorted = [...units].filter(p => formOk(p.form) && p.val != null).sort((a, b) => (b.end || "").localeCompare(a.end || ""));
-  return sorted.length ? { value: sorted[0].val, asOf: sorted[0].end, form: sorted[0].form } : null;
+  if (!sorted.length) return null;
+  if (opts && opts.sumTranches) return sumTranchesAtLatestDate(sorted);
+  return { value: sorted[0].val, asOf: sorted[0].end, form: sorted[0].form };
 }
 const isFilingForm = (f) => f === "10-Q" || f === "10-K";
 
 function extractOptions(facts) {
   if (!facts || !facts.facts) return null;
   const ug = facts.facts["us-gaap"] || {};
-  const count = pickLatestUnit(ug["ShareBasedCompensationArrangementByShareBasedPaymentAwardOptionsOutstandingNumber"], isFilingForm);
+  const count = pickLatestUnit(ug["ShareBasedCompensationArrangementByShareBasedPaymentAwardOptionsOutstandingNumber"], isFilingForm, { sumTranches: true });
   const price = pickLatestUnit(ug["ShareBasedCompensationArrangementByShareBasedPaymentAwardOptionsOutstandingWeightedAverageExercisePrice"], isFilingForm);
   if (!count) return null;
-  return { count: count.value, avgStrike: price ? price.value : null, asOf: count.asOf, priceFound: !!price };
+  return { count: count.value, avgStrike: price ? price.value : null, asOf: count.asOf, priceFound: !!price, tranches: count.tranches };
 }
 
 function extractWarrants(facts) {
   if (!facts || !facts.facts) return null;
   const ug = facts.facts["us-gaap"] || {};
-  const count = pickLatestUnit(ug["ClassOfWarrantOrRightOutstanding"], isFilingForm);
+  const count = pickLatestUnit(ug["ClassOfWarrantOrRightOutstanding"], isFilingForm, { sumTranches: true });
   const price = pickLatestUnit(ug["ClassOfWarrantOrRightExercisePriceOfWarrantsOrRights"], isFilingForm);
   if (!count) return null;
-  return { count: count.value, avgStrike: price ? price.value : null, asOf: count.asOf, priceFound: !!price };
+  return { count: count.value, avgStrike: price ? price.value : null, asOf: count.asOf, priceFound: !!price, tranches: count.tranches };
 }
 
 function extractConvertibleNotes(facts) {
   if (!facts || !facts.facts) return null;
   const ug = facts.facts["us-gaap"] || {};
-  const faceTags = ["ConvertibleNotesPayable", "ConvertibleNotesPayableNoncurrent", "ConvertibleNotesPayableCurrent", "ConvertibleDebtNoncurrent"];
-  let face = null;
-  for (const t of faceTags) { face = pickLatestUnit(ug[t], isFilingForm); if (face) break; }
+  // A convertible note is routinely split across a current and a noncurrent
+  // line on the same balance sheet, under two different tags. This used to
+  // stop at the first tag that matched, so a $5M current + $15M noncurrent
+  // note reported $15M and silently dropped a quarter of the balance. Sum
+  // across the tags the way extractDebt already does, and keep the current /
+  // noncurrent pairs symmetric so a filer using either tag family is covered.
+  const faceTags = [
+    "ConvertibleNotesPayable",
+    "ConvertibleNotesPayableNoncurrent", "ConvertibleNotesPayableCurrent",
+    "ConvertibleDebtNoncurrent", "ConvertibleDebtCurrent"
+  ];
+  let total = 0, asOf = null, found = false;
+  for (const t of faceTags) {
+    const part = pickLatestUnit(ug[t], isFilingForm, { sumTranches: true });
+    if (!part || !(part.value > 0)) continue;
+    total += part.value;
+    found = true;
+    if (!asOf || (part.asOf || "") > asOf) asOf = part.asOf;
+  }
+  // "ConvertibleNotesPayable" is often the combined total AND also broken out
+  // into its current/noncurrent parts. Adding all three would double-count, so
+  // when the combined tag alone already covers the sum of the parts, trust it.
+  const combined = pickLatestUnit(ug["ConvertibleNotesPayable"], isFilingForm, { sumTranches: true });
+  if (combined && combined.value > 0 && total > combined.value && Math.abs(total - combined.value * 2) < 1) {
+    total = combined.value;
+  }
+  const face = found ? { value: total, asOf } : null;
   if (!face) return null;
   // Conversion price is almost never a clean XBRL numeric tag — it's typically
   // footnote text. We don't guess at it; the UI will ask for it manually.

@@ -27,7 +27,7 @@ const FILES = [
   "data.js", "engine.js", "costEngine.js", "rdEngine.js", "posEngine.js",
   "dcfEngine.js", "capitalEngine.js", "scenarioEngine.js", "helpers.js",
   "ts_statsEngine.js", "ts_simulationEngine.js", "ts_peakSalesEngine.js", "ts_pkpdEngine.js",
-  "ts_chart.js", "fdaEngine.js", "chart.js", "ts_fdaEngine.js"
+  "ts_chart.js", "edgarEngine.js", "fdaEngine.js", "chart.js", "ts_fdaEngine.js"
 ];
 global.React = { createElement: () => null, useState: () => [null, () => {}], useEffect: () => {}, Fragment: "F", Component: class {} };
 global.document = { createElement: () => ({ style: {} }), getElementById: () => null };
@@ -83,7 +83,10 @@ const EXPORTS = [
   "computeQuickProgramRevenue", "resolveErosionParams", "LAUNCH_CURVE", "LAUNCH_CURVE_EXACT", "scaleRevenueResult",
   "computeCOGS", "computeSalesForceCost", "computeMarketingCost", "computeCorporateGA",
   "SALES_REP_COST", "SGA_BENCHMARKS", "SALES_FORCE_COMP_GROWTH_PCT",
-  "tsFdaQueryString", "computeDilutionPath"
+  "tsFdaQueryString", "computeDilutionPath",
+  "periodMonths", "sumTranchesAtLatestDate", "calcRunwayFromFacts", "extractDebt",
+  "extractSharesOutstanding", "extractDilutedShares", "extractOptions", "extractWarrants",
+  "extractConvertibleNotes", "pickLatestUnit", "isFilingForm", "formatHalfLife"
 ];
 const api = new Function(combined + "\nreturn {" + EXPORTS.join(",") + "};")();
 
@@ -1848,6 +1851,229 @@ section("Dilution path composes with a manual future raise");
   // A disabled path reports enabled:false so callers know not to overwrite.
   ok("a disabled path reports enabled:false", neither.enabled === false && withRaiseOnly.enabled === false);
   ok("an enabled path reports enabled:true", bothOn.enabled === true);
+}
+report();
+
+// ════════════════════════════════════════════════════════════════════════════
+// EDGAR XBRL EXTRACTION
+// These parse real SEC filing data straight into capital-structure, dilution
+// and runway math, and had no coverage at all until an audit found four real
+// bugs in them. Fixtures below are shaped like genuine companyfacts responses
+// and are the exact cases that reproduced each bug.
+// ════════════════════════════════════════════════════════════════════════════
+section("EDGAR — reporting-period classification (periodMonths)");
+{
+  near("a standalone quarter (Jan 1 - Mar 31) reads as 3 months", api.periodMonths({ start: "2024-01-01", end: "2024-03-31" }), 3, 0);
+  near("a half-year-to-date span (Jan 1 - Jun 30) reads as 6 months", api.periodMonths({ start: "2024-01-01", end: "2024-06-30" }), 6, 0);
+  near("a nine-month span (Jan 1 - Sep 30) reads as 9 months", api.periodMonths({ start: "2024-01-01", end: "2024-09-30" }), 9, 0);
+  near("a full year (Jan 1 - Dec 31) reads as 12 months", api.periodMonths({ start: "2024-01-01", end: "2024-12-31" }), 12, 0);
+  // An instant fact (a balance-sheet item) has no start, and an unrecognised
+  // span must return null rather than being silently rounded to something.
+  ok("an instant fact (no start date) is not classified", api.periodMonths({ end: "2024-06-30" }) === null);
+  ok("a two-month span is not force-fitted to a known period", api.periodMonths({ start: "2024-01-01", end: "2024-03-01" }) === null);
+}
+report();
+
+section("EDGAR — cash runway picks the standalone quarter, not year-to-date");
+{
+  // THE BUG: a Q2 10-Q reports OperatingIncomeLoss for BOTH the 3-month and
+  // the 6-month period, both ending 6/30. Picking the 6-month figure and
+  // dividing by 3 halves the reported runway.
+  // Hand-derived: $60M cash, true quarterly burn $12M -> $4M/mo -> 15.0 months.
+  const q2Facts = {
+    facts: { "us-gaap": {
+      CashAndCashEquivalentsAtCarryingValue: { units: { USD: [
+        { end: "2024-06-30", val: 60000000, form: "10-Q" }
+      ] } },
+      OperatingIncomeLoss: { units: { USD: [
+        // year-to-date row deliberately FIRST, which is what made array order decide
+        { start: "2024-01-01", end: "2024-06-30", val: -24000000, form: "10-Q", fp: "Q2" },
+        { start: "2024-04-01", end: "2024-06-30", val: -12000000, form: "10-Q", fp: "Q2" }
+      ] } }
+    } }
+  };
+  const r = api.calcRunwayFromFacts(q2Facts);
+  near("runway uses the 3-month figure: $60M / ($12M/3) = 15.0 months", r.runwayMonths, 15.0, 1e-9);
+  near("the span actually used is reported as 3 months", r.burnPeriodMonths, 3, 0);
+  near("quarterly burn is normalised to $12M", r.quarterlyBurnUSD, 12000000, 1e-6);
+
+  // Same company, same numbers, rows in the opposite order — the answer must
+  // not depend on the order EDGAR happened to return them in.
+  const flipped = JSON.parse(JSON.stringify(q2Facts));
+  flipped.facts["us-gaap"].OperatingIncomeLoss.units.USD.reverse();
+  near("row order does not change the answer", api.calcRunwayFromFacts(flipped).runwayMonths, 15.0, 1e-9);
+
+  // A 10-K filer reporting only a full year is now usable instead of ignored:
+  // $60M cash, $48M annual burn -> $4M/mo -> 15.0 months.
+  const annualFacts = {
+    facts: { "us-gaap": {
+      CashAndCashEquivalentsAtCarryingValue: { units: { USD: [{ end: "2024-12-31", val: 60000000, form: "10-K" }] } },
+      OperatingIncomeLoss: { units: { USD: [
+        { start: "2024-01-01", end: "2024-12-31", val: -48000000, form: "10-K", fp: "FY" }
+      ] } }
+    } }
+  };
+  const ar = api.calcRunwayFromFacts(annualFacts);
+  near("an annual-only filer: $60M / ($48M/12) = 15.0 months", ar.runwayMonths, 15.0, 1e-9);
+  near("the span used is reported as 12 months", ar.burnPeriodMonths, 12, 0);
+}
+report();
+
+section("EDGAR — same-date tranches are summed, restatements are not");
+{
+  // Two genuinely different tranches on one date (a de-SPAC's public and
+  // private warrants) must add up: 5,000,000 + 3,333,333 = 8,333,333.
+  const twoTranches = api.sumTranchesAtLatestDate([
+    { end: "2024-06-30", val: 5000000, form: "10-Q" },
+    { end: "2024-06-30", val: 3333333, form: "10-Q" }
+  ]);
+  near("two distinct same-date tranches are summed", twoTranches.value, 8333333, 0);
+  near("and the tranche count is reported", twoTranches.tranches, 2, 0);
+
+  // The SAME fact restated by an amended filing must NOT be double-counted.
+  const restated = api.sumTranchesAtLatestDate([
+    { end: "2024-06-30", val: 5000000, form: "10-Q" },
+    { end: "2024-06-30", val: 5000000, form: "10-Q" }
+  ]);
+  near("an identical same-date row is treated as a restatement, not a tranche", restated.value, 5000000, 0);
+  near("and reports a single tranche", restated.tranches, 1, 0);
+
+  // An older period must never be mixed into the latest one.
+  const older = api.sumTranchesAtLatestDate([
+    { end: "2024-06-30", val: 5000000, form: "10-Q" },
+    { end: "2023-12-31", val: 9000000, form: "10-K" }
+  ]);
+  near("a stale earlier period is excluded", older.value, 5000000, 0);
+
+  // End to end through extractWarrants, which is what the app actually calls.
+  const warrantFacts = { facts: { "us-gaap": { ClassOfWarrantOrRightOutstanding: { units: { shares: [
+    { end: "2024-06-30", val: 5000000, form: "10-Q" },
+    { end: "2024-06-30", val: 3333333, form: "10-Q" }
+  ] } } } } };
+  near("extractWarrants sums both tranches", api.extractWarrants(warrantFacts).count, 8333333, 0);
+
+  // A per-share PRICE must never be summed — two $25 strikes are not a $50 strike.
+  const pricedFacts = { facts: { "us-gaap": {
+    ClassOfWarrantOrRightOutstanding: { units: { shares: [{ end: "2024-06-30", val: 1000000, form: "10-Q" }] } },
+    ClassOfWarrantOrRightExercisePriceOfWarrantsOrRights: { units: { "USD/shares": [
+      { end: "2024-06-30", val: 25, form: "10-Q" },
+      { end: "2024-06-30", val: 25, form: "10-Q" }
+    ] } }
+  } } };
+  near("an exercise price is read, never summed", api.extractWarrants(pricedFacts).avgStrike, 25, 0);
+}
+report();
+
+section("EDGAR — convertible notes sum current + noncurrent");
+{
+  // THE BUG: stopping at the first matching tag reported $15M of a $20M note.
+  const split = { facts: { "us-gaap": {
+    ConvertibleNotesPayableCurrent: { units: { USD: [{ end: "2024-06-30", val: 5000000, form: "10-Q" }] } },
+    ConvertibleNotesPayableNoncurrent: { units: { USD: [{ end: "2024-06-30", val: 15000000, form: "10-Q" }] } }
+  } } };
+  near("a $5M current + $15M noncurrent note totals $20M", api.extractConvertibleNotes(split).faceValue, 20000000, 0);
+
+  // The ConvertibleDebt* tag family needed a symmetric current/noncurrent pair;
+  // a filer reporting only a current balance under it used to fall through.
+  const debtFamily = { facts: { "us-gaap": {
+    ConvertibleDebtCurrent: { units: { USD: [{ end: "2024-06-30", val: 7000000, form: "10-Q" }] } }
+  } } };
+  near("a ConvertibleDebtCurrent-only filer is found", api.extractConvertibleNotes(debtFamily).faceValue, 7000000, 0);
+
+  // A filer that reports the combined total AND both parts must not be doubled.
+  const both = { facts: { "us-gaap": {
+    ConvertibleNotesPayable: { units: { USD: [{ end: "2024-06-30", val: 20000000, form: "10-Q" }] } },
+    ConvertibleNotesPayableCurrent: { units: { USD: [{ end: "2024-06-30", val: 5000000, form: "10-Q" }] } },
+    ConvertibleNotesPayableNoncurrent: { units: { USD: [{ end: "2024-06-30", val: 15000000, form: "10-Q" }] } }
+  } } };
+  near("a combined total reported alongside its parts is not double-counted", api.extractConvertibleNotes(both).faceValue, 20000000, 0);
+
+  ok("a company with no convertible notes returns null, not zero", api.extractConvertibleNotes({ facts: { "us-gaap": {} } }) === null);
+}
+report();
+
+section("EDGAR — shares outstanding prefers a point-in-time count");
+{
+  // THE BUG: a micro-cap doubles its share count mid-quarter in a raise.
+  // The EPS weighted-average (26.5M) is a period AVERAGE; the real count as of
+  // the period end is 40M. Ranking the average first understated it by 34%.
+  const postRaise = { facts: { "us-gaap": {
+    WeightedAverageNumberOfShareOutstandingBasicAndDiluted: { units: { shares: [
+      { end: "2024-06-30", val: 26500000, form: "10-Q" }
+    ] } },
+    CommonStockSharesIssued: { units: { shares: [
+      { end: "2024-06-30", val: 40000000, form: "10-Q" }
+    ] } }
+  } } };
+  const s = api.extractSharesOutstanding(postRaise);
+  near("the point-in-time count wins over the period average", s.shares, 40000000, 0);
+  ok("and it is not flagged as a period average", s.periodAverage === false);
+
+  // With only an average available it is still used — but flagged, so a caller
+  // can say so rather than presenting it as a hard count.
+  const avgOnly = { facts: { "us-gaap": {
+    WeightedAverageNumberOfShareOutstandingBasicAndDiluted: { units: { shares: [
+      { end: "2024-06-30", val: 26500000, form: "10-Q" }
+    ] } }
+  } } };
+  const a = api.extractSharesOutstanding(avgOnly);
+  near("a period average is still used as a last resort", a.shares, 26500000, 0);
+  ok("but it is flagged as a period average", a.periodAverage === true);
+
+  // The cover-page dei tag outranks everything.
+  const withDei = { facts: {
+    dei: { EntityCommonStockSharesOutstanding: { units: { shares: [{ end: "2024-08-01", val: 41000000, form: "10-Q" }] } } },
+    "us-gaap": { CommonStockSharesIssued: { units: { shares: [{ end: "2024-06-30", val: 40000000, form: "10-Q" }] } } }
+  } };
+  near("the cover-page count outranks the balance-sheet one", api.extractSharesOutstanding(withDei).shares, 41000000, 0);
+
+  // A dollar figure must never be returned as a share count.
+  const usdOnly = { facts: { "us-gaap": {
+    CommonStockSharesOutstanding: { units: { USD: [{ end: "2024-06-30", val: 12345678, form: "10-Q" }] } }
+  } } };
+  ok("a USD-only fact is never read as a share count", api.extractSharesOutstanding(usdOnly) === null);
+}
+report();
+
+section("EDGAR — missing data degrades cleanly instead of throwing");
+{
+  // A smaller or foreign private issuer may report none of this. Every
+  // extractor must return null rather than taking down the whole EDGAR pull.
+  const empty = { facts: { "us-gaap": {} } };
+  ok("extractOptions returns null", api.extractOptions(empty) === null);
+  ok("extractWarrants returns null", api.extractWarrants(empty) === null);
+  ok("extractConvertibleNotes returns null", api.extractConvertibleNotes(empty) === null);
+  ok("extractSharesOutstanding returns null", api.extractSharesOutstanding(empty) === null);
+  ok("extractDilutedShares returns null", api.extractDilutedShares(empty) === null);
+  ok("extractDebt returns null", api.extractDebt({}) === null);
+  ok("calcRunwayFromFacts returns null", api.calcRunwayFromFacts(empty) === null);
+  ok("calcRunwayFromFacts survives a malformed response", api.calcRunwayFromFacts(null) === null);
+}
+report();
+
+section("Treasury method rejects a negative strike");
+{
+  // 1,000,000 options at a $10 strike and a $40 price: net new shares
+  // = n(p-k)/p = 1,000,000 x 30/40 = 750,000.
+  near("a normal in-the-money grant dilutes by 750,000", api.treasuryMethodShares(1000000, 10, 40), 750000, 1e-9);
+  // A negative strike inverted the arithmetic and returned 1,250,000 — more
+  // net new shares than the pool even contains, which is impossible.
+  const neg = api.treasuryMethodShares(1000000, -10, 40);
+  ok("a negative strike never dilutes beyond the pool size", neg <= 1000000);
+  near("a negative strike is treated as zero exercise proceeds", neg, 1000000, 1e-9);
+  near("a zero strike gives full dilution", api.treasuryMethodShares(1000000, 0, 40), 1000000, 1e-9);
+  near("an at-the-money grant dilutes by nothing", api.treasuryMethodShares(1000000, 40, 40), 0, 0);
+}
+report();
+
+section("PK/PD half-life formats a zero elimination rate");
+{
+  near("a 6-hour half-life comes from Ke = ln(2)/6", api.halfLife(Math.log(2) / 6), 6, 1e-9);
+  ok("a normal half-life prints with units", api.formatHalfLife(Math.log(2) / 6) === "6.00hr");
+  // Ke = 0 is a legitimate input; ln(2)/0 = Infinity is correct maths, but
+  // "Infinityhr" is not a readable answer.
+  ok("Ke = 0 does not print 'Infinityhr'", api.formatHalfLife(0).indexOf("Infinity") === -1);
+  ok("Ke = 0 says what actually happened", api.formatHalfLife(0) === "none (Ke = 0, no elimination modelled)");
 }
 report();
 
