@@ -84,6 +84,8 @@ const EXPORTS = [
   "computeCOGS", "computeSalesForceCost", "computeMarketingCost", "computeCorporateGA",
   "SALES_REP_COST", "SGA_BENCHMARKS", "SALES_FORCE_COMP_GROWTH_PCT",
   "tsFdaQueryString", "computeDilutionPath",
+  "applyPartnershipToRevenue", "getProgramRevenueResult", "computePartnershipContribution",
+  "computeSimpleMultipleValuation", "computeSOTPBreakdown",
   "periodMonths", "sumTranchesAtLatestDate", "calcRunwayFromFacts", "extractDebt",
   "extractSharesOutstanding", "extractDilutedShares", "extractOptions", "extractWarrants",
   "extractConvertibleNotes", "pickLatestUnit", "isFilingForm", "formatHalfLife"
@@ -1861,6 +1863,114 @@ report();
 // bugs in them. Fixtures below are shaped like genuine companyfacts responses
 // and are the exact cases that reproduced each bug.
 // ════════════════════════════════════════════════════════════════════════════
+section("Partnership royalty applies in Quick mode, not just Full");
+{
+  // Quick mode puts 100% of revenue in usRevenue and never shows the territory
+  // selector, so the default "exUS" applied the royalty to a base of zero and
+  // let full commercial revenue through untouched — a 15% deal changed nothing.
+  const quickProgram = {
+    id: "p1", name: "Test", revenueMode: "quick",
+    quickRevenue: { peakRevenue: "500000000", yearsToPeak: "6", profile: "median" },
+    partnership: { enabled: true, royaltyPct: "15" }   // no territory set, as the UI leaves it
+  };
+  const partnered = api.getProgramRevenueResult(quickProgram, 25);
+  const unpartnered = api.getProgramRevenueResult({ ...quickProgram, partnership: null }, 25);
+  ok("a Quick-mode royalty actually changes the revenue line", partnered.peakTotalRevenue !== unpartnered.peakTotalRevenue);
+  // 15% of peak, i.e. the royalty the user actually typed.
+  near("Quick-mode peak revenue becomes 15% of the unpartnered peak",
+    partnered.peakTotalRevenue, Math.round(unpartnered.peakTotalRevenue * 0.15), 2);
+
+  // Full mode must keep honouring an explicit territory choice.
+  const fullBase = {
+    population: { mode: "prevalence", prevalence: "100000", diagnosisRatePct: "100", treatmentRatePct: "100", eligiblePct: "100" },
+    adherencePct: "80",
+    marketShare: { numDrugs: 2, orderOfEntry: 1, peakShareOverridePct: "20" },
+    launchCurve: { yearsToPeak: 6, profile: "median" },
+    pricing: { usAnnualPrice: "10000", usAnnualGrowthPct: "0", includeExUS: true, exUSPriceFactorPct: "50", exUSAnnualGrowthPct: "0", exUSPatientMultiplierPct: "100" },
+    exclusivity: { yearsToLOE: "13", modality: "smallMolecule", volumeRetainedPct: "", priceDeclinePct: "" } };
+  const fullProgram = { id: "p2", name: "Full", revenueMode: "full", revenueBuild: fullBase,
+    partnership: { enabled: true, royaltyPct: "15", territory: "exUS" } };
+  const fullPlain = api.getProgramRevenueResult({ ...fullProgram, partnership: null }, 25);
+  const fullExUS = api.getProgramRevenueResult(fullProgram, 25);
+  ok("Full mode still leaves US revenue untouched for an ex-US deal",
+    fullExUS.years[8].usRevenue === fullPlain.years[8].usRevenue);
+  ok("Full mode still royalty-substitutes the ex-US side",
+    fullExUS.years[8].exUSRevenue < fullPlain.years[8].exUSRevenue);
+}
+report();
+
+section("Upfront and milestone value survives the Simple Multiple method");
+{
+  const baseCase = {
+    name: "T", currentPrice: "10", discountRatePct: "12",
+    capitalStructure: { mode: "simple", dilutedSharesSimple: "10000000", cash: "0", debt: "0" },
+    corporateGA: { preCommercialAnnualM: "0", gaShareOfMatureSgaPct: "0" },
+    programs: [{
+      id: "p1", name: "Asset", currentPhase: "phase2", therapeuticArea: "Oncology", modality: "smallMolecule",
+      revenueMode: "quick", quickRevenue: { peakRevenue: "500000000", yearsToPeak: "6", profile: "median" },
+      launchYearOffset: "8",
+      partnership: { enabled: true, upfrontM: "100", milestones: [{ label: "Filing", gate: "regulatory", valueM: "100" }] }
+    }]
+  };
+  const noDeal = JSON.parse(JSON.stringify(baseCase));
+  noDeal.programs[0].partnership = { enabled: false };
+  const preset = { label: "base", shareMultiplierPct: 100, posMultiplierPct: 100, discountRateAddPct: 0, color: "" };
+
+  const withDeal = api.computeSimpleMultipleValuation(baseCase, preset, "base", 3, 12);
+  const without = api.computeSimpleMultipleValuation(noDeal, preset, "base", 3, 12);
+  ok("Simple Multiple now reports a partnership contribution at all",
+    withDeal.equity.partnershipValueAdded > 0);
+  // The $100M upfront is added undiscounted and unrisked, so the gap must be
+  // at least that much (the milestone adds more on top).
+  ok("the contribution is at least the $100M upfront",
+    withDeal.equity.equityValue - without.equity.equityValue >= 100000000 - 1);
+  ok("and it raises per-share value too",
+    withDeal.equity.perShare > without.equity.perShare);
+
+  // The same deal under DCF should land in the same ballpark — the point of
+  // the fix is that the two methods stop disagreeing by the whole deal value.
+  const dcfWith = api.computeCaseValuation(baseCase, preset, "base", 12, { enabled: false });
+  const dcfWithout = api.computeCaseValuation(noDeal, preset, "base", 12, { enabled: false });
+  const smGap = withDeal.equity.equityValue - without.equity.equityValue;
+  const dcfGap = dcfWith.equity.equityValue - dcfWithout.equity.equityValue;
+  near("both valuation methods credit the same deal value", smGap, dcfGap, Math.abs(dcfGap) * 0.001 + 1);
+}
+report();
+
+section("Sum-of-the-Parts tax-shields G&A like the combined valuation does");
+{
+  const mk = (taxEnabled) => ({
+    name: "T", currentPrice: "10", discountRatePct: "12",
+    taxation: { enabled: taxEnabled, ratePct: "21", startingNOLM: "0" },
+    capitalStructure: { mode: "simple", dilutedSharesSimple: "10000000", cash: "0", debt: "0" },
+    corporateGA: { preCommercialAnnualM: "20", gaShareOfMatureSgaPct: "50" },
+    programs: [{
+      id: "p1", name: "Asset", currentPhase: "phase3", therapeuticArea: "Oncology", modality: "smallMolecule",
+      revenueMode: "quick", quickRevenue: { peakRevenue: "1000000000", yearsToPeak: "6", profile: "median" },
+      launchYearOffset: "4"
+    }]
+  });
+  const preset = { label: "base", shareMultiplierPct: 100, posMultiplierPct: 100, discountRateAddPct: 0, color: "" };
+
+  // With tax OFF the fix must be a no-op — G&A has no shield to apply.
+  const offSOTP = api.computeSOTPBreakdown(mk(false), preset, "base", 12, { enabled: false });
+  ok("with tax off, G&A is still a straight negative drag", offSOTP.gaDrag < 0);
+
+  // With tax ON, G&A costs the company LESS than its face value, because it
+  // reduces taxable income. A raw pre-tax drag would be strictly larger.
+  const onSOTP = api.computeSOTPBreakdown(mk(true), preset, "base", 12, { enabled: false });
+  ok("with tax on, the after-tax G&A drag is smaller than the pre-tax one",
+    Math.abs(onSOTP.gaDrag) < Math.abs(offSOTP.gaDrag));
+  ok("the G&A drag is still a real cost, not zeroed out", onSOTP.gaDrag < 0);
+
+  // The whole point: the parts should now reconcile with the combined number.
+  const combined = api.computeCaseValuation(mk(true), preset, "base", 12, { enabled: false });
+  const gap = Math.abs(onSOTP.sumOfParts - combined.npvResult.npv);
+  ok("sum of the parts now lands within 2% of the combined enterprise value",
+    gap <= Math.abs(combined.npvResult.npv) * 0.02);
+}
+report();
+
 section("EDGAR — reporting-period classification (periodMonths)");
 {
   near("a standalone quarter (Jan 1 - Mar 31) reads as 3 months", api.periodMonths({ start: "2024-01-01", end: "2024-03-31" }), 3, 0);

@@ -231,18 +231,37 @@ function computeCaseValuation(theCase, scenario, scenarioKey, discountRateBasePc
     equity = { ...equity, equityValue: newEquityValue, perShare: equity.dilutedShares > 0 ? newEquityValue / equity.dilutedShares : null, prvValueAdded: prvContribution };
   }
 
-  // Partnership economics — upfront and milestones. Upfront is added
-  // directly (near-certain/already-contracted, not PoS-risked or
-  // discounted — same treatment as cash). Each milestone is risk-adjusted
-  // by the cumulative probability of REACHING its own gate (mirroring how
-  // R&D cost itself is weighted, not completing the gate) and discounted
-  // from that gate's own expected timing, not lumped in with launch —
-  // an earlier milestone is worth more than a later one even at the same
-  // face value, exactly as it should be. Royalty revenue is NOT handled
-  // here — it's already inside npvResult via getProgramRevenueResult's own
-  // substitution, so it doesn't need a second addition.
+  const partnershipContribution = computePartnershipContribution(theCase, r);
+  if (partnershipContribution > 0) {
+    const newEquityValue = equity.equityValue + partnershipContribution;
+    equity = { ...equity, equityValue: newEquityValue, perShare: equity.dilutedShares > 0 ? newEquityValue / equity.dilutedShares : null, partnershipValueAdded: partnershipContribution };
+  }
+
+  return { programVals, calendar, discountRateUsed: discountRate, npvResult, capResult, equity };
+}
+
+// ── Partnership economics — upfront and milestones, as a cash figure to add
+// on top of a computed equity value. Upfront is added directly (near-certain /
+// already-contracted, so not PoS-risked and not discounted — same treatment as
+// cash). Each milestone is risk-adjusted by the cumulative probability of
+// REACHING its own gate (mirroring how R&D cost itself is weighted, not
+// completing the gate) and discounted from that gate's own expected timing
+// rather than lumped in at launch, so an earlier milestone is worth more than
+// a later one at the same face value. Royalty revenue is deliberately NOT
+// handled here — it is already inside the revenue line via
+// getProgramRevenueResult's own substitution, and adding it again would
+// double-count it.
+//
+// This lives in its own function because it used to be inline in
+// computeCaseValuation, which meant the Simple Multiple valuation method never
+// ran it at all: a case with a $100M upfront and a $70M risk-adjusted
+// milestone package showed ~$170M less under Simple Multiple than under DCF
+// for identical deal terms, silently, because both call sites read the result
+// defensively as `partnershipValueAdded || 0`. `r` is the discount rate as a
+// fraction, not a percentage.
+function computePartnershipContribution(theCase, r) {
   let upfrontContribution = 0, milestoneContribution = 0;
-  theCase.programs.forEach(prog => {
+  (theCase.programs || []).forEach(prog => {
     const partnership = prog.partnership;
     if (!partnership || !partnership.enabled) return;
     upfrontContribution += (numOr(partnership.upfrontM, 0)) * 1e6;
@@ -269,13 +288,7 @@ function computeCaseValuation(theCase, scenario, scenarioKey, discountRateBasePc
       milestoneContribution += discounted;
     });
   });
-  const partnershipContribution = upfrontContribution + milestoneContribution;
-  if (partnershipContribution > 0) {
-    const newEquityValue = equity.equityValue + partnershipContribution;
-    equity = { ...equity, equityValue: newEquityValue, perShare: equity.dilutedShares > 0 ? newEquityValue / equity.dilutedShares : null, partnershipValueAdded: partnershipContribution };
-  }
-
-  return { programVals, calendar, discountRateUsed: discountRate, npvResult, capResult, equity };
+  return upfrontContribution + milestoneContribution;
 }
 
 // ── Sum-of-the-Parts breakdown: each program's OWN standalone PV contribution,
@@ -302,11 +315,23 @@ function computeSOTPBreakdown(theCase, scenario, scenarioKey, discountRateBasePc
     return { id: p.id, name: p.drugName || p.name, npv: npv.npv, peakRevenue: pv.peakRevenue, posToLaunch: pv.posToLaunch };
   });
 
-  // Company-level G&A drag, discounted on its own (negative contribution)
+  // Company-level G&A drag, discounted on its own (negative contribution).
+  //
+  // This used to subtract the RAW, pre-tax G&A figure while every program's
+  // NPV above was computed after-tax — so with tax modelling on, G&A got no
+  // tax shield in the parts even though it gets one in the combined
+  // valuation, and the two stopped reconciling by roughly taxRate x G&A every
+  // year. Taking the difference between the taxed calendar WITH G&A and the
+  // taxed calendar WITHOUT it yields G&A's true marginal after-tax cost, and
+  // gets NOLs and zero-tax years right for free by reusing the same
+  // applyTaxToCalendar machinery rather than re-deriving an effective rate.
+  // With taxation off this is identical to the old behaviour.
   const corpGA = theCase.corporateGA || { preCommercialAnnualM: "", gaShareOfMatureSgaPct: "50" };
-  const fullCalendar = computeCompanyRiskAdjustedCF(theCase.programs.map(p => computeProgramValuation(p, scenario, scenarioKey)), corpGA, 25);
-  const gaOnlyCF = fullCalendar.map(c => -c.corporateGA);
-  const gaNPV = computeNPV(gaOnlyCF, discountRate, { enabled: false }, fullCalendar.map(() => 0));
+  const allProgramVals = theCase.programs.map(p => computeProgramValuation(p, scenario, scenarioKey));
+  const withGA = applyTaxToCalendar(computeCompanyRiskAdjustedCF(allProgramVals, corpGA, 25), theCase.taxation);
+  const withoutGA = applyTaxToCalendar(computeCompanyRiskAdjustedCF(allProgramVals, zeroGA, 25), theCase.taxation);
+  const gaOnlyCF = withGA.map((c, i) => c.riskAdjFCF - (withoutGA[i] ? withoutGA[i].riskAdjFCF : 0));
+  const gaNPV = computeNPV(gaOnlyCF, discountRate, { enabled: false }, withGA.map(() => 0));
 
   const sumOfParts = programBreakdown.reduce((s, p) => s + p.npv, 0) + gaNPV.npv;
   return { programBreakdown, gaDrag: gaNPV.npv, sumOfParts };
@@ -399,7 +424,17 @@ function computeSimpleMultipleValuation(theCase, scenario, scenarioKey, multiple
   capResult = applyFutureRaise(capResult, theCase.futureRaise, theCase.currentPrice);
   const dilutionPath2 = computeDilutionPath(theCase, scenario, discountRateBasePct);
   if (dilutionPath2.enabled) capResult = { ...capResult, dilutedShares: dilutionPath2.finalDilutedShares };
-  const equity = computeEquityValue(npv, capResult);
+  let equity = computeEquityValue(npv, capResult);
+
+  // Upfront and milestone cash is real regardless of which valuation method
+  // values the underlying asset, and used to be dropped entirely here — see
+  // computePartnershipContribution. Royalty is already inside peakRevenue via
+  // getProgramRevenueResult, so it is not added again.
+  const partnershipContribution = computePartnershipContribution(theCase, r);
+  if (partnershipContribution > 0) {
+    const newEquityValue = equity.equityValue + partnershipContribution;
+    equity = { ...equity, equityValue: newEquityValue, perShare: equity.dilutedShares > 0 ? newEquityValue / equity.dilutedShares : null, partnershipValueAdded: partnershipContribution };
+  }
 
   // Shape matches computeCaseValuation's return where a field has a real
   // equivalent (equity, capResult, programVals with peakRevenue) so existing

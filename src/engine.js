@@ -259,11 +259,19 @@ function computeQuickProgramRevenue(quick, exclusivity, projectionYears) {
 // sales there. Quick mode has no US/ex-US split (exUSRevenue is always 0
 // there), so only "global" is meaningful for it — "us"/"exUS" territory
 // choices are only actionable in Full mode.
-function applyPartnershipToRevenue(revenueResult, partnership) {
+function applyPartnershipToRevenue(revenueResult, partnership, revenueMode) {
   if (!partnership || !partnership.enabled || partnership.royaltyPct === "" || partnership.royaltyPct == null) return revenueResult;
   const royalty = Number(partnership.royaltyPct) / 100;
   if (!(royalty > 0)) return revenueResult;
-  const territory = partnership.territory || "exUS";
+  // Quick mode puts 100% of revenue in usRevenue and has no ex-US split at
+  // all, and its UI never shows the territory selector — so the default of
+  // "exUS" left the royalty applying to a base of zero while full commercial
+  // revenue passed through untouched. A user who typed 15% saw the same
+  // number as if they had modelled no deal whatsoever. There is only one
+  // revenue figure in Quick mode, so a deal on it is by definition a deal on
+  // all of it: resolve to "global" rather than honouring a territory the user
+  // was never given a way to set.
+  const territory = revenueMode === "quick" ? "global" : (partnership.territory || "exUS");
 
   const years = revenueResult.years.map(yr => {
     const us = (territory === "us" || territory === "global") ? Math.round(yr.usRevenue * royalty) : yr.usRevenue;
@@ -318,5 +326,5 @@ function getProgramRevenueResult(program, projectionYears) {
   } else {
     result = computeProgramRevenue(revenueBuild, projectionYears);
   }
-  return applyPartnershipToRevenue(result, program.partnership);
+  return applyPartnershipToRevenue(result, program.partnership, mode);
 }
