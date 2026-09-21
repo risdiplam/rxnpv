@@ -37,7 +37,7 @@ const MODULE_ORDER = [
   'data.js', 'engine.js', 'costEngine.js', 'rdEngine.js', 'posEngine.js',
   'dcfEngine.js', 'capitalEngine.js', 'scenarioEngine.js',
   // External data integrations (EDGAR, ClinicalTrials.gov, openFDA)
-  'edgarEngine.js', 'ctgovEngine.js', 'fdaEngine.js',
+  'edgarEngine.js', 'ctgovEngine.js', 'trialDecoder.js', 'fdaEngine.js', 'openTargetsEngine.js',
   // Export utilities — must precede the UI files that attach export controls
   'exportEngine.js',
   // Shared UI building blocks

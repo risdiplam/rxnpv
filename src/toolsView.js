@@ -44,7 +44,7 @@ function ToolsView({ cases, updateCase, activeCase, navRequest }) {
   const tabGroups = [
     { label: "Benchmarks", tabs: [["ma","M&A Premium"],["peaksales","Peak Sales Comps"],["licensing","Licensing Comps"]] },
     { label: "Your case", tabs: [["fdmc","Diluted Market Cap"],["runway","Cash Runway"],["runwayCatalyst","Runway vs. Catalyst"],["binaryEvent","Binary Event"],["sensitivity","Sensitivity"]] },
-    { label: "Live research", tabs: [["lookup","Company Lookup"],["calendar","Catalyst Calendar"],["trialwatch","Trial Explorer"],["fdaLookup","FDA Lookup"],["exclusivity","Exclusivity / LOE"]] }
+    { label: "Live research", tabs: [["lookup","Company Lookup"],["calendar","Catalyst Calendar"],["decoder","Trial Decoder"],["trialwatch","Trial Explorer"],["fdaLookup","FDA Lookup"],["exclusivity","Exclusivity / LOE"],["target","Target Dossier"]] }
   ];
 
   return h("div", { style: { maxWidth: 900, margin: "0 auto", padding: "24px 28px 60px" } },
@@ -67,6 +67,8 @@ function ToolsView({ cases, updateCase, activeCase, navRequest }) {
     tab === "peaksales" ? h(PeakSalesCompsTool, { cases, updateCase, activeCase }) :
     tab === "licensing" ? h(LicensingCompsTool, { cases, updateCase, activeCase }) :
     tab === "calendar" ? h(CatalystCalendarTool, { cases, updateCase, activeCase }) :
+    tab === "decoder" ? h(TrialDecoderTool, { initialNctId: pendingNctId, onConsumedInitialNctId: () => setPendingNctId(null) }) :
+    tab === "target" ? h(TargetDossierTool, null) :
     tab === "trialwatch" ? h(TrialWatchTool, { initialNctId: pendingNctId, onConsumedInitialNctId: () => setPendingNctId(null) }) :
     tab === "fdaLookup" ? h(FdaLookupTool, null) :
     tab === "exclusivity" ? h(ExclusivityTool, { cases, updateCase }) :
@@ -1869,6 +1871,266 @@ function FdaLookupTool() {
   );
 }
 
+// ── Target Dossier: is this target real? ───────────────────────────────────
+// Deliberately NOT wired into the valuation. Open Targets' association score
+// is a weighted aggregate over very heterogeneous evidence, and turning it
+// into a PoS input would be precisely the kind of false precision this
+// project avoids. What it answers is a conviction question the rest of the
+// app can't: does human genetics point at this target, and what has already
+// been tried against it.
+function TargetDossierTool() {
+  const h = React.createElement;
+  const [query, setQuery] = React.useState("");
+  const [loading, setLoading] = React.useState(false);
+  const [candidates, setCandidates] = React.useState(null);
+  const [dossier, setDossier] = React.useState(null);
+  const [error, setError] = React.useState(null);
+  const seq = React.useRef(0);
+
+  const search = async () => {
+    if (!query.trim()) return;
+    const mine = ++seq.current;
+    setLoading(true); setError(null); setCandidates(null); setDossier(null);
+    const r = await resolveTarget(query);
+    if (mine !== seq.current) return;
+    if (!r.ok) { setError(r.error); setLoading(false); return; }
+    if (r.hits.length === 1) { await load(r.hits[0].ensemblId, mine); return; }
+    setCandidates(r.hits); setLoading(false);
+  };
+
+  const load = async (ensemblId, mine) => {
+    const token = mine || ++seq.current;
+    setLoading(true); setError(null); setCandidates(null);
+    const r = await fetchTargetDossier(ensemblId);
+    if (token !== seq.current) return;
+    if (!r.ok) { setError(r.error); setLoading(false); return; }
+    setDossier(r.dossier); setLoading(false);
+  };
+
+  const phaseLabel = (p) => p >= 4 ? "Approved" : p > 0 ? "Phase " + p : "Preclinical/unknown";
+
+  return h("div", null,
+    toolCard(h, [
+      toolLabel(h, "Target dossier"),
+      h(Note, { summary: "New here? Why the target matters before the trial does" },
+        h("div", { style: { lineHeight: 1.6 } }, "Before asking whether a trial is well designed, it's worth asking whether the biology it rests on is real. The most durable public signal for that is human genetics: if variants in a gene change a person's risk of the disease, a drug aimed at that gene is working with nature rather than against it. Targets with that kind of support have historically been about twice as likely to survive clinical development (Nelson et al., Nature Genetics 2015, replicated since). This pulls what Open Targets knows — which diseases the target is associated with, whether the association has direct human genetic evidence behind it or rests on animal models and pathway inference, and what drugs have already been tried against it and how far they got. It is context, not a score to plug into a model: no number from this page feeds the valuation, deliberately.")),
+      h("div", { style: { display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 } },
+        h("input", { type: "text", value: query, placeholder: "Gene symbol — e.g. TTR, EGFR, SOD1, PCSK9",
+          "aria-label": "Gene symbol or target name",
+          onChange: e => setQuery(e.target.value), onKeyDown: e => { if (e.key === "Enter") search(); },
+          style: { flex: "1 1 240px", padding: "9px 12px", borderRadius: 7, border: "1.5px solid var(--rule)", background: "var(--surface)", color: "var(--ink-1)", fontFamily: "var(--mono)", fontSize: 13 } }),
+        h("button", { onClick: search, disabled: loading || !query.trim(),
+          style: { padding: "9px 18px", borderRadius: 7, border: "1px solid var(--teal)", background: "var(--teal-bg)", color: "var(--teal)", fontFamily: "var(--mono)", fontSize: 12, fontWeight: 700, cursor: loading ? "default" : "pointer", opacity: query.trim() ? 1 : 0.5 } },
+          loading ? "Looking up…" : "Look up target")
+      )
+    ]),
+
+    error && toolCard(h, h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--amber)", lineHeight: 1.6 } }, error)),
+
+    candidates && toolCard(h, [
+      toolLabel(h, "Which target did you mean?"),
+      h("div", { style: { display: "flex", flexDirection: "column", gap: 6 } },
+        candidates.map(c => h("button", { key: c.ensemblId, onClick: () => load(c.ensemblId),
+          style: { textAlign: "left", padding: "8px 10px", borderRadius: 6, border: "1px solid var(--rule)", background: "var(--surface)", cursor: "pointer", fontFamily: "var(--mono)", fontSize: 11, color: "var(--ink-1)" } },
+          h("b", null, c.symbol), " · ", h("span", { style: { color: "var(--ink-3)" } }, c.ensemblId),
+          c.description && h("div", { style: { fontFamily: "var(--sans)", fontSize: 10.5, color: "var(--ink-3)", marginTop: 3, lineHeight: 1.5 } }, truncateText(c.description, 160)))))
+    ]),
+
+    dossier && h("div", null,
+      toolCard(h, [
+        h("div", { style: { fontSize: 16, fontFamily: "var(--display)", fontWeight: 700, color: "var(--ink-1)" } }, dossier.symbol),
+        h("div", { style: { fontSize: 11.5, fontFamily: "var(--sans)", color: "var(--ink-2)", marginTop: 2, marginBottom: 10 } }, dossier.name),
+        h("div", { style: { display: "flex", gap: 22, flexWrap: "wrap" } },
+          h("div", null,
+            h("div", { style: { fontSize: 9, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.06em" } }, "Human genetic evidence"),
+            h("div", { style: { fontSize: 18, fontFamily: "var(--mono)", fontWeight: 800, color: dossier.anyGeneticEvidence ? "var(--teal)" : "var(--ink-2)" } },
+              dossier.anyGeneticEvidence ? "Present" : "None found")),
+          h("div", null,
+            h("div", { style: { fontSize: 9, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.06em" } }, "Associated diseases"),
+            h("div", { style: { fontSize: 18, fontFamily: "var(--mono)", fontWeight: 800, color: "var(--ink-1)" } }, dossier.diseaseCount.toLocaleString())),
+          h("div", null,
+            h("div", { style: { fontSize: 9, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.06em" } }, "Drugs against it"),
+            h("div", { style: { fontSize: 18, fontFamily: "var(--mono)", fontWeight: 800, color: "var(--ink-1)" } }, dossier.drugCount.toLocaleString())),
+          h("div", null,
+            h("div", { style: { fontSize: 9, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.06em" } }, "Reached Phase 3+"),
+            h("div", { style: { fontSize: 18, fontFamily: "var(--mono)", fontWeight: 800, color: "var(--ink-1)" } }, dossier.approvedOrLateStage))
+        ),
+        h("div", { style: { fontSize: 10.5, fontFamily: "var(--sans)", color: "var(--ink-3)", marginTop: 12, lineHeight: 1.6 } },
+          dossier.anyGeneticEvidence
+            ? "At least one disease association here carries direct human genetic evidence. That is the supportive case — but check below whether the genetics point at YOUR indication specifically, not merely at some disease involving this gene."
+            : "No direct human genetic evidence appears among the top associations. That is not evidence the target is wrong — plenty of approved drugs hit targets with no genetic signal — but it does mean the biological case rests on models and pathway reasoning rather than on human variation."),
+        h("div", { style: { marginTop: 10 } },
+          h(ExternalLink, { href: "https://platform.opentargets.org/target/" + dossier.ensemblId, style: { fontSize: 10 } }, "→ Full target profile on Open Targets"))
+      ]),
+
+      dossier.diseases.length > 0 && toolCard(h, [
+        toolLabel(h, "Top disease associations"),
+        h("div", { style: { fontSize: 10.5, fontFamily: "var(--sans)", color: "var(--ink-3)", marginBottom: 10, lineHeight: 1.6 } },
+          "“Genetic” means direct human genetic evidence for this specific target–disease link. A high overall score with no genetic component is built from other evidence types — animal models, pathway inference, expression, text mining — which are weaker grounds for believing the target causes the disease in people."),
+        h("div", { style: { display: "flex", flexDirection: "column", gap: 4 } },
+          dossier.diseases.map((d, i) => h("div", { key: i, style: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, padding: "6px 0", borderBottom: "1px solid var(--rule)", fontSize: 11, fontFamily: "var(--mono)" } },
+            h("span", { style: { color: "var(--ink-1)", flex: "1 1 auto" } }, d.name),
+            h("span", { style: { color: d.hasGeneticEvidence ? "var(--teal)" : "var(--ink-3)", fontSize: 10, whiteSpace: "nowrap" } },
+              d.hasGeneticEvidence ? "genetic " + d.geneticScore.toFixed(2) : "no genetic"),
+            h("span", { style: { color: "var(--ink-2)", minWidth: 42, textAlign: "right" } }, d.overallScore.toFixed(2)))))
+      ]),
+
+      dossier.drugs.length > 0 && toolCard(h, [
+        toolLabel(h, "Drugs already aimed at this target (" + dossier.drugs.length + " shown)"),
+        h("div", { style: { fontSize: 10.5, fontFamily: "var(--sans)", color: "var(--ink-3)", marginBottom: 10, lineHeight: 1.6 } },
+          "What has been tried and how far it got. A target with approved drugs is validated but crowded; one where several programmes stalled in Phase 2 is a different kind of warning than one nobody has attempted."),
+        h("div", { style: { display: "flex", flexDirection: "column", gap: 4, maxHeight: 340, overflowY: "auto" } },
+          dossier.drugs.map((d, i) => h("div", { key: i, style: { padding: "6px 0", borderBottom: "1px solid var(--rule)" } },
+            h("div", { style: { display: "flex", justifyContent: "space-between", gap: 10, fontSize: 11, fontFamily: "var(--mono)" } },
+              h("span", { style: { color: "var(--ink-1)" } }, d.name),
+              h("span", { style: { color: d.maxPhase >= 4 ? "var(--teal)" : "var(--ink-2)", whiteSpace: "nowrap" } }, phaseLabel(d.maxPhase))),
+            d.mechanism && h("div", { style: { fontSize: 10, fontFamily: "var(--sans)", color: "var(--ink-3)", marginTop: 2 } }, d.mechanism),
+            d.indications.length > 0 && h("div", { style: { fontSize: 10, fontFamily: "var(--sans)", color: "var(--ink-3)", marginTop: 2 } },
+              truncateText(d.indications.slice(0, 4).join(", ") + (d.indications.length > 4 ? " +" + (d.indications.length - 4) + " more" : ""), 150)))))
+      ])
+    )
+  );
+}
+
+// Emphasises a count inline without a wrapper span (which would inherit
+// block display in some of these lists).
+function h0(n) { return String(n); }
+
+// ── Trial Decoder: one NCT, explained ──────────────────────────────────────
+// The gap this fills: the app could already search trials and watch them for
+// changes, but never explain one. Someone who has just read a press release
+// and wants to know whether the trial behind it is any good had nowhere to go.
+//
+// Everything shown is derived from registered CT.gov fields only — see
+// trialDecoder.js. Nothing here predicts success, and nothing is inferred
+// from the sponsor or the drug.
+function TrialDecoderTool({ initialNctId, onConsumedInitialNctId }) {
+  const h = React.createElement;
+  const [nctInput, setNctInput] = React.useState("");
+  const [loading, setLoading] = React.useState(false);
+  const [decoded, setDecoded] = React.useState(null);
+  const [raw, setRaw] = React.useState(null);
+  const [error, setError] = React.useState(null);
+  const [showRaw, setShowRaw] = React.useState(false);
+  const seq = React.useRef(0);
+
+  const run = async (nctId) => {
+    const id = (nctId || nctInput).trim();
+    if (!id) return;
+    const mine = ++seq.current;
+    setLoading(true); setError(null); setDecoded(null); setRaw(null);
+    const r = await fetchStudyByNctId(id);
+    if (mine !== seq.current) return;      // superseded by a newer lookup
+    if (!r.ok) { setError(r.error); setLoading(false); return; }
+    setRaw(r.study);
+    setDecoded(decodeTrial(r.study));
+    setLoading(false);
+  };
+
+  // Arriving from a "decode this trial" link elsewhere — run immediately
+  // rather than making the user paste an ID they just clicked.
+  React.useEffect(() => {
+    if (initialNctId) {
+      setNctInput(initialNctId);
+      run(initialNctId);
+      if (onConsumedInitialNctId) onConsumedInitialNctId();
+    }
+  }, [initialNctId]);
+
+  const sevColor = (s) => s === "high" ? "var(--red)" : s === "medium" ? "var(--amber)" : "var(--ink-2)";
+  const factRow = (label, value, note) => h("div", { style: { display: "flex", gap: 10, padding: "7px 0", borderBottom: "1px solid var(--rule)", alignItems: "baseline", flexWrap: "wrap" } },
+    h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.05em", minWidth: 150 } }, label),
+    h("div", { style: { fontSize: 12, fontFamily: "var(--mono)", color: "var(--ink-1)", flex: "1 1 200px" } }, value),
+    note && h("div", { style: { fontSize: 10, fontFamily: "var(--sans)", color: "var(--ink-3)", flex: "1 1 100%", lineHeight: 1.5 } }, note)
+  );
+
+  return h("div", null,
+    toolCard(h, [
+      toolLabel(h, "Decode a trial"),
+      h(Note, { summary: "New here? What this does and what it deliberately won't do" },
+        h("div", { style: { lineHeight: 1.6 } }, "Paste a ClinicalTrials.gov ID and this lays out the trial's architecture in plain English: who's in it, what it's compared against, who's blinded, what the primary endpoint actually measures, and — the part worth reading — what the design can and cannot establish. Every line comes from fields the sponsor registered; where CT.gov is silent, this says “not stated” rather than assuming a default. It does not predict whether the trial will succeed, and it knows nothing about the company, the drug, or the stock. A clean design can still fail and a flawed one can still read out positive — the point is to see the design clearly before the result arrives and anchors you.")),
+      h("div", { style: { display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 } },
+        h("input", { type: "text", value: nctInput, placeholder: "NCT number — e.g. NCT04368728",
+          "aria-label": "ClinicalTrials.gov ID",
+          onChange: e => setNctInput(e.target.value), onKeyDown: e => { if (e.key === "Enter") run(); },
+          style: { flex: "1 1 260px", padding: "9px 12px", borderRadius: 7, border: "1.5px solid var(--rule)", background: "var(--surface)", color: "var(--ink-1)", fontFamily: "var(--mono)", fontSize: 13 } }),
+        h("button", { onClick: () => run(), disabled: loading || !nctInput.trim(),
+          style: { padding: "9px 18px", borderRadius: 7, border: "1px solid var(--teal)", background: "var(--teal-bg)", color: "var(--teal)", fontFamily: "var(--mono)", fontSize: 12, fontWeight: 700, cursor: loading ? "default" : "pointer", opacity: nctInput.trim() ? 1 : 0.5 } },
+          loading ? "Decoding…" : "Decode")
+      )
+    ]),
+
+    error && toolCard(h, h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--amber)", lineHeight: 1.6 } }, error)),
+
+    decoded && h("div", null,
+      toolCard(h, [
+        h("div", { style: { fontSize: 15, fontFamily: "var(--display)", fontWeight: 700, color: "var(--ink-1)", marginBottom: 4, lineHeight: 1.4 } }, decoded.title || decoded.nctId),
+        h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--teal)", marginBottom: 12 } }, decoded.architecture),
+        factRow("Sponsor", decoded.sponsor || "—"),
+        factRow("Phase / status", (decoded.phase || "—") + " · " + (decoded.status || "—")),
+        factRow("Condition", (decoded.conditions || []).join(", ") || "—"),
+        factRow("Intervention", (decoded.interventions || []).join(", ") || "—"),
+        factRow("Allocation", decoded.allocation.value,
+          decoded.allocation.stated ? null : "CT.gov has no allocation registered for this trial — treat the architecture as unknown rather than assuming."),
+        factRow("Masking", decoded.masking.value + (decoded.masking.who && decoded.masking.who.length ? " (" + decoded.masking.who.map(w => w.toLowerCase()).join(", ") + ")" : ""),
+          decoded.masking.stated ? null : "Masking not registered."),
+        factRow("Comparator", decoded.comparator.value),
+        factRow("Arms", decoded.armCount
+          ? decoded.armCount + (decoded.armLabels.length ? " — " + decoded.armLabels.slice(0, 4).join(" | ")
+              + (decoded.armLabels.length > 4 ? "  … +" + (decoded.armLabels.length - 4) + " more" : "") : "")
+          : "—",
+          decoded.armCount > 6 ? "A trial with this many arms is usually a master protocol spanning several sub-studies rather than one comparison — read the registered arms directly before treating any single result as “the” outcome." : null),
+        factRow("Enrolment", decoded.enrollment != null ? decoded.enrollment.toLocaleString() : "—"),
+        decoded.endpoint.stated && factRow("Primary endpoint" + (decoded.endpoint.count > 1 ? "s (" + decoded.endpoint.count + ")" : ""),
+          decoded.endpoint.items.slice(0, 5).map(o => o.measure + (o.timeFrame ? " @ " + o.timeFrame : "")).join("  •  ")
+            + (decoded.endpoint.items.length > 5 ? "  … and " + (decoded.endpoint.items.length - 5) + " more" : ""),
+          decoded.endpoint.subjective ? "This endpoint involves assessment or self-report rather than a hard event, which is why the masking line above matters."
+            : decoded.endpoint.objective ? "This is a hard event or an independently assessed measure, so it is less sensitive to who knew what."
+            : null),
+        h("div", { style: { marginTop: 10 } },
+          h(ExternalLink, { href: "https://clinicaltrials.gov/study/" + decoded.nctId, style: { fontSize: 10 } }, "→ Full record on ClinicalTrials.gov"))
+      ]),
+
+      toolCard(h, [
+        toolLabel(h, "What this trial can establish"),
+        decoded.canProve.length
+          ? h("ul", { style: { margin: 0, paddingLeft: 18, display: "flex", flexDirection: "column", gap: 7 } },
+              decoded.canProve.map((t, i) => h("li", { key: i, style: { fontSize: 12, fontFamily: "var(--sans)", color: "var(--ink-2)", lineHeight: 1.6 } }, t)))
+          : h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-3)" } }, "Not enough registered design detail to say.")
+      ]),
+
+      toolCard(h, [
+        toolLabel(h, "What it cannot"),
+        h("ul", { style: { margin: 0, paddingLeft: 18, display: "flex", flexDirection: "column", gap: 7 } },
+          decoded.cannotProve.map((t, i) => h("li", { key: i, style: { fontSize: 12, fontFamily: "var(--sans)", color: "var(--ink-2)", lineHeight: 1.6 } }, t)))
+      ]),
+
+      toolCard(h, [
+        toolLabel(h, "Design flags (" + decoded.redFlags.length + ")"),
+        decoded.redFlags.length === 0
+          ? h("div", { style: { fontSize: 11.5, fontFamily: "var(--sans)", color: "var(--ink-2)", lineHeight: 1.6 } },
+              "Nothing in the registered design tripped a flag. That is a statement about the architecture only — it says nothing about whether the drug works, whether the effect size assumed is realistic, or whether the trial will read out positive.")
+          : h("div", { style: { display: "flex", flexDirection: "column", gap: 12 } },
+              decoded.redFlags.map((f, i) => h("div", { key: i, style: { borderLeft: "3px solid " + sevColor(f.severity), paddingLeft: 10 } },
+                h("div", { style: { fontSize: 12, fontFamily: "var(--mono)", fontWeight: 700, color: sevColor(f.severity), marginBottom: 3 } }, f.label),
+                h("div", { style: { fontSize: 11.5, fontFamily: "var(--sans)", color: "var(--ink-2)", lineHeight: 1.6 } }, f.detail)
+              )))
+      ]),
+
+      raw && toolCard(h, [
+        h("button", { onClick: () => setShowRaw(v => !v),
+          style: { background: "none", border: "none", padding: 0, cursor: "pointer", fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)" } },
+          (showRaw ? "▾" : "▸") + " Registered fields this was derived from"),
+        showRaw && h("pre", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-2)", background: "var(--surface-2)", padding: 10, borderRadius: 6, overflowX: "auto", marginTop: 8, lineHeight: 1.5 } },
+          JSON.stringify({ allocation: raw.allocation, interventionModel: raw.interventionModel, masking: raw.masking,
+            whoMasked: raw.whoMasked, armTypes: raw.armTypes, primaryOutcomes: raw.primaryOutcomesFull,
+            enrollment: raw.enrollment, status: raw.status, primaryCompletionDate: raw.primaryCompletionDate,
+            hasResults: raw.hasResults, whyStopped: raw.whyStopped }, null, 2))
+      ])
+    )
+  );
+}
+
 // ── Trial Explorer: comparable-trial search (ClinicalTrials.gov design/
 // status landscape for a condition+phase) plus Trial Watch's snapshot-and-
 // diff for a specific trial by NCT ID, in one tab — these are two sides of
@@ -1891,6 +2153,28 @@ function TrialWatchTool({ initialNctId, onConsumedInitialNctId }) {
   // Same out-of-order-response guard as Company Lookup: a slower earlier
   // search must not overwrite the results of a newer one.
   const compsSeq = React.useRef(0);
+
+  // Analog effect-size board — a separate call from the status landscape above
+  // because it needs the results section, which the landscape query
+  // deliberately filters out for speed.
+  const [effects, setEffects] = React.useState(null);
+  const [effectsLoading, setEffectsLoading] = React.useState(false);
+  const [effectsError, setEffectsError] = React.useState(null);
+  const effectsSeq = React.useRef(0);
+
+  const loadEffects = async () => {
+    const mine = ++effectsSeq.current;
+    setEffectsLoading(true); setEffectsError(null); setEffects(null);
+    try {
+      const r = await fetchAnalogEffects(ctCondition, ctPhase, { intervention: ctIntervention.trim() || undefined, pageSize: 50 });
+      if (mine !== effectsSeq.current) return;
+      setEffects(r);
+    } catch (e) {
+      if (mine !== effectsSeq.current) return;
+      setEffectsError("Couldn't reach ClinicalTrials.gov for posted results: " + e.message + ". This is a connection problem, not a finding of no effect data.");
+    }
+    setEffectsLoading(false);
+  };
 
   const searchComps = async () => {
     const myReq = ++compsSeq.current;
@@ -1975,6 +2259,48 @@ function TrialWatchTool({ initialNctId, onConsumedInitialNctId }) {
           ))
         ),
         h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginTop: 8 } }, ctSummary.caveat),
+
+        // ── Analog effect-size board ──────────────────────────────────────
+        // The status landscape says how these trials ENDED. This says how big
+        // the effects were, which is the reference class a modelled hazard
+        // ratio should actually be read against.
+        h("div", { style: { marginTop: 12, paddingTop: 10, borderTop: "1px dashed var(--rule)" } },
+          h("div", { style: { display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 6 } },
+            h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.06em" } }, "Posted effect sizes"),
+            h("button", { onClick: loadEffects, disabled: effectsLoading,
+              style: { padding: "4px 12px", borderRadius: 6, border: "1px solid var(--rule)", background: "transparent", color: "var(--ink-2)", fontFamily: "var(--mono)", fontSize: 10, cursor: effectsLoading ? "default" : "pointer" } },
+              effectsLoading ? "Reading results\u2026" : (effects ? "Refresh" : "Load what these trials actually reported"))),
+          !effects && !effectsLoading && !effectsError && h("div", { style: { fontSize: 10.5, fontFamily: "var(--sans)", color: "var(--ink-3)", lineHeight: 1.6 } },
+            "A separate call, because posted results are excluded from the landscape query above for speed. This reads the structured analysis fields of trials that posted results, so you can see what winning has actually looked like here rather than only how often it happened."),
+          effectsError && h("div", { style: { fontSize: 10.5, fontFamily: "var(--mono)", color: "var(--amber)", lineHeight: 1.6 } }, effectsError),
+          effects && h("div", null,
+            h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-2)", lineHeight: 1.7, marginBottom: 8 } },
+              h("div", null, effects.sampleSize + " trials read \u00B7 " + effects.withPostedResults + " posted results \u00B7 " +
+                h0(effects.withExtractableEffect) + " with a structured primary effect estimate")),
+            Object.keys(effects.summaryByScale).length === 0
+              ? h("div", { style: { fontSize: 10.5, fontFamily: "var(--sans)", color: "var(--ink-3)", lineHeight: 1.6 } },
+                  "None of these trials registered a primary effect estimate in a form that can be read without guessing. That is common \u2014 many sponsors post results as narrative tables only \u2014 and it is reported here rather than hidden.")
+              : Object.keys(effects.summaryByScale).map(scale => {
+                  const sum = effects.summaryByScale[scale];
+                  const rows = effects.byScale[scale];
+                  if (!sum) return null;
+                  return h("div", { key: scale, style: { marginBottom: 12 } },
+                    h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-1)", fontWeight: 700, marginBottom: 4 } },
+                      (scale === "ratio" ? "Ratio-scale endpoints" : "Difference-scale endpoints") + " (" + sum.n + ")"),
+                    h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-2)", marginBottom: 6 } },
+                      "median " + sum.median.toFixed(2) + " \u00B7 range " + sum.min.toFixed(2) + " to " + sum.max.toFixed(2) +
+                      " \u00B7 " + sum.intervalExcludesNull + " of " + sum.intervalReported + " with a CI excluding no-effect"),
+                    h("div", { style: { display: "flex", flexDirection: "column", gap: 3, maxHeight: 260, overflowY: "auto" } },
+                      rows.map((r, i) => h("div", { key: i, style: { display: "flex", justifyContent: "space-between", gap: 8, fontSize: 10.5, fontFamily: "var(--mono)", color: "var(--ink-2)", padding: "4px 0", borderBottom: "1px solid var(--rule)" } },
+                        h("span", { style: { flex: "1 1 auto", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } },
+                          r.nctId + " \u00B7 " + truncateText(r.outcomeTitle || "primary", 42)),
+                        h("span", { style: { whiteSpace: "nowrap", color: r.crossesNull === false ? "var(--teal)" : "var(--ink-3)" } },
+                          r.paramLabel + " " + r.value.toFixed(2) +
+                          (r.lower != null && r.upper != null ? " (" + r.lower.toFixed(2) + "\u2013" + r.upper.toFixed(2) + ")" : "")))))
+                  );
+                }),
+            h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginTop: 8, lineHeight: 1.6 } }, effects.caveat))
+        ),
 
         ctSummary.studies.length > 0 && h("div", { style: { marginTop: 12, paddingTop: 10, borderTop: "1px dashed var(--rule)" } },
           h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 } },

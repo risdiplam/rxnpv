@@ -22,13 +22,13 @@ function findByLabel(d,t){return [...d.querySelectorAll("input")].find(i=>{const
   setVal(findByLabel(d,"Fully diluted shares"),"100000000"); await wait(150);
 
   click(btn("Tools")); await wait(400);
-  const toolTabs = ["M&A Premium","Company Lookup","Diluted Market Cap","Cash Runway","Runway vs. Catalyst","Binary Event","Peak Sales Comps","Licensing Comps","Catalyst Calendar","Trial Explorer","FDA Lookup","Exclusivity / LOE","Sensitivity"];
+  const toolTabs = ["M&A Premium","Company Lookup","Diluted Market Cap","Cash Runway","Runway vs. Catalyst","Binary Event","Peak Sales Comps","Licensing Comps","Catalyst Calendar","Trial Explorer","FDA Lookup","Exclusivity / LOE","Sensitivity","Trial Decoder","Target Dossier"];
   for (const name of toolTabs) {
     const tb = [...d.querySelectorAll("button")].find(b => b.textContent.trim() === name);
     if (!tb) { console.log("MISSING TAB:", name); continue; }
     click(tb); await wait(400);
   }
-  console.log("All 13 Tools tabs visited without error");
+  console.log("All " + toolTabs.length + " Tools tabs visited without error");
 
   click(btn("Simulation")); await wait(600);
   const simTabs = ["Trial Outcome / PoS","Phase 2→3 Translator","Trial Statistics","Meta-Analysis","Peak Sales","PK/PD"];
@@ -49,7 +49,15 @@ function findByLabel(d,t){return [...d.querySelectorAll("input")].find(i=>{const
 
   click(btn("Portfolio")); await wait(500);
   click(btn("Reference Sheet")); await wait(500);
-  console.log("Portfolio + Reference Sheet visited without error");
+  // Every Reference Sheet tab, including the trial glossary added alongside
+  // the decoder — pure content, but it still has to render.
+  const refTabs = ["How This Works","Revenue Build","Cost Structure","R&D & Timeline","Probability of Success","Discount Rate","Valuation & Dilution","M&A Comps","Trial Glossary"];
+  for (const name of refTabs) {
+    const b = btn(name);
+    if (!b) { console.log("  MISSING Reference Sheet tab: " + name); continue; }
+    click(b); await wait(150);
+  }
+  console.log("Portfolio + all " + refTabs.length + " Reference Sheet tabs visited without error");
 
   const licensingCb = [...d.querySelectorAll("input[type=checkbox]")].find(c => c.closest("label") && c.closest("label").textContent.includes("Partnered asset"));
   console.log("\nErrors:", errors.length);

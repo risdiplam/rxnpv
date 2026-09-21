@@ -366,6 +366,52 @@ const POS_NONSCIENTIFIC_ADJUSTED = {
   nonscientificTerminationRate: { phase1: 25, phase2: 24 }
 };
 
+// ── Endpoint glossary + what each phase can actually prove ─────────────────
+// Teaching content, not benchmarks. This exists because the Trial Decoder is
+// only useful to someone who knows what BICR or a hierarchical gate is — and
+// a retail investor reading their first oncology press release does not. Kept
+// in data.js rather than inline in the view so the wording is versioned and
+// citable like every other reference table here.
+const ENDPOINT_GLOSSARY = [
+  { group: "Oncology", items: [
+    { term: "OS", full: "Overall survival", plain: "Time from randomisation until death from any cause.", why: "The only oncology endpoint nobody argues about. It is unambiguous, needs no adjudication, and blinding barely matters because death is not a judgement call. Its cost is time: OS trials are long and large, which is exactly why sponsors so often run a surrogate instead." },
+    { term: "PFS", full: "Progression-free survival", plain: "Time until the tumour grows past a defined threshold, or the patient dies.", why: "Faster and cheaper than OS, and often what gets a drug approved. But progression is scored from scans, so who reads them matters enormously — which is what BICR is for. A PFS win with no OS benefit is a real and common outcome, not a technicality." },
+    { term: "ORR", full: "Objective response rate", plain: "The share of patients whose tumour shrank by a defined amount.", why: "Fast, and readable in a single-arm trial, which is why it underpins most accelerated approvals. It says nothing about duration — a response that lasts six weeks counts the same as one lasting three years — so it is usually reported alongside DoR." },
+    { term: "DoR", full: "Duration of response", plain: "How long responses lasted, among those who responded.", why: "The companion ORR needs. A high ORR with a short DoR describes a drug that works briefly." },
+    { term: "BICR", full: "Blinded independent central review", plain: "Scans re-read by independent assessors who don't know the treatment.", why: "The fix for the biggest weakness in imaging endpoints. If a trial is open label and PFS is assessed only by the treating investigator, expectation can move the result without anyone acting improperly." }
+  ]},
+  { group: "Trial design", items: [
+    { term: "ITT", full: "Intention to treat", plain: "Everyone randomised is analysed in the arm they were assigned, regardless of what they actually received.", why: "The conservative, regulator-preferred analysis. It preserves randomisation, which is the entire reason a randomised trial can claim causality." },
+    { term: "Per-protocol", full: "Per-protocol analysis", plain: "Only patients who completed treatment as specified.", why: "Usually flatters the drug, because dropping non-completers removes the people for whom it went badly. A result that holds on ITT and fails per-protocol is odd; the reverse is common and much less impressive than it sounds." },
+    { term: "Hierarchical testing", full: "Testing hierarchy / gatekeeping", plain: "A pre-specified order for testing endpoints, where each is only formally tested if the previous one won.", why: "Where multiplicity control usually lives. If the primary misses, everything below the gate is exploratory — no matter how good the p-value looks. A press release quoting a significant secondary after a failed primary is the single most common way this gets misrepresented." },
+    { term: "Non-inferiority", full: "Non-inferiority margin", plain: "A pre-set amount by which the new drug is allowed to be worse and still 'win'.", why: "A non-inferiority win means 'not meaningfully worse', not 'better'. The margin is a judgement made before the trial, and a generous one can make a genuinely inferior drug look successful." },
+    { term: "Open label", full: "Unblinded", plain: "Everyone knows who is getting what.", why: "Acceptable when the endpoint is a hard event. Dangerous when it is a symptom score, a questionnaire, or an investigator's assessment." }
+  ]},
+  { group: "Statistics", items: [
+    { term: "HR", full: "Hazard ratio", plain: "The rate of events on treatment relative to control. Below 1 favours the drug.", why: "An HR of 0.70 means roughly a 30% lower rate of the event at any given moment — not that patients live 30% longer. The confidence interval matters more than the point estimate: 0.70 (0.50–0.98) and 0.70 (0.68–0.72) are very different trials." },
+    { term: "CI", full: "Confidence interval", plain: "The range of effects compatible with the data.", why: "Where the honesty lives. A wide interval that just barely excludes no-effect is a weak result dressed up as a win, and a point estimate quoted without one should be treated as incomplete." },
+    { term: "p-value", full: "p-value", plain: "How surprising the data would be if the drug did nothing.", why: "Not the probability the drug works, and not a measure of how large the effect is. A huge trial can produce p<0.001 for an effect too small to matter to a patient." },
+    { term: "NNT", full: "Number needed to treat", plain: "How many patients must be treated for one to benefit.", why: "The most honest translation of a relative effect into something human. A 50% relative risk reduction sounds transformative until the NNT is 200." },
+    { term: "Power", full: "Statistical power", plain: "The chance of detecting an effect of a given size, if it is really there.", why: "Powered for what matters: a trial powered for a large effect will miss a real but modest one. That is how a working drug produces a failed trial." }
+  ]},
+  { group: "Regulatory", items: [
+    { term: "Accelerated approval", full: "Accelerated approval", plain: "Approval on a surrogate endpoint reasonably likely to predict benefit, with confirmation required later.", why: "Real approval with real revenue, and a real obligation attached. Confirmatory trials do fail, and withdrawals happen." },
+    { term: "Surrogate endpoint", full: "Surrogate endpoint", plain: "A measurable stand-in for how a patient actually feels, functions, or survives.", why: "Its value depends entirely on how well validated it is in that specific indication. A surrogate accepted in one disease carries no automatic standing in another." },
+    { term: "SPA", full: "Special protocol assessment", plain: "Written FDA agreement that a trial's design would support approval if it succeeds.", why: "Meaningful de-risking of the design question — though it binds nobody if the data come in ambiguous, and it says nothing about whether the drug works." }
+  ]}
+];
+
+// What each phase is architecturally capable of demonstrating. Deliberately
+// framed as capability rather than likelihood.
+const PHASE_CAPABILITIES = [
+  { phase: "Phase 1", canShow: ["Whether the drug is tolerated, and at what dose", "How the body absorbs and clears it (PK)", "Occasionally an early efficacy signal, usually in oncology"],
+    cannotShow: ["That the drug works — there is rarely a control group, and the population is often healthy volunteers", "Anything reliable about the dose that will eventually be used"] },
+  { phase: "Phase 2", canShow: ["Whether a biological effect appears at a plausible dose", "Which dose and which population are worth taking forward", "An effect size estimate — the crucial input to Phase 3 planning"],
+    cannotShow: ["Confirmatory efficacy. Phase 2 estimates are systematically optimistic: small trials that read out well are the ones that advance, so the observed effect is selected for luck as much as for biology", "Safety at any real scale — rare harms need thousands of patients"] },
+  { phase: "Phase 3", canShow: ["Confirmatory efficacy against a control, in the population intended for the label", "A safety database large enough to characterise common harms", "The evidence a label is actually written from"],
+    cannotShow: ["Rare adverse events, which often surface only post-marketing", "How the drug performs against standard of care as it will exist at launch, if the comparator is already dated", "Commercial success — approval and uptake are different problems"] }
+];
+
 const THERAPEUTIC_AREAS = ["Allergy","Anti-infective","Autoimmune","Cardiovascular","CNS","Dermatology",
   "Endocrine","Gastrointestinal","Genitourinary","Hematology","Immunomodulation","Infectious disease",
   "Metabolic","Musculoskeletal","Neurology","Oncology","Ophthalmology","Pain/Anesthesiology","Psychiatry",

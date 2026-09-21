@@ -57,7 +57,37 @@ function parseStudy(study) {
     // has genuinely complex, variable statistical structure; getting an
     // extraction or summary subtly wrong in a valuation tool is a real risk,
     // not a cosmetic one, so this points the user to read it themselves.
-    hasResults: !!study.hasResults
+    hasResults: !!study.hasResults,
+
+    // ── Design fields ──────────────────────────────────────────────────────
+    // These arrive in every response already (the API is not field-filtered)
+    // but went unparsed until the trial decoder needed them. They are what
+    // separates "here is a list of trials" from "here is what this trial can
+    // and cannot actually prove".
+    allocation: (design.designInfo || {}).allocation || null,          // RANDOMIZED | NON_RANDOMIZED
+    interventionModel: (design.designInfo || {}).interventionModel || null, // PARALLEL | CROSSOVER | SINGLE_GROUP...
+    primaryPurpose: (design.designInfo || {}).primaryPurpose || null,  // TREATMENT | PREVENTION...
+    masking: ((design.designInfo || {}).maskingInfo || {}).masking || null, // NONE | SINGLE | DOUBLE | TRIPLE | QUADRUPLE
+    whoMasked: ((design.designInfo || {}).maskingInfo || {}).whoMasked || [],
+    armCount: (arms.armGroups || []).length,
+    armLabels: (arms.armGroups || []).map(a => a.label).filter(Boolean),
+    armTypes: (arms.armGroups || []).map(a => a.type).filter(Boolean),  // EXPERIMENTAL | PLACEBO_COMPARATOR | ACTIVE_COMPARATOR...
+    eligibilityCriteria: (p.eligibilityModule || {}).eligibilityCriteria || "",
+    healthyVolunteers: (p.eligibilityModule || {}).healthyVolunteers,
+    minimumAge: (p.eligibilityModule || {}).minimumAge || null,
+    sex: (p.eligibilityModule || {}).sex || null,
+    // Full primary/secondary outcome detail, not just the measure string the
+    // snapshot diff uses — the decoder needs timeFrame to judge whether a
+    // time-to-event claim is plausible at this follow-up.
+    primaryOutcomesFull: (outcomes.primaryOutcomes || []).map(o => ({
+      measure: o.measure || "", timeFrame: o.timeFrame || "", description: o.description || ""
+    })),
+    secondaryOutcomes: (outcomes.secondaryOutcomes || []).map(o => ({
+      measure: o.measure || "", timeFrame: o.timeFrame || ""
+    })),
+    completionDate: status.completionDateStruct ? status.completionDateStruct.date : null,
+    resultsFirstPostDate: status.resultsFirstPostDateStruct ? status.resultsFirstPostDateStruct.date : null,
+    whyStopped: status.whyStopped || null
   };
 }
 

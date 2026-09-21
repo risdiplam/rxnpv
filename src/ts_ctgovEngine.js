@@ -10,10 +10,30 @@ const TS_CTGOV_BASE = 'https://clinicaltrials.gov/api/v2/studies';
 
 const FETCH_FN = (typeof fetch !== 'undefined') ? fetch : null; // browser/Electron global
 
-async function ctgovFetch(params) {
+// Named tsCtgovFetch, NOT ctgovFetch. Both CT.gov engines previously declared
+// a top-level `async function ctgovFetch`, and because this file is
+// concatenated after ctgovEngine.js the definition here silently replaced the
+// Tools-side one for the whole bundle. The consequence was invisible but real:
+// every Tools CT.gov call — Trial Explorer, competitor landscape, Catalyst
+// Calendar — ran through this implementation, which had no timeout, while its
+// own source clearly specified a 15-second abort. A hung request hung forever.
+// Both now have distinct names and a timeout of their own.
+const TS_CTGOV_TIMEOUT_MS = 15000;
+async function tsCtgovFetch(params) {
   if (!FETCH_FN) throw new Error('No fetch available in this environment (node needs a polyfill for live calls)');
   const qs = new URLSearchParams(params).toString();
-  const res = await fetch(`${TS_CTGOV_BASE}?${qs}`);
+  const ctl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+  const timer = ctl ? setTimeout(() => ctl.abort(), TS_CTGOV_TIMEOUT_MS) : null;
+  let res;
+  try {
+    res = await fetch(`${TS_CTGOV_BASE}?${qs}`, ctl ? { signal: ctl.signal } : undefined);
+  } catch (e) {
+    if (timer) clearTimeout(timer);
+    throw new Error(e && e.name === 'AbortError'
+      ? 'ClinicalTrials.gov did not respond within 15 seconds'
+      : 'Could not reach ClinicalTrials.gov: ' + ((e && e.message) || 'network error'));
+  }
+  if (timer) clearTimeout(timer);
   if (!res.ok) throw new Error(`ClinicalTrials.gov API error: ${res.status} ${res.statusText}`);
   return res.json();
 }
@@ -40,7 +60,7 @@ async function fetchHistoricalComps(condition, phase, opts = {}) {
   };
   if (opts.intervention) params['query.intr'] = opts.intervention;
 
-  const data = await ctgovFetch(params);
+  const data = await tsCtgovFetch(params);
   return summarizeStudiesResponse(data, { condition, phase, intervention: opts.intervention || null });
 }
 
@@ -126,5 +146,142 @@ function median(arr) {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { fetchHistoricalComps, fetchTrialByNctId, parseHistoricalStudy, summarizeStudiesResponse, monthsBetween, median, TS_CTGOV_BASE };
+  module.exports = { fetchHistoricalComps, fetchTrialByNctId, parseHistoricalStudy, summarizeStudiesResponse, monthsBetween, median, TS_CTGOV_BASE, extractAnalogEffects, fetchAnalogEffects, TS_EFFECT_PARAM_TYPES };
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// ANALOG EFFECT-SIZE BOARD
+// The historical-comps rollup above answers "how long did trials here take and
+// how did they end up". It cannot answer the more useful question: how big
+// were the effects that actually got posted. That is the reference class a
+// modelled hazard ratio should be read against — a plan assuming HR 0.62 in an
+// indication whose last five randomised trials landed between 0.78 and 0.91 is
+// making a claim worth noticing.
+//
+// The honesty problem here is real and is why this is built the way it is.
+// CT.gov results modules are free text with arbitrary units, and a naive
+// scraper would produce confident-looking nonsense. So this extracts ONLY from
+// the structured `analyses` block, where the sponsor registered a recognised
+// parameter type (hazard ratio, odds ratio, risk difference and so on) with a
+// numeric value — and it always reports its own denominator, so the user can
+// see that effect sizes came from 7 of 18 trials rather than believing the
+// board is the whole picture. Anything unparseable is counted, never guessed.
+// ════════════════════════════════════════════════════════════════════════════
+
+// CT.gov paramType values worth reading, grouped by the scale they live on.
+// Ratios are compared on a log scale and have a null value of 1; differences
+// are linear with a null of 0. Mixing them silently would be meaningless.
+const TS_EFFECT_PARAM_TYPES = {
+  "HAZARD_RATIO": { scale: "ratio", label: "Hazard ratio", nullValue: 1 },
+  "RISK_RATIO": { scale: "ratio", label: "Risk ratio", nullValue: 1 },
+  "ODDS_RATIO": { scale: "ratio", label: "Odds ratio", nullValue: 1 },
+  "RISK_DIFFERENCE": { scale: "difference", label: "Risk difference", nullValue: 0 },
+  "MEAN_DIFFERENCE": { scale: "difference", label: "Mean difference", nullValue: 0 },
+  "LEAST_SQUARES_MEAN_DIFFERENCE": { scale: "difference", label: "LS mean difference", nullValue: 0 }
+};
+
+// Pure function, no network — unit-tested against mocked response shapes.
+function extractAnalogEffects(data, queryMeta) {
+  const studies = (data && data.studies) || [];
+  const rows = [];
+  let withResults = 0, withExtractable = 0;
+
+  studies.forEach(s => {
+    const proto = s.protocolSection || {};
+    const id = proto.identificationModule || {};
+    const status = proto.statusModule || {};
+    const design = proto.designModule || {};
+    const results = s.resultsSection || {};
+    const measures = (results.outcomeMeasuresModule || {}).outcomeMeasures || [];
+    if (!measures.length) return;
+    withResults++;
+
+    // Primary outcomes only. A secondary endpoint's effect size is not a
+    // comparable reference point for a primary endpoint assumption, and
+    // mixing them would quietly inflate the sample.
+    const primaries = measures.filter(m => (m.type || "").toUpperCase() === "PRIMARY");
+    let found = null;
+    for (const m of primaries) {
+      for (const a of (m.analyses || [])) {
+        const spec = TS_EFFECT_PARAM_TYPES[(a.paramType || "").toUpperCase()];
+        const value = parseFloat(a.paramValue);
+        if (!spec || !isFinite(value)) continue;
+        const lower = parseFloat(a.ciLowerLimit), upper = parseFloat(a.ciUpperLimit);
+        found = {
+          nctId: id.nctId,
+          title: id.briefTitle || "",
+          status: status.overallStatus || "",
+          enrollment: design.enrollmentInfo ? design.enrollmentInfo.count : null,
+          completionDate: status.completionDateStruct ? status.completionDateStruct.date : null,
+          outcomeTitle: m.title || "",
+          paramType: (a.paramType || "").toUpperCase(),
+          scale: spec.scale,
+          paramLabel: spec.label,
+          nullValue: spec.nullValue,
+          value,
+          lower: isFinite(lower) ? lower : null,
+          upper: isFinite(upper) ? upper : null,
+          pValue: a.pValue != null ? String(a.pValue) : null,
+          // "Favourable" is direction only, decided by which side of the null
+          // the estimate sits on. It is NOT a judgement that the trial won —
+          // a ratio below 1 can still be a miss if the interval crosses it.
+          favoursTreatment: spec.scale === "ratio" ? value < spec.nullValue : value > spec.nullValue,
+          crossesNull: (isFinite(lower) && isFinite(upper))
+            ? (spec.nullValue >= Math.min(lower, upper) && spec.nullValue <= Math.max(lower, upper))
+            : null
+        };
+        break;
+      }
+      if (found) break;
+    }
+    if (found) { rows.push(found); withExtractable++; }
+  });
+
+  // Group by scale — a hazard ratio and a mean difference cannot share an axis.
+  const byScale = {};
+  rows.forEach(r => { (byScale[r.scale] = byScale[r.scale] || []).push(r); });
+  Object.keys(byScale).forEach(k => byScale[k].sort((a, b) => a.value - b.value));
+
+  const summarize = (arr) => {
+    if (!arr.length) return null;
+    const vals = arr.map(r => r.value).sort((a, b) => a - b);
+    const conclusive = arr.filter(r => r.crossesNull === false).length;
+    return {
+      n: vals.length,
+      min: vals[0],
+      max: vals[vals.length - 1],
+      median: median(vals),
+      // How many had an interval that actually excluded no-effect. This is the
+      // closest honest proxy for "how many were clean wins" available from
+      // registered data, and it is deliberately not called a success rate.
+      intervalExcludesNull: conclusive,
+      intervalReported: arr.filter(r => r.crossesNull !== null).length
+    };
+  };
+
+  return {
+    query: queryMeta,
+    // The denominators, always. Without these the board reads as the whole
+    // landscape when it is often a small and non-random slice of it.
+    totalMatched: (data && data.totalCount) || studies.length,
+    sampleSize: studies.length,
+    withPostedResults: withResults,
+    withExtractableEffect: withExtractable,
+    rows,
+    byScale,
+    summaryByScale: Object.keys(byScale).reduce((acc, k) => { acc[k] = summarize(byScale[k]); return acc; }, {}),
+    caveat: "Effect sizes are read only from CT.gov's structured analysis fields, where a sponsor registered a recognised parameter type with a numeric value. Trials that posted results in narrative form, used an unrecognised parameter, or reported nothing are counted in the denominators above but cannot appear on the board. This is a floor on what exists, not a census."
+  };
+}
+
+async function fetchAnalogEffects(condition, phase, opts = {}) {
+  const params = {
+    'query.cond': condition,
+    'aggFilters': 'phase:' + (TS_PHASE_TO_AGGFILTER[phase] || phase) + ',results:with',
+    'pageSize': String(opts.pageSize || 50),
+    'format': 'json'
+  };
+  if (opts.intervention) params['query.intr'] = opts.intervention;
+  const data = await tsCtgovFetch(params);
+  return extractAnalogEffects(data, { condition, phase, intervention: opts.intervention || null });
 }

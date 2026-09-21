@@ -596,7 +596,43 @@ function ReferenceSheet({ activeCase }) {
   );
   };
 
-  const tabs = [["guide","How This Works"],["revenue","Revenue Build"],["cost","Cost Structure"],["rd","R&D & Timeline"],["pos","Probability of Success"],["discount","Discount Rate"],["valuation","Valuation & Dilution"],["ma","M&A Comps"]];
+  // ── Glossary tab: the vocabulary the Trial Decoder assumes you have ──────
+  const glossaryTab = () => h("div", null,
+    card([
+      label("Reading a trial, in the terms trials are actually written in"),
+      h("div", { style: { fontSize: 12.5, fontFamily: "var(--sans)", color: "var(--ink-2)", lineHeight: 1.7 } },
+        "Everything below is vocabulary, not a benchmark — no number here feeds the model. It exists because the Trial Decoder in Tools is only useful if the words on a trial record mean something to you, and a press release will rarely define them. The “why it matters” column is the part worth reading: most of these terms are perfectly well explained elsewhere, but what makes one endpoint stronger evidence than another rarely is.")
+    ]),
+    ENDPOINT_GLOSSARY.map(group => card([
+      label(group.group),
+      h("div", { style: { display: "flex", flexDirection: "column", gap: 14 } },
+        group.items.map(it => h("div", { key: it.term, style: { borderLeft: "2px solid var(--rule)", paddingLeft: 12 } },
+          h("div", { style: { fontFamily: "var(--mono)", fontSize: 12, fontWeight: 700, color: "var(--ink-1)" } },
+            it.term, h("span", { style: { color: "var(--ink-3)", fontWeight: 400 } }, " — " + it.full)),
+          h("div", { style: { fontFamily: "var(--sans)", fontSize: 12, color: "var(--ink-2)", marginTop: 3, lineHeight: 1.6 } }, it.plain),
+          h("div", { style: { fontFamily: "var(--sans)", fontSize: 11.5, color: "var(--ink-3)", marginTop: 4, lineHeight: 1.6 } }, it.why)
+        )))
+    ])),
+    card([
+      label("What each phase can and cannot establish"),
+      h("div", { style: { fontSize: 11.5, fontFamily: "var(--sans)", color: "var(--ink-3)", marginBottom: 12, lineHeight: 1.6 } },
+        "Framed as what the architecture supports, not how likely it is to succeed. The single most expensive mistake in reading early data is treating a Phase 2 effect size as an estimate of the Phase 3 result — see the Phase 2→3 Translator in Simulation for what the published shrinkage actually looks like."),
+      h("div", { style: { display: "flex", flexDirection: "column", gap: 16 } },
+        PHASE_CAPABILITIES.map(p => h("div", { key: p.phase },
+          h("div", { style: { fontFamily: "var(--mono)", fontSize: 12, fontWeight: 700, color: "var(--teal)", marginBottom: 6 } }, p.phase),
+          h("div", { style: { display: "flex", gap: 18, flexWrap: "wrap" } },
+            h("div", { style: { flex: "1 1 260px" } },
+              h("div", { style: { fontSize: 9, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 } }, "Can establish"),
+              h("ul", { style: { margin: 0, paddingLeft: 16 } }, p.canShow.map((t, i) => h("li", { key: i, style: { fontSize: 11.5, fontFamily: "var(--sans)", color: "var(--ink-2)", lineHeight: 1.6, marginBottom: 3 } }, t)))),
+            h("div", { style: { flex: "1 1 260px" } },
+              h("div", { style: { fontSize: 9, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 } }, "Cannot"),
+              h("ul", { style: { margin: 0, paddingLeft: 16 } }, p.cannotShow.map((t, i) => h("li", { key: i, style: { fontSize: 11.5, fontFamily: "var(--sans)", color: "var(--ink-2)", lineHeight: 1.6, marginBottom: 3 } }, t))))
+          )
+        )))
+    ])
+  );
+
+  const tabs = [["guide","How This Works"],["revenue","Revenue Build"],["cost","Cost Structure"],["rd","R&D & Timeline"],["pos","Probability of Success"],["discount","Discount Rate"],["valuation","Valuation & Dilution"],["ma","M&A Comps"],["glossary","Trial Glossary"]];
 
   return h("div", { style: { maxWidth: 880, margin: "0 auto", padding: "24px 20px 60px" } },
     h("div", { style: { fontFamily: "var(--display)", fontSize: 24, fontWeight: 700, color: "var(--ink-1)", marginBottom: 4 } }, "Reference Sheet"),
@@ -606,6 +642,6 @@ function ReferenceSheet({ activeCase }) {
         style: { padding: "6px 14px", borderRadius: 7, border: "1px solid var(--rule)", cursor: "pointer", fontFamily: "var(--mono)", fontSize: 12,
           background: tab === id ? "var(--teal-bg)" : "transparent", color: tab === id ? "var(--teal)" : "var(--ink-2)", fontWeight: tab === id ? 700 : 400 }
       }, lbl))),
-    tab === "guide" ? guideTab() : tab === "revenue" ? revenueTab() : tab === "cost" ? costTab() : tab === "rd" ? rdTab() : tab === "pos" ? posTab() : tab === "discount" ? discountTab() : tab === "valuation" ? valuationTab() : maTab()
+    tab === "guide" ? guideTab() : tab === "revenue" ? revenueTab() : tab === "cost" ? costTab() : tab === "rd" ? rdTab() : tab === "pos" ? posTab() : tab === "discount" ? discountTab() : tab === "valuation" ? valuationTab() : tab === "glossary" ? glossaryTab() : maTab()
   );
 }

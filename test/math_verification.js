@@ -27,7 +27,7 @@ const FILES = [
   "data.js", "engine.js", "costEngine.js", "rdEngine.js", "posEngine.js",
   "dcfEngine.js", "capitalEngine.js", "scenarioEngine.js", "helpers.js",
   "ts_statsEngine.js", "ts_simulationEngine.js", "ts_peakSalesEngine.js", "ts_pkpdEngine.js",
-  "ts_chart.js", "edgarEngine.js", "fdaEngine.js", "chart.js", "ts_fdaEngine.js"
+  "ts_chart.js", "edgarEngine.js", "ctgovEngine.js", "trialDecoder.js", "ts_ctgovEngine.js", "fdaEngine.js", "chart.js", "ts_fdaEngine.js"
 ];
 global.React = { createElement: () => null, useState: () => [null, () => {}], useEffect: () => {}, Fragment: "F", Component: class {} };
 global.document = { createElement: () => ({ style: {} }), getElementById: () => null };
@@ -84,6 +84,8 @@ const EXPORTS = [
   "computeCOGS", "computeSalesForceCost", "computeMarketingCost", "computeCorporateGA", "computeProgramPnL",
   "SALES_REP_COST", "SGA_BENCHMARKS", "SALES_FORCE_COMP_GROWTH_PCT",
   "tsFdaQueryString", "computeDilutionPath",
+  "extractAnalogEffects", "TS_EFFECT_PARAM_TYPES",
+  "decodeTrial", "decodeTrialRedFlags", "classifyAllocation", "classifyMasking", "classifyComparator", "classifyPrimaryEndpoint",
   "applyPartnershipToRevenue", "getProgramRevenueResult", "computePartnershipContribution", "distributeRnDCostByYear",
   "computeSimpleMultipleValuation", "computeSOTPBreakdown",
   "periodMonths", "sumTranchesAtLatestDate", "calcRunwayFromFacts", "extractDebt",
@@ -1863,6 +1865,164 @@ report();
 // bugs in them. Fixtures below are shaped like genuine companyfacts responses
 // and are the exact cases that reproduced each bug.
 // ════════════════════════════════════════════════════════════════════════════
+section("Analog effect-size board — extracts only what is structured, and says so");
+{
+  // A response shaped like the real thing: one clean hazard ratio, one
+  // unrecognised parameter type, one results-free trial, and one where the
+  // only structured analysis sits on a SECONDARY endpoint.
+  const mk = (nct, opts) => ({
+    protocolSection: {
+      identificationModule: { nctId: nct, briefTitle: "Trial " + nct },
+      statusModule: { overallStatus: "COMPLETED", completionDateStruct: { date: "2024-01-01" } },
+      designModule: { enrollmentInfo: { count: opts.n || 300 } }
+    },
+    resultsSection: opts.measures ? { outcomeMeasuresModule: { outcomeMeasures: opts.measures } } : undefined
+  });
+  const primaryHR = (value, lo, hi) => ([{ type: "PRIMARY", title: "Overall survival",
+    analyses: [{ paramType: "HAZARD_RATIO", paramValue: String(value), ciLowerLimit: String(lo), ciUpperLimit: String(hi), pValue: "0.03" }] }]);
+
+  const data = { totalCount: 40, studies: [
+    mk("NCT01", { measures: primaryHR(0.72, 0.58, 0.90) }),          // clean, excludes null
+    mk("NCT02", { measures: primaryHR(0.88, 0.74, 1.05) }),          // crosses null
+    mk("NCT03", { measures: [{ type: "PRIMARY", title: "Change in score",
+      analyses: [{ paramType: "SOMETHING_ODD", paramValue: "4.2" }] }] }),   // unrecognised type
+    mk("NCT04", {}),                                                  // no results at all
+    mk("NCT05", { measures: [{ type: "SECONDARY", title: "PFS",
+      analyses: [{ paramType: "HAZARD_RATIO", paramValue: "0.5" }] }] })     // secondary only
+  ]};
+  const r = api.extractAnalogEffects(data, { condition: "X", phase: "PHASE3" });
+
+  near("two trials yield an extractable primary effect", r.withExtractableEffect, 2, 0);
+  near("four of the five posted results at all", r.withPostedResults, 4, 0);
+  near("the API's own total is preserved as the outer denominator", r.totalMatched, 40, 0);
+  ok("a secondary-only analysis is excluded from the board",
+    !r.rows.some(x => x.nctId === "NCT05"));
+  ok("an unrecognised parameter type is excluded rather than guessed at",
+    !r.rows.some(x => x.nctId === "NCT03"));
+
+  // Direction and conclusiveness must be separate ideas.
+  const hr72 = r.rows.find(x => x.nctId === "NCT01");
+  const hr88 = r.rows.find(x => x.nctId === "NCT02");
+  ok("an HR below 1 is marked as favouring treatment", hr72.favoursTreatment === true);
+  ok("an interval excluding 1 is marked conclusive", hr72.crossesNull === false);
+  ok("an HR below 1 whose interval crosses 1 still favours treatment directionally", hr88.favoursTreatment === true);
+  ok("but is correctly marked as crossing the null", hr88.crossesNull === true);
+
+  const summary = r.summaryByScale.ratio;
+  near("median of the two ratios", summary.median, 0.80, 1e-9);
+  near("range low", summary.min, 0.72, 1e-9);
+  near("range high", summary.max, 0.88, 1e-9);
+  near("only one interval excluded no-effect", summary.intervalExcludesNull, 1, 0);
+
+  // Ratios and differences must never be pooled onto one axis.
+  const mixed = { totalCount: 2, studies: [
+    mk("NCT10", { measures: primaryHR(0.7, 0.6, 0.85) }),
+    mk("NCT11", { measures: [{ type: "PRIMARY", title: "Change from baseline",
+      analyses: [{ paramType: "MEAN_DIFFERENCE", paramValue: "-2.4", ciLowerLimit: "-3.9", ciUpperLimit: "-0.9" }] }] })
+  ]};
+  const m = api.extractAnalogEffects(mixed, {});
+  ok("ratios and differences are kept on separate scales",
+    m.byScale.ratio.length === 1 && m.byScale.difference.length === 1);
+  ok("a negative mean difference favours treatment on the difference scale",
+    m.byScale.difference[0].favoursTreatment === false);
+
+  // Empty input must not throw or imply a landscape.
+  const empty = api.extractAnalogEffects({ studies: [] }, {});
+  ok("an empty response yields an empty board, not a crash", empty.rows.length === 0);
+  near("with honest zero denominators", empty.withExtractableEffect, 0, 0);
+}
+report();
+
+section("Trial decoder — design classification");
+{
+  const base = { nctId: "NCT00000001", title: "T", status: "RECRUITING", phase: "PHASE3", enrollment: 400, armTypes: [], armCount: 2, primaryOutcomesFull: [] };
+
+  // A textbook Phase 3: randomised, double blind, placebo-controlled.
+  const clean = { ...base, allocation: "RANDOMIZED", interventionModel: "PARALLEL", masking: "DOUBLE",
+    whoMasked: ["PARTICIPANT", "INVESTIGATOR"], armTypes: ["EXPERIMENTAL", "PLACEBO_COMPARATOR"],
+    primaryOutcomesFull: [{ measure: "Overall survival", timeFrame: "36 months" }] };
+  const d1 = api.decodeTrial(clean);
+  ok("randomised allocation is recognised", d1.allocation.randomized === true);
+  ok("double blind is recognised", d1.masking.blinded === true);
+  ok("a placebo arm makes it controlled", d1.comparator.controlled === true);
+  ok("it can support a causal comparison", d1.canProve.some(t => t.indexOf("causal comparison") !== -1));
+  ok("overall survival is read as objective, not subjective", d1.endpoint.subjective === false);
+  ok("and as a time-to-event endpoint", d1.endpoint.timeToEvent === true);
+  ok("a clean design raises no design red flags", d1.redFlags.length === 0);
+
+  // Single-arm: must lose the causal claim, and say so explicitly.
+  const singleArm = { ...base, interventionModel: "SINGLE_GROUP", armCount: 1, masking: "NONE",
+    armTypes: ["EXPERIMENTAL"], primaryOutcomesFull: [{ measure: "Objective response rate", timeFrame: "24 weeks" }] };
+  const d2 = api.decodeTrial(singleArm);
+  ok("single-arm is recognised", d2.allocation.value === "single-arm");
+  ok("it cannot make a causal claim", d2.cannotProve.some(t => t.indexOf("causal claim") !== -1));
+  ok("and that is flagged", d2.redFlags.some(f => f.label.indexOf("Single-arm") !== -1));
+
+  // The highest-value flag: open label + a judgement-based endpoint.
+  ok("open label + ORR raises the expectation-bias flag",
+    d2.redFlags.some(f => f.label.indexOf("Open label") !== -1 && f.severity === "high"));
+  ok("ORR is classified subjective", d2.endpoint.subjective === true);
+
+  // An independent blinded read should rescue an otherwise subjective endpoint.
+  const bicr = { ...singleArm, primaryOutcomesFull: [{ measure: "Progression-free survival by BICR", timeFrame: "24 months" }] };
+  ok("a BICR-assessed endpoint is not treated as subjective",
+    api.decodeTrial(bicr).endpoint.subjective === false);
+
+  // A registration with dozens of primaries is a master protocol, not a
+  // trial with dozens of co-primaries — found against NCT04368728, which
+  // registers 64. The wording has to change with it.
+  const master = { ...clean, primaryOutcomesFull: Array.from({ length: 64 }, (_, i) => ({ measure: "Outcome " + i, timeFrame: "1 week" })) };
+  {
+    const f = api.decodeTrial(master).redFlags.find(x => x.label.indexOf("primary endpoints") !== -1);
+    ok("64 primaries is described as a master protocol, not co-primaries", !!f && f.label.indexOf("registered primary endpoints") !== -1);
+    ok("and the alpha-splitting framing is not applied to it", !!f && f.detail.indexOf("alpha") === -1);
+  }
+
+  // Co-primaries raise the bar and must be called out.
+  const coPrimary = { ...clean, primaryOutcomesFull: [
+    { measure: "Overall survival", timeFrame: "36 months" },
+    { measure: "Progression-free survival", timeFrame: "24 months" }] };
+  ok("two co-primary endpoints are flagged",
+    api.decodeTrial(coPrimary).redFlags.some(f => f.label.indexOf("co-primary") !== -1));
+
+  // Tiny time-to-event trial.
+  const tiny = { ...clean, enrollment: 30 };
+  ok("a 30-patient survival trial is flagged as underpowered-by-design",
+    api.decodeTrial(tiny).redFlags.some(f => f.label.indexOf("Small trial") !== -1));
+
+  // Stopped early.
+  ok("an early termination is surfaced with its stated reason",
+    api.decodeTrial({ ...clean, whyStopped: "Slow accrual" })
+      .redFlags.some(f => f.label.indexOf("stopped early") !== -1 && f.detail.indexOf("Slow accrual") !== -1));
+
+  // Completed long ago with nothing posted.
+  const silent = { ...clean, status: "COMPLETED", primaryCompletionDate: "2022-01-01", hasResults: false };
+  ok("a completed trial with no results past a year is flagged",
+    api.decodeTrial(silent, { now: new Date("2026-09-21") })
+      .redFlags.some(f => f.label.indexOf("no posted results") !== -1));
+  ok("but not if results were actually posted",
+    !api.decodeTrial({ ...silent, hasResults: true }, { now: new Date("2026-09-21") })
+      .redFlags.some(f => f.label.indexOf("no posted results") !== -1));
+
+  // Missing fields must read as "not stated", never as a default.
+  const bare = { nctId: "NCT2", title: "B", armTypes: [], armCount: 0, primaryOutcomesFull: [] };
+  const d3 = api.decodeTrial(bare);
+  ok("an unregistered allocation says 'not stated'", d3.allocation.stated === false);
+  ok("unregistered masking is not silently read as open label", d3.masking.blinded === null);
+  ok("and no open-label flag is raised on unknown masking",
+    !d3.redFlags.some(f => f.label.indexOf("Open label") !== -1));
+
+  // The universal caveat must always be present.
+  ok("every decode states that a win is not an approval",
+    d1.cannotProve.some(t => t.indexOf("Regulatory approval") !== -1) &&
+    d3.cannotProve.some(t => t.indexOf("Regulatory approval") !== -1));
+
+  ok("a malformed study decodes to null rather than throwing", api.decodeTrial(null) === null);
+  ok("architecture summary reads like a reviewer would say it",
+    d1.architecture.indexOf("randomized") !== -1 && d1.architecture.indexOf("n=400") !== -1);
+}
+report();
+
 section("Charts stay valid at data extremes");
 {
   // An SVG attribute of "NaN" or "Infinity" is silently dropped by the
