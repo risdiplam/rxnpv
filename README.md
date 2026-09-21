@@ -38,7 +38,9 @@ Reassembles `src/` into `electron/rxnpv.html` only — no packaging. Fast, usefu
 node build.js --package
 ```
 
-Packages the app into `electron/dist/mac-arm64/` without installing it. Note that `electron/dist/` is a build artifact and gets wiped on a clean rebuild — which is why `--install` puts the copy you actually launch in `/Applications`.
+Packages the app into `electron/dist/mac-arm64/` without installing it, which is why `--install` puts the copy you actually launch in `/Applications` instead.
+
+Note that `electron/dist/` is **not** cleaned between builds. electron-builder overwrites its own current output but leaves unrelated files alone, so artifacts from an earlier build — including ones under a previous product name — can sit there indefinitely until deleted by hand. (This README previously claimed the folder "gets wiped on a clean rebuild"; it does not.)
 
 **Node.js** lives at `~/.local/nodejs/current/bin` (a user-local install, no Homebrew). If `node` isn't found, add it to your PATH first:
 
@@ -59,7 +61,7 @@ See `test/README.md` for what the rest of the suite does and doesn't verify — 
 
 ## Project structure
 
-- `src/` — the 32 source modules (see `CLAUDE.md` for why there are 32 separate files and no bundler)
+- `src/` — the 31 source modules (see `CLAUDE.md` for why there are 31 separate files and no bundler)
 - `electron/` — the desktop app shell
 - `test/` — functional test suite
 - `docs/` — full build history and design-decision record

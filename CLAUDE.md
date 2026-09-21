@@ -22,7 +22,7 @@ Practical implication for how work should be sequenced: don't let more than one 
 
 ## Architecture — read this before touching the build
 
-**This is not built with a real bundler.** No webpack, no esbuild, no Vite, no ES module imports/exports anywhere. It's 32 plain JavaScript files, concatenated in a specific order into one giant inline `<script>` block inside `shell.html`, producing `electron/rxnpv.html` — the single file the Electron shell actually loads.
+**This is not built with a real bundler.** No webpack, no esbuild, no Vite, no ES module imports/exports anywhere. It's 31 plain JavaScript files, concatenated in a specific order into one giant inline `<script>` block inside `shell.html`, producing `electron/rxnpv.html` — the single file the Electron shell actually loads.
 
 This was a pragmatic choice made out of necessity: the app was originally built entirely inside a Claude chat conversation, in a sandboxed environment with no real bundler tooling available. It works, it's been thoroughly tested in that form, and **changing it is a legitimate future improvement but a real, deliberate architecture decision** — not something to fix in passing while doing something else. If you do it, do it as its own isolated change with full re-verification, not bundled into a feature or bug fix.
 
@@ -40,6 +40,10 @@ Quit the running app first if using `--install` — it overwrites the app bundle
 
 `build.js` syntax-checks every source file individually before concatenating — a broken file gives a clear, isolated error here instead of an unreadable failure somewhere inside a 900KB combined blob.
 
+**React is vendored, not fetched.** `electron/vendor/` holds React 18.3.1's UMD builds, committed to the repo and packaged into the app. They used to load from unpkg at runtime, which meant the app could not start at all without an internet connection — the scripts failed, `React`/`ReactDOM` were undefined, and the whole bundle (including `ErrorBoundary`, itself a React component) never ran, leaving a blank window with nothing to explain it. Don't reintroduce a CDN tag here.
+
+**The CSP carries a hash of the bundle, so `build.js` must compute it.** `shell.html` has a `__SCRIPT_HASH__` placeholder inside its `Content-Security-Policy`; `build.js` fills it with the sha256 of the assembled inline script and refuses to write an output if the placeholder is missing. Two things about this are easy to get wrong, and both were: the hash must cover the script element's *exact* text — including the newline right after `<script>` — so it is extracted from the finished artifact rather than reconstructed from `combined`; and `'self'` does not match `file:` subresources in Chromium, so `file:` is named explicitly for the vendored scripts. **jsdom does not enforce CSP**, so the entire test suite stays green against a policy that blanks the real app. Any CSP change has to be verified against the packaged build — see "Verify inside the actual packaged binary" below.
+
 ### A real bug this project's own tooling caught, worth understanding before writing anything similar
 
 `build.js` originally used `shell.replace('__SCRIPT__', combined)` — a plain string as the replacement argument. `String.prototype.replace()` treats certain `$`-prefixed sequences in a *string* replacement argument as special pattern tokens (`$&`, `` $` ``, `$'`, `$$`), even when the search pattern itself is a plain string, not a regex. `combined` is hundreds of KB of real application code, and it happens to contain the literal two-character sequence `$'` (from ordinary code: `'$' + formatNumber(...)` in `ts_app.js`) — which JavaScript silently reinterpreted as "everything after the match," splicing unrelated file content into the middle of a source file. The fix, now in place: pass a **function** as the replacement argument, not a string — a function's return value is always inserted verbatim. If you ever write code that does string-replaces-into-string with large, arbitrary content as the replacement, use a function. This is a real, previously-shipped-adjacent bug, not a hypothetical.
@@ -47,10 +51,10 @@ Quit the running app first if using `--install` — it overwrites the app bundle
 ### Project layout
 
 ```
-src/            32 source modules — see MODULE_ORDER in build.js for the authoritative list/order
+src/            31 source modules — see MODULE_ORDER in build.js for the authoritative list/order
 shell.html      HTML template with a __SCRIPT__ placeholder
 build.js        reassembles src/ into electron/rxnpv.html
-electron/       main.js, preload.js, package.json (electron-builder config), icon.icns/icon.svg
+electron/       main.js, preload.js, package.json (electron-builder config), icon.icns/icon.svg, vendor/ (React UMD builds, committed)
 test/           jsdom-based functional tests — see test/README.md, read it before trusting what these do and don't verify
 docs/           design-decision history and feature documentation — see below
 ```
@@ -75,7 +79,9 @@ docs/           design-decision history and feature documentation — see below
 
 **Comps databases (all with custom add/edit/delete):** M&A (68 deals), Peak Sales (38 drugs), Licensing/royalty (15 deals) — all dated "as of August 2026," each entry multi-source-verified against primary filings/press releases, not a third-party tracker. Counts drift upward over time as the user feeds in new research; check `data.js` directly (count objects in the actual `deals:`/`drugs:` array, not a text search for a field name like `acquirer:` — `SIMPLE_MULTIPLE_PRECEDENTS`, a separate small 7-deal table used specifically to benchmark the Simple Multiple valuation method, shares that field name and will silently inflate a naive count) rather than trust a specific number for long.
 
-**External data integrations, all live-verified against the real APIs (not just parsing logic checked against a fetched sample):** SEC EDGAR (company financials, full-text search, Form 4 insider transactions), ClinicalTrials.gov (search, competitor landscape, Trial Watch snapshot-and-diff, historical comps), openFDA (Drugs@FDA approval history, drug labels, FAERS adverse events, Orange Book patent/exclusivity data).
+**External data integrations, all live-verified against the real APIs (not just parsing logic checked against a fetched sample):** SEC EDGAR (company financials, full-text search, Form 4 insider transactions — **non-derivative only**: direct buys and sells. Option grants and RSU vesting are filed as derivative transactions and are deliberately not parsed, so they never appear; the empty state says so, because "no transactions found" otherwise reads as "no insider activity" when a large option grant may have happened that same week), ClinicalTrials.gov (search, competitor landscape, Trial Watch snapshot-and-diff, historical comps), openFDA (Drugs@FDA approval history, drug labels, FAERS adverse events, Orange Book patent/exclusivity data).
+
+**A note on the three benchmark tables:** `POS_BY_AREA`, `TRIAL_COST_BY_AREA` and `TRIAL_DURATION_BY_AREA` come from different source papers and do not share a taxonomy — the same disease is "Neurology" in one and "CNS" in another, "Autoimmune" vs "Immunomodulation", "Infectious disease" vs "Anti-infective", "Urology" vs "Genitourinary". `THERAPEUTIC_AREAS` is the union of all of them, so the dropdown offers both halves of each pair. `AREA_ALIASES` in `helpers.js` maps the synonyms so picking either name finds the real area-specific benchmark instead of silently falling back to a generic average. If you add a benchmark table, check whether its area names need entries there.
 
 **Cross-feature connections:** Partnership Economics → Licensing Comps, Company Lookup → Trial Watch, Peak Sales Monte Carlo → case export, any Simulation/Tools result → Pin to a case's PDF report — all explicit, one-click, never automatic.
 
@@ -110,4 +116,4 @@ If a future request seems to want one of these, say so plainly and ask before bu
 
 ## Where the rest of the documentation lives
 
-`docs/` contains the full design-decision history: `RxNPV_External_Suggestions_Tracker.md` (the authoritative build log, read this first of the docs — 16 phases as of this writing, in the actual voice used when each was built, including the rename/history-scrub/GitHub-setup work), `RxNPV_Feature_Overview.md`, `RxNPV_Field_Reference.md`, `RxNPV_Human_Test_Checklist.md`, `RxNPV_Interaction_Request.md`, and the biotech-research-agent-system docs (`BiotechAgent.md` and others — a separate, related tool this user also uses for external research, not part of this codebase, included for context only since the Evidence Log and Field Reference are built to match its output format).
+`docs/` contains the full design-decision history: `RxNPV_External_Suggestions_Tracker.md` (the authoritative build log, read this first of the docs — 16 phases as of this writing, in the actual voice used when each was built, including the rename/history-scrub/GitHub-setup work), `RxNPV_Feature_Overview.md`, `RxNPV_Field_Reference.md`, `RxNPV_Human_Test_Checklist.md`, `RxNPV_Interaction_Request.md`, `RxNPV_Findings_TODO.md` (the running audit/fix list — what's been found, what's been fixed, and what is deliberately still open), and the biotech-research-agent-system docs (`BiotechAgent.md` and others — a separate, related tool this user also uses for external research, not part of this codebase, included for context only since the Evidence Log and Field Reference are built to match its output format).

@@ -9,7 +9,8 @@ Every test here runs the *entire app* inside jsdom — a JavaScript DOM implemen
 ## What jsdom cannot do — read this before assuming something is "verified"
 
 - **No real WebAssembly execution.** Chemistry's RDKit analysis has never been confirmed to actually run end-to-end. The binary is confirmed present and byte-correct inside every packaged build, but "the file is there" and "it executes correctly" are different claims. This is the single most important gap in this whole test suite, and it's exactly the kind of thing Claude Code running on a real Mac can now close — it has a real browser (or at least real Electron) available to it, which this sandboxed environment never did.
-- **No real network calls.** Every EDGAR, ClinicalTrials.gov, and openFDA call in every test here is mocked. The parsing logic for each has been checked against real, live responses fetched via web search during development — but the actual `fetch()` calls inside the running app have never executed for real inside a test.
+- **No real network calls.** Every EDGAR, ClinicalTrials.gov, and openFDA call in every test here is mocked, and the `fetch()` calls inside the running app never execute inside a test. Note this is a statement about *this suite*, not about the app: the integrations have separately been exercised against the live APIs by hand, outside these tests. Both claims are true and they are not in conflict — `CLAUDE.md` describes the manual verification, this file describes what the automated suite covers.
+- **No CSP enforcement.** jsdom ignores `Content-Security-Policy` entirely, so a policy that would block the real app in Electron will not fail anything here. A CSP change must be verified against the packaged app — a broken one produces a blank window while this whole suite stays green.
 - **No real visual rendering.** jsdom does no layout and no CSS. These tests can tell you a value is present in the DOM; they cannot tell you it looks right, is positioned sensibly, or is legible. A UI/UX pass has never been done with these tests, and can't be — that needs eyes on a real screen.
 
 ## Setup
@@ -31,7 +32,7 @@ You must run `node build.js` from the project root first — `setup.js` reads `e
 
 This project's original, deepest test coverage — a 38-check suite covering hand-verified DCF math to the cent — did not survive an earlier sandbox reset during development. `final_regression_pass.js` is a leaner behavioural replacement covering the core valuation paths plus every top-level view, but it asserts "nothing crashed and the right text appeared," not "the arithmetic is right."
 
-**`math_verification.js` (130 checks) now covers that gap** and goes wider than the original did — every numerical primitive in the app checked against an independently-derived value.
+**`math_verification.js` (650 checks) now covers that gap** and goes wider than the original did — every numerical primitive in the app checked against an independently-derived value.
 
 ### What it does and does not check — read this before adding to it
 
@@ -46,7 +47,7 @@ When the suite was first written it reported 4 failures — all four turned out 
 ## What each file does
 
 - `setup.js` — generates `test_desktop.html` (see above)
-- `math_verification.js` — 130 numerical checks against independently-derived reference values; needs no DOM, runs straight against the engine source (see "The lost coverage" above for scope and rules)
+- `math_verification.js` — 650 numerical checks against independently-derived reference values; needs no DOM, runs straight against the engine source (see "The lost coverage" above for scope and rules)
 - `final_regression_pass.js` — the main sweep: creates a case, exercises every core valuation path and every top-level view, asserts zero console errors
 - `final_sweep.js` — navigation-only sweep across all Tools/Simulation tabs
 - `recovery_errorboundary_test.js` — deliberately crashes a case (`programs: null`) and verifies the two-layer error boundary catches it, the case-list sidebar stays functional, and switching to a working case recovers cleanly
