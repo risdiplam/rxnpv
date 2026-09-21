@@ -49,8 +49,78 @@ function el(tag, attrs = {}, children = []) {
   return node;
 }
 
+// ── Scientific notation: Cmax -> C with a subscript max ────────────────────
+// PK and PD symbols have real typographic conventions, and flattening them
+// ("Cmax", "K_D", "EC50") reads as sloppy to anyone who works with them daily.
+// Two forms, because the two rendering contexts can't share one:
+//   sci()     -> real <sub> elements, for anything going into the DOM
+//   sciText() -> Unicode subscripts, for SVG chart labels, where <sub> is not
+//                valid markup and would simply not render
+//
+// Case is corrected as well as position: a rate constant is lower-case k
+// (k_a, k_e) while an equilibrium constant is upper-case K (K_D). That
+// distinction is the whole reason the convention exists, so writing "Ka" and
+// "K_D" side by side loses real information rather than just looking untidy.
+const SCI_TOKENS = [
+  ['EC50', 'EC', '50'],
+  ['Cmax', 'C', 'max'],
+  ['Tmax', 'T', 'max'],
+  ['tmax', 't', 'max'],
+  ['Emax', 'E', 'max'],
+  ['K_D', 'K', 'D'],
+  ['KD', 'K', 'D'],
+  ['Ka', 'k', 'a'],
+  ['Ke', 'k', 'e'],
+  ['Vd', 'V', 'd'],
+  ['E0', 'E', '0']
+];
+// Longest first so a shorter token can never shadow a longer one that starts
+// with the same letters.
+const SCI_RE = new RegExp('\\b(' + SCI_TOKENS.map(t => t[0]).sort((a, b) => b.length - a.length)
+  .map(t => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|') + ')\\b', 'g');
+
+function sciParts(str) {
+  const out = [];
+  let last = 0, m;
+  SCI_RE.lastIndex = 0;
+  while ((m = SCI_RE.exec(String(str))) !== null) {
+    if (m.index > last) out.push({ text: String(str).slice(last, m.index) });
+    const tok = SCI_TOKENS.find(t => t[0] === m[1]);
+    out.push({ base: tok[1], sub: tok[2] });
+    last = m.index + m[1].length;
+  }
+  if (last < String(str).length) out.push({ text: String(str).slice(last) });
+  return out;
+}
+
+// Emits the base character and its <sub> as FLAT siblings rather than wrapping
+// each token in its own <span>. A wrapper span inherits `.field span { display:
+// block }`, which silently broke every labelled field onto two lines.
+function sci(str) {
+  const out = [];
+  for (const p of sciParts(str)) {
+    if (p.text != null) out.push(p.text);
+    else { out.push(p.base); out.push(el('sub', {}, p.sub)); }
+  }
+  return out;
+}
+
+// Unicode subscript coverage is incomplete (no 'd', no capitals), so anything
+// unavailable falls back to the plain characters rather than rendering a
+// half-subscripted symbol that looks worse than leaving it alone.
+const UNI_SUB = { a: 'ₐ', e: 'ₑ', m: 'ₘ', x: 'ₓ', o: 'ₒ',
+  '0': '₀', '1': '₁', '2': '₂', '3': '₃', '4': '₄',
+  '5': '₅', '6': '₆', '7': '₇', '8': '₈', '9': '₉' };
+function sciText(str) {
+  return sciParts(str).map(p => {
+    if (p.text != null) return p.text;
+    const chars = p.sub.split('');
+    return chars.every(c => UNI_SUB[c]) ? p.base + chars.map(c => UNI_SUB[c]).join('') : p.base + p.sub;
+  }).join('');
+}
+
 function field(labelText, inputEl) {
-  return el('label', { class: 'field' }, [el('span', {}, labelText), inputEl]);
+  return el('label', { class: 'field' }, [el('span', {}, sci(labelText)), inputEl]);
 }
 
 // Groups fields into the responsive grid so short numeric inputs sit side by
@@ -63,8 +133,8 @@ function fieldGrid(fields) {
 // these aren't just inline paragraphs.
 function note(summaryText, bodyText) {
   return el('details', { class: 'note' }, [
-    el('summary', {}, summaryText),
-    el('div', { class: 'note-body' }, bodyText)
+    el('summary', {}, sci(summaryText)),
+    el('div', { class: 'note-body' }, sci(bodyText))
   ]);
 }
 
@@ -1567,7 +1637,7 @@ function appendExportToCaseSection(resultsDiv, p50Value) {
 function renderPkpdTab(content) {
   const form = el('div', { class: 'panel' }, [
     el('h2', {}, ['PK/PD forward simulation', el('span', { class: 'badge info' }, '→ Forward-looking')]),
-    el('p', { class: 'subtle' }, 'Projects a concentration-time profile from published PK parameters, then maps exposure through a dose-response (Emax) curve. Not a fit to patient data, a forward projection from parameters you supply.'),
+    el('p', { class: 'subtle' }, sci('Projects a concentration-time profile from published PK parameters, then maps exposure through a dose-response (Emax) curve. Not a fit to patient data, a forward projection from parameters you supply.')),
     note('New to PK/PD modeling? Start here', 'This is the most jargon-heavy tool in the app, but the parameters below aren’t something you derive — you look them up. A drug’s FDA label (Clinical Pharmacology section), a published Phase 1 PK paper, or a comparable already-approved drug’s label are the usual sources; company investor decks sometimes state half-life and bioavailability directly too. A worked example: a label states "oral bioavailability ~80%, elimination half-life ~6 hours, volume of distribution ~50L, Tmax ~2 hours" for a 500mg dose. You’d enter F=0.8, Vd=50, Ke≈ln(2)/6≈0.116 (see the note below the fields for why), and pick a Ka that makes the simulated Tmax land near 2 hours (start around Ka=1.0 and adjust — Tmax isn’t a direct input for oral dosing, it falls out of Ka and Ke together). If you don’t have a dose-response relationship to model, you can still run just the concentration-time profile — Emax/EC50/Hill only affect the dose-response chart at the bottom, not Cmax/half-life/AUC.'),
     field('Route', selectInput('route', [{ value: 'oral', label: 'Oral (first-order absorption)' }, { value: 'iv', label: 'IV bolus' }], 'oral')),
     field('Dose (mg)', numberInput('dose', 500)),
@@ -1575,17 +1645,17 @@ function renderPkpdTab(content) {
     field('Ke — elimination rate constant (1/hr)', numberInput('ke', 0.1, { step: '0.01' })),
     field('Vd — volume of distribution (L)', numberInput('Vd', 50)),
     field('F — bioavailability (oral only)', numberInput('F', 1, { step: '0.01', min: 0, max: 1 })),
-    field('Dosing interval tau (hr, 0 = single dose)', numberInput('tau', 0)),
+    field('Dosing interval \u03C4 (hr, 0 = single dose)', numberInput('tau', 0)),
     field('Number of doses', numberInput('numDoses', 1)),
     field('Simulation window (hr)', numberInput('tEnd', 48)),
     note('Where these numbers actually come from', 'Ka and Ke are rarely stated directly — what’s usually published is elimination half-life (Ke = ln(2) ÷ half-life, e.g. a 6-hour half-life → Ke ≈ 0.116/hr) and, for oral drugs, Tmax (roughly when concentration peaks — Ka is typically the value you’d adjust to match a reported Tmax, since there’s no closed-form Tmax → Ka formula for the two-parameter absorption model used here). Vd is sometimes given directly (L, or L/kg × 70kg for a typical adult); if only clearance (CL) is reported, Ke = CL ÷ Vd. F (bioavailability) only matters for oral dosing — IV bolus assumes 100% by definition, which is why the field is disabled for that route.'),
     el('h3', {}, 'Receptor occupancy (optional)'),
-    el('p', { class: 'subtle' }, 'Bridges concentration to target engagement before the Emax curve below — leave K_D blank to skip this and go straight to Emax, same as before.'),
+    el('p', { class: 'subtle' }, sci('Bridges concentration to target engagement before the Emax curve below — leave K_D blank to skip this and go straight to Emax, same as before.')),
     field('K_D — receptor binding affinity (same units as concentration, mg/L)', numberInput('kd', '')),
     field('Occupancy hill coefficient', numberInput('roHill', 1, { step: '0.1' })),
     note('Already have a concentration and just want occupancy?', 'If you already know a real concentration — a trough level from a paper, a Cmax reported in a label, or any single number you don’t want to re-derive by simulating dose/Ka/Ke/Vd — use the standalone Receptor Occupancy Calculator further down this page instead of running the full simulation. Same underlying Hill-Langmuir formula, just takes a concentration directly rather than deriving one from a dosing regimen.'),
     el('h3', {}, 'Dose-response (Emax)'),
-    el('p', { class: 'subtle' }, 'A sigmoidal (Hill/Emax) curve mapping concentration to effect — the standard dose-response shape.'),
+    el('p', { class: 'subtle' }, sci('A sigmoidal (Hill/Emax) curve mapping concentration to effect — the standard dose-response shape.')),
     note('Where E0, Emax, EC50 and Hill come from', 'E0 and Emax are usually reported directly in a paper\u2019s figure or table (the observed baseline and plateau effect). EC50 — the concentration producing half of Emax — and the Hill coefficient are typically fitted parameters reported alongside a dose-response study rather than values you would estimate from scratch. A Hill of 1 is a standard hyperbolic curve; above 1 is steeper and more switch-like.'),
     field('E0 — baseline effect', numberInput('E0', 0)),
     field('Emax — maximum effect', numberInput('Emax', 100)),
@@ -1633,7 +1703,7 @@ function syncPkpdRouteFields() {
 function renderReceptorOccupancyCalculator() {
   return el('div', { class: 'panel', style: 'margin-top:16px' }, [
     el('h2', {}, 'Receptor occupancy calculator'),
-    el('p', { class: 'subtle' }, 'Standalone — skips the concentration-time simulation entirely. Use this when you already have a concentration in hand (a reported trough level, a label’s stated Cmax, an assumed steady-state exposure) rather than one this app simulated.'),
+    el('p', { class: 'subtle' }, sci('Standalone — skips the concentration-time simulation entirely. Use this when you already have a concentration in hand (a reported trough level, a label’s stated Cmax, an assumed steady-state exposure) rather than one this app simulated.')),
     fieldGrid([
       field('Concentration (same units as K_D, e.g. mg/L)', numberInput('roqConc', 2, { step: '0.01' })),
       field('K_D — receptor binding affinity', numberInput('roqKd', 1, { step: '0.01' })),
@@ -1651,14 +1721,14 @@ function runReceptorOccupancyCalculator() {
   resultsDiv.innerHTML = '';
 
   if (![conc, kd, hill].every(isFinite) || conc < 0 || kd <= 0 || hill <= 0) {
-    resultsDiv.appendChild(el('p', { class: 'error' }, 'Concentration must be 0 or greater, and K_D and Hill coefficient must be positive.'));
+    resultsDiv.appendChild(el('p', { class: 'error' }, sci('Concentration must be 0 or greater, and K_D and Hill coefficient must be positive.')));
     return;
   }
 
   const occupancy = receptorOccupancy(conc, kd, hill);
   resultsDiv.appendChild(el('div', { class: 'headline' }, [
     el('span', { class: 'bignum' }, occupancy.toFixed(1) + '%'),
-    el('span', { class: 'sublabel' }, `receptor occupancy at concentration ${conc} (K_D ${kd}, Hill ${hill})`)
+    el('span', { class: 'sublabel' }, sci(`receptor occupancy at concentration ${conc} (K_D ${kd}, Hill ${hill})`))
   ]));
   resultsDiv.appendChild(el('p', { class: 'subtle' },
     conc === kd ? 'Concentration equals K_D exactly — by definition, occupancy is 50% here regardless of the Hill coefficient.'
@@ -1724,8 +1794,8 @@ function runPkpd() {
   resultsDiv.innerHTML = '';
   resultsDiv.appendChild(el('div', { class: 'headline' }, [
     el('span', { class: 'bignum' }, metrics.cMax.toFixed(2) + ' mg/L'),
-    el('span', { class: 'sublabel' }, `Cmax at t=${metrics.tMax.toFixed(2)}hr  \u2022  half-life ${formatHalfLife(numVal('ke'))}  \u2022  AUC (window) ${metrics.aucLastWindow.toFixed(1)} mg\u00B7hr/L`
-      + (hasRO ? `  \u2022  receptor occupancy at Cmax ${receptorOccupancy(metrics.cMax, kd, roHill).toFixed(1)}%` : ''))
+    el('span', { class: 'sublabel' }, sci(`Cmax at t=${metrics.tMax.toFixed(2)}hr  \u2022  half-life ${formatHalfLife(numVal('ke'))}  \u2022  AUC (window) ${metrics.aucLastWindow.toFixed(1)} mg\u00B7hr/L`
+      + (hasRO ? `  \u2022  receptor occupancy at Cmax ${receptorOccupancy(metrics.cMax, kd, roHill).toFixed(1)}%` : '')))
   ]));
   const concChart = renderLineChart([{ name: 'Concentration', color: 'var(--teal)', points: profile.map(p => ({ x: p.t, y: p.c })) }], {
     title: 'Concentration-time profile', xLabel: 'Hours', yLabel: 'mg/L'
@@ -1744,7 +1814,7 @@ function runPkpd() {
   for (let m = 0.1; m <= 3; m += 0.1) doses.push(baseDose * m);
   const doseResponse = simulateDoseResponseCurve(doses, config, pdParams, 'cMax');
   const drChart = renderLineChart([{ name: 'Effect', color: 'var(--amber)', points: doseResponse.map(d => ({ x: d.dose, y: d.effect })) }], {
-    title: 'Dose-response (effect at simulated Cmax)', xLabel: 'Dose (mg)', yLabel: 'Effect'
+    title: sciText('Dose-response (effect at simulated Cmax)'), xLabel: 'Dose (mg)', yLabel: 'Effect'
   });
   appendChartWithExport(resultsDiv, drChart, 'pkpd-dose-response');
 }
