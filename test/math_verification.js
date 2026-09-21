@@ -81,7 +81,7 @@ const EXPORTS = [
   "measureStorage", "STORAGE_ASSUMED_QUOTA_BYTES", "STORAGE_WARN_FRACTION", "STORAGE_CRITICAL_FRACTION",
   "computeTreatedPopulation", "launchCurveForYears", "erosionMultiplier", "computeProgramRevenue",
   "computeQuickProgramRevenue", "resolveErosionParams", "LAUNCH_CURVE", "LAUNCH_CURVE_EXACT", "scaleRevenueResult",
-  "computeCOGS", "computeSalesForceCost", "computeMarketingCost", "computeCorporateGA",
+  "computeCOGS", "computeSalesForceCost", "computeMarketingCost", "computeCorporateGA", "computeProgramPnL",
   "SALES_REP_COST", "SGA_BENCHMARKS", "SALES_FORCE_COMP_GROWTH_PCT",
   "tsFdaQueryString", "computeDilutionPath",
   "applyPartnershipToRevenue", "getProgramRevenueResult", "computePartnershipContribution", "distributeRnDCostByYear",
@@ -2002,6 +2002,68 @@ section("Partnership royalty applies in Quick mode, not just Full");
     fullExUS.years[8].usRevenue === fullPlain.years[8].usRevenue);
   ok("Full mode still royalty-substitutes the ex-US side",
     fullExUS.years[8].exUSRevenue < fullPlain.years[8].exUSRevenue);
+}
+report();
+
+section("Royalty income carries no COGS or marketing — the partner bears those");
+{
+  // A licensed-out territory is commercialised by the PARTNER: they
+  // manufacture and they sell. The licensor's royalty is close to pure
+  // margin, which is the entire economic trade of doing the deal. Charging
+  // the licensor's own COGS and marketing against that royalty understated a
+  // partnered asset by roughly a third on a typical 15% deal.
+  const prog = (partnership) => ({
+    id: "p1", name: "Asset", revenueMode: "quick",
+    quickRevenue: { peakRevenue: "500000000", yearsToPeak: "6", profile: "median" },
+    partnership
+  });
+  const costs = { cogsPct: "15", reps: { primaryCare: 0, specialty: 0, hospital: 0 },
+                  marketingPctOfPeak: "20", yearsToLOE: "13", launchYearOffset: 0 };
+
+  const partnered = api.getProgramRevenueResult(prog({ enabled: true, royaltyPct: "15" }), 25);
+  const solo = api.getProgramRevenueResult(prog(null), 25);
+
+  // The revenue line itself is the royalty: 15% of the commercial peak.
+  near("partnered peak revenue is 15% of the unpartnered peak",
+    partnered.peakTotalRevenue, Math.round(solo.peakTotalRevenue * 0.15), 2);
+  // And all of it is flagged as royalty rather than own-commercial revenue.
+  ok("every dollar of a global royalty deal is tagged as royalty income",
+    partnered.years.every(y => y.royaltyRevenue === y.totalRevenue));
+  near("peak COMMERCIAL revenue is zero when everything is licensed out",
+    partnered.peakCommercialRevenue, 0, 0);
+
+  const pnl = api.computeProgramPnL(partnered, costs);
+  const peakRow = pnl.reduce((b, r) => r.revenue > b.revenue ? r : b, pnl[0]);
+  near("no COGS is charged against royalty income", peakRow.cogs, 0, 0);
+  near("no marketing is charged against royalty income", peakRow.marketing, 0, 0);
+  // Product contribution should now equal the royalty itself, not ~65% of it.
+  near("product contribution equals the royalty received", peakRow.productContribution, peakRow.revenue, 2);
+
+  // An unpartnered programme must be completely unaffected by any of this.
+  const soloPnl = api.computeProgramPnL(solo, costs);
+  const soloPeak = soloPnl.reduce((b, r) => r.revenue > b.revenue ? r : b, soloPnl[0]);
+  near("an unpartnered programme still pays full COGS", soloPeak.cogs, Math.round(soloPeak.revenue * 0.15), 2);
+  ok("an unpartnered programme still pays marketing", soloPeak.marketing > 0);
+
+  // A territory-limited deal must still charge costs on the side the company
+  // actually sells itself — this is not a blanket exemption.
+  const fullBuild = {
+    population: { mode: "prevalence", prevalence: "100000", diagnosisRatePct: "100", treatmentRatePct: "100", eligiblePct: "100" },
+    adherencePct: "80",
+    marketShare: { numDrugs: 2, orderOfEntry: 1, peakShareOverridePct: "20" },
+    launchCurve: { yearsToPeak: 6, profile: "median" },
+    pricing: { usAnnualPrice: "10000", usAnnualGrowthPct: "0", includeExUS: true, exUSPriceFactorPct: "50", exUSAnnualGrowthPct: "0", exUSPatientMultiplierPct: "100" },
+    exclusivity: { yearsToLOE: "13", modality: "smallMolecule", volumeRetainedPct: "", priceDeclinePct: "" }
+  };
+  const exUSDeal = api.getProgramRevenueResult({
+    id: "p2", name: "Split", revenueMode: "full", revenueBuild: fullBuild,
+    partnership: { enabled: true, royaltyPct: "15", territory: "exUS" }
+  }, 25);
+  const splitPnl = api.computeProgramPnL(exUSDeal, costs);
+  const splitPeak = splitPnl.reduce((b, r) => r.revenue > b.revenue ? r : b, splitPnl[0]);
+  ok("an ex-US-only deal still charges COGS on the retained US business", splitPeak.cogs > 0);
+  ok("but less than it would if the whole book were commercial",
+    splitPeak.cogs < Math.round(splitPeak.revenue * 0.15));
 }
 report();
 

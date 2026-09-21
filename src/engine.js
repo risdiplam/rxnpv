@@ -273,15 +273,24 @@ function applyPartnershipToRevenue(revenueResult, partnership, revenueMode) {
   // was never given a way to set.
   const territory = revenueMode === "quick" ? "global" : (partnership.territory || "exUS");
 
+  const usIsRoyalty = territory === "us" || territory === "global";
+  const exUSIsRoyalty = territory === "exUS" || territory === "global";
+
   const years = revenueResult.years.map(yr => {
-    const us = (territory === "us" || territory === "global") ? Math.round(yr.usRevenue * royalty) : yr.usRevenue;
-    const exUS = (territory === "exUS" || territory === "global") ? Math.round(yr.exUSRevenue * royalty) : yr.exUSRevenue;
-    return { ...yr, usRevenue: us, exUSRevenue: exUS, totalRevenue: us + exUS };
+    const us = usIsRoyalty ? Math.round(yr.usRevenue * royalty) : yr.usRevenue;
+    const exUS = exUSIsRoyalty ? Math.round(yr.exUSRevenue * royalty) : yr.exUSRevenue;
+    // Track how much of the year's revenue is royalty income rather than the
+    // company's own commercial sales. Downstream cost logic needs to tell them
+    // apart: a royalty cheque carries none of the licensor's own manufacturing
+    // or selling costs, because the partner is the one doing both.
+    const royaltyRevenue = (usIsRoyalty ? us : 0) + (exUSIsRoyalty ? exUS : 0);
+    return { ...yr, usRevenue: us, exUSRevenue: exUS, totalRevenue: us + exUS, royaltyRevenue };
   });
   return {
     ...revenueResult, years,
     peakUSRevenue: Math.round(Math.max(...years.map(r => r.usRevenue), 0)),
-    peakTotalRevenue: Math.round(Math.max(...years.map(r => r.totalRevenue), 0))
+    peakTotalRevenue: Math.round(Math.max(...years.map(r => r.totalRevenue), 0)),
+    peakCommercialRevenue: Math.round(Math.max(...years.map(r => r.totalRevenue - r.royaltyRevenue), 0))
   };
 }
 

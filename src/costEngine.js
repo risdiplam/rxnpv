@@ -78,10 +78,26 @@ function computeMarketingCost(years, peakRevenue, marketingPctOfPeak, yearsToLOE
 function computeProgramPnL(revenueResult, cost) {
   const years = revenueResult.years.map(y => y.year);
   const revenue = revenueResult.years.map(y => y.totalRevenue);
-  const cogs = computeCOGS(revenue, cost.cogsPct);
+  // Royalty income is not the company's own commercial revenue, and charging
+  // the company's own COGS and marketing against it is simply wrong: in a
+  // licensed-out territory the PARTNER manufactures and sells, which is the
+  // whole economic point of the deal — less revenue, but close to pure margin
+  // and no commercial infrastructure to fund. Charging both against a royalty
+  // understated a partnered asset's contribution by about a third on a typical
+  // 15% deal. COGS and marketing therefore apply only to the commercial
+  // portion. Sales force is deliberately NOT adjusted here: it is an explicit
+  // headcount the user enters rather than a figure derived from revenue, so
+  // zeroing it silently would override a deliberate input — a fully licensed-out
+  // programme should simply have no reps entered against it.
+  const royaltyRevenue = revenueResult.years.map(y => y.royaltyRevenue || 0);
+  const commercialRevenue = revenue.map((r, i) => Math.max(0, r - royaltyRevenue[i]));
+  const peakCommercial = revenueResult.peakCommercialRevenue != null
+    ? revenueResult.peakCommercialRevenue
+    : revenueResult.peakTotalRevenue;
+  const cogs = computeCOGS(commercialRevenue, cost.cogsPct);
   const grossProfit = revenue.map((r, i) => r - cogs[i]);
   const salesForce = computeSalesForceCost(years, cost.reps, cost.yearsToLOE, cost.launchYearOffset);
-  const marketing = computeMarketingCost(years, revenueResult.peakTotalRevenue, cost.marketingPctOfPeak, cost.yearsToLOE);
+  const marketing = computeMarketingCost(years, peakCommercial, cost.marketingPctOfPeak, cost.yearsToLOE);
   const productContribution = grossProfit.map((gp, i) => gp - salesForce[i] - marketing[i]);
   const rows = years.map((y, i) => ({
     year: y, revenue: revenue[i], cogs: cogs[i], grossProfit: grossProfit[i],

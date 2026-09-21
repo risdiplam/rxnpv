@@ -585,7 +585,7 @@ function ProgramEditor({ program, onChange, onDelete, discountRatePct, terminalV
           "Partnered asset (licensed rights, royalty/milestone deal)"),
         partnership.enabled && h("div", null,
           h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginBottom: 10, lineHeight: 1.6 } },
-            "Royalty replaces the partnered territory's revenue rather than adding to it — Detailed mode's own ex-US pricing above should be turned off for a territory that's actually licensed out, or its revenue and the royalty on it would both be counted."),
+            "Royalty replaces the partnered territory's revenue rather than adding to it — Detailed mode's own ex-US pricing above should be turned off for a territory that's actually licensed out, or its revenue and the royalty on it would both be counted. Royalty income is treated as near-pure margin: no COGS and no marketing are charged against it, because the partner is the one manufacturing and selling there. Sales reps are the exception — they're an explicit headcount you enter, so set them to zero yourself for a programme you've fully licensed out."),
           h("div", { style: { display: "flex", flexWrap: "wrap", gap: "0 16px" } },
             h(BenchField, { label: "Royalty rate", value: partnership.royaltyPct, onChange: v => setPartnership({ royaltyPct: v }), suffix: "%",
               help: "Applied to what the partnered territory's revenue would otherwise have been." }),
