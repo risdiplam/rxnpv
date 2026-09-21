@@ -1907,7 +1907,8 @@ function TargetDossierTool() {
     setDossier(r.dossier); setLoading(false);
   };
 
-  const phaseLabel = (p) => p >= 4 ? "Approved" : p > 0 ? "Phase " + p : "Preclinical/unknown";
+  // Prefer the stage string the API actually returned over a re-derived one.
+  const phaseLabel = (d) => d.stageLabel || (d.maxPhase >= 4 ? "Approved" : d.maxPhase > 0 ? "Phase " + d.maxPhase : "Preclinical/unknown");
 
   return h("div", null,
     toolCard(h, [
@@ -1983,7 +1984,7 @@ function TargetDossierTool() {
           dossier.drugs.map((d, i) => h("div", { key: i, style: { padding: "6px 0", borderBottom: "1px solid var(--rule)" } },
             h("div", { style: { display: "flex", justifyContent: "space-between", gap: 10, fontSize: 11, fontFamily: "var(--mono)" } },
               h("span", { style: { color: "var(--ink-1)" } }, d.name),
-              h("span", { style: { color: d.maxPhase >= 4 ? "var(--teal)" : "var(--ink-2)", whiteSpace: "nowrap" } }, phaseLabel(d.maxPhase))),
+              h("span", { style: { color: d.maxPhase >= 4 ? "var(--teal)" : "var(--ink-2)", whiteSpace: "nowrap" } }, phaseLabel(d))),
             d.mechanism && h("div", { style: { fontSize: 10, fontFamily: "var(--sans)", color: "var(--ink-3)", marginTop: 2 } }, d.mechanism),
             d.indications.length > 0 && h("div", { style: { fontSize: 10, fontFamily: "var(--sans)", color: "var(--ink-3)", marginTop: 2 } },
               truncateText(d.indications.slice(0, 4).join(", ") + (d.indications.length > 4 ? " +" + (d.indications.length - 4) + " more" : ""), 150)))))

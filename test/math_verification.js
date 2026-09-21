@@ -27,7 +27,7 @@ const FILES = [
   "data.js", "engine.js", "costEngine.js", "rdEngine.js", "posEngine.js",
   "dcfEngine.js", "capitalEngine.js", "scenarioEngine.js", "helpers.js",
   "ts_statsEngine.js", "ts_simulationEngine.js", "ts_peakSalesEngine.js", "ts_pkpdEngine.js",
-  "ts_chart.js", "edgarEngine.js", "ctgovEngine.js", "trialDecoder.js", "ts_ctgovEngine.js", "fdaEngine.js", "chart.js", "ts_fdaEngine.js"
+  "ts_chart.js", "edgarEngine.js", "ctgovEngine.js", "trialDecoder.js", "openTargetsEngine.js", "ts_ctgovEngine.js", "fdaEngine.js", "chart.js", "ts_fdaEngine.js"
 ];
 global.React = { createElement: () => null, useState: () => [null, () => {}], useEffect: () => {}, Fragment: "F", Component: class {} };
 global.document = { createElement: () => ({ style: {} }), getElementById: () => null };
@@ -84,7 +84,7 @@ const EXPORTS = [
   "computeCOGS", "computeSalesForceCost", "computeMarketingCost", "computeCorporateGA", "computeProgramPnL",
   "SALES_REP_COST", "SGA_BENCHMARKS", "SALES_FORCE_COMP_GROWTH_PCT",
   "tsFdaQueryString", "computeDilutionPath",
-  "extractAnalogEffects", "TS_EFFECT_PARAM_TYPES",
+  "extractAnalogEffects", "tsClassifyEffectParam", "summarizeDossier",
   "decodeTrial", "decodeTrialRedFlags", "classifyAllocation", "classifyMasking", "classifyComparator", "classifyPrimaryEndpoint",
   "applyPartnershipToRevenue", "getProgramRevenueResult", "computePartnershipContribution", "distributeRnDCostByYear",
   "computeSimpleMultipleValuation", "computeSOTPBreakdown",
@@ -1879,16 +1879,16 @@ section("Analog effect-size board — extracts only what is structured, and says
     resultsSection: opts.measures ? { outcomeMeasuresModule: { outcomeMeasures: opts.measures } } : undefined
   });
   const primaryHR = (value, lo, hi) => ([{ type: "PRIMARY", title: "Overall survival",
-    analyses: [{ paramType: "HAZARD_RATIO", paramValue: String(value), ciLowerLimit: String(lo), ciUpperLimit: String(hi), pValue: "0.03" }] }]);
+    analyses: [{ paramType: "Hazard Ratio (HR)", paramValue: String(value), ciLowerLimit: String(lo), ciUpperLimit: String(hi), pValue: "0.03" }] }]);
 
   const data = { totalCount: 40, studies: [
     mk("NCT01", { measures: primaryHR(0.72, 0.58, 0.90) }),          // clean, excludes null
     mk("NCT02", { measures: primaryHR(0.88, 0.74, 1.05) }),          // crosses null
     mk("NCT03", { measures: [{ type: "PRIMARY", title: "Change in score",
-      analyses: [{ paramType: "SOMETHING_ODD", paramValue: "4.2" }] }] }),   // unrecognised type
+      analyses: [{ paramType: "Geometric mean ratio of something odd", paramValue: "4.2" }] }] }),   // unrecognised type
     mk("NCT04", {}),                                                  // no results at all
     mk("NCT05", { measures: [{ type: "SECONDARY", title: "PFS",
-      analyses: [{ paramType: "HAZARD_RATIO", paramValue: "0.5" }] }] })     // secondary only
+      analyses: [{ paramType: "Hazard Ratio (HR)", paramValue: "0.5" }] }] })     // secondary only
   ]};
   const r = api.extractAnalogEffects(data, { condition: "X", phase: "PHASE3" });
 
@@ -1918,7 +1918,7 @@ section("Analog effect-size board — extracts only what is structured, and says
   const mixed = { totalCount: 2, studies: [
     mk("NCT10", { measures: primaryHR(0.7, 0.6, 0.85) }),
     mk("NCT11", { measures: [{ type: "PRIMARY", title: "Change from baseline",
-      analyses: [{ paramType: "MEAN_DIFFERENCE", paramValue: "-2.4", ciLowerLimit: "-3.9", ciUpperLimit: "-0.9" }] }] })
+      analyses: [{ paramType: "Least Squares Mean Difference", paramValue: "-2.4", ciLowerLimit: "-3.9", ciUpperLimit: "-0.9" }] }] })
   ]};
   const m = api.extractAnalogEffects(mixed, {});
   ok("ratios and differences are kept on separate scales",
@@ -1926,10 +1926,59 @@ section("Analog effect-size board — extracts only what is structured, and says
   ok("a negative mean difference favours treatment on the difference scale",
     m.byScale.difference[0].favoursTreatment === false);
 
+  // The real API registers paramType as free text, which is why this is
+  // pattern-matched rather than looked up. Confirmed against live records:
+  // "Hazard Ratio (HR)" and "CMH ESTIMATE OF COMMON ODDS RATIO" both appear.
+  ok("plain 'Hazard Ratio (HR)' is recognised", api.tsClassifyEffectParam("Hazard Ratio (HR)").scale === "ratio");
+  ok("a CMH common odds ratio is recognised", api.tsClassifyEffectParam("CMH ESTIMATE OF COMMON ODDS RATIO").scale === "ratio");
+  ok("relative risk is recognised", api.tsClassifyEffectParam("Relative Risk").scale === "ratio");
+  ok("an LS mean difference lands on the difference scale", api.tsClassifyEffectParam("Least Squares Mean Difference").scale === "difference");
+  // The important refusals: a transformed scale has a different null value, so
+  // matching it as a plain ratio would corrupt every summary on the board.
+  ok("a LOG hazard ratio is refused rather than treated as a ratio", api.tsClassifyEffectParam("Log Hazard Ratio") === null);
+  ok("a slope is refused", api.tsClassifyEffectParam("Slope per unit time") === null);
+  ok("an unrecognised measure is refused", api.tsClassifyEffectParam("Number of participants") === null);
+  ok("empty input is refused", api.tsClassifyEffectParam("") === null);
+
   // Empty input must not throw or imply a landscape.
   const empty = api.extractAnalogEffects({ studies: [] }, {});
   ok("an empty response yields an empty board, not a crash", empty.rows.length === 0);
   near("with honest zero denominators", empty.withExtractableEffect, 0, 0);
+}
+report();
+
+section("Open Targets dossier — stage parsing and evidence split");
+{
+  const mk = (stage) => ({ id: "ENSG1", approvedSymbol: "X", approvedName: "x", biotype: "protein_coding",
+    associatedDiseases: { count: 2, rows: [
+      { score: 0.85, disease: { id: "D1", name: "with genetics" },
+        datatypeScores: [{ id: "genetic_association", score: 0.86 }, { id: "animal_model", score: 0.4 }] },
+      { score: 0.5, disease: { id: "D2", name: "no genetics" },
+        datatypeScores: [{ id: "animal_model", score: 0.5 }, { id: "literature", score: 0.3 }] }
+    ] },
+    drugAndClinicalCandidates: { count: 1, rows: [
+      { id: "CHEMBL1", maxClinicalStage: stage, drug: { id: "CHEMBL1", name: "DrugA" }, diseases: [{ disease: { name: "Some indication" } }] }
+    ] } });
+
+  // The live API returns PHASE_3, not roman numerals. Matching only roman
+  // numerals scored every drug 0, so a target with four Phase 3 programmes
+  // reported "0 reached Phase 3+".
+  near("PHASE_3 parses as phase 3", api.summarizeDossier(mk("PHASE_3")).drugs[0].maxPhase, 3, 0);
+  near("Phase III still parses as 3", api.summarizeDossier(mk("Phase III")).drugs[0].maxPhase, 3, 0);
+  near("PHASE_2 does not get mistaken for 3", api.summarizeDossier(mk("PHASE_2")).drugs[0].maxPhase, 2, 0);
+  near("Phase II is not matched by the Phase III rule", api.summarizeDossier(mk("Phase II")).drugs[0].maxPhase, 2, 0);
+  near("APPROVED counts as 4", api.summarizeDossier(mk("APPROVED")).drugs[0].maxPhase, 4, 0);
+  near("an unknown stage is 0, not guessed", api.summarizeDossier(mk("")).drugs[0].maxPhase, 0, 0);
+  near("phase 3+ count reflects the parse", api.summarizeDossier(mk("PHASE_3")).approvedOrLateStage, 1, 0);
+
+  const d = api.summarizeDossier(mk("PHASE_3"));
+  ok("a machine token is prettified for display", d.drugs[0].stageLabel === "Phase 3");
+  ok("genetic evidence is detected where present", d.diseases[0].hasGeneticEvidence === true);
+  ok("and not claimed where the evidence is animal/literature only", d.diseases[1].hasGeneticEvidence === false);
+  ok("the headline flag is true when any association has genetics", d.anyGeneticEvidence === true);
+  ok("a clinical row's indication is unwrapped from its list item",
+    d.drugs[0].indications[0] === "Some indication");
+  ok("a null target summarises to null rather than throwing", api.summarizeDossier(null) === null);
 }
 report();
 

@@ -146,7 +146,7 @@ function median(arr) {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { fetchHistoricalComps, fetchTrialByNctId, parseHistoricalStudy, summarizeStudiesResponse, monthsBetween, median, TS_CTGOV_BASE, extractAnalogEffects, fetchAnalogEffects, TS_EFFECT_PARAM_TYPES };
+  module.exports = { fetchHistoricalComps, fetchTrialByNctId, parseHistoricalStudy, summarizeStudiesResponse, monthsBetween, median, TS_CTGOV_BASE, extractAnalogEffects, fetchAnalogEffects, tsClassifyEffectParam };
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -171,14 +171,34 @@ if (typeof module !== 'undefined' && module.exports) {
 // CT.gov paramType values worth reading, grouped by the scale they live on.
 // Ratios are compared on a log scale and have a null value of 1; differences
 // are linear with a null of 0. Mixing them silently would be meaningless.
-const TS_EFFECT_PARAM_TYPES = {
-  "HAZARD_RATIO": { scale: "ratio", label: "Hazard ratio", nullValue: 1 },
-  "RISK_RATIO": { scale: "ratio", label: "Risk ratio", nullValue: 1 },
-  "ODDS_RATIO": { scale: "ratio", label: "Odds ratio", nullValue: 1 },
-  "RISK_DIFFERENCE": { scale: "difference", label: "Risk difference", nullValue: 0 },
-  "MEAN_DIFFERENCE": { scale: "difference", label: "Mean difference", nullValue: 0 },
-  "LEAST_SQUARES_MEAN_DIFFERENCE": { scale: "difference", label: "LS mean difference", nullValue: 0 }
-};
+// CT.gov's `paramType` is FREE TEXT, not an enum. Real registered values
+// include "Hazard Ratio (HR)" and "CMH ESTIMATE OF COMMON ODDS RATIO", so an
+// exact-key lookup (which is what this started as) matches nothing at all and
+// the board silently reports zero extractable effects for every indication.
+// Pattern-matching is therefore unavoidable — but it is kept deliberately
+// narrow: a phrase has to clearly name a known effect measure, and anything on
+// a transformed scale is excluded outright, because a log hazard ratio has a
+// null value of 0 rather than 1 and silently mixing the two would corrupt
+// every summary on the board.
+const TS_EFFECT_PATTERNS = [
+  { re: /hazard\s*ratio/i,                              scale: "ratio",      label: "Hazard ratio",    nullValue: 1 },
+  { re: /odds\s*ratio/i,                                scale: "ratio",      label: "Odds ratio",      nullValue: 1 },
+  { re: /(risk\s*ratio|relative\s*risk|rate\s*ratio)/i, scale: "ratio",      label: "Risk ratio",      nullValue: 1 },
+  { re: /risk\s*difference/i,                           scale: "difference", label: "Risk difference", nullValue: 0 },
+  { re: /(mean\s*difference|difference\s+in\s+mean|least\s*squares?\s*mean\s*difference)/i,
+                                                        scale: "difference", label: "Mean difference", nullValue: 0 }
+];
+// A transformed or per-unit scale changes what the null value even is, so
+// these are skipped rather than guessed at.
+const TS_EFFECT_EXCLUDE = /\blog\b|\bln\b|log-?transform|per\s+unit|slope/i;
+
+function tsClassifyEffectParam(paramType) {
+  const t = String(paramType || "");
+  if (!t.trim() || TS_EFFECT_EXCLUDE.test(t)) return null;
+  for (const p of TS_EFFECT_PATTERNS) if (p.re.test(t)) return p;
+  return null;
+}
+
 
 // Pure function, no network — unit-tested against mocked response shapes.
 function extractAnalogEffects(data, queryMeta) {
@@ -203,7 +223,7 @@ function extractAnalogEffects(data, queryMeta) {
     let found = null;
     for (const m of primaries) {
       for (const a of (m.analyses || [])) {
-        const spec = TS_EFFECT_PARAM_TYPES[(a.paramType || "").toUpperCase()];
+        const spec = tsClassifyEffectParam(a.paramType);
         const value = parseFloat(a.paramValue);
         if (!spec || !isFinite(value)) continue;
         const lower = parseFloat(a.ciLowerLimit), upper = parseFloat(a.ciUpperLimit);
@@ -214,7 +234,7 @@ function extractAnalogEffects(data, queryMeta) {
           enrollment: design.enrollmentInfo ? design.enrollmentInfo.count : null,
           completionDate: status.completionDateStruct ? status.completionDateStruct.date : null,
           outcomeTitle: m.title || "",
-          paramType: (a.paramType || "").toUpperCase(),
+          paramType: a.paramType || "",
           scale: spec.scale,
           paramLabel: spec.label,
           nullValue: spec.nullValue,

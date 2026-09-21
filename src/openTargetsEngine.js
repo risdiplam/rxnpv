@@ -93,9 +93,14 @@ const OT_TARGET_QUERY = `
           datatypeScores { id score }
         }
       }
-      knownDrugs(size: 25) {
+      drugAndClinicalCandidates {
         count
-        rows { drugId prefName phase status mechanismOfAction disease { name } }
+        rows {
+          id
+          maxClinicalStage
+          drug { id name mechanismsOfAction { rows { mechanismOfAction } } }
+          diseases { disease { name } }
+        }
       }
     }
   }`;
@@ -122,24 +127,41 @@ function summarizeDossier(target) {
     };
   });
 
-  const drugRows = (target.knownDrugs && target.knownDrugs.rows) || [];
-  // Collapse to one row per drug — knownDrugs returns a row per
-  // drug x indication, so a drug in five indications would otherwise look
-  // like five separate programmes.
-  const byDrug = new Map();
-  drugRows.forEach(d => {
-    const key = d.drugId || d.prefName;
-    if (!key) return;
-    const existing = byDrug.get(key);
-    const phase = typeof d.phase === "number" ? d.phase : parseFloat(d.phase) || 0;
-    if (!existing) {
-      byDrug.set(key, { name: d.prefName || key, maxPhase: phase, mechanism: d.mechanismOfAction || "", indications: d.disease ? [d.disease.name] : [], status: d.status || "" });
-    } else {
-      existing.maxPhase = Math.max(existing.maxPhase, phase);
-      if (d.disease && d.disease.name && existing.indications.indexOf(d.disease.name) === -1) existing.indications.push(d.disease.name);
-    }
-  });
-  const drugs = [...byDrug.values()].sort((a, b) => b.maxPhase - a.maxPhase);
+  // Open Targets renamed this surface: `knownDrugs` no longer exists and the
+  // replacement is `drugAndClinicalCandidates`, whose rows already collapse to
+  // one entry per drug (so no manual de-duplication is needed) and report the
+  // stage as a STRING like "Phase III" rather than a number. Confirmed by
+  // introspecting the live schema rather than assuming — the previous query
+  // was silently returning HTTP 400.
+  const drugRows = (target.drugAndClinicalCandidates && target.drugAndClinicalCandidates.rows) || [];
+  // The API returns "PHASE_3" style strings, not roman numerals. Matching only
+  // roman numerals silently scored every drug as 0, which made a target with
+  // four Phase 3 programmes report "0 reached Phase 3+". Handle both, and
+  // check roman numerals longest-first so "PHASE II" can't match "PHASE III".
+  const stageToNumber = (stage) => {
+    const t = String(stage || "").toUpperCase().replace(/[_\s]+/g, " ").trim();
+    if (/APPROVED|PHASE 4|PHASE IV\b/.test(t)) return 4;
+    if (/PHASE 3|PHASE III\b/.test(t)) return 3;
+    if (/PHASE 2|PHASE II\b/.test(t)) return 2;
+    if (/PHASE 1|PHASE I\b/.test(t)) return 1;
+    return 0;
+  };
+  // "PHASE_3" is a machine token, not something to show a reader.
+  const prettyStage = (stage) => {
+    const t = String(stage || "").replace(/[_\s]+/g, " ").trim().toLowerCase();
+    if (!t) return "";
+    return t.charAt(0).toUpperCase() + t.slice(1);
+  };
+  const drugs = drugRows.map(d => ({
+    name: (d.drug && d.drug.name) || d.id || "(unnamed)",
+    maxPhase: stageToNumber(d.maxClinicalStage),
+    stageLabel: prettyStage(d.maxClinicalStage),
+    mechanism: (d.drug && d.drug.mechanismsOfAction && d.drug.mechanismsOfAction.rows && d.drug.mechanismsOfAction.rows[0])
+      ? d.drug.mechanismsOfAction.rows[0].mechanismOfAction : "",
+    // A clinical-candidate row's `diseases` are ClinicalDiseaseListItem, which
+    // wraps the disease rather than carrying a name directly.
+    indications: (d.diseases || []).map(x => x && x.disease && x.disease.name).filter(Boolean)
+  })).sort((a, b) => b.maxPhase - a.maxPhase);
 
   return {
     ensemblId: target.id,
@@ -150,7 +172,7 @@ function summarizeDossier(target) {
     diseases,
     diseaseCount: (target.associatedDiseases && target.associatedDiseases.count) || diseases.length,
     drugs,
-    drugCount: (target.knownDrugs && target.knownDrugs.count) || drugs.length,
+    drugCount: (target.drugAndClinicalCandidates && target.drugAndClinicalCandidates.count) || drugs.length,
     // The headline: has ANY disease association here got direct human genetic
     // evidence behind it, and has anything reached late-stage development?
     anyGeneticEvidence: diseases.some(d => d.hasGeneticEvidence),
