@@ -1,0 +1,162 @@
+# RxNPV — Feature Map
+
+**Purpose of this document: stop re-litigating scope.** It is the decided inventory of what this app has, what it will have, and what it deliberately will not have. If a future session (or the user) asks "do we have / do we need feature X?", the answer should be in here. If it isn't, add it here as part of deciding.
+
+Status key: **BUILT** · **DECIDED — build** · **DECIDED — no** · **OPEN — needs a call**
+
+Governing scope line, unchanged: *good enough to help a retail biotech investor improve their analyses. Doesn't need to be institutional grade, doesn't need every conceivable feature.* Second principle, added September 2026: **not every feature has to connect to the valuation.** A tool that helps someone understand the science or the trial earns its place on its own.
+
+Organising principle, added September 2026: **fewer tabs, each a workbench.** A workbench holds several related tools that can be used separately or together, rather than one tab per function. The Trial Statistics tab is the existing model for this.
+
+---
+
+## 1. Trial workbench — one NCT in, everything about that trial
+
+The intended flow: decode the design → watch it for changes → read the result when it lands → compare it against what has been posted before.
+
+| Tool | Status | Notes |
+|---|---|---|
+| Trial Decoder | **BUILT** | Design in plain English, can/cannot prove, design red flags |
+| Trial change watch (snapshot/diff) | **BUILT** | Diffs 5 fields today |
+| Analog effect-size board | **BUILT** | Posted effect sizes in an indication, with honest denominators |
+| Comparable-trial landscape | **BUILT** | Status/duration/enrolment rollup |
+| **Results reader** | **DECIDED — build** | *The biggest hole in the app.* See below |
+| **Richer change classification** | **DECIDED — build** | Add eligibility, arms, masking; split routine vs red-flag |
+| **Thin-win detector** | **DECIDED — build** | Percentile of the analog distribution, not an arbitrary threshold |
+| **Multi-trial program view** | **DECIDED — build** | Every NCT for one asset, in one place |
+
+### Results reader — the priority
+
+Right now, when a readout lands — the single most important moment for an investor — the app offers a hyperlink. `ctgovEngine.js` deliberately does not parse `resultsSection`, and that was the right call when the extraction machinery didn't exist. It does now (the analog board reads the same schema).
+
+Three panels, one fetch:
+- **Outcomes** — what the primary actually returned, with CI and p-value. Reuses the analog extractor.
+- **Participant flow** — completion and dropout by arm. **Differential dropout is a red flag the decoder structurally cannot see before results exist.**
+- **Adverse events** — for an *investigational* drug this is the only real safety data there is. FAERS has no denominator; labels only exist post-approval. The app currently has no honest safety view for anything unapproved.
+
+Folded into the Trial Decoder rather than given its own tab: same input, and it makes the before/after framing explicit.
+
+---
+
+## 2. Statistics workbench (existing "Trial Statistics" + Simulation)
+
+Already the model for how a workbench should work. Mature.
+
+| Tool | Status |
+|---|---|
+| Fragility Index · Sample Size/Power · P↔CI · Single-Arm CI · 2×2 Outcome · Non-Inferiority · Multiplicity | **BUILT** |
+| Trial Outcome / PoS assurance (with survival curves) | **BUILT** |
+| Phase 2→3 Translator | **BUILT** |
+| Meta-Analysis (fixed/random, forest plot) | **BUILT** |
+| Peak Sales Monte Carlo | **BUILT** |
+| PK/PD + receptor occupancy | **BUILT** |
+| **Control-arm / dropout stress** | **DECIDED — build** | Smaller than first estimated: control event rate is *already* an input to Sample Size/Power, so this is a sensitivity sweep over it, not new machinery. A benchmark table would only supply a nicer default. |
+
+---
+
+## 3. Science workbench
+
+| Tool | Status | Notes |
+|---|---|---|
+| Target Dossier (Open Targets) | **BUILT** | Genetic support, disease associations, drugs on target |
+| Class neighbours / other drugs on target | **BUILT** | Inside the dossier |
+| **Evidence-thinness indicator** | **OPEN** | "This thesis rests on one open-label Phase 2 in 40 patients" vs "three RCTs plus genetic support." Derivable from data already fetched. Risk: glib if done badly. |
+| Mechanism one-pager (UniProt/Reactome/STRING) | **DECIDED — no** | Pretty, but doesn't change a retail investor's mind about anything |
+| Molecule / structure card (PubChem) | **DECIDED — no** | Chemistry was built and deliberately removed. Fails the product test: molecular weight changes no decision. Do not reopen without an explicit reversal. |
+
+---
+
+## 4. Company workbench
+
+| Tool | Status | Notes |
+|---|---|---|
+| Company Lookup (EDGAR financials, full-text search) | **BUILT** | |
+| Catalyst Calendar | **BUILT** | |
+| Cash Runway · Runway vs Catalyst | **BUILT** | |
+| Insider transactions (Form 4) | **BUILT, incomplete** | Non-derivative only. Option grants and RSU vesting are invisible. |
+| **Form 4 derivative coverage** | **DECIDED — build** | Completes a documented gap |
+| **Pipeline view / 10-K vs CT.gov mismatch** | **DECIDED — build** | The two sources routinely disagree; the disagreement is itself the signal |
+| 13F institutional holdings | **DECIDED — no** | Different filing type, previously declined, still out |
+
+---
+
+## 5. Commercial workbench — **entirely new, and a real gap**
+
+The app assumes pre-revenue. A user modelling an early-commercial name (launched, 1–3 products) is asking different questions, and none of them are served today.
+
+### The one that is arguably a defect, not a feature
+
+**Gross-to-net.** The Reference Sheet correctly says *"ASP — net of rebates/discounts, use this in models. Median ~74% of AWP."* But the revenue model has a single `usAnnualPrice` field and **no gross-to-net adjustment anywhere**. The app dispenses the right advice and then provides no mechanism to follow it, so anyone entering a list price overstates revenue by roughly 25–30% with nothing flagging it. In US pharma, gross-to-net is one of the largest single sources of error in a retail revenue model.
+
+**DECIDED — build**, and treat it as an accuracy fix on the existing valuation, not a new feature.
+
+### The rest of the workbench
+
+| Tool | Status | Notes |
+|---|---|---|
+| **Launch trajectory vs analogs** | **DECIDED — build** | The central early-commercial question: is this launch tracking? The app already has launch-curve benchmarks, but only as *forward assumptions* — you cannot check a real ramp against them. |
+| **Actual vs modelled revenue** | **DECIDED — build** | Enter reported quarterly revenue, see it against your own model. Nothing tracks this today. |
+| **Public dispensing/spend data** | **OPEN — data check needed** | CMS Medicare Part D and Part B spending dashboards and Medicaid State Drug Utilization Data are free and public, and are the only no-cost proxy for real-world uptake. **Caveat to verify before promising anything: the lag is material (Part D is roughly 1–2 years behind).** That may make it useful for analog launches and useless for the drug you are actually watching. Verify before building. |
+| Channel/inventory stocking distortion | **DECIDED — no** | Real phenomenon, but not reliably observable from public data — would be guesswork dressed as analysis |
+| Payer coverage / formulary access | **OPEN** | Genuinely drives uptake; no reliable free source found yet |
+| HTA / ICER / payer value modelling | **DECIDED — no** | Out of scope, institutional |
+| Post-LOE erosion | **BUILT** | Exclusivity/LOE tool + erosion curves in the revenue build |
+
+---
+
+## 6. Benchmarks and reference
+
+| Tool | Status | Notes |
+|---|---|---|
+| M&A comps (68) · Peak Sales (38) · Licensing (15) | **BUILT** | With custom add/edit/delete |
+| Reference Sheet (9 tabs, incl. Trial Glossary) | **BUILT** | |
+| Placebo-response benchmarks | **BUILT, thin** | Only ~2 therapeutic areas, and display-only — nothing computes with it. Expand if control-arm stress wants a default. |
+| Published PoS base rates | **BUILT** | With the deviate-from-benchmark red flag |
+
+---
+
+## 7. Valuation (mature — leave alone)
+
+rNPV/DCF, Quick + Detailed revenue, scenarios, Simple Multiple, PRV, capital structure and dilution, dilution-path financing, partnership economics, full-case Monte Carlo, sensitivity, sum-of-the-parts, risk waterfall, reverse-solve, binary-event implied PoS, portfolio aggregation, PDF report.
+
+**DECIDED — no further DCF mechanics.** This side is complete and heavily verified. New work goes into the workbenches above.
+
+---
+
+## 8. Decided against — do not reopen without an explicit reversal
+
+Each of these has been considered and declined on the merits. Recording them here is the point of this document.
+
+- **Chemistry / molecule cards / cheminformatics** — built, then removed; fails the product test
+- **QSP, PBPK, NONMEM-class modelling** — institutional, out of scope
+- **Docking, structure prediction** — out of scope
+- **Group-sequential / adaptive design engines** — previously declined, unchanged
+- **Black-box AI outcome prediction** — actively unwanted; the app's value is showing its reasoning
+- **HTA / ICER / payer value models** — institutional
+- **13F institutional holdings** — different filing type from Form 4
+- **Versioned case snapshots** — previously declined
+- **AACT bulk download** — good advice for a server-backed product; this is a local app with no database. Live API, cached, is correct here.
+- **Full identifier normalisation (MONDO / Ensembl / InChIKey)** — correct engineering in principle, large refactor, payoff concentrated in analog matching. Revisit *only* if free-text matching demonstrably limits the analog board.
+- **Code signing / notarisation** — $99/yr buys nothing for local use
+- **Real bundler** — legitimate future improvement, but a deliberate isolated architecture change, never bundled into feature work
+- **Channel/inventory stocking analysis** — not reliably observable from public data
+
+---
+
+## 9. Open questions
+
+1. **Tab consolidation.** Tools currently has 15 tabs in 3 groups. The workbench structure above implies regrouping into Trial / Science / Company / Commercial / Benchmarks. This changes an interface in daily use — confirm before doing it.
+2. **CMS data lag.** Verify how far behind Part D/Medicaid actually are before committing to launch-tracking features that depend on them.
+3. **Literature / paper shelf (Europe PMC).** Previously declined as duplicating Google Scholar. The user has since said new APIs are welcome where genuinely useful. Worth a decision either way so it stops recurring.
+4. **Evidence-thinness indicator** — useful, or glib?
+
+---
+
+## 10. Build order
+
+1. **Results reader** (outcomes, dropout, adverse events) — the one real hole
+2. **Gross-to-net** — accuracy fix on existing valuation
+3. **Cheap completions batch** — thin-win vs analogs, change classification, Form 4 derivatives, multi-trial view, control-arm stress
+4. **Commercial workbench** — launch trajectory, actual vs modelled
+5. **Tab consolidation** — after the tools exist, not before
+6. **Electron upgrade** — deferred by the user; needs ~10 minutes of their time (PDF export, panel capture, window resize)
