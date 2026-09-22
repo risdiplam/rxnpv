@@ -57,7 +57,11 @@
      so --red-fill only needed correcting on that one side. Splitting the
      fill into its own token undoes
      that coupling instead of trying to satisfy both roles with one colour. */
-  :root[data-theme="dark"] {
+  /* `.theme-scope-*` lets a subtree be re-themed independently of the page:
+     report snapshots are rendered in the REPORT's theme, not whichever theme
+     the app happened to be in when they were captured. Same declaration block
+     as the root theme, so the two can never drift apart. */
+  :root[data-theme="dark"], .theme-scope-dark {
     --bg: #15171B; --bg-2: #1A1D22; --surface: #1F2329; --surface-2: #262B32;
     --rule: #313640; --ink-1: #E6E2D9; --ink-2: #9C978A; --ink-3: #979388;
     --teal: #6FA99A; --teal-bg: rgba(111,169,154,0.12); --teal-fill: #6FA99A;
@@ -66,7 +70,7 @@
     --green: #7FAD8C; --green-bg: rgba(127,173,140,0.14);
     --slate: #8B96A3; --slate-bg: rgba(139,150,163,0.12);
   }
-  :root[data-theme="light"] {
+  :root[data-theme="light"], .theme-scope-light {
     --bg: #FAF8F3; --bg-2: #F1EDE3; --surface: #FFFFFF; --surface-2: #F5F2EA;
     --rule: #DDD6C7; --ink-1: #2A271F; --ink-2: #5F5A4C; --ink-3: #716B5A;
     --teal: #387762; --teal-bg: rgba(74,137,116,0.10); --teal-fill: #52A088;

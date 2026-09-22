@@ -1219,6 +1219,7 @@ function ExportControls({ targetRef, name, showPanelCapture, compact, panelOnly 
   }, busy === kind ? "…" : label);
 
   return h("div", {
+    "data-no-export": "",
     onMouseEnter: () => setHovered(true), onMouseLeave: () => setHovered(false),
     style: { display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap",
              opacity: hovered || msg || busy ? 1 : 0.45, transition: "opacity 150ms" }

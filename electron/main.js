@@ -151,6 +151,129 @@ function embeddedFontFaces() {
   return _fontFaceCache;
 }
 
+// ── Section → PNG / PDF ────────────────────────────────────────────────────
+// A section arrives as standalone, sanitised HTML (serializeSection in the
+// renderer). It is laid out in an offscreen window with the app's own
+// stylesheet and the same theme, then either printed (PDF: vector, selectable
+// text, links stay clickable) or captured at full height (PNG).
+//
+// Full height is the point. The old "Panel" export was a capture of the
+// visible SCREEN, so anything taller than the window was cut off. An offscreen
+// window has no such limit: the PNG is taken with captureBeyondViewport, the
+// same technique that proved necessary when the app window was on another
+// Space, and the PDF page is sized to the content itself.
+let _appStylesCache = null;
+function appStyles() {
+  if (_appStylesCache !== null) return _appStylesCache;
+  try {
+    const html = fs.readFileSync(path.join(__dirname, 'rxnpv.html'), 'utf8');
+    _appStylesCache = (html.match(/<style[^>]*>[\s\S]*?<\/style>/g) || [])
+      .map(block => block.replace(/^<style[^>]*>/, '').replace(/<\/style>$/, ''))
+      .join('\n');
+  } catch (e) { _appStylesCache = ''; }
+  return _appStylesCache;
+}
+
+function escapeHtmlText(t) {
+  return String(t == null ? '' : t).replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
+}
+
+// PDF pages cannot be taller than 200 inches; beyond that Chromium paginates
+// onto further pages of the same size, which is an acceptable degradation for
+// a section that long.
+const SECTION_PDF_MAX_IN = 200;
+// Keeps a PNG inside what the GPU can hand back in one piece.
+const SECTION_PNG_MAX_DEVICE_PX = 16000;
+
+async function renderSectionToBuffer(payload) {
+  const { html, width, theme, format, title, context } = payload || {};
+  if (!html || typeof html !== 'string') throw new Error('Nothing to export.');
+  const pad = 24;
+  const w = Math.min(3000, Math.max(320, Math.round(Number(width) || 900)));
+  const stamp = new Date().toLocaleString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+  // A one-line footer saying what this is and when it was taken. A section
+  // pulled out of the app loses its surroundings, and a reader handed the
+  // file has no other way to know where the numbers came from or how old
+  // they are.
+  const footer = '<div style="margin-top:14px;font-family:var(--mono);font-size:9.5px;color:var(--ink-3);letter-spacing:0.02em">'
+    + 'RxNPV' + (context ? ' · ' + escapeHtmlText(context) : '') + (title ? ' · ' + escapeHtmlText(title) : '') + ' · exported ' + escapeHtmlText(stamp)
+    + '</div>';
+  const doc = '<!doctype html><html data-theme="' + (theme === 'light' ? 'light' : 'dark') + '"><head><meta charset="utf-8">'
+    // Nothing in here may run or fetch. Sanitised at capture already; this is
+    // the second wall, and it holds even for a snapshot tampered with on disk.
+    + '<meta http-equiv="Content-Security-Policy" content="default-src \'none\'; style-src \'unsafe-inline\'; img-src data:; font-src data:">'
+    + '<style>' + appStyles() + '</style>'
+    + '<style>'
+    + 'html, body { margin: 0; padding: 0; background: var(--bg); }'
+    + 'body { width: ' + w + 'px; padding: ' + pad + 'px; box-sizing: content-box; }'
+    + '[data-no-export] { display: none !important; }'
+    + '@page { margin: 0; }'
+    + '@media print { html, body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }'
+    + '</style></head><body><div id="rxnpv-export-root">' + html + footer + '</div></body></html>';
+
+  const tmpFile = path.join(app.getPath('temp'), 'rxnpv-section-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7) + '.html');
+  let win = null;
+  try {
+    fs.writeFileSync(tmpFile, doc, 'utf8');
+    win = new BrowserWindow({
+      show: false, width: w + pad * 2, height: 900,
+      // JavaScript is enabled only so the main process can measure the page
+      // with executeJavaScript; the page's own CSP forbids any script it might
+      // contain, and the content was sanitised before it got here.
+      webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false, javascript: true, webSecurity: true }
+    });
+    await win.loadFile(tmpFile);
+    await win.webContents.executeJavaScript('document.fonts && document.fonts.ready ? document.fonts.ready.then(() => true) : true');
+    // Measured from the content wrapper, not the document: the document is
+    // never shorter than the window, so measuring it left a band of empty
+    // background under every short section.
+    const dims = await win.webContents.executeJavaScript(
+      '(() => { const r = document.getElementById("rxnpv-export-root").getBoundingClientRect();'
+      + ' return { w: Math.ceil(r.width) + ' + (pad * 2) + ', h: Math.ceil(r.height) + ' + (pad * 2) + ' }; })()');
+
+    if (format === 'pdf') {
+      return await win.webContents.printToPDF({
+        printBackground: true,
+        pageSize: { width: dims.w / 96, height: Math.min(SECTION_PDF_MAX_IN, dims.h / 96) },
+        margins: { top: 0, bottom: 0, left: 0, right: 0 }
+      });
+    }
+    const scale = Math.max(0.5, Math.min(2, SECTION_PNG_MAX_DEVICE_PX / Math.max(1, dims.h)));
+    const dbg = win.webContents.debugger;
+    dbg.attach('1.3');
+    try {
+      const shot = await dbg.sendCommand('Page.captureScreenshot', {
+        format: 'png', captureBeyondViewport: true,
+        clip: { x: 0, y: 0, width: dims.w, height: dims.h, scale }
+      });
+      return Buffer.from(shot.data, 'base64');
+    } finally { try { dbg.detach(); } catch (e) {} }
+  } finally {
+    if (win) { try { win.destroy(); } catch (e) {} }
+    try { fs.unlinkSync(tmpFile); } catch (e) {}
+  }
+}
+
+ipcMain.handle('render-section', async (event, payload) => {
+  if (!mainWindow) return { ok: false, error: "No window available" };
+  const format = payload && payload.format === 'pdf' ? 'pdf' : 'png';
+  try {
+    const buf = await renderSectionToBuffer(Object.assign({}, payload, { format }));
+    // Used by the automated checks, and by nothing that writes anywhere.
+    if (payload && payload.returnData) return { ok: true, format, bytes: buf.length, data: buf.toString('base64') };
+    const { canceled, filePath } = await dialog.showSaveDialog(mainWindow, {
+      title: format === 'pdf' ? 'Save section as PDF' : 'Save section as PNG',
+      defaultPath: (payload && payload.suggestedName) || ('RxNPV-section.' + format),
+      filters: [format === 'pdf' ? { name: 'PDF document', extensions: ['pdf'] } : { name: 'PNG image', extensions: ['png'] }]
+    });
+    if (canceled || !filePath) return { ok: false, canceled: true };
+    fs.writeFileSync(filePath, buf);
+    return { ok: true, filePath };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
+});
+
 ipcMain.handle('export-chart-pdf', async (event, payload) => {
   if (!mainWindow) return { ok: false, error: "No window available" };
   const { svg, suggestedName, widthPx, heightPx } = payload || {};

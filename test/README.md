@@ -48,6 +48,7 @@ When the suite was first written it reported 4 failures — all four turned out 
 
 - `setup.js` — generates `test_desktop.html` (see above)
 - `math_verification.js` — 1,032 numerical checks against independently-derived reference values; needs no DOM, runs straight against the engine source (see "The lost coverage" above for scope and rules)
+- `export_test.js` — the section-export serialiser and sanitiser: form values carried into an export, export chrome removed, truncated titles restored, and — the part that matters most, since snapshots are stored and rendered back later — that nothing executable or remote survives sanitising. jsdom does no layout, so scroll-box expansion and export width are verified live in Electron instead
 - `final_regression_pass.js` — the main sweep: creates a case, exercises every core valuation path and every top-level view, asserts zero console errors
 - `final_sweep.js` — navigation-only sweep across all Tools/Simulation tabs
 - `recovery_errorboundary_test.js` — deliberately crashes a case (`programs: null`) and verifies the two-layer error boundary catches it, the case-list sidebar stays functional, and switching to a working case recovers cleanly

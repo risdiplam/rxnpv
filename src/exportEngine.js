@@ -299,3 +299,247 @@ async function exportPanelAsImage(container, name) {
     slugifyExportName(name) + ".png"
   );
 }
+
+// ════════════════════════════════════════════════════════════════════════════
+// SECTION EXPORT — a whole card, not just its chart
+//
+// Every export in the app used to stop at a chart's edge. The export wrapper
+// sat around the <svg> only, so a PNG of "Company revenue rollup" came out
+// without the title, without "Peak: $2.50B in year 6", and without the notes
+// under it — a picture a reader had no way to interpret. Even "Panel" was a
+// screenshot of the SCREEN, so a section taller than the window, or one
+// scrolled partly out of view, came out cut off, and a scrolling list (Form 4
+// filings, literature results) came out showing only its visible rows.
+//
+// This serialises the section itself instead. The clone is taken with the live
+// form values written in, every scroll box expanded to its full height, every
+// truncated title restored to its full text, and the export chrome removed.
+// The result is standalone HTML that can be rendered offscreen at full height
+// (to PNG or PDF — see render-section in main.js) or stored on a case and laid
+// out inside the report. React styles inline, so outerHTML already carries
+// nearly all of the look; the app stylesheet supplies the rest.
+// ════════════════════════════════════════════════════════════════════════════
+
+// Tags that could run code or fetch something, and are never legitimately part
+// of a section. Stripped at capture AND again at render, so a snapshot edited
+// in storage cannot smuggle anything in either.
+const SNAPSHOT_DROP_TAGS = ["script", "iframe", "object", "embed", "link", "meta", "base", "noscript", "template", "frame", "frameset"];
+// Two different kinds of URL, with two different rules. A LINK is only
+// followed if a reader chooses to click it, so an ordinary web address is fine
+// and keeping it means links in an exported PDF still work. A RESOURCE is
+// fetched the moment the page renders — a remote image is a tracking pixel —
+// so only an embedded data: image is allowed there. The page CSP would block a
+// remote fetch anyway; the sanitiser does not rely on that.
+const SNAPSHOT_LINK_ATTRS = ["href", "xlink:href"];
+const SNAPSHOT_RESOURCE_ATTRS = ["src", "poster", "background", "srcset", "action", "formaction", "data"];
+
+function snapshotLinkAllowed(v) {
+  const t = String(v || "").trim().toLowerCase();
+  return t === "" || t.charAt(0) === "#" || t.indexOf("https:") === 0 || t.indexOf("http:") === 0;
+}
+function snapshotResourceAllowed(v) {
+  const t = String(v || "").trim().toLowerCase();
+  return t === "" || t.indexOf("data:image/") === 0;
+}
+
+// Whitelist by exclusion: drop dangerous elements, event handlers and non-web
+// URLs; keep style, class, SVG presentation and aria attributes, which is
+// everything a section needs to look like itself.
+function sanitizeSnapshotTree(root) {
+  if (!root || !root.querySelectorAll) return root;
+  root.querySelectorAll(SNAPSHOT_DROP_TAGS.join(",")).forEach(n => n.parentNode && n.parentNode.removeChild(n));
+  const all = [root].concat(Array.prototype.slice.call(root.querySelectorAll("*")));
+  all.forEach(n => {
+    if (!n.attributes) return;
+    Array.prototype.slice.call(n.attributes).forEach(a => {
+      const name = a.name.toLowerCase();
+      if (name.indexOf("on") === 0 || name === "srcdoc" || name === "formtarget") n.removeAttribute(a.name);
+      else if (SNAPSHOT_LINK_ATTRS.indexOf(name) !== -1 && !snapshotLinkAllowed(a.value)) n.removeAttribute(a.name);
+      else if (SNAPSHOT_RESOURCE_ATTRS.indexOf(name) !== -1 && !snapshotResourceAllowed(a.value)) n.removeAttribute(a.name);
+      else if (name === "style" && /expression\s*\(|javascript:/i.test(a.value)) n.removeAttribute(a.name);
+    });
+  });
+  return root;
+}
+
+function sanitizeSnapshotHtml(html) {
+  if (typeof document === "undefined") return "";
+  const box = document.createElement("div");
+  // A <template> parses without executing or loading anything, so the string
+  // can be inspected before any of it touches the live document.
+  const tpl = document.createElement("template");
+  tpl.innerHTML = String(html || "");
+  box.appendChild(tpl.content.cloneNode(true));
+  sanitizeSnapshotTree(box);
+  return box.innerHTML;
+}
+
+function serializeSection(root, opts) {
+  opts = opts || {};
+  if (!root || !root.cloneNode) return { ok: false, error: "Nothing to export." };
+  const clone = root.cloneNode(true);
+  // cloneNode preserves structure exactly, so the two lists line up one to one
+  // and each clone node can be corrected from its live counterpart.
+  const live = [root].concat(Array.prototype.slice.call(root.querySelectorAll("*")));
+  const copy = [clone].concat(Array.prototype.slice.call(clone.querySelectorAll("*")));
+  const canvases = [];
+  let extraWidth = 0;
+  for (let i = 0; i < live.length && i < copy.length; i++) {
+    const L = live[i], C = copy[i];
+    const tag = L.tagName;
+    // Form state lives in properties, not attributes, so outerHTML would show
+    // every input as its initial value rather than what the user typed.
+    if (tag === "INPUT") {
+      if (L.type === "checkbox" || L.type === "radio") { if (L.checked) C.setAttribute("checked", ""); else C.removeAttribute("checked"); }
+      else C.setAttribute("value", L.value);
+    } else if (tag === "TEXTAREA") {
+      C.textContent = L.value;
+    } else if (tag === "SELECT") {
+      Array.prototype.forEach.call(C.options || [], (o, j) => {
+        if (L.options[j] && L.options[j].selected) o.setAttribute("selected", ""); else o.removeAttribute("selected");
+      });
+    } else if (tag === "CANVAS") {
+      canvases.push([L, C]);
+    }
+    // A truncated title carries its full text; an export restores it, because
+    // "…" in a PDF is information the reader simply cannot get back.
+    const full = L.getAttribute && L.getAttribute("data-full-text");
+    if (full != null) C.textContent = full;
+
+    if (typeof getComputedStyle === "function" && L.nodeType === 1) {
+      const cs = getComputedStyle(L);
+      // A scroll box shows a window onto its content. In an export there is no
+      // scrollbar to reach the rest, so the box is opened to its full height.
+      const vClipped = L.scrollHeight > L.clientHeight + 1 && /auto|scroll|hidden/.test(cs.overflowY);
+      if (vClipped && tag !== "BODY" && tag !== "HTML") {
+        C.style.maxHeight = "none"; C.style.height = "auto"; C.style.overflowY = "visible";
+      }
+      // Horizontally scrolling tables are widened instead of clipped, and the
+      // export page grows to fit the widest of them.
+      if (L.scrollWidth > L.clientWidth + 1 && /auto|scroll/.test(cs.overflowX)) {
+        C.style.overflowX = "visible";
+        extraWidth = Math.max(extraWidth, L.scrollWidth - L.clientWidth);
+      }
+      // Single-line ellipsis truncation done in CSS rather than in text.
+      if (cs.textOverflow === "ellipsis" && L.scrollWidth > L.clientWidth + 1) {
+        C.style.whiteSpace = "normal"; C.style.textOverflow = "clip"; C.style.overflow = "visible";
+      }
+    }
+  }
+  // Canvas pixels are not part of the DOM, so they are carried across as an
+  // image. (Every chart here is SVG today; this keeps a future canvas honest.)
+  canvases.forEach(pair => {
+    try {
+      const img = document.createElement("img");
+      img.src = pair[0].toDataURL("image/png");
+      img.setAttribute("style", pair[0].getAttribute("style") || "");
+      img.width = pair[0].width; img.height = pair[0].height;
+      pair[1].parentNode.replaceChild(img, pair[1]);
+    } catch (e) { /* a tainted canvas cannot be read; leave it blank rather than fail the export */ }
+  });
+  // Export chrome — the export bar itself, pin controls — never belongs in the
+  // exported picture of a section.
+  Array.prototype.slice.call(clone.querySelectorAll("[data-no-export]")).forEach(n => n.parentNode && n.parentNode.removeChild(n));
+  sanitizeSnapshotTree(clone);
+  // The clone's own margin would otherwise add an off-colour band around it.
+  clone.style.margin = "0";
+
+  const rect = root.getBoundingClientRect ? root.getBoundingClientRect() : { width: 0, height: 0 };
+  const width = Math.max(320, Math.ceil((rect.width || root.offsetWidth || 800) + extraWidth));
+  const html = clone.outerHTML;
+  return {
+    ok: true,
+    html,
+    width,
+    title: opts.title || sectionTitleOf(root),
+    theme: (typeof document !== "undefined" && document.documentElement.getAttribute("data-theme")) || "dark",
+    bytes: html.length
+  };
+}
+
+// The name a reader would use for a section: its declared export name, else
+// its first heading-like line. Used for file names and report headings.
+function sectionTitleOf(root) {
+  if (!root) return "Section";
+  const declared = root.getAttribute && root.getAttribute("data-export-section");
+  if (declared) return declared;
+  const heading = root.querySelector && root.querySelector("h1,h2,h3,h4,[data-section-title]");
+  if (heading && heading.textContent.trim()) return heading.textContent.trim().slice(0, 90);
+  const first = (root.textContent || "").trim().split("\n")[0];
+  return (first || "Section").slice(0, 90);
+}
+
+// Nearest enclosing section of an element — how an export button finds the
+// card it belongs to without every card having to pass a ref down.
+function closestExportSection(el) {
+  let n = el;
+  while (n && n !== document.body) {
+    if (n.hasAttribute && n.hasAttribute("data-export-section")) return n;
+    n = n.parentNode;
+  }
+  return null;
+}
+
+async function exportSectionAs(root, format, opts) {
+  opts = opts || {};
+  if (!isDesktopExport() || !window.electronAPI.renderSection) {
+    return { ok: false, error: "Section export needs the desktop app — it renders the section offscreen, which a browser page cannot do." };
+  }
+  const snap = serializeSection(root, opts);
+  if (!snap.ok) return snap;
+  return await window.electronAPI.renderSection({
+    html: snap.html, width: snap.width, theme: snap.theme, format: format,
+    title: snap.title, context: opts.context || "",
+    suggestedName: slugifyExportName(opts.fileName || snap.title) + (format === "pdf" ? ".pdf" : ".png"),
+    returnData: !!opts.returnData
+  });
+}
+
+// ── Text compression for stored snapshots ──
+// Snapshots live in localStorage beside the user's cases, where the quota is
+// shared and small. HTML full of repeated inline styles compresses roughly
+// tenfold. Falls back to plain text anywhere the streams API is missing, and
+// records which was used so a snapshot is always readable back.
+async function compressSnapshotText(text) {
+  if (typeof CompressionStream === "undefined" || typeof Blob === "undefined") return { enc: "plain", data: text };
+  try {
+    const stream = new Blob([text]).stream().pipeThrough(new CompressionStream("gzip"));
+    const buf = new Uint8Array(await new Response(stream).arrayBuffer());
+    let bin = "";
+    for (let i = 0; i < buf.length; i += 0x8000) bin += String.fromCharCode.apply(null, buf.subarray(i, i + 0x8000));
+    return { enc: "gzip-b64", data: btoa(bin) };
+  } catch (e) { return { enc: "plain", data: text }; }
+}
+
+async function decompressSnapshotText(enc, data) {
+  if (enc !== "gzip-b64") return String(data || "");
+  const bin = atob(data);
+  const buf = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
+  const stream = new Blob([buf]).stream().pipeThrough(new DecompressionStream("gzip"));
+  return await new Response(stream).text();
+}
+
+// Builds a stored report item from a live section.
+async function buildSectionSnapshot(root, meta) {
+  meta = meta || {};
+  const snap = serializeSection(root, meta);
+  if (!snap.ok) return snap;
+  const packed = await compressSnapshotText(snap.html);
+  return {
+    ok: true,
+    pin: {
+      id: "pin_" + Math.random().toString(36).slice(2, 9),
+      kind: "html",
+      title: meta.title || snap.title,
+      source: meta.source || "",
+      note: meta.note || "",
+      capturedAt: Date.now(),
+      theme: snap.theme,
+      width: snap.width,
+      enc: packed.enc,
+      html: packed.data,
+      included: true
+    }
+  };
+}
