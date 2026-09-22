@@ -2745,6 +2745,15 @@ section("Trial results — outcome measures and registered analyses");
   ok("a ratio scale is recognised with a null of 1", win.analyses[0].scale === "ratio" && win.analyses[0].nullValue === 1);
   ok("0.43-0.64 excludes 1, so the interval does not cross the null", win.analyses[0].crossesNull === false);
   ok("the p-value stays a string so '<0.00001' survives", win.analyses[0].pValue === "<0.00001");
+  // DAPA-HF registers its primary hazard ratio against groupIds ["OG001"] --
+  // ONE arm, for a two-arm comparison. The engine passes the list through
+  // untouched rather than inventing the missing side; the UI is what has to
+  // refuse to print a bare arm title where "A vs B" belongs.
+  const oneSided = api.parseResultOutcomes(mk([{ groupIds: ["OG001"], paramType: "Hazard Ratio (HR)",
+    paramValue: "0.74", ciLowerLimit: "0.65", ciUpperLimit: "0.85" }], simpleClasses))[0];
+  ok("an analysis naming one arm keeps exactly that one arm", oneSided.analyses[0].groupIds.length === 1);
+  ok("and an analysis naming none reports none, rather than defaulting to all",
+    api.parseResultOutcomes(mk([{ paramType: "Hazard Ratio (HR)", paramValue: "0.74" }], simpleClasses))[0].analyses[0].groupIds.length === 0);
   ok("CT.gov's backslash escapes are removed from free text", win.analyses[0].comment.indexOf("\\") === -1);
   ok("the measure's own paramType is prettified, not shown as MEDIAN", win.estimateType === "Median");
 

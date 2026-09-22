@@ -2646,12 +2646,22 @@ function TrialResultsPanels({ results, study }) {
     if (a.lower != null && a.upper != null) bits.push("(" + (a.ciPct || "95") + "% CI " + a.lower + " – " + a.upper + ")");
     if (a.pValue) bits.push("p " + (/^[<>=]/.test(a.pValue.trim()) ? a.pValue : "= " + a.pValue));
     const compared = (a.groupIds || []).map(g => groupsById[g]).filter(Boolean);
+    // A sponsor can register an analysis naming FEWER than two arms — DAPA-HF
+    // files its primary hazard ratio against `["OG001"]` alone. Printing that
+    // single title where "A vs B" belongs reads as though the estimate runs
+    // against nothing, or worse, as though that arm is the numerator. When the
+    // record does not name both sides, it says so instead of implying one.
+    const comparedLine = compared.length >= 2 ? compared.join(" vs ") : null;
     return h("div", { style: { marginTop: 8, paddingLeft: 10, borderLeft: "2px solid var(--teal)" } },
       h("div", { style: { fontSize: 12, fontFamily: "var(--mono)", color: "var(--ink-1)" } }, bits.join("   ")),
       h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginTop: 3 } },
-        [compared.length ? compared.join(" vs ") : null,
+        [comparedLine,
          a.method || null,
          a.comparisonType ? a.comparisonType.toLowerCase().replace(/_/g, " ") : null].filter(Boolean).join("  ·  ")),
+      compared.length === 1 && h("div", { style: { fontSize: 10.5, fontFamily: "var(--sans)", color: "var(--ink-3)", marginTop: 3, lineHeight: 1.5 } },
+        "The sponsor registered only \u201C" + compared[0] + "\u201D against this comparison, so the record does not state which two arms the estimate runs between, or which way round. Read the direction from the per-arm numbers above rather than from the ratio."),
+      compared.length === 0 && h("div", { style: { fontSize: 10.5, fontFamily: "var(--sans)", color: "var(--ink-3)", marginTop: 3, lineHeight: 1.5 } },
+        "No arms are registered against this comparison, so the record does not state what it was computed between."),
       a.crossesNull === true && h("div", { style: { fontSize: 10.5, fontFamily: "var(--sans)", color: "var(--amber)", marginTop: 4, lineHeight: 1.5 } },
         "This interval spans " + a.nullValue + ", the value meaning no difference — the data are consistent with no effect."),
       a.crossesNull === false && h("div", { style: { fontSize: 10.5, fontFamily: "var(--sans)", color: "var(--ink-3)", marginTop: 4, lineHeight: 1.5 } },
@@ -2720,9 +2730,9 @@ function TrialResultsPanels({ results, study }) {
       h("td", { style: tdS }, num(r.completed) + (r.completionRate != null ? "  (" + pct(r.completionRate) + ")" : "")),
       h("td", { style: Object.assign({}, tdS, { color: r.nonDeathDiscontinuationRate != null && r.nonDeathDiscontinuationRate >= 0.2 ? "var(--amber)" : "var(--ink-1)" }) },
         num(r.nonDeathDiscontinued) + (r.nonDeathDiscontinuationRate != null ? "  (" + pct(r.nonDeathDiscontinuationRate) + ")" : "")),
-      h("td", { style: tdS }, num(r.deaths)),
+      h("td", { style: tdS }, r.deaths == null ? "not registered" : num(r.deaths)),
       h("td", { style: tdS }, r.withdrewForAE == null ? "not registered" : num(r.withdrewForAE) + "  (" + pct(r.aeWithdrawalRate) + ")"),
-      h("td", { style: tdS }, num(r.lostToFollowUp)))))));
+      h("td", { style: tdS }, r.lostToFollowUp == null ? "not registered" : num(r.lostToFollowUp)))))));
 
   return h("div", null,
     h("div", { style: { display: "flex", alignItems: "center", gap: 10, margin: "26px 0 14px" } },
