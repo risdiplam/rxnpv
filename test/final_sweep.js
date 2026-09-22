@@ -22,13 +22,45 @@ function findByLabel(d,t){return [...d.querySelectorAll("input")].find(i=>{const
   setVal(findByLabel(d,"Fully diluted shares"),"100000000"); await wait(150);
 
   click(btn("Tools")); await wait(400);
-  const toolTabs = ["M&A Premium","Company Lookup","Diluted Market Cap","Cash Runway","Runway vs. Catalyst","Binary Event","Peak Sales Comps","Licensing Comps","Catalyst Calendar","Trial Explorer","FDA Lookup","Exclusivity / LOE","Sensitivity","Trial Decoder","Target Dossier"];
-  for (const name of toolTabs) {
-    const tb = [...d.querySelectorAll("button")].find(b => b.textContent.trim() === name);
-    if (!tb) { console.log("MISSING TAB:", name); continue; }
-    click(tb); await wait(400);
+  // Tools is now six workbenches, each holding two to four tools on a second
+  // row. Every workbench is opened and then every tool inside it, so a tool
+  // that exists in the render chain but was left out of a workbench (or put in
+  // two) shows up here as an unreachable tab rather than as nothing at all.
+  const workbenches = [
+    ["Trial",       ["Trial Decoder", "Asset Program", "Trial Explorer", "FDA Lookup"]],
+    ["Science",     ["Target Dossier", "Literature"]],
+    ["Company",     ["Company Lookup", "Catalyst Calendar", "Cash Runway", "Runway vs. Catalyst"]],
+    ["Commercial",  ["Launch & Actuals", "Exclusivity / LOE"]],
+    ["Valuation",   ["Sensitivity", "Binary Event", "Diluted Market Cap"]],
+    ["Benchmarks",  ["M&A Premium", "Peak Sales Comps", "Licensing Comps"]]
+  ];
+  let toolsVisited = 0, missing = 0;
+  for (const [bench, tools] of workbenches) {
+    const bb = [...d.querySelectorAll("button")].find(b => b.textContent.trim() === bench);
+    if (!bb) { console.log("MISSING WORKBENCH:", bench); missing++; continue; }
+    click(bb); await wait(350);
+    for (const name of tools) {
+      const tb = [...d.querySelectorAll("button")].find(b => b.textContent.trim() === name);
+      if (!tb) { console.log("MISSING TOOL:", bench + " / " + name); missing++; continue; }
+      click(tb); await wait(350);
+      toolsVisited++;
+    }
   }
-  console.log("All " + toolTabs.length + " Tools tabs visited without error");
+  console.log("All " + workbenches.length + " Tools workbenches and " + toolsVisited + " tools visited without error"
+    + (missing ? " (" + missing + " MISSING)" : ""));
+  if (missing) errors.push("ERROR: " + missing + " Tools workbench/tool button(s) not found");
+
+  // The two sub-tools inside the Commercial workbench, which are their own
+  // switch rather than top-level tabs.
+  const commBench = [...d.querySelectorAll("button")].find(b => b.textContent.trim() === "Commercial");
+  if (commBench) {
+    click(commBench); await wait(350);
+    for (const name of ["Launch tracker", "Actual vs modelled"]) {
+      const tb = [...d.querySelectorAll("button")].find(b => b.textContent.trim() === name);
+      if (!tb) { console.log("MISSING COMMERCIAL SUBTOOL:", name); errors.push("ERROR: missing Commercial sub-tool " + name); continue; }
+      click(tb); await wait(300);
+    }
+  }
 
   click(btn("Simulation")); await wait(600);
   const simTabs = ["Trial Outcome / PoS","Phase 2→3 Translator","Trial Statistics","Meta-Analysis","Peak Sales","PK/PD"];

@@ -20,9 +20,45 @@ function CasePicker({ cases, selectedId, onChange, placeholder }) {
   );
 }
 
+// ── The workbench layout ───────────────────────────────────────────────────
+// Tools grew to seventeen flat tabs across three groups, and the groups were
+// organised by HOW a tool worked — static benchmark, computes against your
+// case, hits an external API — which is an implementation detail rather than
+// anything a reader is thinking about. Six workbenches replace them, organised
+// by the QUESTION being asked, each holding two to four tools that are usually
+// used together and can still be used alone.
+//
+// The tab identifiers are deliberately unchanged. Every cross-view deep link
+// in the app (Partnership Economics -> Licensing Comps) and every internal one
+// (Company Lookup -> Trial Watch, Asset Program -> Decoder) addresses a TOOL,
+// and the workbench is derived from the tool rather than stored separately —
+// so an existing link keeps working and cannot drift out of sync with the
+// grouping. Tool LABELS are kept as they were too, for the same reason in the
+// other direction: the grouping changed, the vocabulary did not, so nothing
+// anyone already knows the name of has to be relearned. "Trial Decoder" also
+// covers the results reader now, and "Launch & Actuals" is new.
+const TOOL_WORKBENCHES = [
+  { id: "trial", label: "Trial", question: "What is this trial, what can it prove, and what did it report?",
+    tools: [["decoder", "Trial Decoder"], ["asset", "Asset Program"], ["trialwatch", "Trial Explorer"], ["fdaLookup", "FDA Lookup"]] },
+  { id: "science", label: "Science", question: "Is the target real, and what has been published about it?",
+    tools: [["target", "Target Dossier"], ["literature", "Literature"]] },
+  { id: "company", label: "Company", question: "Can this company reach its next catalyst, and who is buying or selling it?",
+    tools: [["lookup", "Company Lookup"], ["calendar", "Catalyst Calendar"], ["runway", "Cash Runway"], ["runwayCatalyst", "Runway vs. Catalyst"]] },
+  { id: "commercial", label: "Commercial", question: "It is already selling — is the launch tracking, and when does it end?",
+    tools: [["commercial", "Launch & Actuals"], ["exclusivity", "Exclusivity / LOE"]] },
+  { id: "valuation", label: "Valuation", question: "What is the case worth, and what is it most sensitive to?",
+    tools: [["sensitivity", "Sensitivity"], ["binaryEvent", "Binary Event"], ["fdmc", "Diluted Market Cap"]] },
+  { id: "benchmarks", label: "Benchmarks", question: "What have comparable deals and drugs actually done?",
+    tools: [["ma", "M&A Premium"], ["peaksales", "Peak Sales Comps"], ["licensing", "Licensing Comps"]] }
+];
+
+function workbenchForTool(toolId) {
+  return TOOL_WORKBENCHES.find(w => w.tools.some(t => t[0] === toolId)) || TOOL_WORKBENCHES[0];
+}
+
 function ToolsView({ cases, updateCase, activeCase, navRequest }) {
   const h = React.createElement;
-  const [tab, setTab] = React.useState("ma");
+  const [tab, setTab] = React.useState("decoder");
   // Set by Company Lookup's "Watch this trial" link and consumed once by
   // Trial Watch on arrival — entirely local to ToolsView since both tabs
   // are siblings here, no need to route this through App.
@@ -37,28 +73,31 @@ function ToolsView({ cases, updateCase, activeCase, navRequest }) {
     if (navRequest && navRequest.tab) setTab(navRequest.tab);
   }, [navRequest && navRequest.requestId]);
 
-  // Grouped rather than one flat row of nine: these tabs do three genuinely
-  // different kinds of work, and grouping them makes that legible at a
-  // glance instead of requiring the user to remember which is which.
-  // "Benchmarks" are static reference datasets; "Your case" tools compute
-  // against case data already entered; "Live research" hits external APIs.
-  const tabGroups = [
-    { label: "Benchmarks", tabs: [["ma","M&A Premium"],["peaksales","Peak Sales Comps"],["licensing","Licensing Comps"]] },
-    { label: "Your case", tabs: [["fdmc","Diluted Market Cap"],["runway","Cash Runway"],["runwayCatalyst","Runway vs. Catalyst"],["binaryEvent","Binary Event"],["sensitivity","Sensitivity"],["commercial","Commercial"]] },
-    { label: "Live research", tabs: [["lookup","Company Lookup"],["calendar","Catalyst Calendar"],["decoder","Trial Decoder"],["trialwatch","Trial Explorer"],["fdaLookup","FDA Lookup"],["exclusivity","Exclusivity / LOE"],["asset","Asset Program"],["target","Target Dossier"],["literature","Literature"]] }
-  ];
+  const bench = workbenchForTool(tab);
 
   return h("div", { style: { maxWidth: 900, margin: "0 auto", padding: "24px 28px 60px" } },
-    h("div", { style: { display: "flex", gap: 18, marginBottom: 20, flexWrap: "wrap", alignItems: "flex-start" } },
-      tabGroups.map(group => h("div", { key: group.label },
-        h("div", { style: { fontSize: 9, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 5, paddingLeft: 2 } }, group.label),
-        h("div", { style: { display: "flex", gap: 6, flexWrap: "wrap" } },
-          group.tabs.map(([id, lbl]) => h("button", { key: id, onClick: () => setTab(id),
-            style: { padding: "8px 16px", borderRadius: 8, border: "1px solid var(--rule)", cursor: "pointer", fontFamily: "var(--mono)", fontSize: 12,
-              background: tab === id ? "var(--teal-bg)" : "var(--surface)", color: tab === id ? "var(--teal)" : "var(--ink-2)", fontWeight: tab === id ? 700 : 400 } }, lbl))
-        )
-      ))
-    ),
+    h("div", { style: { display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 } },
+      TOOL_WORKBENCHES.map(w => h("button", { key: w.id,
+        // Selecting a workbench lands on its first tool, which is the one most
+        // people want; the others are one click away on the row below.
+        onClick: () => setTab(w.tools[0][0]),
+        title: w.question,
+        "aria-current": bench.id === w.id ? "page" : undefined,
+        style: { padding: "9px 18px", borderRadius: 8, cursor: "pointer", fontFamily: "var(--mono)", fontSize: 12.5,
+          border: "1px solid " + (bench.id === w.id ? "var(--teal)" : "var(--rule)"),
+          background: bench.id === w.id ? "var(--teal-bg)" : "var(--surface)",
+          color: bench.id === w.id ? "var(--teal)" : "var(--ink-2)", fontWeight: bench.id === w.id ? 700 : 400 } }, w.label))),
+
+    h("div", { style: { fontSize: 11, fontFamily: "var(--sans)", color: "var(--ink-3)", lineHeight: 1.6, marginBottom: 10 } }, bench.question),
+
+    h("div", { style: { display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 20, paddingBottom: 14, borderBottom: "1px solid var(--rule)" } },
+      bench.tools.map(([id, lbl]) => h("button", { key: id, onClick: () => setTab(id),
+        "aria-current": tab === id ? "page" : undefined,
+        style: { padding: "6px 14px", borderRadius: 7, cursor: "pointer", fontFamily: "var(--mono)", fontSize: 11.5,
+          border: "1px solid " + (tab === id ? "var(--rule)" : "transparent"),
+          background: tab === id ? "var(--surface-2)" : "transparent",
+          color: tab === id ? "var(--ink-1)" : "var(--ink-3)", fontWeight: tab === id ? 700 : 400 } }, lbl))),
+
     tab === "ma" ? h(MaPremiumTool, { cases, updateCase, activeCase }) :
     tab === "lookup" ? h(CompanyLookupTool, { cases, updateCase, activeCase, onWatchTrial: goToTrialWatch }) :
     tab === "fdmc" ? h(FdmcTool, { cases, updateCase, activeCase }) :

@@ -18,6 +18,10 @@ function findLeafInput(container, labelText) {
 
   click(btn("+ New case")); await wait(400);
   click(btn("Tools")); await wait(400);
+  // Tools is organised into workbenches now, so a tool button only exists once
+  // its workbench is open. Selecting the workbench first is what a user does
+  // too — this is not a test-only step.
+  click([...d.querySelectorAll("button")].find(b=>b.textContent.trim()==="Benchmarks")); await wait(350);
   click([...d.querySelectorAll("button")].find(b=>b.textContent.trim()==="M&A Premium")); await wait(400);
 
   w.saveCustomComps = () => false;

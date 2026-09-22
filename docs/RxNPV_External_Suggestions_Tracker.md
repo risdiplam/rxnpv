@@ -551,3 +551,32 @@ For a **continuous** endpoint the control mean cancels out of the comparison and
 **CSP note**: `connect-src` gained `https://data.cms.gov`. Verified in Electron, since jsdom does not enforce CSP.
 
 **Verified**: `math_verification.js` from 964 to **1,030 checks**, including the exact Winrevair shape (a Q1 against a full prior year must produce *no* growth figure rather than a false collapse), the three-quarters-annualised comparison that turns a naive 20% miss into a real 6.7% beat, the asterisk normalisation, the dataset-start-year detection, and a gap year rendering as a break rather than a zero. Full 10-file suite clean. Both sub-tools driven live in Electron against Winrevair, Opsumit and Uptravi. **Zero console errors.**
+
+---
+
+## Phase 25 — Six workbenches instead of seventeen tabs
+
+✅ Done, confirmed by the user before building since it changes an interface in daily use.
+
+Tools had grown to seventeen flat tabs across three groups — *Benchmarks*, *Your case*, *Live research* — and those groups were organised by **how each tool worked**: whether it read a static table, computed against case data, or hit an external API. That is an implementation detail. Nobody sits down thinking "I need a tool that hits an external API."
+
+Six workbenches replace them, organised by the **question being asked**, each holding two to four tools that are usually used together and can still be used alone:
+
+| Workbench | The question | Tools |
+|---|---|---|
+| **Trial** | What is this trial, what can it prove, and what did it report? | Trial Decoder · Asset Program · Trial Explorer · FDA Lookup |
+| **Science** | Is the target real, and what has been published about it? | Target Dossier · Literature |
+| **Company** | Can this company reach its next catalyst, and who is buying or selling it? | Company Lookup · Catalyst Calendar · Cash Runway · Runway vs. Catalyst |
+| **Commercial** | It is already selling — is the launch tracking, and when does it end? | Launch & Actuals · Exclusivity / LOE |
+| **Valuation** | What is the case worth, and what is it most sensitive to? | Sensitivity · Binary Event · Diluted Market Cap |
+| **Benchmarks** | What have comparable deals and drugs actually done? | M&A Premium · Peak Sales Comps · Licensing Comps |
+
+A sixth workbench — **Valuation** — was added beyond the five the feature map originally proposed, because Sensitivity, Binary Event and Diluted Market Cap answer a question none of the other five do and would otherwise have been scattered.
+
+**The mechanic that keeps this safe.** The `tab` state is still the **tool** id, and the workbench is derived from it (`workbenchForTool`). Every deep link in the app addresses a tool — the external one from Partnership Economics → Licensing Comps, and the internal ones from Company Lookup → "Watch this trial" and Asset Program → "Decode this trial" — so all of them keep working untouched and none can drift out of sync with the grouping. Tool **labels** were kept as they were for the same reason in the other direction: the grouping changed, the vocabulary did not, so nothing anyone already knows the name of has to be relearned. Only "Launch & Actuals" is genuinely new.
+
+**One real consequence, found by the tests.** A tool button now only exists in the DOM once its workbench is open. Four storage-warning tests clicked a tool button directly and broke — correctly, because that is a real change in how the interface works, not a test artefact. They now select the workbench first, which is what a user does too.
+
+**Verification, and an honest note about how.** `final_sweep.js` was rewritten to open every workbench and then every tool inside it, so a tool that exists in the render chain but was left out of a workbench (or put in two) surfaces as an unreachable button rather than as silence — all 6 workbenches and 18 tools visited, zero errors. The deep link was driven live in Electron end to end (Workspace → enable Partnership → click the Licensing Comps link → both the workbench and the tool come back marked `aria-current="page"` with the licensing panel rendered).
+
+**CDP screenshot capture was unavailable this session** — `Page.captureScreenshot` hung, most likely because the Electron window was occluded behind other applications, which blocks Chromium compositing on macOS. Rather than claim a visual check that did not happen, the layout was verified **geometrically** instead: every workbench and tool button's `getBoundingClientRect()` read at 1280, 900 and 700 pixels wide, asserting no overlaps, nothing outside the container, nothing clipped below a legible size, the workbench row staying on one line, and `scrollWidth === clientWidth` so there is no horizontal page scroll. For a change that is two rows of buttons, that is arguably a stronger check than eyeballing a screenshot — but it is a different claim, and it is recorded as one.

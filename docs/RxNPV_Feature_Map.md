@@ -146,8 +146,8 @@ Each of these has been considered and declined on the merits. Recording them her
 
 ## 9. Open questions
 
-1. **Tab consolidation.** Tools currently has 15 tabs in 3 groups. The workbench structure above implies regrouping into Trial / Science / Company / Commercial / Benchmarks. This changes an interface in daily use — confirm before doing it.
-2. **CMS data lag.** Verify how far behind Part D/Medicaid actually are before committing to launch-tracking features that depend on them.
+1. ~~**Tab consolidation.**~~ **Resolved: confirmed by the user and built** (Phase 25). Six workbenches, organised by the question being asked. A sixth — *Valuation* — was added beyond the five originally proposed, because Sensitivity, Binary Event and Diluted Market Cap answer a question none of the other five do.
+2. ~~**CMS data lag.**~~ **Resolved: checked, and the assumption was wrong** (Phase 24). The annual datasets lag 1–2 years; the **quarterly** Part D/Part B datasets run about one quarter behind, which makes them a live uptake read rather than an analog-only source.
 3. ~~**Literature / paper shelf (Europe PMC).**~~ **Resolved: built** (Phase 21). The user's condition was "not just the European one" — which turned out not to be a constraint, because Europe PMC indexes MEDLINE/PubMed in full rather than European content only. One source, not three.
 4. ~~**Evidence-thinness indicator** — useful, or glib?~~ **Resolved: built** (Phase 22), as a checklist on the Asset Program view with no composite score.
 
@@ -159,5 +159,5 @@ Each of these has been considered and declined on the merits. Recording them her
 2. ~~**Gross-to-net** — accuracy fix on existing valuation~~ — **done**, Phase 18
 3. ~~**Cheap completions batch**~~ — **all done**: thin-win and change classification (Phase 19), Form 4 derivatives (Phase 20), literature shelf (Phase 21), multi-trial view + evidence checklist (Phase 22), control-arm/dropout stress (Phase 23)
 4. ~~**Commercial workbench** — launch trajectory, actual vs modelled~~ — **done**, Phase 24
-5. **Tab consolidation** — after the tools exist, not before. **Confirmed by the user, September 2026**: regroup into Trial / Science / Company / Commercial / Benchmarks. ← next
-6. **Electron upgrade** — deferred by the user; needs ~10 minutes of their time (PDF export, panel capture, window resize)
+5. ~~**Tab consolidation**~~ — **done**, Phase 25. Six workbenches (Trial / Science / Company / Commercial / Valuation / Benchmarks), 18 tools.
+6. **Electron upgrade** — deferred by the user; needs ~10 minutes of their time (PDF export, panel capture, window resize) ← **the only item left on this list**
