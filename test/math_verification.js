@@ -94,6 +94,7 @@ const EXPORTS = [
   "computeSimpleMultipleValuation", "computeSOTPBreakdown",
   "periodMonths", "sumTranchesAtLatestDate", "calcRunwayFromFacts", "extractDebt",
   "extractSharesOutstanding", "extractDilutedShares", "extractOptions", "extractWarrants",
+  "summarizeOpenMarketActivity", "FORM4_CODE_LABELS",
   "extractConvertibleNotes", "pickLatestUnit", "isFilingForm", "formatHalfLife"
 ];
 const api = new Function(combined + "\nreturn {" + EXPORTS.join(",") + "};")();
@@ -3063,6 +3064,54 @@ section("Analog board — placing one number in the posted reference class");
 
   ok("an empty reference class yields nothing rather than a fake percentile", api.positionInAnalogs([], 0.75) === null);
   ok("a non-numeric input yields nothing", api.positionInAnalogs(ratios, NaN) === null);
+}
+report();
+
+section("Form 4 — a grant is not a purchase");
+{
+  // Only codes P (open-market buy) and S (open-market sell) are somebody
+  // choosing to transact at a market price. Everything else on a Form 4 is a
+  // transfer, an award, a withholding or a conversion, and rolling them into a
+  // "net insider buying" figure is exactly how that figure stops meaning
+  // anything. 10,000 @ $12 = $120,000 bought; 4,000 @ $15 = $60,000 sold.
+  const txns = [
+    { code: "P", shares: 10000, valueUsd: 120000, ownerName: "A. Chen" },
+    { code: "S", shares: 4000, valueUsd: 60000, ownerName: "B. Okafor" },
+    { code: "A", shares: 50000, valueUsd: null, ownerName: "A. Chen" },     // grant
+    { code: "F", shares: 1200, valueUsd: 18000, ownerName: "B. Okafor" },   // tax withholding
+    { code: "M", shares: 25000, valueUsd: null, ownerName: "C. Silva" },    // option exercise
+    { code: "G", shares: 3000, valueUsd: null, ownerName: "A. Chen" }       // gift
+  ];
+  const sum = api.summarizeOpenMarketActivity(txns);
+  near("only the P is counted as buying", sum.boughtShares, 10000, 0);
+  near("and only at its own dollar value", sum.boughtUsd, 120000, 0);
+  near("only the S is counted as selling", sum.soldShares, 4000, 0);
+  near("net is purchases minus sales, nothing else", sum.netUsd, 60000, 0);
+  ok("a 50,000-share grant is not counted as buying", sum.boughtShares === 10000);
+  ok("tax withholding is not counted as selling", sum.soldShares === 4000);
+  near("one distinct buyer", sum.buyerCount, 1, 0);
+  near("one distinct seller", sum.sellerCount, 1, 0);
+
+  // An empty filing set must read as "nothing happened here", not as zero
+  // net buying dressed up as a finding.
+  const none = api.summarizeOpenMarketActivity([]);
+  ok("no transactions means nothing to report", none.any === false && none.netUsd === 0);
+  // Grants alone must not make the summary claim open-market activity.
+  ok("grants alone do not count as open-market activity",
+    api.summarizeOpenMarketActivity([{ code: "A", shares: 50000, valueUsd: null }]).any === false);
+  // The same insider on both sides counts once each way, not twice.
+  const both = api.summarizeOpenMarketActivity([
+    { code: "P", shares: 100, valueUsd: 1000, ownerName: "A" },
+    { code: "P", shares: 200, valueUsd: 2000, ownerName: "A" },
+    { code: "S", shares: 50, valueUsd: 500, ownerName: "A" }
+  ]);
+  ok("repeat transactions by one insider count as one buyer and one seller",
+    both.buyerCount === 1 && both.sellerCount === 1);
+  near("but their shares still add up", both.boughtShares, 300, 0);
+
+  // Derivative codes need labels, or the grants tab prints raw letters.
+  ok("the derivative codes have labels",
+    ["A", "M", "F", "D", "C", "X"].every(c => typeof api.FORM4_CODE_LABELS[c] === "string" && api.FORM4_CODE_LABELS[c].length > 2));
 }
 report();
 

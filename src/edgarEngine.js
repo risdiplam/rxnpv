@@ -601,9 +601,18 @@ async function searchCatalystFilings(cik, monthsBack) {
 // (ciks= filter, _id-splitting for the document URL), then fetches and
 // parses each filing's actual ownership XML for the structured transaction
 // data (shares, price, transaction code) that search-result metadata alone
-// doesn't carry. Non-derivative transactions only (direct stock buys/sells)
-// — derivative transactions (options, RSUs vesting) are a real but
-// substantially messier category left out of this first pass.
+// doesn't carry.
+//
+// BOTH tables are read, and they are kept apart on purpose. Non-derivative
+// transactions are direct stock buys and sells — the part with signal in it,
+// since an executive spending their own money is a decision. Derivative
+// transactions are options and RSUs: grants, vesting and exercises. Those used
+// to be skipped entirely, which meant "no transactions found" could be printed
+// in a week the CEO received a multi-million-dollar option grant. Reading them
+// is better. Merging them into one list would be worse than skipping them: a
+// grant is compensation the board handed over, not conviction the insider
+// bought, and a $5M award sitting in the same column as a $5M purchase would
+// read as the same event. They are returned, and displayed, separately.
 function parseForm4Xml(xmlText) {
   if (typeof DOMParser === "undefined") return null;
   let doc;
@@ -619,12 +628,24 @@ function parseForm4Xml(xmlText) {
   const ownerEl = doc.querySelector("reportingOwner");
   const relEl = ownerEl ? ownerEl.querySelector("reportingOwnerRelationship") : null;
 
+  // The relationship flags are booleans, and filers write them BOTH ways: the
+  // schema's own examples use 1/0, and plenty of real filings use true/false.
+  // Checking only for "1" silently labelled a live filing from Sarepta's Chief
+  // Financial Officer as "Other" — which is not a cosmetic slip, since who was
+  // transacting is most of what an insider transaction means.
+  const flag = (el, tag) => {
+    const n = el ? el.querySelector(tag) : null;
+    const t = n ? n.textContent.trim().toLowerCase() : "";
+    return t === "1" || t === "true";
+  };
   let role = "Other";
   if (relEl) {
     const title = val(relEl, "officerTitle");
-    if (relEl.querySelector("isDirector")?.textContent.trim() === "1") role = "Director";
-    else if (relEl.querySelector("isOfficer")?.textContent.trim() === "1") role = title || "Officer";
-    else if (relEl.querySelector("isTenPercentOwner")?.textContent.trim() === "1") role = "10%+ Owner";
+    // Officer before director: a filer who is both is more usefully described
+    // by their executive title than by a board seat.
+    if (flag(relEl, "isOfficer")) role = title || "Officer";
+    else if (flag(relEl, "isDirector")) role = "Director";
+    else if (flag(relEl, "isTenPercentOwner")) role = "10%+ Owner";
   }
 
   const transactions = [...doc.querySelectorAll("nonDerivativeTable > nonDerivativeTransaction")].map(t => ({
@@ -637,39 +658,94 @@ function parseForm4Xml(xmlText) {
     sharesOwnedAfter: parseFloat(val(t, "postTransactionAmounts sharesOwnedFollowingTransaction value"))
   })).filter(t => t.date && !isNaN(t.shares));
 
+  // Derivative securities: options, RSUs, warrants held by the insider. The
+  // shares figure here counts derivative securities, which is usually but not
+  // always 1:1 with the underlying — underlyingShares is read separately rather
+  // than assumed. `transactionPricePerShare` on a grant is normally 0 (it was
+  // given, not bought), so no dollar value is computed: the honest figures are
+  // the share count and the strike, and inventing a notional from a market
+  // price this function does not have would be worse than leaving it blank.
+  const derivativeTransactions = [...doc.querySelectorAll("derivativeTable > derivativeTransaction")].map(t => ({
+    securityTitle: val(t, "securityTitle value"),
+    date: val(t, "transactionDate value"),
+    code: val(t, "transactionCoding transactionCode"),
+    shares: parseFloat(val(t, "transactionAmounts transactionShares value")),
+    pricePerShare: parseFloat(val(t, "transactionAmounts transactionPricePerShare value")),
+    acquiredDisposed: val(t, "transactionAmounts transactionAcquiredDisposedCode value"),
+    strikePrice: parseFloat(val(t, "conversionOrExercisePrice value")),
+    exercisableFrom: val(t, "exerciseDate value"),
+    expiresOn: val(t, "expirationDate value"),
+    underlyingTitle: val(t, "underlyingSecurity underlyingSecurityTitle value"),
+    underlyingShares: parseFloat(val(t, "underlyingSecurity underlyingSecurityShares value")),
+    sharesOwnedAfter: parseFloat(val(t, "postTransactionAmounts sharesOwnedFollowingTransaction value"))
+  })).filter(t => t.date && !isNaN(t.shares));
+
   return {
     issuerName: val(issuerEl, "issuerName"),
     issuerCik: val(issuerEl, "issuerCik"),
     ownerName: val(ownerEl, "reportingOwnerId rptOwnerName"),
     role,
-    transactions
+    transactions,
+    derivativeTransactions
   };
 }
 
 // Standard Section 16 transaction-code labels, the ones that actually matter
 // for a "did an insider buy or sell" read — everything else falls back to
 // showing the raw code rather than guessing at a label.
-const FORM4_CODE_LABELS = { P: "Open-market buy", S: "Open-market sell", A: "Grant/award", M: "Option exercise", F: "Tax withholding", G: "Gift", J: "Other (per footnote)" };
+const FORM4_CODE_LABELS = {
+  P: "Open-market buy", S: "Open-market sell", A: "Grant/award", M: "Option exercise",
+  F: "Tax withholding", G: "Gift", J: "Other (per footnote)",
+  D: "Disposed to issuer", C: "Conversion", X: "In-the-money exercise", E: "Expired short derivative",
+  H: "Expired long derivative", I: "Discretionary transaction", U: "Tender of shares"
+};
+
+// Only codes P and S — an open-market purchase and an open-market sale. Every
+// other code is a transfer, a grant, a tax withholding or a conversion, none of
+// which is anybody choosing to buy or sell at a market price, and rolling them
+// into a "net insider buying" figure is the standard way that figure becomes
+// meaningless.
+function summarizeOpenMarketActivity(transactions) {
+  let boughtShares = 0, boughtUsd = 0, soldShares = 0, soldUsd = 0, buyers = {}, sellers = {};
+  (transactions || []).forEach(t => {
+    if (t.code === "P") { boughtShares += t.shares || 0; boughtUsd += t.valueUsd || 0; if (t.ownerName) buyers[t.ownerName] = true; }
+    else if (t.code === "S") { soldShares += t.shares || 0; soldUsd += t.valueUsd || 0; if (t.ownerName) sellers[t.ownerName] = true; }
+  });
+  return {
+    boughtShares, boughtUsd, soldShares, soldUsd,
+    buyerCount: Object.keys(buyers).length,
+    sellerCount: Object.keys(sellers).length,
+    netUsd: boughtUsd - soldUsd,
+    any: boughtShares > 0 || soldShares > 0
+  };
+}
 
 async function fetchInsiderTransactions(cik, limit) {
   limit = limit || 20;
   const cikPadded = String(cik).replace(/\D/g, "").padStart(10, "0");
-  const url = "https://efts.sec.gov/LATEST/search-index?q=%22Form%204%22&forms=4&ciks=" + cikPadded;
 
-  let data;
-  try { data = await edgarFetch(url); } catch (e) { return { ok: false, error: e.message }; }
-  if (!data || !data.hits || !data.hits.hits) return { ok: false, error: "No response from EDGAR full-text search." };
+  // Discovered from the company's own submissions index, NOT from full-text
+  // search. The search endpoint returns hits in RELEVANCE order — confirmed
+  // live: asking it for Sarepta's Form 4s returned filings from 2008, 2011 and
+  // 2016 among the first ten, out of 277. So "the last 20 Form 4 filings" was
+  // an arbitrary 20, and a company's most recent insider activity could be
+  // absent from a panel whose whole purpose is to show it. The submissions
+  // index is already fetched and cached elsewhere in this file, is genuinely
+  // reverse-chronological, and needs no second API surface.
+  const subs = await fetchSubmissions(cikPadded);
+  if (!subs) return { ok: false, error: "Couldn't reach EDGAR for this company's filing index." };
+  const form4s = recentFilingsByType(subs, ["4", "4/A"], limit);
 
-  const filingRefs = data.hits.hits.slice(0, limit).map(h => {
-    const src = h._source || {};
-    const idParts = String(h._id || "").split(":");
-    const accessionRaw = idParts[0] || "";
-    const fileName = idParts[1] || "";
-    const accessionNoDashes = accessionRaw.replace(/-/g, "");
-    const docUrl = accessionNoDashes && fileName
-      ? "https://www.sec.gov/Archives/edgar/data/" + parseInt(cikPadded, 10) + "/" + accessionNoDashes + "/" + fileName
+  const filingRefs = form4s.map(f => {
+    const accessionNoDashes = String(f.accession || "").replace(/-/g, "");
+    // primaryDocument points at the human-readable rendering
+    // ("xslF345X06/ownership.xml"); the machine-readable XML is the same name
+    // with that stylesheet directory removed.
+    const rawDoc = String(f.primaryDoc || "").replace(/^xslF345X\d+\//i, "");
+    const docUrl = accessionNoDashes && rawDoc
+      ? "https://www.sec.gov/Archives/edgar/data/" + parseInt(cikPadded, 10) + "/" + accessionNoDashes + "/" + rawDoc
       : null;
-    return { docUrl, fileDate: src.file_date || null };
+    return { docUrl, fileDate: f.date || null };
   }).filter(r => r.docUrl);
 
   if (!filingRefs.length) return { ok: true, transactions: [], filingsChecked: 0 };
@@ -682,19 +758,40 @@ async function fetchInsiderTransactions(cik, limit) {
     } catch (e) { return null; }
   }));
 
-  const transactions = [];
+  const transactions = [], derivativeTransactions = [];
   parsed.filter(Boolean).forEach(doc => {
+    const who = { ownerName: doc.ownerName, role: doc.role, filingDate: doc.filingDate, sourceUrl: doc.sourceUrl };
     doc.transactions.forEach(t => {
-      transactions.push({
-        ownerName: doc.ownerName, role: doc.role, filingDate: doc.filingDate, sourceUrl: doc.sourceUrl,
+      transactions.push(Object.assign({}, who, {
         date: t.date, code: t.code, codeLabel: FORM4_CODE_LABELS[t.code] || ("Code " + t.code),
+        securityTitle: t.securityTitle,
         shares: t.shares, pricePerShare: t.pricePerShare, acquiredDisposed: t.acquiredDisposed,
         valueUsd: (t.pricePerShare > 0 && t.shares > 0) ? t.shares * t.pricePerShare : null,
         sharesOwnedAfter: t.sharesOwnedAfter
-      });
+      }));
+    });
+    (doc.derivativeTransactions || []).forEach(t => {
+      derivativeTransactions.push(Object.assign({}, who, {
+        date: t.date, code: t.code, codeLabel: FORM4_CODE_LABELS[t.code] || ("Code " + t.code),
+        securityTitle: t.securityTitle, shares: t.shares, acquiredDisposed: t.acquiredDisposed,
+        strikePrice: isFinite(t.strikePrice) ? t.strikePrice : null,
+        exercisableFrom: t.exercisableFrom, expiresOn: t.expiresOn,
+        underlyingTitle: t.underlyingTitle,
+        underlyingShares: isFinite(t.underlyingShares) ? t.underlyingShares : null,
+        sharesOwnedAfter: t.sharesOwnedAfter,
+        isDerivative: true
+      }));
     });
   });
-  transactions.sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+  const byDateDesc = (a, b) => (b.date || "").localeCompare(a.date || "");
+  transactions.sort(byDateDesc);
+  derivativeTransactions.sort(byDateDesc);
 
-  return { ok: true, transactions, filingsChecked: filingRefs.length, filingsParsed: parsed.filter(Boolean).length };
+  return {
+    ok: true, transactions, derivativeTransactions,
+    // The one summary worth stating up front: money actually spent, and money
+    // actually taken out. Grants are deliberately absent from both.
+    openMarketSummary: summarizeOpenMarketActivity(transactions),
+    filingsChecked: filingRefs.length, filingsParsed: parsed.filter(Boolean).length
+  };
 }

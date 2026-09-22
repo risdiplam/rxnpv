@@ -73,8 +73,8 @@ Already the model for how a workbench should work. Mature.
 | Company Lookup (EDGAR financials, full-text search) | **BUILT** | |
 | Catalyst Calendar | **BUILT** | |
 | Cash Runway · Runway vs Catalyst | **BUILT** | |
-| Insider transactions (Form 4) | **BUILT, incomplete** | Non-derivative only. Option grants and RSU vesting are invisible. |
-| **Form 4 derivative coverage** | **DECIDED — build** | Completes a documented gap |
+| Insider transactions (Form 4) | **BUILT** | Both tables, split by transaction code — P/S on one tab, awards and vesting on another (Phase 20) |
+| **Form 4 derivative coverage** | **BUILT** | Plus two real bugs found on the way: relevance-ordered discovery, and officer titles read as “Other” |
 | **Pipeline view / 10-K vs CT.gov mismatch** | **DECIDED — build** | The two sources routinely disagree; the disagreement is itself the signal |
 | 13F institutional holdings | **DECIDED — no** | Different filing type, previously declined, still out |
 
@@ -156,7 +156,7 @@ Each of these has been considered and declined on the merits. Recording them her
 
 1. ~~**Results reader** (outcomes, dropout, adverse events)~~ — **done**, Phase 17
 2. ~~**Gross-to-net** — accuracy fix on existing valuation~~ — **done**, Phase 18
-3. **Cheap completions batch** — ~~thin-win vs analogs~~, ~~change classification~~ (both done, Phase 19); Form 4 derivatives, multi-trial view, control-arm stress ← next
+3. **Cheap completions batch** — ~~thin-win vs analogs~~, ~~change classification~~ (Phase 19), ~~Form 4 derivatives~~ (Phase 20); multi-trial view, control-arm stress ← next
 4. **Commercial workbench** — launch trajectory, actual vs modelled
 5. **Tab consolidation** — after the tools exist, not before
 6. **Electron upgrade** — deferred by the user; needs ~10 minutes of their time (PDF export, panel capture, window resize)

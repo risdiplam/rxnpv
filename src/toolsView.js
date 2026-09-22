@@ -266,6 +266,9 @@ function CompanyLookupTool({ cases, updateCase, activeCase, onWatchTrial }) {
   const [insiderResult, setInsiderResult] = React.useState(null);
   const [insiderError, setInsiderError] = React.useState(null);
   const [insiderLoading, setInsiderLoading] = React.useState(false);
+  // Two lists, never merged: an executive spending their own money is a
+  // decision; an option grant is compensation the board handed over.
+  const [insiderView, setInsiderView] = React.useState("market");
   const isDesktop = typeof window !== "undefined" && window.electronAPI && window.electronAPI.isDesktop;
 
   // Without these, correcting a search mid-flight ("Moderna" -> "Merck") let
@@ -375,27 +378,79 @@ function CompanyLookupTool({ cases, updateCase, activeCase, onWatchTrial }) {
           style: { padding: "6px 14px", borderRadius: 6, border: "1px solid var(--rule)", background: "transparent", color: "var(--ink-2)", fontFamily: "var(--mono)", fontSize: 11, cursor: insiderLoading ? "default" : "pointer" }
         }, insiderLoading ? "Loading insider activity…" : "Load insider activity (Form 4)"),
         insiderError && h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-2)", marginTop: 6 } }, insiderError),
-        insiderResult && h("div", { style: { padding: "10px 14px", borderRadius: 8, background: "var(--surface-2)", marginTop: 6 } },
-          h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", fontWeight: 700, color: "var(--ink-2)", marginBottom: 6 } },
-            "Insider transactions (" + insiderResult.transactions.length + " from last " + insiderResult.filingsChecked + " Form 4 filings)"),
-          // Worded carefully: this tool only parses NON-derivative Form 4
-          // activity (direct buys and sells). Option grants and RSU vesting
-          // are filed as derivative transactions and are not read at all, so a
-          // bare "no transactions found" could mean a CEO's large option grant
-          // happened the same week and simply isn't shown.
-          insiderResult.transactions.length === 0 && h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-3)", lineHeight: 1.6 } },
-            "No direct buy/sell transactions in the filings checked. Note this covers non-derivative Form 4 activity only — option grants and RSU vesting aren't parsed yet, so they wouldn't appear here even if they happened."),
-          h("div", { style: { display: "flex", flexDirection: "column", gap: 6, maxHeight: 340, overflowY: "auto" } },
-            insiderResult.transactions.map((t, i) => h("div", { key: i, style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-2)", padding: "6px 0", borderBottom: "1px solid var(--rule)" } },
-              h("div", { style: { display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" } },
-                h("span", { style: { color: t.acquiredDisposed === "A" ? "var(--teal)" : t.acquiredDisposed === "D" ? "var(--red)" : "var(--ink-2)", fontWeight: 700 } }, t.codeLabel),
-                h("span", null, t.date), h("span", { style: { color: "var(--ink-3)" } }, "· " + t.ownerName + " (" + t.role + ")")),
-              h("div", null,
-                fmtNum(t.shares) + " shares" + (t.pricePerShare ? " @ $" + t.pricePerShare.toFixed(2) : "") + (t.valueUsd ? " (" + fmtMoney(t.valueUsd) + ")" : ""),
-                h(ExternalLink, { href: t.sourceUrl, style: { fontSize: 9, marginLeft: 8 } }, "→ Filing"))
-            ))
-          )
-        )
+        insiderResult && (() => {
+          // Split by WHAT THE TRANSACTION IS, not by which XML table it came
+          // from. A restricted-stock award is filed in the non-derivative
+          // table, so a naive derivative/non-derivative split puts a CEO's
+          // 756,104-share grant under "bought and sold" — which is the exact
+          // confusion this tab exists to prevent. Codes P and S are the only
+          // two that mean somebody chose to transact at a market price;
+          // everything else is an award, a vesting, a withholding, an exercise
+          // or a transfer.
+          const all = insiderResult.transactions || [];
+          const market = all.filter(t => t.code === "P" || t.code === "S");
+          const grants = all.filter(t => t.code !== "P" && t.code !== "S")
+            .concat(insiderResult.derivativeTransactions || [])
+            .sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+          const sum = insiderResult.openMarketSummary || {};
+          const rows = insiderView === "market" ? market : grants;
+          const tab = (key, label, n) => h("button", { key: key, onClick: () => setInsiderView(key),
+            style: { padding: "4px 12px", borderRadius: 6, fontSize: 10, fontFamily: "var(--mono)", cursor: "pointer",
+              border: "1px solid " + (insiderView === key ? "var(--teal)" : "var(--rule)"),
+              background: insiderView === key ? "var(--teal-bg)" : "transparent",
+              color: insiderView === key ? "var(--teal)" : "var(--ink-3)" } }, label + " (" + n + ")");
+          return h("div", { style: { padding: "10px 14px", borderRadius: 8, background: "var(--surface-2)", marginTop: 6 } },
+            h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", fontWeight: 700, color: "var(--ink-2)", marginBottom: 6 } },
+              "Insider transactions — " + insiderResult.filingsChecked + " most recent Form 4 filings"),
+
+            // The headline is open-market activity only. A net figure that
+            // folded in grants and tax withholding would be the standard way
+            // this number stops meaning anything.
+            sum.any
+              ? h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-1)", lineHeight: 1.7, marginBottom: 8 } },
+                  h("div", null,
+                    sum.boughtShares > 0
+                      ? h("span", { style: { color: "var(--teal)" } }, "Bought " + fmtNum(sum.boughtShares) + " shares" + (sum.boughtUsd ? " (" + fmtMoney(sum.boughtUsd) + ")" : "") + " across " + sum.buyerCount + " insider" + (sum.buyerCount === 1 ? "" : "s"))
+                      : h("span", { style: { color: "var(--ink-3)" } }, "No open-market buying"),
+                    " · ",
+                    sum.soldShares > 0
+                      ? h("span", { style: { color: "var(--red)" } }, "sold " + fmtNum(sum.soldShares) + " shares" + (sum.soldUsd ? " (" + fmtMoney(sum.soldUsd) + ")" : "") + " across " + sum.sellerCount + " insider" + (sum.sellerCount === 1 ? "" : "s"))
+                      : h("span", { style: { color: "var(--ink-3)" } }, "no open-market selling")))
+              : h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-3)", lineHeight: 1.6, marginBottom: 8 } },
+                  "No open-market buying or selling in the filings checked" + (grants.length ? " — but " + grants.length + " award, vesting or exercise transaction" + (grants.length === 1 ? " was" : "s were") + " filed, on the other tab." : ".")),
+
+            h("div", { style: { display: "flex", gap: 8, marginBottom: 8, flexWrap: "wrap" } },
+              tab("market", "Bought & sold", market.length),
+              tab("grants", "Grants, vesting & options", grants.length)),
+
+            rows.length === 0 && h("div", { style: { fontSize: 11, fontFamily: "var(--sans)", color: "var(--ink-3)", lineHeight: 1.6 } },
+              insiderView === "market"
+                ? "No open-market purchases or sales in the filings checked. Awards, vesting and exercises, if any, are on the other tab."
+                : "No awards, vesting, exercises or other non-market transactions in the filings checked."),
+
+            h("div", { style: { display: "flex", flexDirection: "column", gap: 6, maxHeight: 340, overflowY: "auto" } },
+              rows.map((t, i) => h("div", { key: i, style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-2)", padding: "6px 0", borderBottom: "1px solid var(--rule)" } },
+                h("div", { style: { display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" } },
+                  h("span", { style: { color: t.code === "P" ? "var(--teal)" : t.code === "S" ? "var(--red)" : t.acquiredDisposed === "A" ? "var(--ink-1)" : "var(--ink-2)", fontWeight: 700 } }, t.codeLabel),
+                  h("span", null, t.date), h("span", { style: { color: "var(--ink-3)" } }, "· " + t.ownerName + " (" + t.role + ")")),
+                t.isDerivative
+                  ? h("div", null,
+                      fmtNum(t.shares) + " " + (t.securityTitle || "derivative securities")
+                        + (t.strikePrice != null && t.strikePrice > 0 ? " · strike $" + t.strikePrice.toFixed(2) : t.strikePrice === 0 ? " · no exercise price (RSU-type)" : "")
+                        + (t.underlyingShares != null && t.underlyingShares !== t.shares ? " · over " + fmtNum(t.underlyingShares) + " underlying shares" : "")
+                        + (t.expiresOn ? " · expires " + t.expiresOn : ""),
+                      h(ExternalLink, { href: t.sourceUrl, style: { fontSize: 9, marginLeft: 8 } }, "→ Filing"))
+                  : h("div", null,
+                      fmtNum(t.shares) + " shares" + (t.pricePerShare ? " @ $" + t.pricePerShare.toFixed(2) : "") + (t.valueUsd ? " (" + fmtMoney(t.valueUsd) + ")" : ""),
+                      h(ExternalLink, { href: t.sourceUrl, style: { fontSize: 9, marginLeft: 8 } }, "→ Filing"))
+              ))),
+
+            h("div", { style: { fontSize: 10, fontFamily: "var(--sans)", color: "var(--ink-3)", lineHeight: 1.6, marginTop: 8 } },
+              insiderView === "market"
+                ? "Only codes P and S: an insider deciding to buy or sell at a market price with their own money. That is the part of a Form 4 with any signal in it, and it is why everything else lives on the other tab."
+                : "Compensation, not conviction — an award is something the board decided, not something the insider bought, and a tax withholding is not a decision to sell. Restricted stock arrives in the same table as an ordinary purchase in the filing itself, which is exactly why these are separated by what the transaction is rather than by where it sits in the XML. Option grants carry no dollar value here: a grant's registered price is normally zero, and a notional built from a market price this tool does not have would be a made-up number. An exercise followed by a same-day sale appears here as the exercise and on the other tab as the sale.")
+          );
+        })()
       ),
 
       trialsResult && h("div", { style: { padding: "10px 14px", borderRadius: 8, background: "var(--surface-2)" } },
