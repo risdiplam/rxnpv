@@ -10,21 +10,28 @@ The bulk of this list came out of an exhaustive audit pass (September 2026) cove
 
 ## Still open
 
-### 🟡 Electron is 11 major versions behind (33.4.11, current is 44.x) — **DEFERRED BY THE USER, NOT FORGOTTEN**
-The user asked to hold this for a later session (2026-09-21) because it needs ten minutes of their time and they didn't have it. **Do not silently drop it, and do not start it unattended** — it is the one remaining item with a real verification step only they can perform.
+**Nothing.** The Electron upgrade was the last item on this list, and it closed on 2026-09-22 (see below). That is a statement about *this* list — the audit findings and the things flagged during it — not a claim that the app has no remaining gaps. The two standing limitations are in CLAUDE.md under "Known limitations", and `RxNPV_Feature_Map.md` holds what is deliberately not built.
 
-*Why it matters:* Electron bundles Chromium, V8 and Node, so an upgrade picks up their security patches. Actual exposure here was checked and is near zero — the app only ever loads a local file (`win.loadFile`, never `loadURL`), the only network traffic is JSON from three government APIs (parsed, never executed), `contextIsolation`/`sandbox` are on, and there is now a restrictive CSP. `npm audit`'s 14 findings are all in packaging-time tooling that never runs for the end user. So this is **hygiene, not urgency**: staying current so a future change doesn't land on an 11-version-old base, and so it keeps building as macOS moves.
-
-*What the work looks like:* the upgrade, rebuild and full automated suite are all doable unattended. What is not is the handful of behaviours that cross into native macOS territory, which a major Electron jump can change and which neither jsdom nor the DevTools Protocol can drive:
-- Export a PDF report (native save dialog, `webContents.printToPDF`)
-- Pin a panel to a report / capture a panel image (`webContents.capturePage`)
-- Resize the window, quit and reopen (window state, `minWidth`)
-
-*Their part is roughly ten minutes:* click those four things on the packaged app and confirm nothing looks off. Everything else is automatable.
+One small thing that is not a finding but is worth not forgetting: `npm install` in `electron/` now reports one package with an unapproved install script, `electron-winstaller`. It is Windows packaging tooling, this project builds a macOS zip only, and leaving its script unrun is the safer default. No action needed unless Windows packaging is ever added.
 
 ---
 
 ## Fixed
+
+### 🟢 Electron upgraded 33.4.11 → 44.4.4 (eleven majors), and what it actually changed
+Deferred by the user on 2026-09-21 because it needed their time; done 2026-09-22 with almost all of the verification automated after all.
+
+**What moved:** Electron 33.4.11 → 44.4.4 (Chromium 130 → **152**, Node 20 → 22), electron-builder 25.1.8 → 26.15.3 (25 predates Electron 44 and would not have packaged it). `npm audit` went from **14 findings to 0** — all fourteen were in packaging-time tooling, exactly as the original assessment said, and they are simply gone now.
+
+**The one user-visible consequence:** the bundle's `LSMinimumSystemVersion` rose from **11.0 to 13.0**. This machine runs macOS 26.6.2 so it does not matter here, but the app will no longer launch for anyone on macOS 12 or earlier — worth knowing before sharing it.
+
+**Most of the "only a human can check this" list turned out to be automatable**, which is the useful finding. A throwaway Electron script driving the real main-process APIs with no save dialogs verified, under 44: `loadFile` ok · `printToPDF` producing a 27,577-byte file with a valid `%PDF-` header · `capturePage` non-empty and returning the requested rect at the display's real 2× device pixel ratio · `nativeImage.resize` and `toDataURL` ok · **`minWidth` still clamping** (a request for 500×400 came back as 900×600). Separately, through the running app itself: the CSP hash still validates under Chromium 152 (the app renders, which it would not if the hash had broken), all seven `contextBridge` methods are exposed, and all four network paths work — the EDGAR main-process bridge returned HTTP 200, and CT.gov, CMS and Europe PMC all fetched through the CSP.
+
+*One false alarm worth recording so it isn't re-investigated:* the probe's own direct `fetch` to SEC returned **403**. That was the probe sending its own User-Agent rather than the app's `EDGAR_USER_AGENT` — through the app's real bridge the same URL returns 200 and parses. SEC rejects unidentified clients; it was not an Electron regression.
+
+**Verified on the installed app**, launched from `/Applications` on the new runtime: reports Electron 44.4.4 / Chromium 152, renders, and the real saved data is intact — the Stok Therapeutics case with its Elsunersen phase-3 program, one watched trial, one custom comp, zero leftover `pdcf_` keys, zero console errors. Local Storage was backed up to `~/Documents/rxnpv-backups/localstorage-pre-electron-upgrade-*` first and the backup confirmed to contain the case data before anything was touched.
+
+**What still genuinely needs a human** is now only the two native *save dialogs* (a panel has to appear and write a file — `printToPDF` and `capturePage` themselves are proven) and a subjective look at window resize/reopen. Roughly three minutes, not ten.
 
 ### 🟢 Two CT.gov engines both declared `ctgovFetch`, and the Tools-side timeout was being silently discarded
 Found while building the trial decoder. `ctgovEngine.js` and `ts_ctgovEngine.js` each declared a top-level `async function ctgovFetch`; because the latter is concatenated second, its definition replaced the former for the entire bundle. Every Tools-side CT.gov call — Trial Explorer, competitor landscape, Catalyst Calendar — was therefore running through an implementation with **no timeout at all**, while its own source clearly specified a 15-second abort. A hung request hung forever. Renamed to `tsCtgovFetch` and given its own timeout.

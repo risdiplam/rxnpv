@@ -8,7 +8,9 @@ A desktop valuation sandbox and trial-outcome simulator for a retail biotech inv
 
 This line should govern every future decision about what to build. It has already been used, explicitly, to decline several reasonable-sounding feature ideas (see "Deliberately not built" below). Treat a new feature request against this bar before starting it, and say so if something seems like it's drifting past it — that's the correct, previously-established response, not silent compliance.
 
-macOS (Apple Silicon / arm64) only. Not tested on Intel. Not signed or notarized — deliberately deferred; see "Known limitations" below for why and what it would take.
+macOS (Apple Silicon / arm64) only. Not tested on Intel. Not signed or notarized — deliberately decided against; see "Deliberately not built" below for why.
+
+**Runs on Electron 44.4.4 (Chromium 152, Node 22).** Upgraded from 33.4.11 in September 2026. One consequence worth knowing before sharing the app with anyone: Electron 44 raised the bundle's `LSMinimumSystemVersion` from **11.0 to 13.0**, so the app no longer launches on macOS 12 or earlier. That is fine for this machine and would only matter for someone else's older Mac.
 
 ## Standing instruction: push to GitHub continuously, not in batches
 

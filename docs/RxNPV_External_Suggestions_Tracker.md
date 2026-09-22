@@ -598,3 +598,33 @@ A sixth workbench — **Valuation** — was added beyond the five the feature ma
 Neither would have surfaced from the text tree, the geometry check, or any assertion in the suite. Both came from looking at the rendered page.
 
 **Verified**: `math_verification.js` **1,032 checks** (two added, asserting that an analysis naming one arm keeps exactly one and an analysis naming none reports none, rather than either being backfilled). Full 10-file suite clean. Re-driven live against NCT03036124 with the corrected copy on screen, zero console errors. Packaged, installed, and byte-searched inside `/Applications/RxNPV.app`'s `app.asar` — every new engine present, CSP hash independently recomputed and matching, both new origins in `connect-src`.
+
+---
+
+## Phase 27 — Electron 33 → 44, and how much of it turned out to be automatable
+
+✅ Done. The last item on the findings list, deferred by the user on 2026-09-21 because it was believed to need ten minutes of their time. It needed about three, because most of the "only a human can check this" list turned out to be testable after all.
+
+**What moved:** Electron **33.4.11 → 44.4.4** — eleven majors, Chromium 130 → **152**, Node 20 → 22 — and electron-builder **25.1.8 → 26.15.3**, because 25 predates Electron 44 and would not have packaged it. `npm audit` went from **14 findings to zero**; all fourteen were in packaging-time tooling, exactly as the original assessment said, and the upgrade simply removed them.
+
+**Backup first.** Local Storage was copied to `~/Documents/rxnpv-backups/localstorage-pre-electron-upgrade-*` and the copy confirmed to actually contain the case data — not merely created — before the runtime was touched. Swapping the Chromium underneath a leveldb store is not a thing to do on faith.
+
+**The verification that was supposed to need a human.** A throwaway Electron script exercising the real main-process APIs with no save dialogs, under 44:
+
+| Checked | Result |
+|---|---|
+| `loadFile` | ok |
+| `webContents.printToPDF` | 27,577 bytes, valid `%PDF-` header |
+| `webContents.capturePage` | non-empty, returns the requested rect at the display's real 2× device pixel ratio |
+| `nativeImage.resize` / `toDataURL` | ok |
+| `minWidth` clamping | a request for 500×400 came back as **900×600** — still enforced |
+
+And through the running app itself: the **CSP hash still validates under Chromium 152** (the app renders at all, which it would not if the hash had broken), all seven `contextBridge` methods are exposed, and all four network paths work — the EDGAR main-process bridge returns HTTP 200 and parses, and CT.gov, CMS and Europe PMC all fetch through the CSP.
+
+**One false alarm, recorded so it is not re-investigated.** The probe's own direct `fetch` to SEC returned **403**, which looks exactly like a regression in the main-process fetch. It was the probe sending its own User-Agent instead of the app's `EDGAR_USER_AGENT`; through the app's real bridge the same URL returns 200. SEC rejects unidentified clients. The lesson is narrower than "check the User-Agent": when probing a bridge, drive the bridge, not a reimplementation of it.
+
+**The one user-visible consequence of the jump:** Electron 44 raised the bundle's `LSMinimumSystemVersion` from **11.0 to 13.0**. This machine runs macOS 26.6.2, so it changes nothing here — but the app will no longer launch for anyone on macOS 12 or earlier, which matters only if it is ever shared with someone on an older Mac. Recorded in CLAUDE.md next to the platform line rather than buried here.
+
+**Installed and confirmed.** Packaged with builder 26, installed over `/Applications/RxNPV.app`, launched, and read back: Electron 44.4.4, Chromium 152, renders, and the real saved data intact — the Stok Therapeutics case with its Elsunersen phase-3 program, one watched trial, one custom comp, zero leftover `pdcf_` keys, **zero console errors**. Full 10-file suite clean at 1,032 checks (it runs in jsdom and does not exercise Electron, which is precisely why the live checks above matter).
+
+**What was left for the user** is the two native *save dialogs* — a panel has to appear and actually write a file, and nothing but a person can confirm that — plus a subjective look at window resize and reopen.
