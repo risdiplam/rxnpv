@@ -2415,6 +2415,10 @@ function TrialWatchTool({ initialNctId, onConsumedInitialNctId }) {
   const [effectsLoading, setEffectsLoading] = React.useState(false);
   const [effectsError, setEffectsError] = React.useState(null);
   const effectsSeq = React.useRef(0);
+  // "Where does my number sit in that?" — the question a reader has the moment
+  // the board finishes loading, in both directions: an assumption before a
+  // readout, or a posted result afterwards.
+  const [myEffect, setMyEffect] = React.useState("");
 
   const loadEffects = async () => {
     const mine = ++effectsSeq.current;
@@ -2553,6 +2557,45 @@ function TrialWatchTool({ initialNctId, onConsumedInitialNctId }) {
                           (r.lower != null && r.upper != null ? " (" + r.lower.toFixed(2) + "\u2013" + r.upper.toFixed(2) + ")" : "")))))
                   );
                 }),
+            // ── Where one number sits in the reference class ──────────────
+            Object.keys(effects.byScale).length > 0 && h("div", { style: { marginTop: 10, paddingTop: 10, borderTop: "1px solid var(--rule)" } },
+              h("div", { style: { display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" } },
+                h("label", { style: { fontSize: 10.5, fontFamily: "var(--mono)", color: "var(--ink-2)" }, htmlFor: "analog-position-input" },
+                  "Place a number in this distribution"),
+                h("input", { id: "analog-position-input", type: "text", value: myEffect, placeholder: "e.g. 0.75",
+                  "aria-label": "Effect size to place in the analog distribution",
+                  onChange: e => setMyEffect(e.target.value),
+                  style: { width: 110, padding: "5px 9px", borderRadius: 6, border: "1.5px solid var(--rule)", background: "var(--surface)", color: "var(--ink-1)", fontFamily: "var(--mono)", fontSize: 12 } })),
+              (() => {
+                const v = parseFloat(myEffect);
+                if (!isFinite(v)) return h("div", { style: { fontSize: 10, fontFamily: "var(--sans)", color: "var(--ink-3)", lineHeight: 1.6, marginTop: 6 } },
+                  "Your modelled effect before a readout, or the one a trial just posted. It is compared only against results on the same scale — a hazard ratio against hazard ratios, never against a mean difference.");
+                return h("div", { style: { marginTop: 8, display: "flex", flexDirection: "column", gap: 8 } },
+                  Object.keys(effects.byScale).map(scale => {
+                    const pos = positionInAnalogs(effects.byScale[scale], v);
+                    if (!pos) return null;
+                    const pct = Math.round(pos.percentile * 100);
+                    // Deliberately not a verdict. Rank, denominator, and the
+                    // one thing a percentile cannot tell you.
+                    const read = pct >= 80
+                      ? "More favourable than almost everything posted in this indication. That is a real claim about being better than the field, and it wants a specific reason — a mechanism, a biomarker-selected population, a genuinely different comparator."
+                      : pct <= 20
+                        ? "Towards the thin end of what has been posted here. It can still clear a p-value and still be a modest result, which is exactly the gap between statistically real and commercially interesting."
+                        : "Squarely inside the range this indication has actually produced.";
+                    return h("div", { key: scale, style: { borderLeft: "3px solid " + (pct >= 80 ? "var(--amber)" : "var(--teal)"), paddingLeft: 10 } },
+                      h("div", { style: { fontSize: 11.5, fontFamily: "var(--mono)", color: "var(--ink-1)" } },
+                        v + " is more favourable than " + pos.beats + " of " + pos.n + " posted "
+                          + (scale === "ratio" ? "ratio-scale" : "difference-scale") + " results (" + pct + "th percentile)"
+                          + (pos.ties ? ", and ties " + pos.ties : "")),
+                      h("div", { style: { fontSize: 10.5, fontFamily: "var(--mono)", color: "var(--ink-3)", marginTop: 2 } },
+                        "median here is " + pos.median.toFixed(2) + ", range " + pos.min.toFixed(2) + " to " + pos.max.toFixed(2)
+                          + (pos.favoursTreatment ? "" : " \u2014 and this number is on the wrong side of " + pos.nullValue + " altogether")),
+                      h("div", { style: { fontSize: 10.5, fontFamily: "var(--sans)", color: "var(--ink-2)", marginTop: 4, lineHeight: 1.6 } }, read));
+                  }),
+                  h("div", { style: { fontSize: 10, fontFamily: "var(--sans)", color: "var(--ink-3)", lineHeight: 1.6 } },
+                    "A percentile of " + effects.withExtractableEffect + " extractable results, not of every trial ever run here — and it says nothing about precision. A point estimate with a wide interval can sit high in this ranking and still be consistent with no effect.")
+                );
+              })()),
             h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginTop: 8, lineHeight: 1.6 } }, effects.caveat))
         ),
 
@@ -2598,21 +2641,39 @@ function TrialWatchTool({ initialNctId, onConsumedInitialNctId }) {
       result && h("div", { style: { padding: "12px 14px", borderRadius: 8, background: "var(--surface-2)" } },
         h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", fontWeight: 700, color: "var(--ink-2)", marginBottom: 6 } },
           result.nctId + " — " + (result.study.title || "untitled") + " (" + result.study.status + ")"),
+        result.baselinePredatesDesignFields && !result.isFirstSnapshot && h("div", { style: { fontSize: 10.5, fontFamily: "var(--sans)", color: "var(--ink-3)", lineHeight: 1.6, marginBottom: 8 } },
+          "Your saved baseline for this trial was taken before the watch recorded allocation, masking and arm labels, so those three are not compared this time. They will be from the next check onward — this check has just re-saved the baseline with them."),
         result.isFirstSnapshot
           ? h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-3)" } }, "First check — saved as the baseline. Check again later to see what's changed.")
           : result.changes.length === 0
             ? h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--teal)" } }, "No changes since the last check (" + fmtDate(result.previousCheckedAt) + ").")
-            : h("div", null,
-                h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginBottom: 8 } }, "Changed since " + fmtDate(result.previousCheckedAt) + ":"),
-                result.changes.map((c, i) => h("div", { key: i, style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-1)", padding: "5px 0", borderTop: i > 0 ? "1px solid var(--rule)" : "none" } },
-                  h("b", null, c.label), c.from !== undefined
-                    ? h("span", null, ": ", h("span", { style: { color: "var(--ink-3)" } }, String(c.from)), " → ", h("span", { style: { color: "var(--amber)", fontWeight: 700 } }, String(c.to)))
-                    : h("div", { style: { marginTop: 2 } },
-                        c.removed.length > 0 && h("div", { style: { color: "var(--red)" } }, "− " + c.removed.join("; ")),
-                        c.added.length > 0 && h("div", { style: { color: "var(--teal)" } }, "+ " + c.added.join("; "))
-                      )
-                ))
-              ),
+            : (() => {
+                // Ranked by what the change means, not by field order: an
+                // endpoint swap and a status flip are not the same event.
+                const sevColor = (sv) => sv === "high" ? "var(--red)" : sv === "medium" ? "var(--amber)" : "var(--ink-3)";
+                const sevWord = (sv) => sv === "high" ? "changes what the trial can show"
+                  : sv === "medium" ? "changes the terms" : "routine";
+                const worth = result.changes.filter(c => c.severity === "high" || c.severity === "medium").length;
+                return h("div", null,
+                  h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginBottom: 8 } },
+                    result.changes.length + " change" + (result.changes.length === 1 ? "" : "s") + " since " + fmtDate(result.previousCheckedAt)
+                      + (worth ? " — " + worth + " worth reading" : " — all routine") + ":"),
+                  result.changes.map((c, i) => h("div", { key: i, style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-1)", padding: "6px 0 6px 9px", marginTop: i > 0 ? 4 : 0, borderLeft: "3px solid " + sevColor(c.severity) } },
+                    h("b", { style: { color: sevColor(c.severity) } }, c.label),
+                    h("span", { style: { color: "var(--ink-3)", fontSize: 9.5, marginLeft: 7 } }, "· " + sevWord(c.severity)),
+                    c.note
+                      ? h("div", { style: { marginTop: 3, fontFamily: "var(--sans)", fontSize: 11, color: "var(--ink-2)", lineHeight: 1.6 } }, c.note)
+                      : c.from !== undefined
+                        ? h("div", { style: { marginTop: 2 } }, h("span", { style: { color: "var(--ink-3)" } }, String(c.from)), " → ", h("span", { style: { color: "var(--amber)", fontWeight: 700 } }, String(c.to)))
+                        : h("div", { style: { marginTop: 2 } },
+                            c.removed.length > 0 && h("div", { style: { color: "var(--red)" } }, "− " + c.removed.join("; ")),
+                            c.added.length > 0 && h("div", { style: { color: "var(--teal)" } }, "+ " + c.added.join("; "))
+                          )
+                  )),
+                  h("div", { style: { fontSize: 10, fontFamily: "var(--sans)", color: "var(--ink-3)", lineHeight: 1.6, marginTop: 10 } },
+                    "This compares your last two checks, not every revision the sponsor filed. CT.gov keeps a full version history; if something important moved, read it there rather than assuming this caught the whole sequence.")
+                );
+              })(),
         h(ExternalLink, { href: "https://clinicaltrials.gov/study/" + result.nctId, style: { fontSize: 9, marginTop: 8, display: "inline-block" } }, "→ View on ClinicalTrials.gov")
       )
     ]),

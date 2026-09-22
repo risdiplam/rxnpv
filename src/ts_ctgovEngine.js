@@ -146,7 +146,7 @@ function median(arr) {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { fetchHistoricalComps, fetchTrialByNctId, parseHistoricalStudy, summarizeStudiesResponse, monthsBetween, median, TS_CTGOV_BASE, extractAnalogEffects, fetchAnalogEffects, tsClassifyEffectParam };
+  module.exports = { fetchHistoricalComps, fetchTrialByNctId, parseHistoricalStudy, summarizeStudiesResponse, monthsBetween, median, TS_CTGOV_BASE, extractAnalogEffects, fetchAnalogEffects, tsClassifyEffectParam, positionInAnalogs };
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -291,6 +291,44 @@ function extractAnalogEffects(data, queryMeta) {
     byScale,
     summaryByScale: Object.keys(byScale).reduce((acc, k) => { acc[k] = summarize(byScale[k]); return acc; }, {}),
     caveat: "Effect sizes are read only from CT.gov's structured analysis fields, where a sponsor registered a recognised parameter type with a numeric value. Trials that posted results in narrative form, used an unrecognised parameter, or reported nothing are counted in the denominators above but cannot appear on the board. This is a floor on what exists, not a census."
+  };
+}
+
+// ── Where does one number sit in that distribution? ────────────────────────
+// The board answers "what got posted here"; this answers the question a reader
+// immediately has next, in both directions. Before a readout: an assumed
+// hazard ratio of 0.62 in an indication whose posted results run 0.78 to 0.91
+// is a claim that needs a reason. After one: a hazard ratio of 0.91 that
+// cleared its p-value is a statistically real, clinically thin win, and saying
+// so as a percentile of the actual reference class beats any fixed threshold —
+// a "thin" effect size in oncology and in a rare metabolic disease are not the
+// same number, and no constant in this file could know which one you are in.
+//
+// Deliberately NOT a verdict. It reports rank and denominator and leaves the
+// judgement where it belongs.
+function positionInAnalogs(rows, value) {
+  const vals = (rows || []).map(r => (r && typeof r.value === "number") ? r : null).filter(Boolean);
+  if (!vals.length || typeof value !== "number" || !isFinite(value)) return null;
+  const scale = vals[0].scale;
+  const nullValue = vals[0].nullValue;
+  // "More favourable" is direction only, decided by which way the scale runs:
+  // below 1 for a ratio, above 0 for a difference. It is not a claim that the
+  // trial won — an interval can still span the null.
+  const better = (a, b) => scale === "ratio" ? a < b : a > b;
+  const beats = vals.filter(r => better(value, r.value)).length;
+  const ties = vals.filter(r => r.value === value).length;
+  const sorted = vals.map(r => r.value).sort((a, b) => a - b);
+  return {
+    scale, nullValue, value,
+    n: vals.length,
+    beats, ties,
+    // Share of the posted reference class this value is more favourable than.
+    percentile: beats / vals.length,
+    median: median(sorted),
+    min: sorted[0],
+    max: sorted[sorted.length - 1],
+    // Whether the value is on the favourable side of no-effect at all.
+    favoursTreatment: scale === "ratio" ? value < nullValue : value > nullValue
   };
 }
 

@@ -85,9 +85,10 @@ const EXPORTS = [
   "computeCOGS", "computeSalesForceCost", "computeMarketingCost", "computeCorporateGA", "computeProgramPnL",
   "SALES_REP_COST", "SGA_BENCHMARKS", "SALES_FORCE_COMP_GROWTH_PCT",
   "tsFdaQueryString", "computeDilutionPath",
-  "extractAnalogEffects", "tsClassifyEffectParam", "summarizeDossier",
+  "extractAnalogEffects", "tsClassifyEffectParam", "summarizeDossier", "positionInAnalogs",
   "decodeTrial", "decodeTrialRedFlags", "classifyAllocation", "classifyMasking", "classifyComparator", "classifyPrimaryEndpoint",
   "parseTrialResults", "parseResultOutcomes", "summarizeParticipantFlow", "summarizeAdverseEvents",
+  "diffTrialSnapshots", "snapshotPredatesDesignFields",
   "resultsRedFlags", "trUnescape", "trNum", "trRate", "trMonthsBetweenDates",
   "applyPartnershipToRevenue", "getProgramRevenueResult", "computePartnershipContribution", "distributeRnDCostByYear",
   "computeSimpleMultipleValuation", "computeSOTPBreakdown",
@@ -2969,6 +2970,99 @@ section("Gross-to-net — an entered price converted to the one the model uses")
   // A case with no basis field at all values exactly as it did before.
   near("a legacy pricing object still produces the unadjusted $2.0B",
     build(base).peakUSRevenue, 2.0e9, 1);
+}
+report();
+
+section("Trial Watch — a protocol amendment is not the same event as a status flip");
+{
+  // A complete baseline, so nothing is skipped for being absent.
+  const base = {
+    status: "RECRUITING", phase: "PHASE3", enrollment: 500,
+    primaryCompletionDate: "2027-06", completionDate: "2028-01",
+    allocation: "RANDOMIZED", masking: "DOUBLE", armCount: 2,
+    armLabels: ["Drug", "Placebo"], whyStopped: null,
+    primaryOutcomes: ["Overall survival"],
+    secondaryOutcomes: [{ measure: "ORR", timeFrame: "24 wk" }],
+    eligibilityCriteria: "Adults with confirmed disease."
+  };
+  const after = (over) => api.diffTrialSnapshots(base, Object.assign({}, base, over));
+  const sevOf = (changes, field) => { const c = changes.find(x => x.field === field); return c && c.severity; };
+
+  ok("replacing the primary endpoint is high", sevOf(after({ primaryOutcomes: ["Progression-free survival"] }), "primaryOutcomes") === "high");
+  ok("losing the blind is high", sevOf(after({ masking: "NONE" }), "masking") === "high");
+  ok("tightening the blind is not", sevOf(after({ masking: "QUADRUPLE" }), "masking") === "medium");
+  ok("changing the randomisation is high", sevOf(after({ allocation: "NON_RANDOMIZED" }), "allocation") === "high");
+  ok("a trial being terminated is high", sevOf(after({ status: "TERMINATED" }), "status") === "high");
+  ok("a reason for stopping appearing is high", sevOf(after({ whyStopped: "Slow accrual" }), "whyStopped") === "high");
+  // 500 -> 380 is a 24% cut, past the one-fifth line; 500 -> 450 is 10% and is not.
+  ok("cutting enrolment by a quarter is high", sevOf(after({ enrollment: 380 }), "enrollment") === "high");
+  ok("trimming it by a tenth is not", sevOf(after({ enrollment: 450 }), "enrollment") === "medium");
+  ok("expanding enrolment is not high", sevOf(after({ enrollment: 900 }), "enrollment") === "medium");
+  ok("recruiting to active-not-recruiting is routine", sevOf(after({ status: "ACTIVE_NOT_RECRUITING" }), "status") === "routine");
+  ok("a completion-date shift is routine", sevOf(after({ completionDate: "2029-01" }), "completionDate") === "routine");
+  ok("a secondary endpoint moving is routine", sevOf(after({ secondaryOutcomes: [{ measure: "DoR", timeFrame: "24 wk" }] }), "secondaryOutcomes") === "routine");
+
+  // Ordering: the reader should meet the amendment before the housekeeping.
+  const mixed = after({ status: "ACTIVE_NOT_RECRUITING", primaryOutcomes: ["Progression-free survival"], completionDate: "2029-01" });
+  ok("changes are ranked with the consequential ones first", mixed[0].severity === "high");
+  ok("and the routine ones last", mixed[mixed.length - 1].severity === "routine");
+
+  // Eligibility: reported as changed and by how much, never interpreted.
+  const elig = after({ eligibilityCriteria: "Adults with confirmed disease and no prior therapy." });
+  const ec = elig.find(c => c.field === "eligibilityCriteria");
+  ok("an eligibility change is reported without a direction", !!ec && ec.from === undefined && /widened or narrowed/.test(ec.note));
+
+  // Nothing changed at all.
+  ok("an unchanged study produces no changes", api.diffTrialSnapshots(base, Object.assign({}, base)).length === 0);
+
+  // ── The one that would fabricate findings if unguarded. A baseline saved
+  // before masking/armLabels were ever parsed has `undefined` there, and
+  // `undefined -> "DOUBLE"` is not a protocol amendment.
+  const oldBaseline = { status: "RECRUITING", phase: "PHASE3", enrollment: 500, primaryCompletionDate: "2027-06", primaryOutcomes: ["Overall survival"] };
+  const vsOld = api.diffTrialSnapshots(oldBaseline, base);
+  ok("a pre-design-fields baseline reports no phantom design changes",
+    !vsOld.some(c => ["masking", "allocation", "armCount", "armLabels", "eligibilityCriteria", "secondaryOutcomes", "completionDate"].indexOf(c.field) !== -1));
+  ok("and the caller is told the baseline is older than the fields",
+    api.snapshotPredatesDesignFields(oldBaseline) === true && api.snapshotPredatesDesignFields(base) === false);
+  // It must still diff the fields it does have.
+  ok("a pre-design-fields baseline still catches what it did record",
+    api.diffTrialSnapshots(oldBaseline, Object.assign({}, oldBaseline, { enrollment: 300 })).length === 1);
+}
+report();
+
+section("Analog board — placing one number in the posted reference class");
+{
+  // Five posted hazard ratios: 0.62, 0.71, 0.80, 0.88, 0.95. Lower is more
+  // favourable on a ratio scale, and the null is 1.
+  const ratios = [0.62, 0.71, 0.80, 0.88, 0.95].map(v => ({ value: v, scale: "ratio", nullValue: 1 }));
+  // 0.75 beats 0.80, 0.88 and 0.95 -> 3 of 5 = 60th percentile.
+  const mid = api.positionInAnalogs(ratios, 0.75);
+  near("a mid-pack ratio beats three of five", mid.beats, 3, 0);
+  near("which is the 60th percentile", mid.percentile, 0.6, 1e-12);
+  near("the median of the five is 0.80", mid.median, 0.80, 1e-12);
+  ok("and it is on the favourable side of 1", mid.favoursTreatment === true);
+  // 0.55 beats all five.
+  near("a ratio better than everything posted is the 100th percentile", api.positionInAnalogs(ratios, 0.55).percentile, 1, 0);
+  // 0.99 beats none of them, and is still below the null.
+  const thin = api.positionInAnalogs(ratios, 0.99);
+  near("a ratio worse than everything posted is the 0th percentile", thin.percentile, 0, 0);
+  ok("but is still reported as favouring treatment, because 0.99 < 1", thin.favoursTreatment === true);
+  // 1.10 is on the wrong side of no-effect entirely.
+  ok("a ratio above 1 does not favour treatment", api.positionInAnalogs(ratios, 1.10).favoursTreatment === false);
+  // An exact tie beats nobody but is counted as a tie rather than vanishing.
+  const tie = api.positionInAnalogs(ratios, 0.80);
+  near("an exact match beats the two above it", tie.beats, 2, 0);
+  near("and is recorded as a tie", tie.ties, 1, 0);
+
+  // Difference scale runs the other way: higher is more favourable, null is 0.
+  const diffs = [0.02, 0.05, 0.09].map(v => ({ value: v, scale: "difference", nullValue: 0 }));
+  const d = api.positionInAnalogs(diffs, 0.07);
+  near("a mean difference of 0.07 beats two of three", d.beats, 2, 0);
+  ok("direction is reversed on a difference scale", d.favoursTreatment === true);
+  ok("a negative difference does not favour treatment", api.positionInAnalogs(diffs, -0.01).favoursTreatment === false);
+
+  ok("an empty reference class yields nothing rather than a fake percentile", api.positionInAnalogs([], 0.75) === null);
+  ok("a non-numeric input yields nothing", api.positionInAnalogs(ratios, NaN) === null);
 }
 report();
 

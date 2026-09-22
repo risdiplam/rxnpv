@@ -229,27 +229,96 @@ function forgetTrialSnapshot(nctId) {
   try { localStorage.removeItem(CTGOV_SNAPSHOT_PREFIX + nctId); } catch (e) {}
 }
 
-// Compares two parsed studies field by field. Array fields (primaryOutcomes)
-// diff as added/removed entries rather than a single before/after string,
-// since a single new arm's endpoint added to a list isn't the same kind of
-// change as the whole endpoint being replaced.
+// Compares two parsed studies field by field. Array fields diff as
+// added/removed entries rather than a single before/after string, since one
+// new arm's endpoint added to a list isn't the same kind of change as the
+// whole endpoint being replaced.
+//
+// Each change carries a SEVERITY, because the five-field diff this started as
+// treated "recruiting → active, not recruiting" and "the primary endpoint was
+// replaced" as the same kind of event. They are not. A protocol amendment
+// after a trial is underway is one of the few things a retail investor can
+// see before a readout that genuinely changes what the readout will mean, and
+// the ones that matter are: the endpoint changing, the blind coming off, the
+// randomisation changing, enrolment being cut, and the trial stopping.
+//
+// "high" means the amendment changes what the trial can establish.
+// "medium" means it changes the terms of the bet — timing, size, who is in it.
+// "routine" means a trial doing what trials do.
+const CTGOV_DIFF_FIELDS = [
+  { key: "status", label: "Status", severity: (from, to) =>
+      /TERMINATED|SUSPENDED|WITHDRAWN/.test(String(to || "")) ? "high" : "routine" },
+  { key: "phase", label: "Phase", severity: () => "medium" },
+  { key: "enrollment", label: "Enrolment", severity: (from, to) =>
+      // A cut of a fifth or more is usually a recruitment problem or a
+      // re-powering; an increase is more often an adaptive expansion.
+      (typeof from === "number" && typeof to === "number" && from > 0 && to < from * 0.8) ? "high" : "medium" },
+  { key: "primaryCompletionDate", label: "Primary completion date", severity: () => "medium" },
+  { key: "completionDate", label: "Completion date", severity: () => "routine" },
+  { key: "allocation", label: "Allocation", severity: () => "high" },
+  { key: "masking", label: "Masking", severity: (from, to) =>
+      // Losing the blind mid-trial is a different event from gaining it.
+      String(to || "") === "NONE" ? "high" : "medium" },
+  { key: "armCount", label: "Number of arms", severity: () => "medium" },
+  { key: "whyStopped", label: "Reason stopped", severity: () => "high" }
+];
+
 function diffTrialSnapshots(oldStudy, newStudy) {
   const changes = [];
-  const scalarFields = [
-    { key: "status", label: "Status" },
-    { key: "phase", label: "Phase" },
-    { key: "enrollment", label: "Enrollment" },
-    { key: "primaryCompletionDate", label: "Primary completion date" }
-  ];
-  scalarFields.forEach(f => {
+  CTGOV_DIFF_FIELDS.forEach(f => {
     const from = oldStudy[f.key], to = newStudy[f.key];
-    if (from !== to && !(from == null && to == null)) changes.push({ field: f.key, label: f.label, from, to });
+    // A baseline saved before a field was ever parsed has `undefined` there,
+    // and reporting undefined → "DOUBLE" as a protocol amendment would be a
+    // fabricated change. Skipped, and the caller is told the baseline is older
+    // than the fields being compared.
+    if (from === undefined) return;
+    if (from === to || (from == null && to == null)) return;
+    changes.push({ field: f.key, label: f.label, from, to, severity: f.severity(from, to) });
   });
-  const oldOutcomes = oldStudy.primaryOutcomes || [], newOutcomes = newStudy.primaryOutcomes || [];
-  const added = newOutcomes.filter(o => !oldOutcomes.includes(o));
-  const removed = oldOutcomes.filter(o => !newOutcomes.includes(o));
-  if (added.length || removed.length) changes.push({ field: "primaryOutcomes", label: "Primary endpoint(s)", added, removed });
-  return changes;
+
+  const listDiff = (key, label, severity) => {
+    const before = oldStudy[key], after = newStudy[key] || [];
+    if (before === undefined) return;
+    const added = after.filter(o => (before || []).indexOf(o) === -1);
+    const removed = (before || []).filter(o => after.indexOf(o) === -1);
+    if (added.length || removed.length) changes.push({ field: key, label, added, removed, severity });
+  };
+  listDiff("primaryOutcomes", "Primary endpoint(s)", "high");
+  listDiff("armLabels", "Arms", "medium");
+
+  // Secondary endpoints arrive as objects, so they are compared on their
+  // measure text — the part a reader would notice changing.
+  const secBefore = oldStudy.secondaryOutcomes, secAfter = newStudy.secondaryOutcomes || [];
+  if (secBefore !== undefined) {
+    const names = (arr) => (arr || []).map(o => (o && o.measure) || "").filter(Boolean);
+    const b = names(secBefore), a = names(secAfter);
+    const added = a.filter(x => b.indexOf(x) === -1), removed = b.filter(x => a.indexOf(x) === -1);
+    if (added.length || removed.length) changes.push({ field: "secondaryOutcomes", label: "Secondary endpoint(s)", added, removed, severity: "routine" });
+  }
+
+  // Eligibility is a block of free text, often thousands of characters. A
+  // word-level diff of it would be unreadable and, worse, would invite reading
+  // a broadening as a narrowing — the direction is genuinely not inferable
+  // from the text. So: report that it changed, and by how much.
+  const eligBefore = oldStudy.eligibilityCriteria, eligAfter = newStudy.eligibilityCriteria || "";
+  if (eligBefore !== undefined && eligBefore !== eligAfter) {
+    const delta = eligAfter.length - (eligBefore || "").length;
+    changes.push({
+      field: "eligibilityCriteria", label: "Eligibility criteria", severity: "medium",
+      note: "The criteria text changed (" + (delta === 0 ? "same length, different wording"
+        : (delta > 0 ? "+" : "") + delta + " characters") + "). Whether that widened or narrowed who can enrol is not something a text diff can tell you — read both versions on CT.gov's own history."
+    });
+  }
+
+  const rank = { high: 0, medium: 1, routine: 2 };
+  return changes.sort((a, b) => (rank[a.severity] == null ? 3 : rank[a.severity]) - (rank[b.severity] == null ? 3 : rank[b.severity]));
+}
+
+// True when the stored baseline predates the fields the diff now compares —
+// so the UI can say "nothing to compare here yet" instead of implying the
+// design has been stable.
+function snapshotPredatesDesignFields(oldStudy) {
+  return !oldStudy || oldStudy.masking === undefined || oldStudy.armLabels === undefined;
 }
 
 // The main entry point: fetch current state, compare against whatever's
@@ -263,5 +332,9 @@ async function checkTrialForChanges(nctId) {
   saveTrialSnapshot(id, result.study);
   if (!prior) return { ok: true, isFirstSnapshot: true, study: result.study };
   const changes = diffTrialSnapshots(prior.study, result.study);
-  return { ok: true, isFirstSnapshot: false, study: result.study, changes, previousCheckedAt: prior.checkedAt };
+  return {
+    ok: true, isFirstSnapshot: false, study: result.study, changes,
+    previousCheckedAt: prior.checkedAt,
+    baselinePredatesDesignFields: snapshotPredatesDesignFields(prior.study)
+  };
 }

@@ -17,12 +17,12 @@ The intended flow: decode the design → watch it for changes → read the resul
 | Tool | Status | Notes |
 |---|---|---|
 | Trial Decoder | **BUILT** | Design in plain English, can/cannot prove, design red flags |
-| Trial change watch (snapshot/diff) | **BUILT** | Diffs 5 fields today |
+| Trial change watch (snapshot/diff) | **BUILT** | Diffs 14 fields, each ranked by what the change means (Phase 19) |
 | Analog effect-size board | **BUILT** | Posted effect sizes in an indication, with honest denominators |
 | Comparable-trial landscape | **BUILT** | Status/duration/enrolment rollup |
 | **Results reader** | **BUILT** | Outcomes, participant flow and adverse events, inside the decoder. See below |
-| **Richer change classification** | **DECIDED — build** | Add eligibility, arms, masking; split routine vs red-flag |
-| **Thin-win detector** | **DECIDED — build** | Percentile of the analog distribution, not an arbitrary threshold |
+| **Richer change classification** | **BUILT** | Eligibility, arms, masking, allocation, why-stopped; high / medium / routine |
+| **Thin-win detector** | **BUILT** | Place any number in the posted distribution — works before a readout and after it |
 | **Multi-trial program view** | **DECIDED — build** | Every NCT for one asset, in one place |
 
 ### Results reader — built (Phase 17)
@@ -156,7 +156,7 @@ Each of these has been considered and declined on the merits. Recording them her
 
 1. ~~**Results reader** (outcomes, dropout, adverse events)~~ — **done**, Phase 17
 2. ~~**Gross-to-net** — accuracy fix on existing valuation~~ — **done**, Phase 18
-3. **Cheap completions batch** — thin-win vs analogs, change classification, Form 4 derivatives, multi-trial view, control-arm stress ← next
+3. **Cheap completions batch** — ~~thin-win vs analogs~~, ~~change classification~~ (both done, Phase 19); Form 4 derivatives, multi-trial view, control-arm stress ← next
 4. **Commercial workbench** — launch trajectory, actual vs modelled
 5. **Tab consolidation** — after the tools exist, not before
 6. **Electron upgrade** — deferred by the user; needs ~10 minutes of their time (PDF export, panel capture, window resize)
