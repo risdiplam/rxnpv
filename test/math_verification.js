@@ -54,6 +54,7 @@ const EXPORTS = [
   "closedFormPowerTwoProportion", "closedFormPowerMeans", "schoenfeldPower",
   "solveSampleSizeTwoProportion", "solveSampleSizeMeans", "solveEventsNeeded",
   "solveMinDetectableEffect", "solveMinDetectableRateTwoProportion", "solveMinDetectableDeltaMeans", "solveMinDetectableHazardRatio",
+  "projectTreatmentRate", "effectiveNAfterDropout", "inflateForDropout", "stressPowerOver", "stressRange",
   "sampleTriangular", "pearsonCorrelation", "concIVBolus", "concOralFirstOrder",
   "halfLife", "analyticalAUC_IV", "analyticalAUC_Oral", "emaxEffect", "receptorOccupancy",
   "computeNPV", "computeCapitalStructure", "computePoSWeighting", "computePoSModifiers",
@@ -3283,6 +3284,86 @@ section("Asset programme — the shape of an evidence base, never a score");
   // An empty programme must produce nothing rather than a confident nothing.
   ok("an empty programme yields no description", api.describeEvidenceBase(api.summarizeAssetProgram([], "acmezumab")).length === 0);
   ok("and does not throw", api.summarizeAssetProgram(null, "x").trialCount === 0);
+}
+report();
+
+section("Assumption stress — what a power calculation does when its inputs are wrong");
+{
+  // A trial planned at 30% control, 45% treatment. If the control arm actually
+  // responds at 40%, the two coherent projections disagree and the difference
+  // is material:
+  //   absolute:  0.40 + (0.45 - 0.30) = 0.55
+  //   relative:  0.40 x (0.45 / 0.30) = 0.40 x 1.5 = 0.60
+  near("a constant absolute benefit puts treatment at 55%",
+    api.projectTreatmentRate(0.30, 0.45, 0.40, "absolute").rate, 0.55, 1e-12);
+  near("a constant relative benefit puts it at 60%",
+    api.projectTreatmentRate(0.30, 0.45, 0.40, "relative").rate, 0.60, 1e-12);
+  // At the planned control rate both models must return the planned treatment
+  // rate, or the baseline column would disagree with the calculation above it.
+  near("at the planned control rate, absolute reproduces the plan",
+    api.projectTreatmentRate(0.30, 0.45, 0.30, "absolute").rate, 0.45, 1e-12);
+  near("and so does relative", api.projectTreatmentRate(0.30, 0.45, 0.30, "relative").rate, 0.45, 1e-12);
+  // A relative projection from a high control rate runs past 1. Clamping is
+  // the honest answer; silently handing 1.05 to a power function is not.
+  const over = api.projectTreatmentRate(0.30, 0.45, 0.70, "relative");   // 0.70 x 1.5 = 1.05
+  ok("a projection past certainty is clamped and says so", over.rate < 1 && over.clamped === true);
+  ok("a projection inside the range is not marked clamped",
+    api.projectTreatmentRate(0.30, 0.45, 0.40, "relative").clamped === false);
+  ok("an impossible input yields null rather than a number", api.projectTreatmentRate(0, 0.45, 0.4, "absolute") === null);
+
+  // Dropout. 400 randomised with 15% lost leaves 340 to analyse.
+  near("15% dropout from 400 leaves 340", api.effectiveNAfterDropout(400, 0.15), 340, 0);
+  near("no dropout changes nothing", api.effectiveNAfterDropout(400, 0), 400, 0);
+  ok("an arm is never emptied entirely", api.effectiveNAfterDropout(10, 0.999) >= 1);
+  // The inflation is N/(1-d), not N*(1+d) -- the common mistake. At 20%,
+  // 400/0.8 = 500, which is 25% more patients, not 20%.
+  near("to keep 400 analysable at 20% dropout, randomise 500", api.inflateForDropout(400, 0.20), 500, 0);
+  ok("and that is more than the naive N*(1+d) of 480", api.inflateForDropout(400, 0.20) > 480);
+  near("zero dropout needs no inflation", api.inflateForDropout(400, 0), 400, 0);
+
+  // The sweep range must always contain the planned value, so the baseline is
+  // visible in the same column as the stresses.
+  const rng = api.stressRange(0.30);
+  ok("the planned value is in its own sweep", rng.some(v => Math.abs(v - 0.30) < 1e-12));
+  ok("the sweep is ordered", rng.every((v, i) => i === 0 || v >= rng[i - 1]));
+  near("it spans 60% to 140% of the plan", rng[0], 0.18, 1e-12);
+  near("at the top end", rng[rng.length - 1], 0.42, 1e-12);
+
+  // The sweep itself, against the real power function. Power must rise with N.
+  const swept = api.stressPowerOver([100, 200, 400], n =>
+    api.closedFormPowerTwoProportion(0.30, 0.45, n, n, 0.05, "two"));
+  ok("power increases with sample size across the sweep",
+    swept[0].power < swept[1].power && swept[1].power < swept[2].power);
+  // A power function that throws must produce a null cell, not kill the table.
+  const broken = api.stressPowerOver([1, 2], () => { throw new Error("boom"); });
+  ok("a failing cell is null, not a crash", broken.length === 2 && broken[0].power === null);
+  ok("a non-finite power is also null", api.stressPowerOver([1], () => NaN)[0].power === null);
+
+  // End to end, and the whole claim the panel makes — worked longhand so the
+  // expected numbers come from arithmetic rather than from the app.
+  //
+  // Planned: 165/arm, 30% vs 45%, two-sided alpha 0.05.
+  //   pbar = 0.375
+  //   SE0  = sqrt(2 x 0.375 x 0.625 / 165) = sqrt(0.0028409) = 0.053301
+  //   SE1  = sqrt((0.30x0.70 + 0.45x0.55) / 165) = sqrt(0.0027727) = 0.052657
+  //   z    = (0.15 - 1.96 x 0.053301) / 0.052657 = 0.045530 / 0.052657 = 0.8647
+  //   power = PHI(0.8647) = 0.8064
+  const planned = api.closedFormPowerTwoProportion(0.30, 0.45, 165, 165, 0.05, "two");
+  near("165 per arm is the ~80%-power design point for 30% vs 45%", planned, 0.8064, 0.003);
+
+  // Lose 20% and 132 remain analysable per arm:
+  //   SE0 = sqrt(0.46875 / 132) = 0.059591
+  //   SE1 = sqrt(0.45750 / 132) = 0.058872
+  //   z   = (0.15 - 1.96 x 0.059591) / 0.058872 = 0.033202 / 0.058872 = 0.5640
+  //   power = PHI(0.5640) = 0.7136
+  const nAfter = api.effectiveNAfterDropout(165, 0.20);
+  near("20% dropout leaves 132 per arm", nAfter, 132, 0);
+  const afterDropout = api.closedFormPowerTwoProportion(0.30, 0.45, nAfter, nAfter, 0.05, "two");
+  near("and power falls to about 71%", afterDropout, 0.7136, 0.003);
+  ok("which is a real loss, not a rounding one", planned - afterDropout > 0.08);
+  // The fix, and the reason the inflation formula matters: randomise 207 and
+  // 165 survive, restoring the planned power.
+  near("randomising 207 restores 165 analysable", api.effectiveNAfterDropout(api.inflateForDropout(165, 0.20), 0.20), 165, 0);
 }
 report();
 

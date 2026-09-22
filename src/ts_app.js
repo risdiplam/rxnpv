@@ -1156,6 +1156,8 @@ function runSampleSize() {
       title: 'Power vs. sample size', xLabel: 'N (control arm)', yLabel: 'Power', markerX: r.n1, markerLabel: 'n=' + r.n1.toLocaleString()
     });
     appendChartWithExport(resultsDiv, chartHtml, 'sample-size-power-curve');
+    renderAssumptionStress(resultsDiv, { type: 'binary', alpha, sided, allocationRatio,
+      n1: r.n1, n2: r.n2, plannedPower: r.achievedPower, p1, p2 });
   } else if (type === 'continuous') {
     const delta = numVal('ssDelta'), sd = numVal('ssSd');
     if (![delta, sd].every(isFinite) || sd <= 0 || delta === 0) {
@@ -1176,6 +1178,8 @@ function runSampleSize() {
       title: 'Power vs. sample size', xLabel: 'N (control arm)', yLabel: 'Power', markerX: r.n1, markerLabel: 'n=' + r.n1.toLocaleString()
     });
     appendChartWithExport(resultsDiv, chartHtml, 'sample-size-power-curve');
+    renderAssumptionStress(resultsDiv, { type: 'continuous', alpha, sided, allocationRatio,
+      n1: r.n1, n2: r.n2, plannedPower: r.achievedPower, delta, sd });
   } else {
     const hr = numVal('ssHazardRatio');
     if (!isFinite(hr) || hr <= 0 || hr === 1) {
@@ -1196,7 +1200,116 @@ function runSampleSize() {
       title: 'Power vs. total events', xLabel: 'Total events', yLabel: 'Power', markerX: r.n, markerLabel: 'events=' + r.n.toLocaleString()
     });
     appendChartWithExport(resultsDiv, chartHtml, 'sample-size-power-curve');
+    renderAssumptionStress(resultsDiv, { type: 'timeToEvent', alpha, sided, allocationRatio,
+      plannedPower: r.achievedPower, hr, events: r.n });
   }
+}
+
+
+// ── Assumption stress, shown under every sample-size result ────────────────
+// A sample-size calculation is a statement about a world that has not happened
+// yet, and the two inputs most often wrong are not the effect size everyone
+// argues about: they are how the control arm behaves and how many people
+// leave. Both are usually lifted from an older trial in a differently selected
+// population. This is a sweep over the same verified power functions the
+// calculation above already used — the value is in seeing the gradient, not in
+// any new method.
+const STRESS_DROPOUTS = [0, 0.05, 0.10, 0.15, 0.20, 0.30];
+
+function stressPowerCell(power, planned) {
+  if (power == null) return el('td', { style: 'color:var(--ink-3)' }, '—');
+  const pct = (power * 100).toFixed(1) + '%';
+  // Coloured against the planned power, not against an absolute 80% line: the
+  // question is how far this moves from what was designed for.
+  const delta = planned != null ? power - planned : 0;
+  const color = delta < -0.10 ? 'var(--red)' : delta < -0.03 ? 'var(--amber)'
+    : delta > 0.03 ? 'var(--teal)' : 'var(--ink-1)';
+  return el('td', { style: 'color:' + color }, pct);
+}
+
+function renderAssumptionStress(resultsDiv, ctx) {
+  // ctx: { type, alpha, sided, allocationRatio, n1, n2, plannedPower,
+  //        p1, p2, delta, sd, hr, events }
+  const wrap = el('div', { class: 'panel', style: 'margin-top:18px' });
+  wrap.appendChild(el('h3', {}, 'If the assumptions are wrong'));
+  wrap.appendChild(el('p', { class: 'subtle' },
+    'Everything above assumes the control arm behaves as planned and nobody leaves. Neither is usually true, and both are ordinary reasons a trial that looked adequately powered on paper reads out ambiguous.'));
+
+  // ── 1. The control arm ───────────────────────────────────────────────────
+  if (ctx.type === 'binary' && ctx.p1 != null && ctx.p2 != null) {
+    const rates = stressRange(ctx.p1).filter(r => r > 0.005 && r < 0.995);
+    const rows = rates.map(r => {
+      const abs = projectTreatmentRate(ctx.p1, ctx.p2, r, 'absolute');
+      const rel = projectTreatmentRate(ctx.p1, ctx.p2, r, 'relative');
+      const powAbs = abs ? closedFormPowerTwoProportion(r, abs.rate, ctx.n1, ctx.n2, ctx.alpha, ctx.sided) : null;
+      const powRel = rel ? closedFormPowerTwoProportion(r, rel.rate, ctx.n1, ctx.n2, ctx.alpha, ctx.sided) : null;
+      const isPlan = Math.abs(r - ctx.p1) < 1e-9;
+      return el('tr', {}, [
+        el('td', { style: isPlan ? 'font-weight:700' : '' }, (r * 100).toFixed(1) + '%' + (isPlan ? ' (planned)' : '')),
+        el('td', {}, abs ? (abs.rate * 100).toFixed(1) + '%' + (abs.clamped ? '*' : '') : '—'),
+        stressPowerCell(powAbs, ctx.plannedPower),
+        el('td', {}, rel ? (rel.rate * 100).toFixed(1) + '%' + (rel.clamped ? '*' : '') : '—'),
+        stressPowerCell(powRel, ctx.plannedPower)
+      ]);
+    });
+    wrap.appendChild(el('h4', { style: 'margin-top:14px' }, 'If the control arm responds differently'));
+    wrap.appendChild(el('table', { class: 'desctable' }, [
+      el('tr', {}, ['Control rate', 'Treatment (same points)', 'Power', 'Treatment (same ratio)', 'Power']
+        .map(t => el('td', { style: 'font-weight:700' }, t))),
+      ...rows
+    ]));
+    wrap.appendChild(note('Why there are two answers here, and why you have to pick one',
+      'If the control arm responds better or worse than planned, what does the treatment arm do? Two projections are coherent and they disagree materially. "Same points" holds the absolute benefit fixed — the drug adds the same number of percentage points whatever the baseline. "Same ratio" holds the relative benefit fixed — the drug multiplies the control rate by the same factor, so a higher control rate produces a larger absolute gap and more power. Which is right is a judgement about the mechanism, not a statistical one, and neither is a safe default. A cell marked * had its projection clamped at 0% or 100%, where the projection has stopped being meaningful.'));
+  } else if (ctx.type === 'continuous' && ctx.sd != null && ctx.delta != null) {
+    const sds = stressRange(ctx.sd).filter(x => x > 0);
+    wrap.appendChild(el('h4', { style: 'margin-top:14px' }, 'If the outcome is more variable than assumed'));
+    wrap.appendChild(el('table', { class: 'desctable' }, [
+      el('tr', {}, ['Common SD', 'Standardised effect', 'Power'].map(t => el('td', { style: 'font-weight:700' }, t))),
+      ...sds.map(sd => {
+        const isPlan = Math.abs(sd - ctx.sd) < 1e-9;
+        return el('tr', {}, [
+          el('td', { style: isPlan ? 'font-weight:700' : '' }, sd.toFixed(2) + (isPlan ? ' (planned)' : '')),
+          el('td', {}, (ctx.delta / sd).toFixed(3)),
+          stressPowerCell(closedFormPowerMeans(ctx.delta, sd, ctx.n1, ctx.n2, ctx.alpha, ctx.sided), ctx.plannedPower)
+        ]);
+      })
+    ]));
+    wrap.appendChild(note('Why variance, not the control mean',
+      'For a continuous endpoint the control arm’s mean cancels out of the comparison — what does not cancel is the spread. An SD a third larger than the pilot suggested is one of the most common reasons a well-designed trial misses, and pilot studies systematically understate it because they are small and selected. The standardised effect column is the effect in SD units, which is what the power actually depends on.'));
+  } else if (ctx.type === 'timeToEvent') {
+    wrap.appendChild(el('p', { class: 'subtle', style: 'margin-top:12px' },
+      'A time-to-event calculation is driven by the number of EVENTS, not the number of patients, so there is no control-rate axis to stress here — a slower-than-expected control event rate does not weaken the trial, it delays it. What it does change is whether the events arrive before the readout date, which is a timeline question rather than a power one.'));
+  }
+
+  // ── 2. Dropout ───────────────────────────────────────────────────────────
+  const unitLabel = ctx.type === 'timeToEvent' ? 'events' : 'per arm';
+  const baseN = ctx.type === 'timeToEvent' ? ctx.events : ctx.n1;
+  if (baseN != null && isFinite(baseN) && baseN > 0) {
+    const powerAtN = (n) => {
+      if (ctx.type === 'binary') return closedFormPowerTwoProportion(ctx.p1, ctx.p2, n, Math.max(1, Math.round(n * ctx.allocationRatio)), ctx.alpha, ctx.sided);
+      if (ctx.type === 'continuous') return closedFormPowerMeans(ctx.delta, ctx.sd, n, Math.max(1, Math.round(n * ctx.allocationRatio)), ctx.alpha, ctx.sided);
+      return schoenfeldPower(ctx.hr, n, ctx.allocationRatio, ctx.alpha);
+    };
+    wrap.appendChild(el('h4', { style: 'margin-top:18px' },
+      ctx.type === 'timeToEvent' ? 'If events fall short of plan' : 'If patients drop out'));
+    wrap.appendChild(el('table', { class: 'desctable' }, [
+      el('tr', {}, [ctx.type === 'timeToEvent' ? 'Shortfall' : 'Dropout',
+        'Analysable ' + unitLabel, 'Power', 'Needed to preserve the plan'].map(t => el('td', { style: 'font-weight:700' }, t))),
+      ...STRESS_DROPOUTS.map(d => {
+        const nEff = effectiveNAfterDropout(baseN, d);
+        return el('tr', {}, [
+          el('td', { style: d === 0 ? 'font-weight:700' : '' }, (d * 100).toFixed(0) + '%' + (d === 0 ? ' (planned)' : '')),
+          el('td', {}, nEff.toLocaleString()),
+          stressPowerCell(powerAtN(nEff), ctx.plannedPower),
+          el('td', { style: 'color:var(--ink-2)' }, inflateForDropout(baseN, d).toLocaleString())
+        ]);
+      })
+    ]));
+    wrap.appendChild(note('The inflation is N/(1−d), not N×(1+d)',
+      'The last column is how many you would have to randomise so that the planned number survives. It is the planned N divided by (1 − dropout), which is not the same as adding the dropout percentage back on: at 20% dropout you need 25% more patients, not 20%. Getting that backwards is a standard way a trial ends up slightly underpowered by design. Note also that this treats dropout as random. It usually is not — if the arms lose different kinds of people at different rates, the problem is bias in what remains, which no amount of extra enrolment fixes, and which the Trial Decoder’s results reader checks for once results exist.'));
+  }
+
+  resultsDiv.appendChild(wrap);
 }
 
 // Generates points across [0, nMax] for any single-argument power function

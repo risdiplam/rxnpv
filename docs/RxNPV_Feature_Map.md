@@ -50,7 +50,7 @@ Already the model for how a workbench should work. Mature.
 | Meta-Analysis (fixed/random, forest plot) | **BUILT** |
 | Peak Sales Monte Carlo | **BUILT** |
 | PK/PD + receptor occupancy | **BUILT** |
-| **Control-arm / dropout stress** | **DECIDED — build** | Smaller than first estimated: control event rate is *already* an input to Sample Size/Power, so this is a sensitivity sweep over it, not new machinery. A benchmark table would only supply a nicer default. |
+| **Control-arm / dropout stress** | **BUILT** | Under every Sample Size/Power result. Forces a choice between a constant-absolute and a constant-relative effect model, because they disagree materially (Phase 23) |
 
 ---
 
@@ -157,7 +157,7 @@ Each of these has been considered and declined on the merits. Recording them her
 
 1. ~~**Results reader** (outcomes, dropout, adverse events)~~ — **done**, Phase 17
 2. ~~**Gross-to-net** — accuracy fix on existing valuation~~ — **done**, Phase 18
-3. **Cheap completions batch** — ~~thin-win~~ and ~~change classification~~ (Phase 19), ~~Form 4 derivatives~~ (Phase 20), ~~literature shelf~~ (Phase 21), ~~multi-trial view + evidence checklist~~ (Phase 22); control-arm stress ← next
-4. **Commercial workbench** — launch trajectory, actual vs modelled
-5. **Tab consolidation** — after the tools exist, not before
+3. ~~**Cheap completions batch**~~ — **all done**: thin-win and change classification (Phase 19), Form 4 derivatives (Phase 20), literature shelf (Phase 21), multi-trial view + evidence checklist (Phase 22), control-arm/dropout stress (Phase 23)
+4. **Commercial workbench** — launch trajectory, actual vs modelled ← next
+5. **Tab consolidation** — after the tools exist, not before. **Confirmed by the user, September 2026**: regroup into Trial / Science / Company / Commercial / Benchmarks.
 6. **Electron upgrade** — deferred by the user; needs ~10 minutes of their time (PDF export, panel capture, window resize)

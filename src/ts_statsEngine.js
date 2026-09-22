@@ -650,6 +650,95 @@ function shrinkHazardRatio(assumedHR) {
   return { projectedP3HR: Math.max(0.001, projected), factor: HR_SHRINKAGE_FACTOR, crossesNull: projected >= 1 };
 }
 
+
+// ════════════════════════════════════════════════════════════════════════════
+// ASSUMPTION STRESS — what a power calculation does when its inputs are wrong
+//
+// A sample-size calculation is a statement about a world that has not happened
+// yet, and two of its inputs are wrong far more often than the effect size
+// everyone argues about: how the CONTROL arm behaves, and how many people
+// LEAVE. Both are routinely lifted from a decade-old trial in a differently
+// selected population, and a modern standard of care has usually moved since.
+//
+// This is a sweep over machinery that already exists — the same verified
+// closed-form power functions above — not a new statistical method. What it
+// adds is the reasoning about how the numbers move together, which is the part
+// that is easy to get wrong by hand.
+// ════════════════════════════════════════════════════════════════════════════
+
+// If the control arm turns out to respond at a different rate than planned,
+// what does the treatment arm do? There are two coherent answers and they give
+// materially different results, so the caller has to choose one rather than
+// having this file pick silently:
+//
+//   "absolute" — the drug adds the same number of percentage points. A control
+//                arm at 40% instead of 30% puts treatment at 55% instead of 45%.
+//   "relative" — the drug multiplies the control rate by the same factor. The
+//                same shift puts treatment at 60%, because 0.45/0.30 = 1.5.
+//
+// Which is right is a scientific judgement about the mechanism, not a
+// statistical one, and neither is the safe default.
+function projectTreatmentRate(p1Assumed, p2Assumed, p1Actual, effectModel) {
+  if (![p1Assumed, p2Assumed, p1Actual].every(x => typeof x === "number" && isFinite(x))) return null;
+  if (p1Assumed <= 0 || p1Assumed >= 1 || p1Actual <= 0 || p1Actual >= 1) return null;
+  let p2;
+  if (effectModel === "relative") {
+    p2 = p1Actual * (p2Assumed / p1Assumed);
+  } else {
+    p2 = p1Actual + (p2Assumed - p1Assumed);
+  }
+  // A projected rate can run past a probability. Clamping is honest — the
+  // projection has simply stopped being meaningful there — and it keeps the
+  // power function from being handed an impossible input.
+  const EPS = 1e-6;
+  return { rate: Math.min(1 - EPS, Math.max(EPS, p2)), clamped: p2 <= 0 || p2 >= 1 };
+}
+
+// Patients who leave are not in the analysis. The planned N is what was
+// randomised; this is what is left to analyse.
+function effectiveNAfterDropout(n, dropoutFraction) {
+  const d = Math.min(0.999, Math.max(0, Number(dropoutFraction) || 0));
+  return Math.max(1, Math.floor(Number(n) * (1 - d)));
+}
+
+// The standard planning adjustment, stated the other way round: to still have
+// N analysable after losing d of them, randomise this many. Note it is N/(1-d)
+// and NOT N*(1+d), which is the usual mistake and understates the inflation —
+// at 20% dropout the right answer is 25% more patients, not 20%.
+function inflateForDropout(n, dropoutFraction) {
+  const d = Math.min(0.999, Math.max(0, Number(dropoutFraction) || 0));
+  return Math.ceil(Number(n) / (1 - d));
+}
+
+// Sweeps a one-argument power function over a list of candidate values.
+// Deliberately generic: the caller partially applies everything except the
+// quantity being stressed, so the same helper serves the control-rate sweep,
+// the variance sweep and the dropout sweep, and there is one place where the
+// shape of a stress result is defined.
+function stressPowerOver(values, powerAt) {
+  return (values || []).map(v => {
+    let power = null;
+    try { power = powerAt(v); } catch (e) { power = null; }
+    return { value: v, power: (typeof power === "number" && isFinite(power)) ? power : null };
+  });
+}
+
+// Candidate values around a planned one: -40% to +40% in ten-point steps of
+// the planned value, always including the plan itself so the baseline is
+// visible in the same column as the stresses.
+function stressRange(planned, opts) {
+  opts = opts || {};
+  const lo = opts.lo != null ? opts.lo : 0.6, hi = opts.hi != null ? opts.hi : 1.4;
+  const steps = opts.steps || 5;
+  const out = [];
+  for (let i = 0; i < steps; i++) {
+    const f = lo + (hi - lo) * (steps === 1 ? 0 : i / (steps - 1));
+    out.push(planned * f);
+  }
+  if (!out.some(v => Math.abs(v - planned) < 1e-12)) out.push(planned);
+  return out.sort((a, b) => a - b);
+}
+
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     randUniform, randNormal, randExponential, randBinomialCount,
@@ -663,6 +752,7 @@ if (typeof module !== 'undefined' && module.exports) {
     solveMinN, solveSampleSizeTwoProportion, solveSampleSizeMeans, solveEventsNeeded,
     solveMinDetectableEffect, solveMinDetectableRateTwoProportion, solveMinDetectableDeltaMeans, solveMinDetectableHazardRatio,
     wilsonScoreInterval, ciFromPValue, pValueFromCI, ciFromPValueRatio, pValueFromCIRatio,
-    shrinkBinaryResponseRate, shrinkHazardRatio, BINARY_SHRINKAGE_FACTOR, HR_SHRINKAGE_FACTOR
+    shrinkBinaryResponseRate, shrinkHazardRatio, BINARY_SHRINKAGE_FACTOR, HR_SHRINKAGE_FACTOR,
+    projectTreatmentRate, effectiveNAfterDropout, inflateForDropout, stressPowerOver, stressRange
   };
 }
