@@ -75,7 +75,7 @@ function ToolsView({ cases, updateCase, activeCase, navRequest }) {
 
   const bench = workbenchForTool(tab);
 
-  return h("div", { style: { maxWidth: 900, margin: "0 auto", padding: "24px 28px 60px" } },
+  return h("div", { style: { maxWidth: "var(--app-max-width)", margin: "0 auto", padding: "24px 28px 60px" } },
     h("div", { style: { display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 } },
       TOOL_WORKBENCHES.map(w => h("button", { key: w.id,
         // Selecting a workbench lands on its first tool, which is the one most
@@ -488,7 +488,7 @@ function CompanyLookupTool({ cases, updateCase, activeCase, onWatchTrial }) {
                       h(ExternalLink, { href: t.sourceUrl, style: { fontSize: 9, marginLeft: 8 } }, "→ Filing"))
               ))),
 
-            h("div", { style: { fontSize: 10, fontFamily: "var(--sans)", color: "var(--ink-3)", lineHeight: 1.6, marginTop: 8 } },
+            h("div", { className: "prose", style: { fontSize: 10, fontFamily: "var(--sans)", color: "var(--ink-3)", lineHeight: 1.6, marginTop: 8 } },
               insiderView === "market"
                 ? "Only codes P and S: an insider deciding to buy or sell at a market price with their own money. That is the part of a Form 4 with any signal in it, and it is why everything else lives on the other tab."
                 : "Compensation, not conviction — an award is something the board decided, not something the insider bought, and a tax withholding is not a decision to sell. Restricted stock arrives in the same table as an ordinary purchase in the filing itself, which is exactly why these are separated by what the transaction is rather than by where it sits in the XML. Option grants carry no dollar value here: a grant's registered price is normally zero, and a notional built from a market price this tool does not have would be a made-up number. An exercise followed by a same-day sale appears here as the exercise and on the other tab as the sale.")
@@ -2181,14 +2181,14 @@ function LaunchTrackerTool() {
       h("input", { type: "text", value: analogInput, placeholder: "optional: up to 3 analog brands to compare, comma separated",
         "aria-label": "Analog brand names", onChange: e => setAnalogInput(e.target.value), onKeyDown: e => { if (e.key === "Enter") run(); },
         style: { width: "100%", boxSizing: "border-box", marginTop: 8, padding: "8px 12px", borderRadius: 7, border: "1.5px solid var(--rule)", background: "var(--surface)", color: "var(--ink-1)", fontFamily: "var(--mono)", fontSize: 12 } }),
-      h("div", { style: { fontSize: 10, fontFamily: "var(--sans)", color: "var(--ink-3)", lineHeight: 1.6, marginTop: 6 } },
+      h("div", { className: "prose", style: { fontSize: 10, fontFamily: "var(--sans)", color: "var(--ink-3)", lineHeight: 1.6, marginTop: 6 } },
         "Part B covers what a clinician administers — infusions, injections given in a clinic. Part D covers what a pharmacy dispenses. A drug appears in one or the other, occasionally both, and picking the wrong one returns nothing rather than a zero.")
     ]),
 
     error && toolCard(h, h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--amber)", lineHeight: 1.6 } },
       error + " This is a connection problem, not a finding that the drug has no Medicare spending.")),
 
-    primary && !primary.found && toolCard(h, h("div", { style: { fontSize: 11.5, fontFamily: "var(--sans)", color: "var(--ink-2)", lineHeight: 1.6 } }, primary.error)),
+    primary && !primary.found && toolCard(h, h("div", { className: "prose", style: { fontSize: 11.5, fontFamily: "var(--sans)", color: "var(--ink-2)", lineHeight: 1.6 } }, primary.error)),
 
     primary && primary.found && h("div", null,
       toolCard(h, [
@@ -2212,7 +2212,7 @@ function LaunchTrackerTool() {
             ))))),
         primary.impliedAnnual != null && h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-2)", marginTop: 8 } },
           "Implied annual run rate from " + primary.latest.label + ": " + money(primary.impliedAnnual)),
-        h("div", { style: { fontSize: 10, fontFamily: "var(--sans)", color: "var(--ink-3)", lineHeight: 1.6, marginTop: 8 } },
+        h("div", { className: "prose", style: { fontSize: 10, fontFamily: "var(--sans)", color: "var(--ink-3)", lineHeight: 1.6, marginTop: 8 } },
           "The last column only ever compares periods covering the same number of quarters — a single quarter against a full year would show a collapse in a drug that is tripling. A run rate assumes the remaining quarters look exactly like the reported ones, which for a ramping launch understates it. " + primary.caveat)
       ]),
 
@@ -2241,7 +2241,7 @@ function LaunchTrackerTool() {
                 + " sitting where a ramp should be, which makes the comparison read backwards — use an analog launched inside the data window for a like-for-like ramp.")
           );
         })(),
-        rows.length > 1 && h("div", { style: { fontSize: 10, fontFamily: "var(--sans)", color: "var(--ink-3)", lineHeight: 1.6, marginTop: 6 } },
+        rows.length > 1 && h("div", { className: "prose", style: { fontSize: 10, fontFamily: "var(--sans)", color: "var(--ink-3)", lineHeight: 1.6, marginTop: 6 } },
           "Indexed to each drug's first year of Medicare spending, so launches from different years sit on the same axis. Year 1 is almost never a full commercial year — a drug approved in March shows nine months of it — so the first point understates every curve by a different amount depending on approval date. A mature analog's later years are its plateau, not its ramp."),
         rows.some(r => r.found && r.series.some(p => !p.isFullYear)) && h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--amber)", marginTop: 4 } },
           "One or more points is a partial period plotted at its reported value, not annualised — the line dips there for a reporting reason, not a commercial one.")
@@ -2305,7 +2305,7 @@ function ActualVsModelTool({ cases, updateCase, activeCase }) {
             style: Object.assign({}, inputStyle, { width: 74 }) })))
     ]),
 
-    theCase && calendar.length === 0 && toolCard(h, h("div", { style: { fontSize: 11.5, fontFamily: "var(--sans)", color: "var(--ink-2)", lineHeight: 1.6 } },
+    theCase && calendar.length === 0 && toolCard(h, h("div", { className: "prose", style: { fontSize: 11.5, fontFamily: "var(--sans)", color: "var(--ink-2)", lineHeight: 1.6 } },
       "This case has no program that produces a revenue projection yet, so there is nothing to compare against. Fill in a program's revenue build on the Workspace first.")),
 
     theCase && calendar.length > 0 && h("div", null,
@@ -2359,7 +2359,7 @@ function ActualVsModelTool({ cases, updateCase, activeCase }) {
             ],
             height: 220, showLegend: true
           })),
-        h("div", { style: { fontSize: 10, fontFamily: "var(--sans)", color: "var(--ink-3)", lineHeight: 1.6, marginTop: 6 } },
+        h("div", { className: "prose", style: { fontSize: 10, fontFamily: "var(--sans)", color: "var(--ink-3)", lineHeight: 1.6, marginTop: 6 } },
           "A year with nothing reported is drawn at zero on the reported line — read the table above for which years actually have data, since the chart cannot draw a gap. " + cmp.caveat)
       ])
     )
@@ -2414,7 +2414,7 @@ function AssetProgramTool({ onDecodeTrial, onWatchTrial }) {
     error && toolCard(h, h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--amber)", lineHeight: 1.6 } },
       error + " This is a connection problem, not a finding that no trials exist.")),
 
-    summary && summary.trialCount === 0 && toolCard(h, h("div", { style: { fontSize: 11.5, fontFamily: "var(--sans)", color: "var(--ink-2)", lineHeight: 1.6 } },
+    summary && summary.trialCount === 0 && toolCard(h, h("div", { className: "prose", style: { fontSize: 11.5, fontFamily: "var(--sans)", color: "var(--ink-2)", lineHeight: 1.6 } },
       "The registry returned " + summary.scanned + " record" + (summary.scanned === 1 ? "" : "s") + " for that text, and none of them actually lists “" + summary.drugName + "” as an intervention. ClinicalTrials.gov's intervention search is a loose text match, so a name that only appears in a description will bring back other people's trials. Try the generic name, the brand name, or the development code.")),
 
     summary && summary.trialCount > 0 && h("div", null,
@@ -2428,7 +2428,7 @@ function AssetProgramTool({ onDecodeTrial, onWatchTrial }) {
         h("div", { style: { display: "flex", flexDirection: "column", gap: 8 } },
           describeEvidenceBase(summary).map((l, i) =>
             h("div", { key: i, style: { borderLeft: "3px solid " + toneColor(l.tone), paddingLeft: 10, fontSize: 12, fontFamily: "var(--sans)", color: "var(--ink-1)", lineHeight: 1.6 } }, l.text))),
-        h("div", { style: { fontSize: 10, fontFamily: "var(--sans)", color: "var(--ink-3)", lineHeight: 1.6, marginTop: 10 } },
+        h("div", { className: "prose", style: { fontSize: 10, fontFamily: "var(--sans)", color: "var(--ink-3)", lineHeight: 1.6, marginTop: 10 } },
           summary.caveat
             + (summary.totalMatchedByRegistry > summary.pageSize
               ? "  The registry reports " + summary.totalMatchedByRegistry.toLocaleString() + " text matches and this read the first " + summary.pageSize + " of them."
@@ -2444,7 +2444,7 @@ function AssetProgramTool({ onDecodeTrial, onWatchTrial }) {
             h("div", { style: { fontSize: 11.5, fontFamily: "var(--sans)", color: "var(--ink-2)", lineHeight: 1.5, marginTop: 2 } }, truncateText(s.title || "", 110)),
             h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: s.whyStopped ? "var(--amber)" : "var(--ink-3)", marginTop: 3 } },
               s.whyStopped ? "Reason given: " + s.whyStopped : "No reason registered.")))),
-        h("div", { style: { fontSize: 10, fontFamily: "var(--sans)", color: "var(--ink-3)", lineHeight: 1.6, marginTop: 10 } },
+        h("div", { className: "prose", style: { fontSize: 10, fontFamily: "var(--sans)", color: "var(--ink-3)", lineHeight: 1.6, marginTop: 10 } },
           "A sponsor stops a trial for business reasons — reprioritisation, funding, a partner walking — about as often as for scientific ones, and the registered reason is frequently a single vague sentence or absent entirely. Read the reason, not the fact.")
       ]),
 
@@ -2489,7 +2489,7 @@ function AssetProgramTool({ onDecodeTrial, onWatchTrial }) {
             ind.condition + " · " + ind.trials))),
         summary.indications.length > 30 && h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginTop: 6 } },
           "…and " + (summary.indications.length - 30) + " more."),
-        h("div", { style: { fontSize: 10, fontFamily: "var(--sans)", color: "var(--ink-3)", lineHeight: 1.6, marginTop: 8 } },
+        h("div", { className: "prose", style: { fontSize: 10, fontFamily: "var(--sans)", color: "var(--ink-3)", lineHeight: 1.6, marginTop: 8 } },
           "These are the sponsor's own registered condition strings, not a normalised vocabulary — the same disease often appears two or three ways, which inflates the count. Read the spread, not the number.")
       ])
     )
@@ -2553,7 +2553,7 @@ function LiteratureList({ result, emptyText }) {
           h(ExternalLink, { href: r.url, style: { fontSize: 9, marginTop: 3, display: "inline-block" } }, "→ Read it"));
       })),
 
-    h("div", { style: { fontSize: 10, fontFamily: "var(--sans)", color: "var(--ink-3)", lineHeight: 1.6, marginTop: 10 } },
+    h("div", { className: "prose", style: { fontSize: 10, fontFamily: "var(--sans)", color: "var(--ink-3)", lineHeight: 1.6, marginTop: 10 } },
       "Types come from MEDLINE's own publication tags, not from anything guessed here. Citation counts are an age-biased popularity measure — a 2018 paper has had seven years to accumulate them and a 2026 one has not — so they are useful for finding the paper everyone cites and useless as a quality score. Preprints have not been peer reviewed, whatever they report.")
   );
 }
@@ -2626,7 +2626,7 @@ function TrialResultsPanels({ results, study }) {
   const thL = Object.assign({}, thS, { textAlign: "left" });
   const tdS = { padding: "6px 10px", borderBottom: "1px solid var(--rule)", fontSize: 11, color: "var(--ink-1)", textAlign: "right", whiteSpace: "nowrap" };
   const tdL = Object.assign({}, tdS, { textAlign: "left", whiteSpace: "normal", minWidth: 170 });
-  const caveat = (t) => h("div", { style: { fontSize: 10, fontFamily: "var(--sans)", color: "var(--ink-3)", lineHeight: 1.6, marginTop: 8 } }, t);
+  const caveat = (t) => h("div", { className: "prose", style: { fontSize: 10, fontFamily: "var(--sans)", color: "var(--ink-3)", lineHeight: 1.6, marginTop: 8 } }, t);
   const scroll = (child) => h("div", { style: { overflowX: "auto" } }, child);
 
   // "NA" is a real, meaningful answer for a median — it means the endpoint was
@@ -2658,9 +2658,9 @@ function TrialResultsPanels({ results, study }) {
         [comparedLine,
          a.method || null,
          a.comparisonType ? a.comparisonType.toLowerCase().replace(/_/g, " ") : null].filter(Boolean).join("  ·  ")),
-      compared.length === 1 && h("div", { style: { fontSize: 10.5, fontFamily: "var(--sans)", color: "var(--ink-3)", marginTop: 3, lineHeight: 1.5 } },
+      compared.length === 1 && h("div", { className: "prose", style: { fontSize: 10.5, fontFamily: "var(--sans)", color: "var(--ink-3)", marginTop: 3, lineHeight: 1.5 } },
         "The sponsor registered only \u201C" + compared[0] + "\u201D against this comparison, so the record does not state which two arms the estimate runs between, or which way round. Read the direction from the per-arm numbers above rather than from the ratio."),
-      compared.length === 0 && h("div", { style: { fontSize: 10.5, fontFamily: "var(--sans)", color: "var(--ink-3)", marginTop: 3, lineHeight: 1.5 } },
+      compared.length === 0 && h("div", { className: "prose", style: { fontSize: 10.5, fontFamily: "var(--sans)", color: "var(--ink-3)", marginTop: 3, lineHeight: 1.5 } },
         "No arms are registered against this comparison, so the record does not state what it was computed between."),
       a.crossesNull === true && h("div", { style: { fontSize: 10.5, fontFamily: "var(--sans)", color: "var(--amber)", marginTop: 4, lineHeight: 1.5 } },
         "This interval spans " + a.nullValue + ", the value meaning no difference — the data are consistent with no effect."),
@@ -2836,18 +2836,18 @@ function TrialResultsPanels({ results, study }) {
     toolCard(h, [
       toolLabel(h, "Results flags (" + flagList.length + ")"),
       flagList.length === 0
-        ? h("div", { style: { fontSize: 11.5, fontFamily: "var(--sans)", color: "var(--ink-2)", lineHeight: 1.6 } },
+        ? h("div", { className: "prose", style: { fontSize: 11.5, fontFamily: "var(--sans)", color: "var(--ink-2)", lineHeight: 1.6 } },
             "Nothing in the posted results tripped a flag — no differential dropout, no unreported primary, no interval spanning no-effect, no large safety gap between arms. That is a statement about the reported data only. It does not mean the effect is large, durable, or commercially relevant.")
         : h("div", { style: { display: "flex", flexDirection: "column", gap: 12 } },
             flagList.map((f, i) => h("div", { key: i, style: { borderLeft: "3px solid " + sevColor(f.severity), paddingLeft: 10 } },
               h("div", { style: { fontSize: 12, fontFamily: "var(--mono)", fontWeight: 700, color: sevColor(f.severity), marginBottom: 3 } }, f.label),
-              h("div", { style: { fontSize: 11.5, fontFamily: "var(--sans)", color: "var(--ink-2)", lineHeight: 1.6 } }, f.detail)))),
+              h("div", { className: "prose", style: { fontSize: 11.5, fontFamily: "var(--sans)", color: "var(--ink-2)", lineHeight: 1.6 } }, f.detail)))),
       caveat("These check the posted results. They are separate from the design flags above, which check the registered protocol, and from the red-flag checks on the Workspace, which check your own modelling inputs.")
     ]),
 
     (results.limitations || results.agreementRestriction) && toolCard(h, [
       toolLabel(h, "The sponsor's own caveats"),
-      results.limitations && h("div", { style: { fontSize: 11.5, fontFamily: "var(--sans)", color: "var(--ink-2)", lineHeight: 1.6 } }, results.limitations),
+      results.limitations && h("div", { className: "prose", style: { fontSize: 11.5, fontFamily: "var(--sans)", color: "var(--ink-2)", lineHeight: 1.6 } }, results.limitations),
       results.agreementRestriction && h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-3)", marginTop: 8, lineHeight: 1.6 } },
         "Publication agreement: " + results.agreementRestriction.toLowerCase().replace(/_/g, " ")
         + " — the sponsor retains some right to review or delay what investigators publish, which affects how quickly independent analysis of this trial appears."),
@@ -2914,7 +2914,7 @@ function TrialDecoderTool({ initialNctId, onConsumedInitialNctId }) {
   const factRow = (label, value, note) => h("div", { style: { display: "flex", gap: 10, padding: "7px 0", borderBottom: "1px solid var(--rule)", alignItems: "baseline", flexWrap: "wrap" } },
     h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.05em", minWidth: 150 } }, label),
     h("div", { style: { fontSize: 12, fontFamily: "var(--mono)", color: "var(--ink-1)", flex: "1 1 200px" } }, value),
-    note && h("div", { style: { fontSize: 10, fontFamily: "var(--sans)", color: "var(--ink-3)", flex: "1 1 100%", lineHeight: 1.5 } }, note)
+    note && h("div", { className: "prose", style: { fontSize: 10, fontFamily: "var(--sans)", color: "var(--ink-3)", flex: "1 1 100%", lineHeight: 1.5 } }, note)
   );
 
   return h("div", null,
@@ -2968,25 +2968,25 @@ function TrialDecoderTool({ initialNctId, onConsumedInitialNctId }) {
         toolLabel(h, "What this trial can establish"),
         decoded.canProve.length
           ? h("ul", { style: { margin: 0, paddingLeft: 18, display: "flex", flexDirection: "column", gap: 7 } },
-              decoded.canProve.map((t, i) => h("li", { key: i, style: { fontSize: 12, fontFamily: "var(--sans)", color: "var(--ink-2)", lineHeight: 1.6 } }, t)))
+              decoded.canProve.map((t, i) => h("li", { key: i, className: "prose", style: { fontSize: 12, fontFamily: "var(--sans)", color: "var(--ink-2)", lineHeight: 1.6 } }, t)))
           : h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-3)" } }, "Not enough registered design detail to say.")
       ]),
 
       toolCard(h, [
         toolLabel(h, "What it cannot"),
         h("ul", { style: { margin: 0, paddingLeft: 18, display: "flex", flexDirection: "column", gap: 7 } },
-          decoded.cannotProve.map((t, i) => h("li", { key: i, style: { fontSize: 12, fontFamily: "var(--sans)", color: "var(--ink-2)", lineHeight: 1.6 } }, t)))
+          decoded.cannotProve.map((t, i) => h("li", { key: i, className: "prose", style: { fontSize: 12, fontFamily: "var(--sans)", color: "var(--ink-2)", lineHeight: 1.6 } }, t)))
       ]),
 
       toolCard(h, [
         toolLabel(h, "Design flags (" + decoded.redFlags.length + ")"),
         decoded.redFlags.length === 0
-          ? h("div", { style: { fontSize: 11.5, fontFamily: "var(--sans)", color: "var(--ink-2)", lineHeight: 1.6 } },
+          ? h("div", { className: "prose", style: { fontSize: 11.5, fontFamily: "var(--sans)", color: "var(--ink-2)", lineHeight: 1.6 } },
               "Nothing in the registered design tripped a flag. That is a statement about the architecture only — it says nothing about whether the drug works, whether the effect size assumed is realistic, or whether the trial will read out positive.")
           : h("div", { style: { display: "flex", flexDirection: "column", gap: 12 } },
               decoded.redFlags.map((f, i) => h("div", { key: i, style: { borderLeft: "3px solid " + sevColor(f.severity), paddingLeft: 10 } },
                 h("div", { style: { fontSize: 12, fontFamily: "var(--mono)", fontWeight: 700, color: sevColor(f.severity), marginBottom: 3 } }, f.label),
-                h("div", { style: { fontSize: 11.5, fontFamily: "var(--sans)", color: "var(--ink-2)", lineHeight: 1.6 } }, f.detail)
+                h("div", { className: "prose", style: { fontSize: 11.5, fontFamily: "var(--sans)", color: "var(--ink-2)", lineHeight: 1.6 } }, f.detail)
               )))
       ]),
 
@@ -2998,14 +2998,14 @@ function TrialDecoderTool({ initialNctId, onConsumedInitialNctId }) {
       ]),
 
       !results && !decoded.hasResults && toolCard(h, [
-        h("div", { style: { fontSize: 11.5, fontFamily: "var(--sans)", color: "var(--ink-2)", lineHeight: 1.6 } },
+        h("div", { className: "prose", style: { fontSize: 11.5, fontFamily: "var(--sans)", color: "var(--ink-2)", lineHeight: 1.6 } },
           "No results are posted for this trial yet. When they are, this page gains what the endpoints returned, who finished and who left by arm, and the adverse events as reported — read against the design above rather than after it.")
       ]),
 
       toolCard(h, [
         toolLabel(h, "What has been published about this trial"),
         !papers && !papersLoading && !papersError && h("div", null,
-          h("div", { style: { fontSize: 11.5, fontFamily: "var(--sans)", color: "var(--ink-2)", lineHeight: 1.6, marginBottom: 10 } },
+          h("div", { className: "prose", style: { fontSize: 11.5, fontFamily: "var(--sans)", color: "var(--ink-2)", lineHeight: 1.6, marginBottom: 10 } },
             "A registry record is what the sponsor filed. A publication is what survived review, and it carries the things the registry never does — the actual numbers in context, the limitations section, and whether anyone independent has since disagreed. This searches Europe PMC for papers naming this NCT number, most-cited first, because a trial's own primary report is almost always the one everything else cites."),
           h("button", { onClick: () => loadPapers(decoded.nctId),
             style: { padding: "7px 16px", borderRadius: 7, border: "1px solid var(--rule)", background: "transparent", color: "var(--ink-2)", fontFamily: "var(--mono)", fontSize: 11, cursor: "pointer" } },
@@ -3016,7 +3016,7 @@ function TrialDecoderTool({ initialNctId, onConsumedInitialNctId }) {
         papers && h("div", null,
           h(LiteratureList, { result: papers,
             emptyText: "No indexed paper names this NCT number. For a trial that has not read out, that is expected. For one that reported years ago, it is worth noticing — either the result was never published, or it was published without citing its own registration." }),
-          papers.rows.length > 0 && h("div", { style: { fontSize: 10, fontFamily: "var(--sans)", color: "var(--ink-3)", lineHeight: 1.6, marginTop: 6 } },
+          papers.rows.length > 0 && h("div", { className: "prose", style: { fontSize: 10, fontFamily: "var(--sans)", color: "var(--ink-3)", lineHeight: 1.6, marginTop: 6 } },
             "These are papers that MENTION this NCT number, which is mostly other people's reviews. The trial's own report is usually the most-cited one here, but that is a heuristic and not a guarantee — check that the top result's title actually describes this trial before treating it as the primary publication."))
       ]),
 
@@ -3217,7 +3217,7 @@ function TrialWatchTool({ initialNctId, onConsumedInitialNctId }) {
                   style: { width: 110, padding: "5px 9px", borderRadius: 6, border: "1.5px solid var(--rule)", background: "var(--surface)", color: "var(--ink-1)", fontFamily: "var(--mono)", fontSize: 12 } })),
               (() => {
                 const v = parseFloat(myEffect);
-                if (!isFinite(v)) return h("div", { style: { fontSize: 10, fontFamily: "var(--sans)", color: "var(--ink-3)", lineHeight: 1.6, marginTop: 6 } },
+                if (!isFinite(v)) return h("div", { className: "prose", style: { fontSize: 10, fontFamily: "var(--sans)", color: "var(--ink-3)", lineHeight: 1.6, marginTop: 6 } },
                   "Your modelled effect before a readout, or the one a trial just posted. It is compared only against results on the same scale — a hazard ratio against hazard ratios, never against a mean difference.");
                 return h("div", { style: { marginTop: 8, display: "flex", flexDirection: "column", gap: 8 } },
                   Object.keys(effects.byScale).map(scale => {
@@ -3319,7 +3319,7 @@ function TrialWatchTool({ initialNctId, onConsumedInitialNctId }) {
                             c.added.length > 0 && h("div", { style: { color: "var(--teal)" } }, "+ " + c.added.join("; "))
                           )
                   )),
-                  h("div", { style: { fontSize: 10, fontFamily: "var(--sans)", color: "var(--ink-3)", lineHeight: 1.6, marginTop: 10 } },
+                  h("div", { className: "prose", style: { fontSize: 10, fontFamily: "var(--sans)", color: "var(--ink-3)", lineHeight: 1.6, marginTop: 10 } },
                     "This compares your last two checks, not every revision the sponsor filed. CT.gov keeps a full version history; if something important moved, read it there rather than assuming this caught the whole sequence.")
                 );
               })(),

@@ -628,3 +628,34 @@ And through the running app itself: the **CSP hash still validates under Chromiu
 **Installed and confirmed.** Packaged with builder 26, installed over `/Applications/RxNPV.app`, launched, and read back: Electron 44.4.4, Chromium 152, renders, and the real saved data intact — the Stok Therapeutics case with its Elsunersen phase-3 program, one watched trial, one custom comp, zero leftover `pdcf_` keys, **zero console errors**. Full 10-file suite clean at 1,032 checks (it runs in jsdom and does not exercise Electron, which is precisely why the live checks above matter).
 
 **What was left for the user** is the two native *save dialogs* — a panel has to appear and actually write a file, and nothing but a person can confirm that — plus a subjective look at window resize and reopen.
+
+---
+
+## Phase 28 — One layout width, and PDF export for charts
+
+✅ Done, both from the user's own review of the upgraded build.
+
+### The layout
+
+Full screen looked wrong and the user was right about why. Each view had hard-coded its own max width — Workspace and Reference Sheet 980, Tools and Simulation 900, Portfolio 1100 — and on this machine's full-screen viewport of **1470 logical points** (a 2560×1664 Retina panel at 2× scaling) that left Tools and Simulation using **61% of the window**, with roughly 285 points of dead space a side. The inconsistency mattered as much as the narrowness: five views disagreeing is what makes a layout read as broken rather than merely conservative.
+
+All five now share `--app-max-width: min(1240px, calc(100vw - 72px))`. Tools and Simulation go from 61% to **82%** of a full-screen window, and every view agrees.
+
+**The half that is easy to miss:** widening the container without capping the prose would have traded one problem for a worse one. Measured after the container change, body copy was running at **188 characters per line** (comfortable is 65–75). So long-form text is capped separately at `--prose-width`, set to **660px — the Reference Sheet's own long-standing `PROSE` constant**, reused rather than invented so the app has one reading measure instead of two. `.note-body` and `.subtle` already carried most of the Simulation side's copy; a `.prose` class covers the React views, applied in the helpers that actually emit body text.
+
+Verified by A/B: Reference Sheet, Simulation, Workspace and Portfolio produce **identical** line-length censuses at 980 and at 1240, confirming their text was already capped and nothing regressed. Only Tools still stretched, and its remaining uncapped blocks — the decoder's fact-row notes, the can/cannot-prove list items, the one-arm analysis explanation and the papers-panel intro — were capped individually. What is deliberately left uncapped: **titles and tables**. A trial title wrapping at 660px would look worse than a long one, and a table should use the width it has.
+
+### PDF export for charts
+
+The user asked why charts could be saved as PNG and SVG but not PDF. The honest answer is that it was never a decision: PNG and SVG are produced entirely in the renderer — serialise the `<svg>`, or rasterise it through a canvas — and **a browser renderer has no PDF writer**. PDF needs Chromium's print engine, which lives in the main process and until now was only wired up for the full report.
+
+`export-chart-pdf` closes that. The SVG arrives already standalone from `svgToStandaloneString()` (styles inlined, explicit dimensions, background rect), so the handler only has to put it on a correctly-sized page and print it — and it stays **vector**, which is the entire point, since a PDF of a rasterised chart would be no better than the PNG.
+
+Two details worth keeping:
+
+- **Fonts are read out of the packaged `rxnpv.html`, not passed through IPC.** The app embeds its typefaces as 11 base64 `@font-face` rules totalling 273KB. An offscreen window would otherwise fall back to a system face and quietly produce a PDF that does not match what is on screen. Reading them in the main process costs nothing per export and cannot drift from what the app ships.
+- **The print window is deliberately inert**: no preload, no Node, sandboxed, and `javascript: false`. It renders one SVG this app just produced and nothing else.
+
+Verified end to end short of the save dialog: page requested 9.38in × 2.08in, `MediaBox` came back **675.12 × 150 pt** against 675 × 150 requested; **fonts embedded** (`/FontFile` present); **no `/Subtype /Image`**, so it stayed vector; 10KB for a chart. The button appears alongside PNG / SVG / Panel on every chart, desktop-only and hidden in a browser rather than failing on click.
+
+Full 10-file suite clean at 1,032 checks. (The suite runs in jsdom with no `electronAPI`, so the PDF button correctly does not render there — which is itself the desired behaviour.)

@@ -205,7 +205,7 @@ function App() {
       // Main content — keyed on activeCaseId (not just view) so switching to
       // a different, working case resets a tripped boundary immediately,
       // not just switching views.
-      h("div", { style: { flex: 1, padding: "24px 28px 60px", maxWidth: 980, margin: "0 auto", width: "100%" } },
+      h("div", { style: { flex: 1, padding: "24px 28px 60px", maxWidth: "var(--app-max-width)", margin: "0 auto", width: "100%" } },
         h(ErrorBoundary, { key: activeCaseId },
           activeCase
             ? h(React.Fragment, null,

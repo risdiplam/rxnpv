@@ -13,5 +13,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   capturePanelData: (rect, maxWidth) => ipcRenderer.invoke('capture-panel-data', rect, maxWidth),
   // Save an already-encoded asset the renderer produced (SVG text, or a PNG
   // data URL rasterised from an SVG at arbitrary scale).
-  saveAsset: (payload) => ipcRenderer.invoke('save-asset', payload)
+  saveAsset: (payload) => ipcRenderer.invoke('save-asset', payload),
+  // Vector PDF of a single chart. Needs the main process because a renderer
+  // has no PDF writer — see the handler's comment in main.js.
+  exportChartPdf: (payload) => ipcRenderer.invoke('export-chart-pdf', payload)
 });

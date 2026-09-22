@@ -124,6 +124,82 @@ ipcMain.handle('capture-panel', async (event, rect, suggestedName) => {
 });
 
 // ── Save a renderer-produced asset (SVG text or a PNG data URL) ─────────────
+// ── Chart → PDF ─────────────────────────────────────────────────────────────
+// PNG and SVG are produced entirely in the renderer: serialise the <svg>, or
+// rasterise it through a canvas. Neither can write a PDF, because a browser
+// renderer has no PDF writer — PDF needs Chromium's print engine, which lives
+// in the main process. That is the whole reason chart export stopped at PNG
+// and SVG, and it is a plumbing gap rather than a decision.
+//
+// The SVG arrives already standalone (styles inlined, explicit width/height,
+// background rect) from svgToStandaloneString(), so this only has to put it on
+// a correctly-sized page and print it. It stays VECTOR through Chromium's
+// print path, which is the point — a PDF of a rasterised chart would be no
+// better than the PNG.
+//
+// Fonts are read straight out of the packaged rxnpv.html rather than shipped
+// through IPC: the app embeds its typefaces as base64 @font-face rules, and an
+// offscreen window would otherwise fall back to a system face and quietly
+// produce a PDF that does not match what is on screen.
+let _fontFaceCache = null;
+function embeddedFontFaces() {
+  if (_fontFaceCache !== null) return _fontFaceCache;
+  try {
+    const html = fs.readFileSync(path.join(__dirname, 'rxnpv.html'), 'utf8');
+    _fontFaceCache = (html.match(/@font-face\s*\{[^}]*\}/g) || []).join('\n');
+  } catch (e) { _fontFaceCache = ''; }
+  return _fontFaceCache;
+}
+
+ipcMain.handle('export-chart-pdf', async (event, payload) => {
+  if (!mainWindow) return { ok: false, error: "No window available" };
+  const { svg, suggestedName, widthPx, heightPx } = payload || {};
+  if (!svg || typeof svg !== 'string') return { ok: false, error: "Nothing to export." };
+
+  // Page sized to the chart's own aspect at 96 CSS px per inch, so there is no
+  // band of empty paper around it. Clamped so a malformed viewBox cannot ask
+  // for a 400-inch page.
+  const w = Math.min(40, Math.max(1, (Number(widthPx) || 800) / 96));
+  const h = Math.min(40, Math.max(1, (Number(heightPx) || 400) / 96));
+
+  const html = '<!doctype html><html><head><meta charset="utf-8">'
+    + '<style>' + embeddedFontFaces()
+    + '@page { margin: 0; } html, body { margin: 0; padding: 0; }'
+    + 'svg { display: block; width: 100%; height: auto; }</style>'
+    + '</head><body>' + svg + '</body></html>';
+
+  const tmpFile = path.join(app.getPath('temp'), 'rxnpv-chart-' + Date.now() + '.html');
+  let win = null;
+  try {
+    fs.writeFileSync(tmpFile, html, 'utf8');
+    // Deliberately inert: no preload, no node, sandboxed, scripts off. It
+    // renders one SVG this app just produced and nothing else.
+    win = new BrowserWindow({
+      show: false, width: 1200, height: 800,
+      webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false, javascript: false, webSecurity: true }
+    });
+    await win.loadFile(tmpFile);
+    const pdf = await win.webContents.printToPDF({
+      printBackground: true,
+      pageSize: { width: w, height: h },
+      margins: { top: 0, bottom: 0, left: 0, right: 0 }
+    });
+    const { canceled, filePath } = await dialog.showSaveDialog(mainWindow, {
+      title: 'Save chart as PDF',
+      defaultPath: suggestedName || 'RxNPV-chart.pdf',
+      filters: [{ name: 'PDF document', extensions: ['pdf'] }]
+    });
+    if (canceled || !filePath) return { ok: false, canceled: true };
+    fs.writeFileSync(filePath, pdf);
+    return { ok: true, filePath };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  } finally {
+    if (win) { try { win.destroy(); } catch (e) {} }
+    try { fs.unlinkSync(tmpFile); } catch (e) {}
+  }
+});
+
 ipcMain.handle('save-asset', async (event, payload) => {
   if (!mainWindow) return { ok: false, error: "No window available" };
   const { data, encoding, suggestedName, filterName, extensions } = payload || {};

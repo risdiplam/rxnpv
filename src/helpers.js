@@ -1230,6 +1230,8 @@ function ExportControls({ targetRef, name, showPanelCapture, compact, panelOnly 
     // panelOnly hides them rather than offering an action that always errors.
     !panelOnly && btn("PNG", "png", () => exportChartAsPng(targetRef.current, name, 3), "High-resolution PNG (3x) of the chart"),
     !panelOnly && btn("SVG", "svg", () => exportChartAsSvg(targetRef.current, name), "Vector SVG — scales to any size, editable in design tools"),
+    // Desktop only: a PDF needs Chromium's print engine in the main process.
+    !panelOnly && isDesktopExport() && btn("PDF", "pdf", () => exportChartAsPdf(targetRef.current, name), "Vector PDF of the chart, sized to its own aspect — for dropping into a document"),
     (showPanelCapture || panelOnly) && btn("Panel", "panel", () => exportPanelAsImage(targetRef.current, name), "Capture the whole panel including its text and tables (desktop app)"),
     msg && h("span", { style: { fontSize: 9, fontFamily: "var(--mono)", color: msg.tone === "ok" ? "var(--teal)" : "var(--red)" } }, msg.text)
   );

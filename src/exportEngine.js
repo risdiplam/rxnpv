@@ -203,6 +203,26 @@ async function exportChartAsSvg(container, name) {
   return await saveTextAsset(text, slugifyExportName(name) + ".svg", "SVG image", ["svg"]);
 }
 
+// Vector PDF of one chart. Desktop only, and the button is hidden otherwise
+// rather than failing on click — a browser renderer genuinely cannot write a
+// PDF, so there is nothing to fall back to.
+async function exportChartAsPdf(container, name) {
+  const svg = findExportableSvg(container);
+  if (!svg) return { ok: false, error: "No chart found to export here." };
+  if (!isDesktopExport() || !window.electronAPI.exportChartPdf) {
+    return { ok: false, error: "PDF export needs the desktop app — it uses Chromium's print engine, which a browser page has no access to." };
+  }
+  const text = svgToStandaloneString(svg);
+  // Dimensions come from the same viewBox the serialiser just wrote, so the
+  // page matches the chart's aspect exactly.
+  const vb = (svg.getAttribute("viewBox") || "").split(/[\s,]+/).map(Number);
+  const widthPx = (vb.length === 4 && vb[2]) ? vb[2] : (svg.clientWidth || 800);
+  const heightPx = (vb.length === 4 && vb[3]) ? vb[3] : (svg.clientHeight || 400);
+  return await window.electronAPI.exportChartPdf({
+    svg: text, suggestedName: slugifyExportName(name) + ".pdf", widthPx, heightPx
+  });
+}
+
 async function exportChartAsPng(container, name, scale) {
   const svg = findExportableSvg(container);
   if (!svg) return { ok: false, error: "No chart found to export here." };

@@ -25,7 +25,7 @@ function PortfolioView({ cases }) {
   const fmtYears = (v) => v == null ? "—" : v.toFixed(1) + "yr";
   const fmtPrice = (v) => v == null || v === 0 ? "—" : fmtShare(v);
 
-  return h("div", { style: { padding: "20px 24px", maxWidth: 1100, margin: "0 auto" } },
+  return h("div", { style: { padding: "20px 24px", maxWidth: "var(--app-max-width)", margin: "0 auto" } },
     h("div", { style: { fontFamily: "var(--display)", fontSize: 18, fontWeight: 700, color: "var(--ink-1)", marginBottom: 4 } }, "Portfolio"),
     h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-3)", marginBottom: 20 } },
       valid.length + " case" + (valid.length === 1 ? "" : "s") + (broken.length ? ", " + broken.length + " couldn't be computed (see below)" : "")),

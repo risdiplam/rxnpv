@@ -76,6 +76,26 @@
     --slate: #5B6676; --slate-bg: rgba(107,118,134,0.10);
   }
   :root { --display: 'Fraunces', Georgia, serif; --sans: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, sans-serif; --mono: 'IBM Plex Mono', 'JetBrains Mono', monospace; }
+  /* ── One content width for every view ──────────────────────────────────
+     Workspace, Reference Sheet, Tools, Simulation and Portfolio each had
+     their own hard-coded max-width (980, 980, 900, 900, 1100). Full screen
+     on a 1470-point display that left Tools and Simulation using 61% of the
+     window with ~285 points of dead space a side, and — worse — the five
+     views disagreed with each other, which is what made it read as broken
+     rather than merely narrow. One variable now, responsive so it fills a
+     laptop screen and still caps on a large external monitor.
+     Long-form prose is capped separately and much narrower (--prose-width);
+     a 1200-point line of 12px body text is not readable, so widening the
+     container must not widen the paragraphs inside it. */
+  :root { --app-max-width: min(1240px, calc(100vw - 72px)); --prose-width: 660px; }
+  /* 660 is not a new number — it is the Reference Sheet's own long-standing
+     PROSE constant, reused so the app has one reading measure rather than two.
+     `.note-body` and `.subtle` are the Simulation side's existing classes and
+     carry the bulk of the long-form copy; `.prose` is for the React views,
+     applied in the few helpers that actually emit body text. An inline
+     max-width still wins over these, which is why the Reference Sheet's own
+     capped paragraphs are untouched. */
+  .prose, .note-body, .subtle { max-width: var(--prose-width); }
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; background: var(--bg); }
   body { font-family: var(--sans); }
@@ -175,7 +195,7 @@
   .subtabbtn { background: var(--surface); color: var(--ink-2); border: 1px solid var(--rule); border-radius: 7px; padding: 6px 13px; font-size: 12px; cursor: pointer; transition: color 0.15s, background 0.15s; }
   .subtabbtn:hover { color: var(--ink-1); }
   .subtabbtn.active { color: var(--teal); background: var(--teal-bg); border-color: var(--teal); font-weight: 600; }
-  .content { padding: 20px; max-width: 900px; margin: 0 auto; animation: tsFadeIn 0.15s ease-in; }
+  .content { padding: 20px; max-width: var(--app-max-width); margin: 0 auto; animation: tsFadeIn 0.15s ease-in; }
   @keyframes tsFadeIn { from { opacity: 0; } to { opacity: 1; } }
   .panel { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 20px; }
   .panel h2 { margin-top: 0; font-size: 17px; }
