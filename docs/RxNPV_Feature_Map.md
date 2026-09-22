@@ -23,7 +23,7 @@ The intended flow: decode the design → watch it for changes → read the resul
 | **Results reader** | **BUILT** | Outcomes, participant flow and adverse events, inside the decoder. See below |
 | **Richer change classification** | **BUILT** | Eligibility, arms, masking, allocation, why-stopped; high / medium / routine |
 | **Thin-win detector** | **BUILT** | Place any number in the posted distribution — works before a readout and after it |
-| **Multi-trial program view** | **DECIDED — build** | Every NCT for one asset, in one place |
+| **Multi-trial program view** | **BUILT** | Every NCT for one asset, by phase, with stopped trials and their reasons (Phase 22) |
 
 ### Results reader — built (Phase 17)
 
@@ -61,7 +61,7 @@ Already the model for how a workbench should work. Mature.
 | Target Dossier (Open Targets) | **BUILT** | Genetic support, disease associations, drugs on target |
 | Class neighbours / other drugs on target | **BUILT** | Inside the dossier |
 | Literature shelf (Europe PMC) | **BUILT** | Typed by MEDLINE publication type, so primary evidence is separable from reviews of it (Phase 21) |
-| **Evidence-thinness indicator** | **DECIDED — build** | As a *checklist of what the evidence base is*, never a composite score. The literature shelf's composition counts are half of it already. |
+| Evidence-thinness indicator | **BUILT** | Lives on the Asset Program view as a checklist of counts with denominators — no composite score, by design (Phase 22) |
 | Mechanism one-pager (UniProt/Reactome/STRING) | **DECIDED — no** | Pretty, but doesn't change a retail investor's mind about anything |
 | Molecule / structure card (PubChem) | **DECIDED — no** | Chemistry was built and deliberately removed. Fails the product test: molecular weight changes no decision. Do not reopen without an explicit reversal. |
 
@@ -149,7 +149,7 @@ Each of these has been considered and declined on the merits. Recording them her
 1. **Tab consolidation.** Tools currently has 15 tabs in 3 groups. The workbench structure above implies regrouping into Trial / Science / Company / Commercial / Benchmarks. This changes an interface in daily use — confirm before doing it.
 2. **CMS data lag.** Verify how far behind Part D/Medicaid actually are before committing to launch-tracking features that depend on them.
 3. ~~**Literature / paper shelf (Europe PMC).**~~ **Resolved: built** (Phase 21). The user's condition was "not just the European one" — which turned out not to be a constraint, because Europe PMC indexes MEDLINE/PubMed in full rather than European content only. One source, not three.
-4. ~~**Evidence-thinness indicator** — useful, or glib?~~ **Resolved: build it**, as a checklist of what the evidence base actually is (how many randomised trials, how many blinded, total N, genetic support, anything published) with **no composite score**. A single "thinness number" would be exactly the false precision this project avoids.
+4. ~~**Evidence-thinness indicator** — useful, or glib?~~ **Resolved: built** (Phase 22), as a checklist on the Asset Program view with no composite score.
 
 ---
 
@@ -157,7 +157,7 @@ Each of these has been considered and declined on the merits. Recording them her
 
 1. ~~**Results reader** (outcomes, dropout, adverse events)~~ — **done**, Phase 17
 2. ~~**Gross-to-net** — accuracy fix on existing valuation~~ — **done**, Phase 18
-3. **Cheap completions batch** — ~~thin-win vs analogs~~, ~~change classification~~ (Phase 19), ~~Form 4 derivatives~~ (Phase 20); multi-trial view, control-arm stress ← next
+3. **Cheap completions batch** — ~~thin-win~~ and ~~change classification~~ (Phase 19), ~~Form 4 derivatives~~ (Phase 20), ~~literature shelf~~ (Phase 21), ~~multi-trial view + evidence checklist~~ (Phase 22); control-arm stress ← next
 4. **Commercial workbench** — launch trajectory, actual vs modelled
 5. **Tab consolidation** — after the tools exist, not before
 6. **Electron upgrade** — deferred by the user; needs ~10 minutes of their time (PDF export, panel capture, window resize)

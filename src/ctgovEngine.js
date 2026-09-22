@@ -42,6 +42,12 @@ function parseStudy(study) {
     status: status.overallStatus || "",
     conditions: cond.conditions || [],
     interventions: (arms.interventions || []).map(i => i.name).filter(Boolean),
+    // Full intervention records, because `otherNames` is where brand names
+    // live ("Keytruda" against an intervention registered as "pembrolizumab")
+    // and the asset-programme view has to match on both.
+    interventionsDetailed: (arms.interventions || []).map(i => ({
+      name: i.name || "", type: i.type || "", otherNames: i.otherNames || []
+    })),
     enrollment: design.enrollmentInfo ? design.enrollmentInfo.count : null,
     startDate: status.startDateStruct ? status.startDateStruct.date : null,
     primaryCompletionDate: status.primaryCompletionDateStruct ? status.primaryCompletionDateStruct.date : null,

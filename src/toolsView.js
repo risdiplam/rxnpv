@@ -28,6 +28,7 @@ function ToolsView({ cases, updateCase, activeCase, navRequest }) {
   // are siblings here, no need to route this through App.
   const [pendingNctId, setPendingNctId] = React.useState(null);
   const goToTrialWatch = (nctId) => { setPendingNctId(nctId); setTab("trialwatch"); };
+  const goToTrialDecoder = (nctId) => { setPendingNctId(nctId); setTab("decoder"); };
 
   // Cross-view navigation arriving from outside ToolsView (e.g. Partnership
   // Economics -> Licensing Comps). requestId changes on every request even
@@ -44,7 +45,7 @@ function ToolsView({ cases, updateCase, activeCase, navRequest }) {
   const tabGroups = [
     { label: "Benchmarks", tabs: [["ma","M&A Premium"],["peaksales","Peak Sales Comps"],["licensing","Licensing Comps"]] },
     { label: "Your case", tabs: [["fdmc","Diluted Market Cap"],["runway","Cash Runway"],["runwayCatalyst","Runway vs. Catalyst"],["binaryEvent","Binary Event"],["sensitivity","Sensitivity"]] },
-    { label: "Live research", tabs: [["lookup","Company Lookup"],["calendar","Catalyst Calendar"],["decoder","Trial Decoder"],["trialwatch","Trial Explorer"],["fdaLookup","FDA Lookup"],["exclusivity","Exclusivity / LOE"],["target","Target Dossier"],["literature","Literature"]] }
+    { label: "Live research", tabs: [["lookup","Company Lookup"],["calendar","Catalyst Calendar"],["decoder","Trial Decoder"],["trialwatch","Trial Explorer"],["fdaLookup","FDA Lookup"],["exclusivity","Exclusivity / LOE"],["asset","Asset Program"],["target","Target Dossier"],["literature","Literature"]] }
   ];
 
   return h("div", { style: { maxWidth: 900, margin: "0 auto", padding: "24px 28px 60px" } },
@@ -70,6 +71,7 @@ function ToolsView({ cases, updateCase, activeCase, navRequest }) {
     tab === "decoder" ? h(TrialDecoderTool, { initialNctId: pendingNctId, onConsumedInitialNctId: () => setPendingNctId(null) }) :
     tab === "target" ? h(TargetDossierTool, null) :
     tab === "literature" ? h(LiteratureTool, null) :
+    tab === "asset" ? h(AssetProgramTool, { onDecodeTrial: goToTrialDecoder, onWatchTrial: goToTrialWatch }) :
     tab === "trialwatch" ? h(TrialWatchTool, { initialNctId: pendingNctId, onConsumedInitialNctId: () => setPendingNctId(null) }) :
     tab === "fdaLookup" ? h(FdaLookupTool, null) :
     tab === "exclusivity" ? h(ExclusivityTool, { cases, updateCase }) :
@@ -2065,6 +2067,136 @@ function h0(n) { return String(n); }
 // actually reported. Deliberately rendered below the design cards, in that
 // order, because the whole point is to read the architecture first and the
 // outcome second. Engine in trialResults.js; this file only lays it out.
+// ── Asset programme view ───────────────────────────────────────────────────
+// Every registered trial for one drug at once. Engine in assetProgram.js; this
+// only lays it out. The evidence-base checklist sits at the top on purpose —
+// the shape of a programme is what a reader should meet before the list.
+function AssetProgramTool({ onDecodeTrial, onWatchTrial }) {
+  const h = React.createElement;
+  const [drug, setDrug] = React.useState("");
+  const [loading, setLoading] = React.useState(false);
+  const [summary, setSummary] = React.useState(null);
+  const [error, setError] = React.useState(null);
+  const [openPhase, setOpenPhase] = React.useState(null);
+  const seq = React.useRef(0);
+
+  const run = async () => {
+    if (!drug.trim()) return;
+    const mine = ++seq.current;
+    setLoading(true); setError(null); setSummary(null); setOpenPhase(null);
+    const r = await fetchAssetProgram(drug, { pageSize: 100 });
+    if (mine !== seq.current) return;      // superseded by a newer lookup
+    if (!r.ok) setError(r.error); else { setSummary(r.summary); setOpenPhase(r.summary.phases.length ? r.summary.phases[0].phase : null); }
+    setLoading(false);
+  };
+
+  const toneColor = (tone) => tone === "thin" ? "var(--amber)" : tone === "watch" ? "var(--red)"
+    : tone === "solid" ? "var(--teal)" : "var(--ink-2)";
+  const statusColor = (s) => /TERMINATED|WITHDRAWN|SUSPENDED/.test(s) ? "var(--red)"
+    : /COMPLETED/.test(s) ? "var(--teal)" : "var(--ink-2)";
+
+  return h("div", null,
+    toolCard(h, [
+      toolLabel(h, "One asset, every trial"),
+      h(Note, { summary: "Why look at a programme rather than a trial" },
+        h("div", { style: { lineHeight: 1.6 } },
+          "Nobody holds a thesis about a trial; they hold one about an asset, and an asset is usually eight to forty trials across different sponsors, phases, indications and fates. Three things are invisible when you read them one at a time: how much of the programme is randomised rather than single-arm, whether this is one focused indication or a platform being tried everywhere, and which trials were quietly stopped. ",
+          "The checklist at the top is deliberately a set of counts with their own denominators and not a score. A single “evidence strength” number would need invented weights, and you would anchor on it instead of on the four facts underneath it.")),
+      h("div", { style: { display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 } },
+        h("input", { type: "text", value: drug, placeholder: "drug or intervention name — e.g. sotatercept",
+          "aria-label": "Drug or intervention name",
+          onChange: e => setDrug(e.target.value), onKeyDown: e => { if (e.key === "Enter") run(); },
+          style: { flex: "1 1 260px", padding: "9px 12px", borderRadius: 7, border: "1.5px solid var(--rule)", background: "var(--surface)", color: "var(--ink-1)", fontFamily: "var(--mono)", fontSize: 13 } }),
+        h("button", { onClick: run, disabled: loading || !drug.trim(),
+          style: { padding: "9px 18px", borderRadius: 7, border: "1px solid var(--teal)", background: "var(--teal-bg)", color: "var(--teal)", fontFamily: "var(--mono)", fontSize: 12, fontWeight: 700, cursor: loading ? "default" : "pointer", opacity: drug.trim() ? 1 : 0.5 } },
+          loading ? "Reading the registry…" : "Build the programme"))
+    ]),
+
+    error && toolCard(h, h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--amber)", lineHeight: 1.6 } },
+      error + " This is a connection problem, not a finding that no trials exist.")),
+
+    summary && summary.trialCount === 0 && toolCard(h, h("div", { style: { fontSize: 11.5, fontFamily: "var(--sans)", color: "var(--ink-2)", lineHeight: 1.6 } },
+      "The registry returned " + summary.scanned + " record" + (summary.scanned === 1 ? "" : "s") + " for that text, and none of them actually lists “" + summary.drugName + "” as an intervention. ClinicalTrials.gov's intervention search is a loose text match, so a name that only appears in a description will bring back other people's trials. Try the generic name, the brand name, or the development code.")),
+
+    summary && summary.trialCount > 0 && h("div", null,
+      toolCard(h, [
+        toolLabel(h, "The evidence base for " + summary.drugName),
+        h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-2)", marginBottom: 10 } },
+          summary.trialCount + " registered trial" + (summary.trialCount === 1 ? "" : "s")
+            + " · " + summary.evidence.indicationCount + " indication" + (summary.evidence.indicationCount === 1 ? "" : "s")
+            + " · " + summary.evidence.sponsorCount + " sponsor" + (summary.evidence.sponsorCount === 1 ? "" : "s")
+            + (summary.droppedForName ? "  (" + summary.droppedForName + " search hit" + (summary.droppedForName === 1 ? "" : "s") + " dropped for not listing this intervention)" : "")),
+        h("div", { style: { display: "flex", flexDirection: "column", gap: 8 } },
+          describeEvidenceBase(summary).map((l, i) =>
+            h("div", { key: i, style: { borderLeft: "3px solid " + toneColor(l.tone), paddingLeft: 10, fontSize: 12, fontFamily: "var(--sans)", color: "var(--ink-1)", lineHeight: 1.6 } }, l.text))),
+        h("div", { style: { fontSize: 10, fontFamily: "var(--sans)", color: "var(--ink-3)", lineHeight: 1.6, marginTop: 10 } },
+          summary.caveat
+            + (summary.totalMatchedByRegistry > summary.pageSize
+              ? "  The registry reports " + summary.totalMatchedByRegistry.toLocaleString() + " text matches and this read the first " + summary.pageSize + " of them."
+              : ""))
+      ]),
+
+      summary.stopped.length > 0 && toolCard(h, [
+        toolLabel(h, "Trials that stopped (" + summary.stopped.length + ")"),
+        h("div", { style: { display: "flex", flexDirection: "column", gap: 8 } },
+          summary.stopped.map((s, i) => h("div", { key: i, style: { borderLeft: "3px solid var(--red)", paddingLeft: 10 } },
+            h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-1)" } },
+              s.nctId + " · " + s.phase + " · " + s.status + (s.enrollment ? " · n=" + s.enrollment.toLocaleString() : "")),
+            h("div", { style: { fontSize: 11.5, fontFamily: "var(--sans)", color: "var(--ink-2)", lineHeight: 1.5, marginTop: 2 } }, truncateText(s.title || "", 110)),
+            h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: s.whyStopped ? "var(--amber)" : "var(--ink-3)", marginTop: 3 } },
+              s.whyStopped ? "Reason given: " + s.whyStopped : "No reason registered.")))),
+        h("div", { style: { fontSize: 10, fontFamily: "var(--sans)", color: "var(--ink-3)", lineHeight: 1.6, marginTop: 10 } },
+          "A sponsor stops a trial for business reasons — reprioritisation, funding, a partner walking — about as often as for scientific ones, and the registered reason is frequently a single vague sentence or absent entirely. Read the reason, not the fact.")
+      ]),
+
+      toolCard(h, [
+        toolLabel(h, "By phase"),
+        h("div", { style: { display: "flex", flexDirection: "column", gap: 6 } },
+          summary.phases.map(p => h("div", { key: p.phase },
+            h("button", { onClick: () => setOpenPhase(openPhase === p.phase ? null : p.phase),
+              style: { width: "100%", textAlign: "left", background: "none", border: "none", borderBottom: "1px solid var(--rule)", padding: "7px 0", cursor: "pointer",
+                fontSize: 11.5, fontFamily: "var(--mono)", color: "var(--ink-1)" } },
+              (openPhase === p.phase ? "▾ " : "▸ ") + p.label + " — " + p.count + " trial" + (p.count === 1 ? "" : "s")
+                + (p.enrolled ? " · " + p.enrolled.toLocaleString() + " registered participants" : "")),
+            openPhase === p.phase && h("div", { style: { display: "flex", flexDirection: "column", gap: 4, padding: "6px 0 10px 12px" } },
+              p.trials.map(s => h("div", { key: s.nctId, style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-2)", padding: "5px 0", borderBottom: "1px solid var(--rule)" } },
+                h("div", { style: { display: "flex", gap: 8, flexWrap: "wrap", alignItems: "baseline" } },
+                  h("span", { style: { color: "var(--ink-1)" } }, s.nctId),
+                  h("span", { style: { color: statusColor(s.status) } }, s.status),
+                  s.enrollment != null && h("span", { style: { color: "var(--ink-3)" } }, "n=" + s.enrollment.toLocaleString()),
+                  s.hasResults && h("span", { style: { color: "var(--teal)", fontSize: 9.5, fontWeight: 700 } }, "RESULTS POSTED"),
+                  s.allocation === "RANDOMIZED" && h("span", { style: { color: "var(--ink-3)", fontSize: 9.5 } }, "randomised"),
+                  s.masking && s.masking !== "NONE" && h("span", { style: { color: "var(--ink-3)", fontSize: 9.5 } }, "blinded")),
+                h("div", { style: { fontSize: 11, fontFamily: "var(--sans)", color: "var(--ink-2)", lineHeight: 1.5, marginTop: 2 } }, truncateText(s.title || "", 110)),
+                h("div", { style: { fontSize: 10, color: "var(--ink-3)", marginTop: 2 } },
+                  [s.sponsor, (s.conditions || []).slice(0, 2).join(", "), s.startDate ? "started " + s.startDate : null].filter(Boolean).join(" · ")),
+                h("div", { style: { display: "flex", gap: 10, marginTop: 3, flexWrap: "wrap" } },
+                  onDecodeTrial && h("span", { onClick: () => onDecodeTrial(s.nctId), role: "button", tabIndex: 0,
+                    onKeyDown: e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onDecodeTrial(s.nctId); } },
+                    style: { fontSize: 9.5, fontFamily: "var(--mono)", color: "var(--teal)", cursor: "pointer", textDecoration: "underline" } }, "Decode this trial →"),
+                  onWatchTrial && h("span", { onClick: () => onWatchTrial(s.nctId), role: "button", tabIndex: 0,
+                    onKeyDown: e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onWatchTrial(s.nctId); } },
+                    style: { fontSize: 9.5, fontFamily: "var(--mono)", color: "var(--teal)", cursor: "pointer", textDecoration: "underline" } }, "Watch it →"),
+                  h(ExternalLink, { href: "https://clinicaltrials.gov/study/" + s.nctId, style: { fontSize: 9 } }, "→ Registry"))
+              )))
+          )))
+      ]),
+
+      summary.indications.length > 1 && toolCard(h, [
+        toolLabel(h, "Where it is being tried (" + summary.indications.length + " registered conditions)"),
+        h("div", { style: { display: "flex", flexWrap: "wrap", gap: 6 } },
+          summary.indications.slice(0, 30).map((ind, i) => h("span", { key: i,
+            style: { fontSize: 10.5, fontFamily: "var(--mono)", color: "var(--ink-2)", background: "var(--surface-2)", borderRadius: 5, padding: "3px 8px" } },
+            ind.condition + " · " + ind.trials))),
+        summary.indications.length > 30 && h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginTop: 6 } },
+          "…and " + (summary.indications.length - 30) + " more."),
+        h("div", { style: { fontSize: 10, fontFamily: "var(--sans)", color: "var(--ink-3)", lineHeight: 1.6, marginTop: 8 } },
+          "These are the sponsor's own registered condition strings, not a normalised vocabulary — the same disease often appears two or three ways, which inflates the count. Read the spread, not the number.")
+      ])
+    )
+  );
+}
+
 // ── Literature shelf ───────────────────────────────────────────────────────
 // Shared between the standalone search tab and the Trial Decoder's own
 // "papers about this trial" panel. Engine in literatureEngine.js.

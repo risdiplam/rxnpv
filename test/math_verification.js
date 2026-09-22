@@ -27,7 +27,7 @@ const FILES = [
   "data.js", "engine.js", "costEngine.js", "rdEngine.js", "posEngine.js",
   "dcfEngine.js", "capitalEngine.js", "scenarioEngine.js", "helpers.js",
   "ts_statsEngine.js", "ts_simulationEngine.js", "ts_peakSalesEngine.js", "ts_pkpdEngine.js",
-  "ts_chart.js", "edgarEngine.js", "ctgovEngine.js", "trialDecoder.js", "trialResults.js", "openTargetsEngine.js", "literatureEngine.js", "ts_ctgovEngine.js", "fdaEngine.js", "chart.js", "ts_fdaEngine.js"
+  "ts_chart.js", "edgarEngine.js", "ctgovEngine.js", "trialDecoder.js", "trialResults.js", "openTargetsEngine.js", "literatureEngine.js", "assetProgram.js", "ts_ctgovEngine.js", "fdaEngine.js", "chart.js", "ts_fdaEngine.js"
 ];
 global.React = { createElement: () => null, useState: () => [null, () => {}], useEffect: () => {}, Fragment: "F", Component: class {} };
 global.document = { createElement: () => ({ style: {} }), getElementById: () => null };
@@ -89,6 +89,7 @@ const EXPORTS = [
   "decodeTrial", "decodeTrialRedFlags", "classifyAllocation", "classifyMasking", "classifyComparator", "classifyPrimaryEndpoint",
   "parseTrialResults", "parseResultOutcomes", "summarizeParticipantFlow", "summarizeAdverseEvents",
   "classifyPublication", "parseEpmcResult", "summarizeLiterature", "epmcClean",
+  "summarizeAssetProgram", "describeEvidenceBase", "studyNamesIntervention", "assetPhaseRank", "ASSET_PROGRAM_FIELDS",
   "diffTrialSnapshots", "snapshotPredatesDesignFields",
   "resultsRedFlags", "trUnescape", "trNum", "trRate", "trMonthsBetweenDates",
   "applyPartnershipToRevenue", "getProgramRevenueResult", "computePartnershipContribution", "distributeRnDCostByYear",
@@ -3178,6 +3179,110 @@ section("Literature shelf — what kind of paper is this");
   near("one preprint", mix.byEvidence.unreviewed, 1, 0);
   near("four are readable without a subscription", mix.freeFullText, 4, 0);
   near("and the total is stated", mix.total, 6, 0);
+}
+report();
+
+section("Asset programme — the shape of an evidence base, never a score");
+{
+  const t = (over) => Object.assign({
+    nctId: "NCT00000001", title: "A study", phase: "PHASE2", status: "COMPLETED",
+    sponsor: "Acme Bio", conditions: ["Disease X"], enrollment: 100,
+    interventions: ["acmezumab"], interventionsDetailed: [{ name: "acmezumab", otherNames: [] }],
+    allocation: "RANDOMIZED", masking: "DOUBLE", armTypes: ["EXPERIMENTAL", "PLACEBO_COMPARATOR"],
+    hasResults: false, whyStopped: null, startDate: "2022-01"
+  }, over);
+
+  // ── The matching problem. CT.gov's query.intr is a loose text search:
+  // asking for pembrolizumab returns single-arm nivolumab studies. A view that
+  // silently kept those would overstate the programme.
+  ok("a study listing the drug matches", api.studyNamesIntervention(t({}), "acmezumab"));
+  ok("a study listing only another drug does not",
+    !api.studyNamesIntervention(t({ interventions: ["nivolumab"], interventionsDetailed: [{ name: "nivolumab", otherNames: [] }], title: "Nivolumab study" }), "acmezumab"));
+  ok("a brand name in otherNames matches the generic search",
+    api.studyNamesIntervention(t({ interventions: ["Acmeda"], interventionsDetailed: [{ name: "Acmeda", otherNames: ["acmezumab"] }] }), "acmezumab"));
+  ok("matching is case-insensitive", api.studyNamesIntervention(t({}), "ACMEZUMAB"));
+  ok("a drug named only in the title still matches, as the weakest case",
+    api.studyNamesIntervention(t({ interventions: ["placebo"], interventionsDetailed: [{ name: "placebo", otherNames: [] }], title: "Acmezumab versus placebo" }), "acmezumab"));
+
+  // Phase ordering, so "furthest reached" is a real maximum.
+  ok("Phase 3 outranks Phase 2", api.assetPhaseRank("PHASE3") > api.assetPhaseRank("PHASE2"));
+  ok("Phase 1/2 sits between them", api.assetPhaseRank("PHASE1/PHASE2") > api.assetPhaseRank("PHASE1")
+    && api.assetPhaseRank("PHASE1/PHASE2") < api.assetPhaseRank("PHASE2"));
+  ok("an unknown phase ranks lowest, it does not throw", api.assetPhaseRank("NONSENSE") === 0);
+
+  // ── A programme with a deliberately mixed shape ──
+  // 6 trials named right, 1 that isn't. 2 randomised of 5 with a stated
+  // allocation (one registers none at all). 1 blinded. 2 with a comparator.
+  // 1 with results. 1 terminated. Largest n = 740, total = 100+40+740+60+30+12.
+  const prog = api.summarizeAssetProgram([
+    t({ nctId: "NCT1", phase: "PHASE3", enrollment: 740, allocation: "RANDOMIZED", masking: "QUADRUPLE", hasResults: true }),
+    t({ nctId: "NCT2", phase: "PHASE2", enrollment: 100, allocation: "RANDOMIZED", masking: "NONE", armTypes: ["EXPERIMENTAL", "ACTIVE_COMPARATOR"] }),
+    t({ nctId: "NCT3", phase: "PHASE1", enrollment: 40, allocation: "NA", masking: "NONE", armTypes: ["EXPERIMENTAL"] }),
+    t({ nctId: "NCT4", phase: "PHASE2", enrollment: 60, allocation: "NON_RANDOMIZED", masking: "NONE", armTypes: ["EXPERIMENTAL"], conditions: ["Disease Y"] }),
+    t({ nctId: "NCT5", phase: "PHASE1", enrollment: 30, allocation: null, masking: null, armTypes: [], status: "TERMINATED", whyStopped: "Business decision", sponsor: "Other Bio" }),
+    t({ nctId: "NCT6", phase: "PHASE2", enrollment: 12, allocation: "NA", masking: "NONE", armTypes: ["EXPERIMENTAL"] }),
+    t({ nctId: "NCT7", interventions: ["somethingelse"], interventionsDetailed: [{ name: "somethingelse", otherNames: [] }], title: "Unrelated" })
+  ], "acmezumab");
+
+  near("the study that does not name the drug is dropped", prog.trialCount, 6, 0);
+  near("and the drop is counted, not hidden", prog.droppedForName, 1, 0);
+  near("two of the five with a stated allocation are randomised", prog.evidence.randomised, 2, 0);
+  near("and that denominator excludes the one registering none", prog.evidence.withStatedAllocation, 5, 0);
+  near("one trial is blinded", prog.evidence.blinded, 1, 0);
+  near("two register a comparator arm", prog.evidence.controlled, 2, 0);
+  near("one has posted results", prog.evidence.withPostedResults, 1, 0);
+  near("one was stopped", prog.evidence.stopped, 1, 0);
+  ok("and the registered reason travels with it", prog.stopped[0].whyStopped === "Business decision");
+  near("largest single trial is 740", prog.evidence.largestEnrolment, 740, 0);
+  // 740 + 100 + 60 + 40 + 30 + 12 = 982
+  near("total registered enrolment is 982", prog.evidence.totalEnrolment, 982, 0);
+  ok("furthest reached is Phase 3", prog.evidence.highestPhase === "PHASE3");
+  near("two distinct indications", prog.evidence.indicationCount, 2, 0);
+  near("two sponsors", prog.evidence.sponsorCount, 2, 0);
+  ok("phases are listed highest first", prog.phases[0].phase === "PHASE3");
+  // Disease X appears in five of the six, Disease Y in one.
+  ok("indications are ranked by trial count", prog.indications[0].condition === "Disease X" && prog.indications[0].trials === 5);
+
+  // Duplicates from a repeated or paged query must not inflate anything.
+  const dup = api.summarizeAssetProgram([t({ nctId: "NCT1" }), t({ nctId: "NCT1" }), t({ nctId: "NCT2" })], "acmezumab");
+  near("the same NCT twice counts once", dup.trialCount, 2, 0);
+
+  // ── The description, which must stay a checklist ──
+  const lines = api.describeEvidenceBase(prog);
+  ok("every line carries its own denominator or a plain fact", lines.length >= 5);
+  ok("no line reports a composite score", !lines.some(l => /score|rating|out of 10|\/100|strength:/i.test(l.text)));
+  ok("the randomised line states both numbers", lines.some(l => l.key === "randomised" && /2 of 5/.test(l.text)));
+
+  // A single-arm-only programme has to say so plainly — this is the case the
+  // whole checklist exists for.
+  const thin = api.summarizeAssetProgram([
+    t({ nctId: "NCT1", allocation: "NA", masking: "NONE", armTypes: ["EXPERIMENTAL"], enrollment: 40, phase: "PHASE2", hasResults: false }),
+    t({ nctId: "NCT2", allocation: "NA", masking: "NONE", armTypes: ["EXPERIMENTAL"], enrollment: 22, phase: "PHASE1", hasResults: false })
+  ], "acmezumab");
+  const thinLines = api.describeEvidenceBase(thin);
+  ok("a programme with no randomised trial says exactly that",
+    thinLines.some(l => l.key === "randomised" && /None of the/.test(l.text) && l.tone === "thin"));
+  ok("no comparator anywhere is stated plainly",
+    thinLines.some(l => l.key === "controlled" && /nothing in this programme to measure the drug against/.test(l.text)));
+  ok("nothing posted is stated plainly",
+    thinLines.some(l => l.key === "results" && /No trial has posted results/.test(l.text)));
+  ok("a 40-patient largest trial is flagged as too small to detect a modest effect",
+    thinLines.some(l => l.key === "size" && /modest effect/.test(l.text)));
+
+  // ── The field list is asserted, not assumed. CT.gov v2 drops `hasResults`
+  // from the response when `fields` is specified and it is not requested, and
+  // parseStudy coerces the missing value to false. The checklist then stated
+  // in a full sentence that no trial had posted results, for a drug with
+  // sixteen that had. Every field the view reads must be requested.
+  ["NCTId", "OverallStatus", "WhyStopped", "Phase", "Condition", "InterventionName",
+   "InterventionOtherName", "EnrollmentCount", "DesignInfo", "ArmGroup", "HasResults",
+   "LeadSponsorName", "StartDate"].forEach(f => {
+    ok("the asset-programme query asks for " + f, api.ASSET_PROGRAM_FIELDS.indexOf(f) !== -1);
+  });
+
+  // An empty programme must produce nothing rather than a confident nothing.
+  ok("an empty programme yields no description", api.describeEvidenceBase(api.summarizeAssetProgram([], "acmezumab")).length === 0);
+  ok("and does not throw", api.summarizeAssetProgram(null, "x").trialCount === 0);
 }
 report();
 
