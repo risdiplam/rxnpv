@@ -44,7 +44,7 @@ function ToolsView({ cases, updateCase, activeCase, navRequest }) {
   const tabGroups = [
     { label: "Benchmarks", tabs: [["ma","M&A Premium"],["peaksales","Peak Sales Comps"],["licensing","Licensing Comps"]] },
     { label: "Your case", tabs: [["fdmc","Diluted Market Cap"],["runway","Cash Runway"],["runwayCatalyst","Runway vs. Catalyst"],["binaryEvent","Binary Event"],["sensitivity","Sensitivity"]] },
-    { label: "Live research", tabs: [["lookup","Company Lookup"],["calendar","Catalyst Calendar"],["decoder","Trial Decoder"],["trialwatch","Trial Explorer"],["fdaLookup","FDA Lookup"],["exclusivity","Exclusivity / LOE"],["target","Target Dossier"]] }
+    { label: "Live research", tabs: [["lookup","Company Lookup"],["calendar","Catalyst Calendar"],["decoder","Trial Decoder"],["trialwatch","Trial Explorer"],["fdaLookup","FDA Lookup"],["exclusivity","Exclusivity / LOE"],["target","Target Dossier"],["literature","Literature"]] }
   ];
 
   return h("div", { style: { maxWidth: 900, margin: "0 auto", padding: "24px 28px 60px" } },
@@ -69,6 +69,7 @@ function ToolsView({ cases, updateCase, activeCase, navRequest }) {
     tab === "calendar" ? h(CatalystCalendarTool, { cases, updateCase, activeCase }) :
     tab === "decoder" ? h(TrialDecoderTool, { initialNctId: pendingNctId, onConsumedInitialNctId: () => setPendingNctId(null) }) :
     tab === "target" ? h(TargetDossierTool, null) :
+    tab === "literature" ? h(LiteratureTool, null) :
     tab === "trialwatch" ? h(TrialWatchTool, { initialNctId: pendingNctId, onConsumedInitialNctId: () => setPendingNctId(null) }) :
     tab === "fdaLookup" ? h(FdaLookupTool, null) :
     tab === "exclusivity" ? h(ExclusivityTool, { cases, updateCase }) :
@@ -2064,6 +2065,123 @@ function h0(n) { return String(n); }
 // actually reported. Deliberately rendered below the design cards, in that
 // order, because the whole point is to read the architecture first and the
 // outcome second. Engine in trialResults.js; this file only lays it out.
+// ── Literature shelf ───────────────────────────────────────────────────────
+// Shared between the standalone search tab and the Trial Decoder's own
+// "papers about this trial" panel. Engine in literatureEngine.js.
+//
+// The composition bar above the list is the point of the whole thing: twelve
+// papers that turn out to be eleven reviews of one trial is a different
+// evidence base from twelve trial reports, and a plain list of titles hides
+// that completely.
+const LIT_EVIDENCE_META = {
+  primary:      { one: "primary paper",      many: "primary papers",      color: "var(--teal)",  note: "new evidence — a trial reporting its own result" },
+  synthesis:    { one: "synthesis",          many: "syntheses",           color: "var(--ink-1)", note: "pools other people's trials" },
+  secondary:    { one: "review",             many: "reviews",             color: "var(--ink-2)", note: "discusses evidence it did not generate" },
+  unreviewed:   { one: "preprint",           many: "preprints",           color: "var(--amber)", note: "posted without peer review" },
+  abstract:     { one: "conference abstract", many: "conference abstracts", color: "var(--amber)", note: "a few hundred words, no methods section" },
+  anecdote:     { one: "case report",        many: "case reports",        color: "var(--ink-3)", note: "one patient, no control" },
+  opinion:      { one: "opinion piece",      many: "opinion pieces",      color: "var(--ink-3)", note: "editorial or correspondence" },
+  unclassified: { one: "paper of unstated type", many: "papers of unstated type", color: "var(--ink-3)", note: "indexed, but with no publication type saying what kind of study it is" }
+};
+
+function LiteratureList({ result, emptyText }) {
+  const h = React.createElement;
+  if (!result) return null;
+  const rows = result.rows || [];
+  const counts = result.counts || { byEvidence: {}, freeFullText: 0, total: 0 };
+  const order = ["primary", "synthesis", "secondary", "unreviewed", "abstract", "anecdote", "opinion", "unclassified"];
+  const present = order.filter(k => (counts.byEvidence[k] || 0) > 0);
+
+  if (!rows.length) {
+    return h("div", { style: { fontSize: 11.5, fontFamily: "var(--sans)", color: "var(--ink-3)", lineHeight: 1.6 } },
+      emptyText || "Nothing indexed matches that. A thin literature is itself informative for an early asset — but check the spelling of the target or drug name before reading it that way.");
+  }
+
+  return h("div", null,
+    h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-2)", lineHeight: 1.7, marginBottom: 8 } },
+      h("div", null, "Showing " + rows.length + " of " + result.totalMatched.toLocaleString() + " indexed"
+        + (counts.freeFullText ? " · " + counts.freeFullText + " readable without a subscription" : "")),
+      h("div", { style: { display: "flex", gap: 10, flexWrap: "wrap", marginTop: 3 } },
+        present.map(k => {
+          const n = counts.byEvidence[k], m = LIT_EVIDENCE_META[k];
+          return h("span", { key: k, title: m.note, style: { color: m.color, cursor: "help" } }, n + " " + (n === 1 ? m.one : m.many));
+        }))),
+
+    h("div", { style: { display: "flex", flexDirection: "column", gap: 2, maxHeight: 520, overflowY: "auto" } },
+      rows.map((r, i) => {
+        const meta = LIT_EVIDENCE_META[r.evidence] || LIT_EVIDENCE_META.unclassified;
+        return h("div", { key: r.id || i, style: { padding: "8px 0 8px 10px", borderLeft: "3px solid " + meta.color, borderBottom: "1px solid var(--rule)" } },
+          h("div", { style: { display: "flex", gap: 8, alignItems: "baseline", flexWrap: "wrap", marginBottom: 2 } },
+            h("span", { style: { fontSize: 9.5, fontFamily: "var(--mono)", color: meta.color, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em" } }, r.kindLabel),
+            r.freeFullText && h("span", { style: { fontSize: 9, fontFamily: "var(--mono)", color: "var(--teal)" } }, "free full text"),
+            r.citedBy != null && h("span", { style: { fontSize: 9, fontFamily: "var(--mono)", color: "var(--ink-3)" } }, r.citedBy.toLocaleString() + " citations")),
+          h("div", { style: { fontSize: 12, fontFamily: "var(--sans)", color: "var(--ink-1)", lineHeight: 1.5 } }, r.title),
+          h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginTop: 2 } },
+            [r.venue, r.year].filter(Boolean).join(" · ")
+              + (r.authors ? " · " + truncateText(r.authors, 60) : "")),
+          h(ExternalLink, { href: r.url, style: { fontSize: 9, marginTop: 3, display: "inline-block" } }, "→ Read it"));
+      })),
+
+    h("div", { style: { fontSize: 10, fontFamily: "var(--sans)", color: "var(--ink-3)", lineHeight: 1.6, marginTop: 10 } },
+      "Types come from MEDLINE's own publication tags, not from anything guessed here. Citation counts are an age-biased popularity measure — a 2018 paper has had seven years to accumulate them and a 2026 one has not — so they are useful for finding the paper everyone cites and useless as a quality score. Preprints have not been peer reviewed, whatever they report.")
+  );
+}
+
+function LiteratureTool({ initialQuery }) {
+  const h = React.createElement;
+  const [q, setQ] = React.useState(initialQuery || "");
+  // Most-cited by default, and deliberately so: relevance ranking on a
+  // drug+indication query returns this month's editorials, while the pivotal
+  // trial everyone is arguing about sits on page three. Verified on
+  // sotatercept — most-cited puts STELLAR (Phase 3) and PULSAR (Phase 2) at
+  // the top; best-match puts four 2026 letters and editorials there.
+  const [sort, setSort] = React.useState("cited");
+  const [excludePreprints, setExcludePreprints] = React.useState(false);
+  const [loading, setLoading] = React.useState(false);
+  const [result, setResult] = React.useState(null);
+  const [error, setError] = React.useState(null);
+  const seq = React.useRef(0);
+
+  const run = async () => {
+    if (!q.trim()) return;
+    const mine = ++seq.current;
+    setLoading(true); setError(null); setResult(null);
+    const r = await searchLiterature(q, { sort, excludePreprints, pageSize: 25 });
+    if (mine !== seq.current) return;      // superseded by a newer search
+    if (!r.ok) setError(r.error); else setResult(r);
+    setLoading(false);
+  };
+
+  return h("div", null,
+    toolCard(h, [
+      toolLabel(h, "Search the literature"),
+      h(Note, { summary: "What this is, and what the name gets wrong" },
+        h("div", { style: { lineHeight: 1.6 } },
+          "This searches Europe PMC, and the name misleads: it is not a European database. Its main index is MEDLINE — the same records PubMed searches, in full — plus open-access full text, plus preprints from bioRxiv, medRxiv and Research Square. So this is a superset of PubMed rather than a regional slice of it, which is why there is one literature source here and not three; a second general index would return the same MEDLINE records again under a different name. ",
+          "What it adds over a plain web search is the one thing a search engine cannot tell you: what kind of paper each result is. A primary randomised trial report, a meta-analysis, a narrative review and an unreviewed preprint arrive already separated, because the difference between “three trials support this” and “three reviews of the same trial support this” is most of what you are trying to establish.")),
+      h("div", { style: { display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10, alignItems: "center" } },
+        h("input", { type: "text", value: q, placeholder: "drug, target, indication, or an NCT number",
+          "aria-label": "Literature search",
+          onChange: e => setQ(e.target.value), onKeyDown: e => { if (e.key === "Enter") run(); },
+          style: { flex: "1 1 280px", padding: "9px 12px", borderRadius: 7, border: "1.5px solid var(--rule)", background: "var(--surface)", color: "var(--ink-1)", fontFamily: "var(--mono)", fontSize: 13 } }),
+        h("select", { value: sort, onChange: e => setSort(e.target.value), "aria-label": "Sort order",
+          style: { padding: "9px 10px", borderRadius: 7, border: "1.5px solid var(--rule)", background: "var(--surface)", color: "var(--ink-1)", fontFamily: "var(--mono)", fontSize: 12 } },
+          h("option", { value: "cited" }, "Most cited"),
+          h("option", { value: "recent" }, "Most recent"),
+          h("option", { value: "relevance" }, "Best match")),
+        h("button", { onClick: run, disabled: loading || !q.trim(),
+          style: { padding: "9px 18px", borderRadius: 7, border: "1px solid var(--teal)", background: "var(--teal-bg)", color: "var(--teal)", fontFamily: "var(--mono)", fontSize: 12, fontWeight: 700, cursor: loading ? "default" : "pointer", opacity: q.trim() ? 1 : 0.5 } },
+          loading ? "Searching…" : "Search")),
+      h("label", { style: { display: "flex", alignItems: "center", gap: 8, fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-2)", cursor: "pointer", marginTop: 8 } },
+        h("input", { type: "checkbox", checked: excludePreprints, onChange: e => setExcludePreprints(e.target.checked) }),
+        "Peer-reviewed only (exclude preprints)")
+    ]),
+    error && toolCard(h, h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--amber)", lineHeight: 1.6 } },
+      error + " This is a connection problem, not a finding that no papers exist.")),
+    result && toolCard(h, [toolLabel(h, "Results for “" + result.query + "”"), h(LiteratureList, { result })])
+  );
+}
+
 function TrialResultsPanels({ results, study }) {
   const h = React.createElement;
   const [openSecondary, setOpenSecondary] = React.useState(false);
@@ -2307,12 +2425,29 @@ function TrialDecoderTool({ initialNctId, onConsumedInitialNctId }) {
   const [error, setError] = React.useState(null);
   const [showRaw, setShowRaw] = React.useState(false);
   const seq = React.useRef(0);
+  // Papers are a separate, explicit call: a trial lookup should not silently
+  // become two API round trips, and plenty of the time the registered design
+  // is all a reader wanted.
+  const [papers, setPapers] = React.useState(null);
+  const [papersLoading, setPapersLoading] = React.useState(false);
+  const [papersError, setPapersError] = React.useState(null);
+  const papersSeq = React.useRef(0);
+
+  const loadPapers = async (nctId) => {
+    const mine = ++papersSeq.current;
+    setPapersLoading(true); setPapersError(null); setPapers(null);
+    const r = await publicationsForTrial(nctId);
+    if (mine !== papersSeq.current) return;
+    if (!r.ok) setPapersError(r.error); else setPapers(r);
+    setPapersLoading(false);
+  };
 
   const run = async (nctId) => {
     const id = (nctId || nctInput).trim();
     if (!id) return;
     const mine = ++seq.current;
     setLoading(true); setError(null); setDecoded(null); setRaw(null); setResults(null);
+    setPapers(null); setPapersError(null); papersSeq.current++;
     const r = await fetchStudyByNctId(id);
     if (mine !== seq.current) return;      // superseded by a newer lookup
     if (!r.ok) { setError(r.error); setLoading(false); return; }
@@ -2424,6 +2559,24 @@ function TrialDecoderTool({ initialNctId, onConsumedInitialNctId }) {
       !results && !decoded.hasResults && toolCard(h, [
         h("div", { style: { fontSize: 11.5, fontFamily: "var(--sans)", color: "var(--ink-2)", lineHeight: 1.6 } },
           "No results are posted for this trial yet. When they are, this page gains what the endpoints returned, who finished and who left by arm, and the adverse events as reported — read against the design above rather than after it.")
+      ]),
+
+      toolCard(h, [
+        toolLabel(h, "What has been published about this trial"),
+        !papers && !papersLoading && !papersError && h("div", null,
+          h("div", { style: { fontSize: 11.5, fontFamily: "var(--sans)", color: "var(--ink-2)", lineHeight: 1.6, marginBottom: 10 } },
+            "A registry record is what the sponsor filed. A publication is what survived review, and it carries the things the registry never does — the actual numbers in context, the limitations section, and whether anyone independent has since disagreed. This searches Europe PMC for papers naming this NCT number, most-cited first, because a trial's own primary report is almost always the one everything else cites."),
+          h("button", { onClick: () => loadPapers(decoded.nctId),
+            style: { padding: "7px 16px", borderRadius: 7, border: "1px solid var(--rule)", background: "transparent", color: "var(--ink-2)", fontFamily: "var(--mono)", fontSize: 11, cursor: "pointer" } },
+            "Find the papers")),
+        papersLoading && h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-3)" } }, "Searching Europe PMC…"),
+        papersError && h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--amber)", lineHeight: 1.6 } },
+          papersError + " This is a connection problem, not a finding that nothing has been published."),
+        papers && h("div", null,
+          h(LiteratureList, { result: papers,
+            emptyText: "No indexed paper names this NCT number. For a trial that has not read out, that is expected. For one that reported years ago, it is worth noticing — either the result was never published, or it was published without citing its own registration." }),
+          papers.rows.length > 0 && h("div", { style: { fontSize: 10, fontFamily: "var(--sans)", color: "var(--ink-3)", lineHeight: 1.6, marginTop: 6 } },
+            "These are papers that MENTION this NCT number, which is mostly other people's reviews. The trial's own report is usually the most-cited one here, but that is a heuristic and not a guarantee — check that the top result's title actually describes this trial before treating it as the primary publication."))
       ]),
 
       raw && toolCard(h, [

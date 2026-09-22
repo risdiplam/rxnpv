@@ -27,7 +27,7 @@ const FILES = [
   "data.js", "engine.js", "costEngine.js", "rdEngine.js", "posEngine.js",
   "dcfEngine.js", "capitalEngine.js", "scenarioEngine.js", "helpers.js",
   "ts_statsEngine.js", "ts_simulationEngine.js", "ts_peakSalesEngine.js", "ts_pkpdEngine.js",
-  "ts_chart.js", "edgarEngine.js", "ctgovEngine.js", "trialDecoder.js", "trialResults.js", "openTargetsEngine.js", "ts_ctgovEngine.js", "fdaEngine.js", "chart.js", "ts_fdaEngine.js"
+  "ts_chart.js", "edgarEngine.js", "ctgovEngine.js", "trialDecoder.js", "trialResults.js", "openTargetsEngine.js", "literatureEngine.js", "ts_ctgovEngine.js", "fdaEngine.js", "chart.js", "ts_fdaEngine.js"
 ];
 global.React = { createElement: () => null, useState: () => [null, () => {}], useEffect: () => {}, Fragment: "F", Component: class {} };
 global.document = { createElement: () => ({ style: {} }), getElementById: () => null };
@@ -88,6 +88,7 @@ const EXPORTS = [
   "extractAnalogEffects", "tsClassifyEffectParam", "summarizeDossier", "positionInAnalogs",
   "decodeTrial", "decodeTrialRedFlags", "classifyAllocation", "classifyMasking", "classifyComparator", "classifyPrimaryEndpoint",
   "parseTrialResults", "parseResultOutcomes", "summarizeParticipantFlow", "summarizeAdverseEvents",
+  "classifyPublication", "parseEpmcResult", "summarizeLiterature", "epmcClean",
   "diffTrialSnapshots", "snapshotPredatesDesignFields",
   "resultsRedFlags", "trUnescape", "trNum", "trRate", "trMonthsBetweenDates",
   "applyPartnershipToRevenue", "getProgramRevenueResult", "computePartnershipContribution", "distributeRnDCostByYear",
@@ -3112,6 +3113,71 @@ section("Form 4 — a grant is not a purchase");
   // Derivative codes need labels, or the grants tab prints raw letters.
   ok("the derivative codes have labels",
     ["A", "M", "F", "D", "C", "X"].every(c => typeof api.FORM4_CODE_LABELS[c] === "string" && api.FORM4_CODE_LABELS[c].length > 2));
+}
+report();
+
+section("Literature shelf — what kind of paper is this");
+{
+  // Real pubTypeList from the KEYNOTE-189 record: four types at once. The
+  // randomised-trial tag has to win over the plain "Journal Article", or the
+  // primary report of the trial reads as an ordinary article.
+  const k189 = ["Clinical Trial, Phase III", "Research Support, Non-U.S. Gov't", "Multicenter Study", "Randomized Controlled Trial", "Journal Article"];
+  const c = api.classifyPublication(k189, "MED");
+  ok("a randomised trial report is recognised as primary evidence", c.kind === "rct" && c.evidence === "primary");
+  ok("a meta-analysis is synthesis, not primary", api.classifyPublication(["Meta-Analysis", "Journal Article"], "MED").evidence === "synthesis");
+  ok("a systematic review is synthesis", api.classifyPublication(["Systematic Review"], "MED").kind === "systematic");
+  ok("a narrative review is secondary", api.classifyPublication(["Review", "Journal Article"], "MED").evidence === "secondary");
+  ok("a case report is an anecdote, and said so", api.classifyPublication(["Case Reports"], "MED").evidence === "anecdote");
+  ok("an editorial is opinion", api.classifyPublication(["Editorial"], "MED").evidence === "opinion");
+  ok("a bare journal article is not upgraded to anything", api.classifyPublication(["Journal Article"], "MED").kind === "article");
+  ok("an unreviewed manuscript is a preprint whatever else it claims",
+    api.classifyPublication(["Randomized Controlled Trial"], "PPR").kind === "preprint");
+  ok("and its evidence status says unreviewed", api.classifyPublication([], "PPR").evidence === "unreviewed");
+  const abs = api.classifyPublication(["Abstract"], "MED");
+  ok("a conference abstract is its own tier, not a paper", abs.kind === "abstract" && abs.evidence === "abstract");
+  // A non-randomised trial still counts as primary, one tier below an RCT.
+  const nonRand = api.classifyPublication(["Clinical Trial, Phase II", "Journal Article"], "MED");
+  ok("a single-arm trial report is primary but not an RCT", nonRand.kind === "trial" && nonRand.evidence === "primary");
+
+  // MEDLINE escapes its own markup, so a decode has to happen before a strip
+  // or "&lt;i&gt;KRAS&lt;/i&gt;" survives as literal angle brackets.
+  ok("escaped markup is decoded then stripped", api.epmcClean("Efficacy in &lt;i&gt;KRAS&lt;/i&gt; tumours") === "Efficacy in KRAS tumours");
+  ok("structured-abstract headings are removed", api.epmcClean("<h4>Background</h4>First-line therapy") === "Background First-line therapy");
+  ok("an ampersand survives as an ampersand", api.epmcClean("Smith &amp; Jones") === "Smith & Jones");
+  ok("null text is an empty string, not the word null", api.epmcClean(null) === "");
+
+  // Full record parsing, shaped exactly as the live API returns it.
+  const row = api.parseEpmcResult({
+    id: "29658856", source: "MED", pmid: "29658856", doi: "10.1056/nejmoa1801005",
+    title: "Pembrolizumab plus Chemotherapy in Metastatic Non-Small-Cell Lung Cancer",
+    authorString: "Gandhi L, Rodriguez-Abreu D, et al.",
+    journalInfo: { journal: { title: "The New England journal of medicine" } },
+    pubYear: 2018, citedByCount: 5399, isOpenAccess: "N", inEPMC: "N", inPMC: "N",
+    pubTypeList: { pubType: k189 }, abstractText: "<h4>Background</h4>First-line therapy."
+  });
+  ok("a DOI becomes the link when there is one", row.url === "https://doi.org/10.1056/nejmoa1801005");
+  ok("the citation count is carried through", row.citedBy === 5399);
+  ok("a closed-access NEJM paper is not marked as free to read", row.freeFullText === false);
+  ok("it is typed as a randomised trial report", row.kind === "rct");
+  // A preprint has no journal, and its server lives in a different field.
+  const pre = api.parseEpmcResult({ id: "PPR1258317", source: "PPR", title: "A finding",
+    bookOrReportDetails: { publisher: "bioRxiv" }, pubYear: 2026, pubTypeList: { pubType: [] } });
+  ok("a preprint's server is read as its venue", pre.venue === "bioRxiv");
+  ok("and a preprint is always free to read", pre.freeFullText === true);
+  ok("with no DOI or PMID it still gets a working link", pre.url.indexOf("europepmc.org/article/PPR/PPR1258317") !== -1);
+
+  // The composition of the shelf, which is the part worth reading first:
+  // eleven reviews of one trial is not the same evidence base as eleven trials.
+  const mix = api.summarizeLiterature([
+    { evidence: "primary", freeFullText: false }, { evidence: "primary", freeFullText: true },
+    { evidence: "secondary", freeFullText: true }, { evidence: "secondary", freeFullText: true },
+    { evidence: "secondary", freeFullText: false }, { evidence: "unreviewed", freeFullText: true }
+  ]);
+  near("two primary papers out of six", mix.byEvidence.primary, 2, 0);
+  near("three reviews", mix.byEvidence.secondary, 3, 0);
+  near("one preprint", mix.byEvidence.unreviewed, 1, 0);
+  near("four are readable without a subscription", mix.freeFullText, 4, 0);
+  near("and the total is stated", mix.total, 6, 0);
 }
 report();
 

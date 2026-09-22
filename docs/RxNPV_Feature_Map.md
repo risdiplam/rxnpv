@@ -60,7 +60,8 @@ Already the model for how a workbench should work. Mature.
 |---|---|---|
 | Target Dossier (Open Targets) | **BUILT** | Genetic support, disease associations, drugs on target |
 | Class neighbours / other drugs on target | **BUILT** | Inside the dossier |
-| **Evidence-thinness indicator** | **OPEN** | "This thesis rests on one open-label Phase 2 in 40 patients" vs "three RCTs plus genetic support." Derivable from data already fetched. Risk: glib if done badly. |
+| Literature shelf (Europe PMC) | **BUILT** | Typed by MEDLINE publication type, so primary evidence is separable from reviews of it (Phase 21) |
+| **Evidence-thinness indicator** | **DECIDED — build** | As a *checklist of what the evidence base is*, never a composite score. The literature shelf's composition counts are half of it already. |
 | Mechanism one-pager (UniProt/Reactome/STRING) | **DECIDED — no** | Pretty, but doesn't change a retail investor's mind about anything |
 | Molecule / structure card (PubChem) | **DECIDED — no** | Chemistry was built and deliberately removed. Fails the product test: molecular weight changes no decision. Do not reopen without an explicit reversal. |
 
@@ -147,8 +148,8 @@ Each of these has been considered and declined on the merits. Recording them her
 
 1. **Tab consolidation.** Tools currently has 15 tabs in 3 groups. The workbench structure above implies regrouping into Trial / Science / Company / Commercial / Benchmarks. This changes an interface in daily use — confirm before doing it.
 2. **CMS data lag.** Verify how far behind Part D/Medicaid actually are before committing to launch-tracking features that depend on them.
-3. **Literature / paper shelf (Europe PMC).** Previously declined as duplicating Google Scholar. The user has since said new APIs are welcome where genuinely useful. Worth a decision either way so it stops recurring.
-4. **Evidence-thinness indicator** — useful, or glib?
+3. ~~**Literature / paper shelf (Europe PMC).**~~ **Resolved: built** (Phase 21). The user's condition was "not just the European one" — which turned out not to be a constraint, because Europe PMC indexes MEDLINE/PubMed in full rather than European content only. One source, not three.
+4. ~~**Evidence-thinness indicator** — useful, or glib?~~ **Resolved: build it**, as a checklist of what the evidence base actually is (how many randomised trials, how many blinded, total N, genetic support, anything published) with **no composite score**. A single "thinness number" would be exactly the false precision this project avoids.
 
 ---
 
