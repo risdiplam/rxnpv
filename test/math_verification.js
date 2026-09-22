@@ -27,7 +27,7 @@ const FILES = [
   "data.js", "engine.js", "costEngine.js", "rdEngine.js", "posEngine.js",
   "dcfEngine.js", "capitalEngine.js", "scenarioEngine.js", "helpers.js",
   "ts_statsEngine.js", "ts_simulationEngine.js", "ts_peakSalesEngine.js", "ts_pkpdEngine.js",
-  "ts_chart.js", "edgarEngine.js", "ctgovEngine.js", "trialDecoder.js", "trialResults.js", "openTargetsEngine.js", "literatureEngine.js", "assetProgram.js", "ts_ctgovEngine.js", "fdaEngine.js", "chart.js", "ts_fdaEngine.js"
+  "ts_chart.js", "edgarEngine.js", "ctgovEngine.js", "trialDecoder.js", "trialResults.js", "openTargetsEngine.js", "literatureEngine.js", "assetProgram.js", "cmsEngine.js", "commercialEngine.js", "ts_ctgovEngine.js", "fdaEngine.js", "chart.js", "ts_fdaEngine.js"
 ];
 global.React = { createElement: () => null, useState: () => [null, () => {}], useEffect: () => {}, Fragment: "F", Component: class {} };
 global.document = { createElement: () => ({ style: {} }), getElementById: () => null };
@@ -91,6 +91,9 @@ const EXPORTS = [
   "parseTrialResults", "parseResultOutcomes", "summarizeParticipantFlow", "summarizeAdverseEvents",
   "classifyPublication", "parseEpmcResult", "summarizeLiterature", "epmcClean",
   "summarizeAssetProgram", "describeEvidenceBase", "studyNamesIntervention", "assetPhaseRank", "ASSET_PROGRAM_FIELDS",
+  "parseCmsPeriodLabel", "parseCmsAnnualRow", "parseCmsQuarterlyRow", "pickOverallRows",
+  "mergeDrugSpendSeries", "addComparablePeriodGrowth", "impliedAnnualRunRate", "cmsSeriesFreshness", "indexToLaunch", "cmsNum", "CMS_DATASETS", "cmsNormalizeName", "cmsDisplayName",
+  "normalizeActualEntry", "impliedAnnualFromActual", "modelYearForCalendar", "compareActualToModel", "actualVsModelSeries",
   "diffTrialSnapshots", "snapshotPredatesDesignFields",
   "resultsRedFlags", "trUnescape", "trNum", "trRate", "trMonthsBetweenDates",
   "applyPartnershipToRevenue", "getProgramRevenueResult", "computePartnershipContribution", "distributeRnDCostByYear",
@@ -3364,6 +3367,213 @@ section("Assumption stress — what a power calculation does when its inputs are
   // The fix, and the reason the inflation formula matters: randomise 207 and
   // 165 survive, restoring the planned power.
   near("randomising 207 restores 165 analysable", api.effectiveNAfterDropout(api.inflateForDropout(165, 0.20), 0.20), 165, 0);
+}
+report();
+
+section("CMS drug spending — a quarter is not a year");
+{
+  // The quarterly dataset writes its period as free text, mixing a rolling
+  // full year with a partial one in the same column. These are the two real
+  // shapes, verified live against the Winrevair record.
+  const fy = api.parseCmsPeriodLabel("2025 (Q1-Q4)");
+  ok("a Q1-Q4 label is a full year", fy.isFullYear === true && fy.quarterCount === 4 && fy.year === 2025);
+  const q1 = api.parseCmsPeriodLabel("2026 (Q1)");
+  ok("a single-quarter label is not", q1.isFullYear === false && q1.quarterCount === 1 && q1.year === 2026);
+  ok("2026 Q1 sorts after all of 2025", q1.sortKey > fy.sortKey);
+  const h1 = api.parseCmsPeriodLabel("2026 (Q1-Q2)");
+  ok("a half-year covers two quarters", h1.quarterCount === 2 && h1.isFullYear === false);
+  ok("an unparseable label yields nothing", api.parseCmsPeriodLabel("no year here") === null);
+
+  // Both CMS datasets repeat each drug once per manufacturer AND once as
+  // "Overall" with the same totals. Summing the rows double-counts every
+  // single-manufacturer drug exactly twice.
+  const rows = [
+    { Brnd_Name: "Winrevair", Mftr_Name: "Overall", Tot_Spndng: "499382409.13" },
+    { Brnd_Name: "Winrevair", Mftr_Name: "Merck Sharp & D", Tot_Spndng: "499382409.13" },
+    { Brnd_Name: "Something Else", Mftr_Name: "Overall", Tot_Spndng: "1" }
+  ];
+  const picked = api.pickOverallRows(rows, "Winrevair");
+  ok("only the Overall row survives", picked.length === 1 && picked[0].Mftr_Name === "Overall");
+  ok("and a different brand is not swept in", picked[0].Brnd_Name === "Winrevair");
+  // CMS appends a footnote asterisk to some names and does it INCONSISTENTLY
+  // BETWEEN ITS OWN DATASETS: selexipag is "Uptravi" in the quarterly file and
+  // "Uptravi*" in the annual one. Exact matching returned the recent quarters
+  // and silently dropped the whole annual history, leaving a mature drug's
+  // plateau sitting where its ramp should have been on the analog chart.
+  ok("a trailing asterisk is not part of the name", api.cmsNormalizeName("Uptravi*") === "uptravi");
+  ok("neither are several of them", api.cmsNormalizeName("Uptravi**  ") === "uptravi");
+  ok("case and padding are ignored", api.cmsNormalizeName("  OPSUMIT ") === "opsumit");
+  ok("the footnote marker is stripped for display without lowercasing", api.cmsDisplayName("Uptravi*") === "Uptravi");
+  ok("an asterisked row matches the plain search term",
+    api.pickOverallRows([{ Brnd_Name: "Uptravi*", Mftr_Name: "Overall", Tot_Spndng: "1" }], "Uptravi").length === 1);
+  ok("and an asterisked manufacturer is still recognised as Overall",
+    api.pickOverallRows([
+      { Brnd_Name: "Uptravi*", Mftr_Name: "Overall*", Tot_Spndng: "1" },
+      { Brnd_Name: "Uptravi*", Mftr_Name: "Actelion Pharma*", Tot_Spndng: "1" }
+    ], "Uptravi").length === 1);
+
+  // If a drug somehow has no Overall row, fall back rather than returning none.
+  ok("a record with no Overall row still returns something",
+    api.pickOverallRows([{ Brnd_Name: "X", Mftr_Name: "Acme", Tot_Spndng: "5" }], "X").length === 1);
+
+  // The annual dataset is WIDE: Tot_Spndng_2020, Tot_Spndng_2021 ... on one row,
+  // with pre-launch years blank rather than zero.
+  const annual = api.parseCmsAnnualRow({
+    Brnd_Name: "Winrevair", Gnrc_Name: "Sotatercept-Csrk", Mftr_Name: "Overall",
+    Tot_Spndng_2022: "", Tot_Benes_2022: "",
+    Tot_Spndng_2023: "", Tot_Benes_2023: "",
+    Tot_Spndng_2024: "177600000", Tot_Benes_2024: "1923", Tot_Clms_2024: "10663", Outlier_Flag_2024: "0"
+  });
+  ok("a year before launch is absent, not zero", annual.periods.length === 1 && annual.periods[0].year === 2024);
+  near("and the year that exists carries its spend", annual.periods[0].spending, 177600000, 0);
+  ok("every annual period is a full year", annual.periods.every(p => p.isFullYear));
+
+  // ── The merge, and the mistake it exists to prevent ──
+  // Real Winrevair shape: 2024 annual $177.6M, 2025 rolling year $499.4M,
+  // 2026 Q1 $179.2M. Comparing that Q1 to the 2025 full year shows a 64% fall
+  // in a drug that is in fact tripling.
+  const merged = api.mergeDrugSpendSeries(
+    [ { label: "2024", year: 2024, quarters: [1,2,3,4], quarterCount: 4, isFullYear: true, sortKey: 20244, source: "annual", spending: 177600000 } ],
+    [ { label: "2025 (Q1-Q4)", year: 2025, quarters: [1,2,3,4], quarterCount: 4, isFullYear: true, sortKey: 20254, source: "quarterly", spending: 499382409 },
+      { label: "2026 (Q1)", year: 2026, quarters: [1], quarterCount: 1, isFullYear: false, sortKey: 20261, source: "quarterly", spending: 179167695 } ]);
+  ok("the merged series is in chronological order",
+    merged.map(p => p.label).join("|") === "2024|2025 (Q1-Q4)|2026 (Q1)");
+
+  const grown = api.addComparablePeriodGrowth(merged);
+  // 499382409 / 177600000 - 1 = 1.8119...
+  near("2025 against 2024 is a like-for-like +181%", grown[1].growthVsComparable, 499382409 / 177600000 - 1, 1e-9);
+  ok("and it says which period it compared against", grown[1].comparableTo === "2024");
+  // The Q1 row has no earlier single-quarter period to compare to, so it must
+  // report nothing rather than compare itself to a full year.
+  ok("a lone quarter has no comparable prior period", grown[2].growthVsComparable === null && grown[2].comparableTo === null);
+
+  // A finalised annual row must win over a rolling quarterly one for the same
+  // year -- the rolling figure can still move.
+  const dedup = api.mergeDrugSpendSeries(
+    [ { label: "2025", year: 2025, quarters: [1,2,3,4], quarterCount: 4, isFullYear: true, sortKey: 20254, source: "annual", spending: 500 } ],
+    [ { label: "2025 (Q1-Q4)", year: 2025, quarters: [1,2,3,4], quarterCount: 4, isFullYear: true, sortKey: 20254, source: "quarterly", spending: 499 } ]);
+  ok("one row per full year, and it is the finalised one", dedup.length === 1 && dedup[0].spending === 500);
+
+  // The run rate is offered but labelled: 179,167,695 x 4 = 716,670,780.
+  near("a single quarter annualises by four", api.impliedAnnualRunRate(grown[2]), 179167695 * 4, 1e-6);
+  ok("a full year is not annualised again", api.impliedAnnualRunRate(grown[1]) === null);
+
+  // Staleness: the pinned dataset id is checked by looking at the data, not by
+  // trusting that CMS still publishes at that address.
+  const fresh = api.cmsSeriesFreshness(merged, new Date("2026-09-21"));
+  // 2026 Q1 ends in March; September is six months later.
+  near("2026 Q1 read in September is six months behind", fresh.monthsBehind, 6, 0);
+  ok("which is not stale", fresh.stale === false);
+  const old = api.cmsSeriesFreshness([{ label: "2023", year: 2023, quarters: [1,2,3,4] }], new Date("2026-09-21"));
+  ok("a series ending in 2023 read in 2026 is stale", old.stale === true);
+  ok("an empty series has no freshness to report", api.cmsSeriesFreshness([], new Date()) === null);
+
+  // ── Re-indexing for an analog comparison, and the trap in it ──
+  // A drug whose first figure is the dataset's own first year was almost
+  // certainly selling before that. Aligning it as if year one were its launch
+  // puts a mature drug's plateau exactly where a new drug's ramp belongs,
+  // which makes the comparison read backwards rather than merely imprecise.
+  const mature = api.indexToLaunch(
+    [{ label: "2020", year: 2020, quarters: [1,2,3,4], spending: 768.7e6 },
+     { label: "2021", year: 2021, quarters: [1,2,3,4], spending: 863.2e6 }], 2020);
+  ok("an analog already selling when the data starts is flagged", mature[0].launchPredatesData === true);
+  ok("a drug that first appears after the data starts is not",
+    api.indexToLaunch([{ label: "2024", year: 2024, quarters: [1,2,3,4], spending: 177.6e6 }], 2020)[0].launchPredatesData === false);
+  ok("with no dataset start year known, nothing is claimed either way",
+    api.indexToLaunch([{ label: "2020", year: 2020, quarters: [1,2,3,4], spending: 1 }])[0].launchPredatesData === false);
+  // The wide annual row also reports where the dataset itself begins, taken
+  // from every year column present rather than only the populated ones.
+  const wide = api.parseCmsAnnualRow({ Brnd_Name: "X", Mftr_Name: "Overall",
+    Tot_Spndng_2020: "", Tot_Spndng_2021: "", Tot_Spndng_2022: "500" });
+  near("the dataset start year comes from the blank columns too", wide.dataStartYear, 2020, 0);
+  ok("while the drug's own first period is the first populated one", wide.periods[0].year === 2022);
+
+  const indexed = api.indexToLaunch(merged);
+  near("the launch year is period zero", indexed[0].periodsSinceFirst, 0, 0);
+  near("and 2026 is two years on", indexed[2].periodsSinceFirst, 2, 0);
+  ok("the first period is flagged, since it is rarely a full commercial year", indexed[0].isFirstPeriod === true);
+
+  near("a dollar string with separators parses", api.cmsNum("$1,234.56"), 1234.56, 1e-9);
+  ok("a suppressed (blank) count is null, never zero", api.cmsNum("") === null);
+}
+report();
+
+section("Actual versus modelled revenue — a partial year is not a full one");
+{
+  // A model whose Year 0 is 2025: $100M, $300M, $600M, $900M.
+  const cal = [100e6, 300e6, 600e6, 900e6].map((v, i) => ({ calendarYear: i, totalRevenue: v }));
+
+  ok("an entry defaults to a full year when quarters are unstated",
+    api.normalizeActualEntry({ year: 2025, revenueUsd: 90e6 }).quarters === 4);
+  ok("a dollar string with separators parses",
+    api.normalizeActualEntry({ year: 2025, quarters: 4, revenueUsd: "$90,000,000" }).revenueUsd === 90e6);
+  ok("more than four quarters is clamped", api.normalizeActualEntry({ year: 2025, quarters: 9, revenueUsd: 1 }).quarters === 4);
+  ok("a junk year is rejected outright", api.normalizeActualEntry({ year: "soon", revenueUsd: 1 }) === null);
+  ok("negative revenue is rejected", api.normalizeActualEntry({ year: 2025, revenueUsd: -5 }) === null);
+
+  // Three quarters at $60M implies $80M for the year: 60 x 4/3.
+  near("three quarters annualise by four thirds",
+    api.impliedAnnualFromActual(api.normalizeActualEntry({ year: 2026, quarters: 3, revenueUsd: 60e6 })), 80e6, 1e-6);
+  ok("a full year is not annualised again",
+    api.impliedAnnualFromActual(api.normalizeActualEntry({ year: 2026, quarters: 4, revenueUsd: 60e6 })) === null);
+
+  // ── The mistake this file exists to prevent ──
+  // 2026 is modelled at $300M. Three quarters of it came in at $240M.
+  // Comparing $240M to $300M reads as a 20% MISS. The run rate is
+  // 240 x 4/3 = $320M, which is a 6.7% BEAT. Same facts, opposite conclusions.
+  const cmp = api.compareActualToModel(cal, [
+    { year: 2025, quarters: 4, revenueUsd: 90e6 },
+    { year: 2026, quarters: 3, revenueUsd: 240e6 }
+  ], 2025);
+  const y2025 = cmp.rows[0], y2026 = cmp.rows[1];
+  near("a completed year compares directly: 90 against 100 is -10%", y2025.deltaVsModel, -0.10, 1e-12);
+  ok("and it says so", y2025.comparisonBasis === "reported full year");
+  near("a three-quarter year compares on its run rate, not its face value",
+    y2026.deltaVsModel, (320e6 / 300e6) - 1, 1e-12);
+  ok("which is a beat, where the naive comparison would have shown a miss", y2026.deltaVsModel > 0);
+  ok("and the basis is spelled out", /implied run rate from 3 of 4 quarters/.test(y2026.comparisonBasis));
+  near("the implied annual figure is carried through", y2026.impliedAnnualUsd, 320e6, 1e-6);
+
+  // The headline uses the most recent COMPLETED year only, because that is the
+  // only comparison where both sides are reported numbers.
+  ok("the headline is the last completed year", cmp.latestCompleted && cmp.latestCompleted.year === 2025);
+  ok("and there is no verdict attached", !("verdict" in cmp) && !("onTrack" in cmp));
+
+  // A year outside the model is a distinct answer from a miss — it almost
+  // always means Year 0 is set wrong, and calling it a 100% shortfall would
+  // send the reader after the wrong problem.
+  const outside = api.compareActualToModel(cal, [{ year: 2019, quarters: 4, revenueUsd: 50e6 }], 2025);
+  ok("a year before the model starts is flagged as outside it", outside.rows[0].outsideModel === true);
+  ok("and gets no delta", outside.rows[0].deltaVsModel === null);
+  const beyond = api.compareActualToModel(cal, [{ year: 2099, quarters: 4, revenueUsd: 50e6 }], 2025);
+  ok("so is a year past the end of the projection", beyond.rows[0].outsideModel === true);
+
+  // A modelled zero in a year the drug was selling means the model has the
+  // launch in the wrong place, which is a different finding from a shortfall.
+  const preLaunch = api.compareActualToModel(
+    [{ calendarYear: 0, totalRevenue: 0 }, { calendarYear: 1, totalRevenue: 500e6 }],
+    [{ year: 2025, quarters: 4, revenueUsd: 40e6 }], 2025);
+  ok("revenue in a year the model has pre-launch is flagged", preLaunch.rows[0].modelPreLaunch === true);
+  ok("and produces no percentage, since the denominator is zero", preLaunch.rows[0].deltaVsModel === null);
+
+  // ── Chart series ──
+  const ser = api.actualVsModelSeries(cal, [
+    { year: 2025, quarters: 4, revenueUsd: 90e6 },
+    { year: 2027, quarters: 4, revenueUsd: 700e6 }
+  ], 2025, { yearsAhead: 1 });
+  ok("the axis runs from Year 0", ser.years[0] === 2025);
+  // A year with nothing reported must be a gap, not a zero -- plotting zero
+  // would draw a collapse to nothing and back that never happened.
+  ok("an unreported year is a gap in the actual line, not a zero",
+    ser.actual[1].v === null && ser.actual[0].v === 90e6 && ser.actual[2].v === 700e6);
+  ok("the modelled line has a value every year", ser.modelled.every(p => typeof p.v === "number"));
+  near("and the modelled 2027 is the third calendar entry", ser.modelled[2].v, 600e6, 0);
+  ok("the modelled line runs past the last reported year", ser.years[ser.years.length - 1] > 2027);
+
+  ok("no model calendar yields empty series rather than throwing",
+    api.actualVsModelSeries([], [{ year: 2025, quarters: 4, revenueUsd: 1 }], 2025).modelled.length === 0);
+  ok("a missing Year 0 anchor yields empty series", api.actualVsModelSeries(cal, [], "").modelled.length === 0);
+  near("the calendar mapping is a plain offset", api.modelYearForCalendar(2028, 2025), 3, 0);
 }
 report();
 

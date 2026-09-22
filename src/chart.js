@@ -15,7 +15,10 @@ function revenueChartYScale(allVals) {
   return { minV, maxV, range };
 }
 
-function RevenueChart({ series, height, showLegend }) {
+// xPrefix defaults to "Year " because every original caller plots the model's
+// own relative calendar. The commercial tools plot real period labels
+// ("2026 (Q1)"), where "Year 2026 (Q1)" would read as a mistake.
+function RevenueChart({ series, height, showLegend, xPrefix, xAxisPrefix }) {
   const h = React.createElement;
   height = height || 220;
   const W = 900, H = height, padL = 56, padR = 16, padT = 16, padB = 28;
@@ -84,7 +87,7 @@ function RevenueChart({ series, height, showLegend }) {
       // X-axis year labels (every ~3rd year)
       series[0].points.map((p, i) => (i % Math.ceil(nPoints / 8) === 0) && h("text", {
         key: i, x: x(i), y: H - 6, textAnchor: "middle", fontSize: 9, fontFamily: "var(--mono)", fill: "var(--ink-3)"
-      }, "Y" + p.label)),
+      }, (xAxisPrefix != null ? xAxisPrefix : "Y") + p.label)),
       // Hover guideline + point markers
       hoverIdx != null && h("g", null,
         h("line", { x1: x(hoverIdx), x2: x(hoverIdx), y1: padT, y2: padT + plotH, stroke: "var(--ink-3)", strokeWidth: 1, strokeDasharray: "2,2" }),
@@ -101,7 +104,7 @@ function RevenueChart({ series, height, showLegend }) {
         fontFamily: "var(--mono)", fontSize: 10, color: "var(--ink-2)", pointerEvents: "none", whiteSpace: "nowrap", boxShadow: "0 2px 8px rgba(0,0,0,0.15)"
       }
     },
-      h("div", { style: { color: "var(--ink-1)", fontWeight: 700, marginBottom: 2 } }, "Year " + series[0].points[hoverIdx].label),
+      h("div", { style: { color: "var(--ink-1)", fontWeight: 700, marginBottom: 2 } }, (xPrefix != null ? xPrefix : "Year ") + series[0].points[hoverIdx].label),
       series.map((s, si) => h("div", { key: si, style: { color: s.color } }, s.name + ": " + fmtM(s.points[hoverIdx].v)))
     ),
     showLegend && h("div", { style: { display: "flex", gap: 14, marginTop: 8, flexWrap: "wrap" } },

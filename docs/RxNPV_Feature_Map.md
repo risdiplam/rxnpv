@@ -95,9 +95,9 @@ The app assumes pre-revenue. A user modelling an early-commercial name (launched
 
 | Tool | Status | Notes |
 |---|---|---|
-| **Launch trajectory vs analogs** | **DECIDED — build** | The central early-commercial question: is this launch tracking? The app already has launch-curve benchmarks, but only as *forward assumptions* — you cannot check a real ramp against them. |
-| **Actual vs modelled revenue** | **DECIDED — build** | Enter reported quarterly revenue, see it against your own model. Nothing tracks this today. |
-| **Public dispensing/spend data** | **OPEN — data check needed** | CMS Medicare Part D and Part B spending dashboards and Medicaid State Drug Utilization Data are free and public, and are the only no-cost proxy for real-world uptake. **Caveat to verify before promising anything: the lag is material (Part D is roughly 1–2 years behind).** That may make it useful for analog launches and useless for the drug you are actually watching. Verify before building. |
+| **Launch trajectory vs analogs** | **BUILT** | CMS Medicare spending, quarterly, with analogs indexed to first Medicare year (Phase 24) |
+| **Actual vs modelled revenue** | **BUILT** | Case-linked, persisted, and refuses to compare a partial year to a full one (Phase 24) |
+| Public dispensing/spend data | **BUILT** | **The lag assumption was wrong, and checking it changed the decision.** The *annual* CMS datasets do lag 1–2 years, but CMS also publishes **quarterly** Part D and Part B spending — current to 2026 Q1 as of July 2026, about one quarter behind. That is a live uptake read, not just an analog source. Medicaid SDUD not used: Part D/B covers the same question with better recency. |
 | Channel/inventory stocking distortion | **DECIDED — no** | Real phenomenon, but not reliably observable from public data — would be guesswork dressed as analysis |
 | Payer coverage / formulary access | **OPEN** | Genuinely drives uptake; no reliable free source found yet |
 | HTA / ICER / payer value modelling | **DECIDED — no** | Out of scope, institutional |
@@ -158,6 +158,6 @@ Each of these has been considered and declined on the merits. Recording them her
 1. ~~**Results reader** (outcomes, dropout, adverse events)~~ — **done**, Phase 17
 2. ~~**Gross-to-net** — accuracy fix on existing valuation~~ — **done**, Phase 18
 3. ~~**Cheap completions batch**~~ — **all done**: thin-win and change classification (Phase 19), Form 4 derivatives (Phase 20), literature shelf (Phase 21), multi-trial view + evidence checklist (Phase 22), control-arm/dropout stress (Phase 23)
-4. **Commercial workbench** — launch trajectory, actual vs modelled ← next
-5. **Tab consolidation** — after the tools exist, not before. **Confirmed by the user, September 2026**: regroup into Trial / Science / Company / Commercial / Benchmarks.
+4. ~~**Commercial workbench** — launch trajectory, actual vs modelled~~ — **done**, Phase 24
+5. **Tab consolidation** — after the tools exist, not before. **Confirmed by the user, September 2026**: regroup into Trial / Science / Company / Commercial / Benchmarks. ← next
 6. **Electron upgrade** — deferred by the user; needs ~10 minutes of their time (PDF export, panel capture, window resize)

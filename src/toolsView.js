@@ -44,7 +44,7 @@ function ToolsView({ cases, updateCase, activeCase, navRequest }) {
   // against case data already entered; "Live research" hits external APIs.
   const tabGroups = [
     { label: "Benchmarks", tabs: [["ma","M&A Premium"],["peaksales","Peak Sales Comps"],["licensing","Licensing Comps"]] },
-    { label: "Your case", tabs: [["fdmc","Diluted Market Cap"],["runway","Cash Runway"],["runwayCatalyst","Runway vs. Catalyst"],["binaryEvent","Binary Event"],["sensitivity","Sensitivity"]] },
+    { label: "Your case", tabs: [["fdmc","Diluted Market Cap"],["runway","Cash Runway"],["runwayCatalyst","Runway vs. Catalyst"],["binaryEvent","Binary Event"],["sensitivity","Sensitivity"],["commercial","Commercial"]] },
     { label: "Live research", tabs: [["lookup","Company Lookup"],["calendar","Catalyst Calendar"],["decoder","Trial Decoder"],["trialwatch","Trial Explorer"],["fdaLookup","FDA Lookup"],["exclusivity","Exclusivity / LOE"],["asset","Asset Program"],["target","Target Dossier"],["literature","Literature"]] }
   ];
 
@@ -72,6 +72,7 @@ function ToolsView({ cases, updateCase, activeCase, navRequest }) {
     tab === "target" ? h(TargetDossierTool, null) :
     tab === "literature" ? h(LiteratureTool, null) :
     tab === "asset" ? h(AssetProgramTool, { onDecodeTrial: goToTrialDecoder, onWatchTrial: goToTrialWatch }) :
+    tab === "commercial" ? h(CommercialTool, { cases, updateCase, activeCase }) :
     tab === "trialwatch" ? h(TrialWatchTool, { initialNctId: pendingNctId, onConsumedInitialNctId: () => setPendingNctId(null) }) :
     tab === "fdaLookup" ? h(FdaLookupTool, null) :
     tab === "exclusivity" ? h(ExclusivityTool, { cases, updateCase }) :
@@ -2067,6 +2068,265 @@ function h0(n) { return String(n); }
 // actually reported. Deliberately rendered below the design cards, in that
 // order, because the whole point is to read the architecture first and the
 // outcome second. Engine in trialResults.js; this file only lays it out.
+// ── Commercial workbench ───────────────────────────────────────────────────
+// The half of the app that assumes a drug is already selling. Two tools that
+// answer the two questions an early-commercial holder actually has: is the
+// launch tracking against comparable launches, and is it tracking against my
+// own model. Engines in cmsEngine.js and commercialEngine.js.
+const COMMERCIAL_SERIES_COLORS = ["var(--teal)", "var(--amber)", "var(--ink-1)", "var(--red)"];
+
+function CommercialTool({ cases, updateCase, activeCase }) {
+  const h = React.createElement;
+  const [sub, setSub] = React.useState("launch");
+  const subTab = (key, label) => h("button", { key: key, onClick: () => setSub(key),
+    style: { padding: "7px 16px", borderRadius: 8, fontSize: 12, fontFamily: "var(--mono)", cursor: "pointer",
+      border: "1px solid " + (sub === key ? "var(--teal)" : "var(--rule)"),
+      background: sub === key ? "var(--teal-bg)" : "var(--surface)",
+      color: sub === key ? "var(--teal)" : "var(--ink-2)", fontWeight: sub === key ? 700 : 400 } }, label);
+
+  return h("div", null,
+    h("div", { style: { display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" } },
+      subTab("launch", "Launch tracker"),
+      subTab("actual", "Actual vs modelled")),
+    sub === "launch" ? h(LaunchTrackerTool, null) : h(ActualVsModelTool, { cases, updateCase, activeCase })
+  );
+}
+
+// ── Launch tracker: Medicare spending as an uptake proxy ───────────────────
+function LaunchTrackerTool() {
+  const h = React.createElement;
+  const [brand, setBrand] = React.useState("");
+  const [programme, setProgramme] = React.useState("Part D");
+  const [analogInput, setAnalogInput] = React.useState("");
+  const [rows, setRows] = React.useState([]);        // [{result}] — the drug first, then analogs
+  const [loading, setLoading] = React.useState(false);
+  const [error, setError] = React.useState(null);
+  const seq = React.useRef(0);
+
+  const run = async () => {
+    if (!brand.trim()) return;
+    const mine = ++seq.current;
+    setLoading(true); setError(null); setRows([]);
+    const names = [brand.trim()].concat(
+      analogInput.split(",").map(s => s.trim()).filter(Boolean).slice(0, 3));
+    const results = await Promise.all(names.map(n => fetchDrugSpending(n, { programme })));
+    if (mine !== seq.current) return;      // superseded by a newer lookup
+    const failed = results.find(r => !r.ok);
+    if (failed) { setError(failed.error); setLoading(false); return; }
+    setRows(results);
+    setLoading(false);
+  };
+
+  const primary = rows[0];
+  const money = (v) => v == null ? "—" : fmtMoney(v);
+
+  return h("div", null,
+    toolCard(h, [
+      toolLabel(h, "Is the launch tracking?"),
+      h(Note, { summary: "What Medicare spending is, and the three ways it is not revenue" },
+        h("div", { style: { lineHeight: 1.6 } },
+          "CMS publishes what Medicare paid for every drug, by brand, and — the part that makes this usable rather than historical — it publishes it quarterly, about one quarter behind. That is the only free, current, drug-level read on real-world uptake there is. ",
+          h("b", null, "It is not revenue, and the gap is large in three directions: "),
+          "it is Medicare only, so nothing commercial, Medicaid, cash or ex-US appears; it is gross of manufacturer rebates, the same 25–50% gap the revenue model's price-basis control exists for; and counts below eleven are suppressed, so a small launch reads blank rather than zero. Read the shape and the direction, never the level.")),
+      h("div", { style: { display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 } },
+        h("input", { type: "text", value: brand, placeholder: "brand name — e.g. Winrevair",
+          "aria-label": "Brand name", onChange: e => setBrand(e.target.value), onKeyDown: e => { if (e.key === "Enter") run(); },
+          style: { flex: "1 1 200px", padding: "9px 12px", borderRadius: 7, border: "1.5px solid var(--rule)", background: "var(--surface)", color: "var(--ink-1)", fontFamily: "var(--mono)", fontSize: 13 } }),
+        h("select", { value: programme, onChange: e => setProgramme(e.target.value), "aria-label": "Medicare programme",
+          style: { padding: "9px 10px", borderRadius: 7, border: "1.5px solid var(--rule)", background: "var(--surface)", color: "var(--ink-1)", fontFamily: "var(--mono)", fontSize: 12 } },
+          h("option", { value: "Part D" }, "Part D — pharmacy dispensed"),
+          h("option", { value: "Part B" }, "Part B — clinic administered")),
+        h("button", { onClick: run, disabled: loading || !brand.trim(),
+          style: { padding: "9px 18px", borderRadius: 7, border: "1px solid var(--teal)", background: "var(--teal-bg)", color: "var(--teal)", fontFamily: "var(--mono)", fontSize: 12, fontWeight: 700, cursor: loading ? "default" : "pointer", opacity: brand.trim() ? 1 : 0.5 } },
+          loading ? "Reading CMS…" : "Track it")),
+      h("input", { type: "text", value: analogInput, placeholder: "optional: up to 3 analog brands to compare, comma separated",
+        "aria-label": "Analog brand names", onChange: e => setAnalogInput(e.target.value), onKeyDown: e => { if (e.key === "Enter") run(); },
+        style: { width: "100%", boxSizing: "border-box", marginTop: 8, padding: "8px 12px", borderRadius: 7, border: "1.5px solid var(--rule)", background: "var(--surface)", color: "var(--ink-1)", fontFamily: "var(--mono)", fontSize: 12 } }),
+      h("div", { style: { fontSize: 10, fontFamily: "var(--sans)", color: "var(--ink-3)", lineHeight: 1.6, marginTop: 6 } },
+        "Part B covers what a clinician administers — infusions, injections given in a clinic. Part D covers what a pharmacy dispenses. A drug appears in one or the other, occasionally both, and picking the wrong one returns nothing rather than a zero.")
+    ]),
+
+    error && toolCard(h, h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--amber)", lineHeight: 1.6 } },
+      error + " This is a connection problem, not a finding that the drug has no Medicare spending.")),
+
+    primary && !primary.found && toolCard(h, h("div", { style: { fontSize: 11.5, fontFamily: "var(--sans)", color: "var(--ink-2)", lineHeight: 1.6 } }, primary.error)),
+
+    primary && primary.found && h("div", null,
+      toolCard(h, [
+        toolLabel(h, primary.brand + (primary.generic ? " (" + primary.generic + ")" : "") + " — Medicare " + primary.programme),
+        primary.freshness && primary.freshness.stale && h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--amber)", lineHeight: 1.6, marginBottom: 8 } },
+          "The newest period in this dataset is " + primary.freshness.latestPeriod + ", which is " + primary.freshness.monthsBehind
+            + " months old. CMS mints a new dataset address for each release, so this is most likely the app pointing at a version that has stopped being updated rather than CMS having gone quiet."),
+        h("div", { style: { overflowX: "auto" } },
+          h("table", { style: { borderCollapse: "collapse", fontFamily: "var(--mono)", minWidth: 560 } },
+            h("thead", null, h("tr", null, ["Period", "Medicare spend", "Beneficiaries", "Claims", "Spend/beneficiary", "vs like period"].map(t =>
+              h("th", { key: t, style: { padding: "6px 10px", background: "var(--surface-2)", borderBottom: "1px solid var(--rule)", fontSize: 10, color: "var(--ink-3)", fontWeight: 500, textAlign: t === "Period" ? "left" : "right", whiteSpace: "nowrap" } }, t)))),
+            h("tbody", null, primary.series.map((p, i) => h("tr", { key: i },
+              h("td", { style: { padding: "6px 10px", borderBottom: "1px solid var(--rule)", fontSize: 11, color: "var(--ink-1)", whiteSpace: "nowrap" } },
+                p.label, !p.isFullYear && h("span", { style: { color: "var(--amber)", fontSize: 9.5, marginLeft: 6 } }, "partial")),
+              h("td", { style: { padding: "6px 10px", borderBottom: "1px solid var(--rule)", fontSize: 11, textAlign: "right", color: "var(--ink-1)" } }, money(p.spending)),
+              h("td", { style: { padding: "6px 10px", borderBottom: "1px solid var(--rule)", fontSize: 11, textAlign: "right", color: "var(--ink-2)" } }, p.beneficiaries != null ? p.beneficiaries.toLocaleString() : "suppressed"),
+              h("td", { style: { padding: "6px 10px", borderBottom: "1px solid var(--rule)", fontSize: 11, textAlign: "right", color: "var(--ink-2)" } }, p.claims != null ? p.claims.toLocaleString() : "—"),
+              h("td", { style: { padding: "6px 10px", borderBottom: "1px solid var(--rule)", fontSize: 11, textAlign: "right", color: "var(--ink-2)" } }, money(p.avgSpendPerBene)),
+              h("td", { style: { padding: "6px 10px", borderBottom: "1px solid var(--rule)", fontSize: 11, textAlign: "right", color: p.growthVsComparable == null ? "var(--ink-3)" : p.growthVsComparable >= 0 ? "var(--teal)" : "var(--red)" } },
+                p.growthVsComparable == null ? "—" : (p.growthVsComparable >= 0 ? "+" : "") + (p.growthVsComparable * 100).toFixed(0) + "% vs " + p.comparableTo)
+            ))))),
+        primary.impliedAnnual != null && h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-2)", marginTop: 8 } },
+          "Implied annual run rate from " + primary.latest.label + ": " + money(primary.impliedAnnual)),
+        h("div", { style: { fontSize: 10, fontFamily: "var(--sans)", color: "var(--ink-3)", lineHeight: 1.6, marginTop: 8 } },
+          "The last column only ever compares periods covering the same number of quarters — a single quarter against a full year would show a collapse in a drug that is tripling. A run rate assumes the remaining quarters look exactly like the reported ones, which for a ramping launch understates it. " + primary.caveat)
+      ]),
+
+      toolCard(h, [
+        toolLabel(h, rows.length > 1 ? "Against its analogs, indexed to first Medicare year" : "Trajectory"),
+        (() => {
+          const indexed = rows.filter(r => r.found && r.series.length).map((r, i) => ({
+            result: r, i, points: indexToLaunch(r.series, r.dataStartYear)
+          })).filter(x => x.points.length);
+          const predating = indexed.filter(x => x.points[0].launchPredatesData);
+          return h("div", null,
+            h(ExportableBlock, { name: primary.brand.toLowerCase().replace(/\s+/g, "-") + "-medicare-spend", showPanelCapture: true, compact: true },
+              h(RevenueChart, {
+                xPrefix: "", xAxisPrefix: "",
+                series: indexed.map(x => ({
+                  name: x.result.brand + (x.i === 0 ? "" : " (analog)") + (x.points[0].launchPredatesData ? " — already selling before the data starts" : ""),
+                  color: COMMERCIAL_SERIES_COLORS[x.i % COMMERCIAL_SERIES_COLORS.length],
+                  points: x.points.map(p => ({ v: p.spending, label: (rows.length > 1 ? "Y" + (p.periodsSinceFirst + 1) : p.label) }))
+                })),
+                height: 220, showLegend: true
+              })),
+            predating.length > 0 && h("div", { style: { fontSize: 10.5, fontFamily: "var(--sans)", color: "var(--amber)", lineHeight: 1.6, marginTop: 6 } },
+              predating.map(x => x.result.brand).join(" and ") + (predating.length === 1 ? " was" : " were")
+                + " already selling when this dataset begins, so “year 1” here is the first year CMS covers, not the launch year. "
+                + (predating.length === 1 ? "That curve is a plateau" : "Those curves are plateaus")
+                + " sitting where a ramp should be, which makes the comparison read backwards — use an analog launched inside the data window for a like-for-like ramp.")
+          );
+        })(),
+        rows.length > 1 && h("div", { style: { fontSize: 10, fontFamily: "var(--sans)", color: "var(--ink-3)", lineHeight: 1.6, marginTop: 6 } },
+          "Indexed to each drug's first year of Medicare spending, so launches from different years sit on the same axis. Year 1 is almost never a full commercial year — a drug approved in March shows nine months of it — so the first point understates every curve by a different amount depending on approval date. A mature analog's later years are its plateau, not its ramp."),
+        rows.some(r => r.found && r.series.some(p => !p.isFullYear)) && h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--amber)", marginTop: 4 } },
+          "One or more points is a partial period plotted at its reported value, not annualised — the line dips there for a reporting reason, not a commercial one.")
+      ])
+    )
+  );
+}
+
+// ── Actual vs modelled ─────────────────────────────────────────────────────
+function ActualVsModelTool({ cases, updateCase, activeCase }) {
+  const h = React.createElement;
+  const [caseId, setCaseId] = React.useState(activeCase ? activeCase.id : "");
+  const theCase = (cases || []).find(c => c.id === caseId);
+  const [draft, setDraft] = React.useState({ year: "", quarters: "4", revenueM: "" });
+
+  const actuals = (theCase && theCase.actualRevenue) || [];
+  const yearZero = (theCase && theCase.modelYearZero) || String(new Date().getFullYear());
+
+  const save = (patch) => { if (theCase) updateCase(Object.assign({}, theCase, patch, { updatedAt: Date.now() })); };
+
+  // Rebuilt exactly the way the Workspace builds it, so the numbers compared
+  // here are the same ones the valuation used rather than a second derivation
+  // that could drift.
+  const calendar = React.useMemo(() => {
+    if (!theCase || !theCase.programs || !theCase.programs.length) return [];
+    const results = theCase.programs.map(p => {
+      const offset = resolveLaunchYearOffset(p);
+      try { return { id: p.id, name: p.drugName || p.name, launchYearOffset: offset, revenueResult: getProgramRevenueResult(p, Math.max(20, COMPANY_CALENDAR_YEARS - offset + 2)) }; }
+      catch (e) { return null; }
+    }).filter(Boolean);
+    return results.length ? aggregateCompanyRevenue(results, COMPANY_CALENDAR_YEARS) : [];
+  }, [theCase]);
+
+  const series = actualVsModelSeries(calendar, actuals, yearZero);
+  const cmp = series.comparison || compareActualToModel(calendar, actuals, yearZero);
+
+  const addEntry = () => {
+    const revenueUsd = parseFloat(String(draft.revenueM).replace(/[$,]/g, "")) * 1e6;
+    const entry = normalizeActualEntry({ year: draft.year, quarters: draft.quarters, revenueUsd });
+    if (!entry) return;
+    save({ actualRevenue: actuals.filter(a => !(String(a.year) === String(entry.year) && String(a.quarters) === String(entry.quarters))).concat([entry]) });
+    setDraft({ year: "", quarters: "4", revenueM: "" });
+  };
+  const removeEntry = (i) => save({ actualRevenue: actuals.filter((_, j) => j !== i) });
+
+  const inputStyle = { padding: "8px 10px", borderRadius: 6, border: "1.5px solid var(--rule)", background: "var(--surface)", color: "var(--ink-1)", fontFamily: "var(--mono)", fontSize: 12 };
+
+  return h("div", null,
+    toolCard(h, [
+      toolLabel(h, "Reported revenue against your own model"),
+      h(Note, { summary: "Why a partial year needs saying so" },
+        h("div", { style: { lineHeight: 1.6 } },
+          "Three quarters of reported revenue against a full modelled year shows a 25% miss on a drug that is exactly on plan. That mistake is easy to make by hand and impossible to spot afterwards, so this only computes a direct comparison once four quarters are in — a partial year is compared on an explicitly-labelled run rate instead. ",
+          "And the gap is a statement about your model as much as about the drug: a launch beating a conservative model and a launch beating a realistic one look identical from here.")),
+      h("div", { style: { display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", marginTop: 10 } },
+        h(CasePicker, { cases, selectedId: caseId, onChange: setCaseId, placeholder: "Pick a case…" }),
+        theCase && h("label", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-2)", display: "flex", alignItems: "center", gap: 6 } },
+          "Model Year 0 =",
+          h("input", { type: "text", value: yearZero, "aria-label": "Calendar year of model Year 0",
+            onChange: e => save({ modelYearZero: e.target.value }),
+            style: Object.assign({}, inputStyle, { width: 74 }) })))
+    ]),
+
+    theCase && calendar.length === 0 && toolCard(h, h("div", { style: { fontSize: 11.5, fontFamily: "var(--sans)", color: "var(--ink-2)", lineHeight: 1.6 } },
+      "This case has no program that produces a revenue projection yet, so there is nothing to compare against. Fill in a program's revenue build on the Workspace first.")),
+
+    theCase && calendar.length > 0 && h("div", null,
+      toolCard(h, [
+        toolLabel(h, "Reported periods"),
+        h("div", { style: { display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 12 } },
+          h("input", { type: "text", value: draft.year, placeholder: "year", "aria-label": "Calendar year",
+            onChange: e => setDraft(Object.assign({}, draft, { year: e.target.value })), style: Object.assign({}, inputStyle, { width: 80 }) }),
+          h("select", { value: draft.quarters, "aria-label": "Quarters reported",
+            onChange: e => setDraft(Object.assign({}, draft, { quarters: e.target.value })), style: inputStyle },
+            [1, 2, 3, 4].map(q => h("option", { key: q, value: String(q) }, q + (q === 4 ? " quarters (full year)" : q === 1 ? " quarter" : " quarters")))),
+          h("input", { type: "text", value: draft.revenueM, placeholder: "revenue $M", "aria-label": "Reported revenue in millions",
+            onChange: e => setDraft(Object.assign({}, draft, { revenueM: e.target.value })), onKeyDown: e => { if (e.key === "Enter") addEntry(); },
+            style: Object.assign({}, inputStyle, { width: 130 }) }),
+          h("button", { onClick: addEntry,
+            style: { padding: "8px 16px", borderRadius: 6, border: "1px solid var(--teal)", background: "var(--teal-bg)", color: "var(--teal)", fontFamily: "var(--mono)", fontSize: 11, fontWeight: 700, cursor: "pointer" } }, "Add")),
+
+        actuals.length === 0
+          ? h("div", { style: { fontSize: 11, fontFamily: "var(--sans)", color: "var(--ink-3)", lineHeight: 1.6 } },
+              "Nothing entered yet. Take the product revenue line straight from the 10-Q or 10-K — total company revenue including collaboration and milestone income is a different number and will not compare to a revenue build.")
+          : h("div", { style: { overflowX: "auto" } },
+              h("table", { style: { borderCollapse: "collapse", fontFamily: "var(--mono)", minWidth: 620 } },
+                h("thead", null, h("tr", null, ["Year", "Reported", "Basis", "Your model", "Gap", ""].map(t =>
+                  h("th", { key: t, style: { padding: "6px 10px", background: "var(--surface-2)", borderBottom: "1px solid var(--rule)", fontSize: 10, color: "var(--ink-3)", fontWeight: 500, textAlign: t === "Year" || t === "Basis" ? "left" : "right", whiteSpace: "nowrap" } }, t)))),
+                h("tbody", null, cmp.rows.map((r, i) => h("tr", { key: i },
+                  h("td", { style: { padding: "6px 10px", borderBottom: "1px solid var(--rule)", fontSize: 11, color: "var(--ink-1)" } }, r.year),
+                  h("td", { style: { padding: "6px 10px", borderBottom: "1px solid var(--rule)", fontSize: 11, textAlign: "right", color: "var(--ink-1)" } },
+                    fmtMoney(r.actualUsd), r.impliedAnnualUsd != null && h("div", { style: { fontSize: 9.5, color: "var(--ink-3)" } }, "→ " + fmtMoney(r.impliedAnnualUsd) + " annualised")),
+                  h("td", { style: { padding: "6px 10px", borderBottom: "1px solid var(--rule)", fontSize: 10, color: "var(--ink-3)" } }, r.comparisonBasis),
+                  h("td", { style: { padding: "6px 10px", borderBottom: "1px solid var(--rule)", fontSize: 11, textAlign: "right", color: "var(--ink-2)" } },
+                    r.outsideModel ? "outside the model" : r.modelPreLaunch ? "pre-launch" : fmtMoney(r.modelledUsd)),
+                  h("td", { style: { padding: "6px 10px", borderBottom: "1px solid var(--rule)", fontSize: 11, textAlign: "right", fontWeight: 700,
+                      color: r.deltaVsModel == null ? "var(--ink-3)" : r.deltaVsModel >= 0 ? "var(--teal)" : "var(--red)" } },
+                    r.deltaVsModel == null ? "—" : (r.deltaVsModel >= 0 ? "+" : "") + (r.deltaVsModel * 100).toFixed(0) + "%"),
+                  h("td", { style: { padding: "6px 10px", borderBottom: "1px solid var(--rule)", textAlign: "right" } },
+                    h(ConfirmXButton, { label: "Remove", armedLabel: "Click again", title: "Remove this reported period", onConfirm: () => removeEntry(i) }))
+                )))))
+      ]),
+
+      cmp.rows.some(r => r.outsideModel) && toolCard(h, h("div", { style: { fontSize: 11.5, fontFamily: "var(--sans)", color: "var(--amber)", lineHeight: 1.6 } },
+        "At least one reported year falls outside the model's projection window. That almost always means Model Year 0 is set to the wrong calendar year rather than that the model is wildly off — check that first.")),
+
+      toolCard(h, [
+        toolLabel(h, "Modelled against reported"),
+        h(ExportableBlock, { name: (theCase.name || "case") + "-actual-vs-modelled", showPanelCapture: true, compact: true },
+          h(RevenueChart, {
+            xPrefix: "", xAxisPrefix: "",
+            series: [
+              { name: "Your model", color: "var(--teal)", points: series.modelled },
+              { name: "Reported (partial years annualised)", color: "var(--amber)", points: series.actual.map(p => ({ v: p.v == null ? 0 : p.v, label: p.label })) }
+            ],
+            height: 220, showLegend: true
+          })),
+        h("div", { style: { fontSize: 10, fontFamily: "var(--sans)", color: "var(--ink-3)", lineHeight: 1.6, marginTop: 6 } },
+          "A year with nothing reported is drawn at zero on the reported line — read the table above for which years actually have data, since the chart cannot draw a gap. " + cmp.caveat)
+      ])
+    )
+  );
+}
+
 // ── Asset programme view ───────────────────────────────────────────────────
 // Every registered trial for one drug at once. Engine in assetProgram.js; this
 // only lays it out. The evidence-base checklist sits at the top on purpose —

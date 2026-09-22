@@ -13,7 +13,7 @@
      script-src deliberately does NOT allow it, so only the bundled scripts
      can execute. EDGAR is absent on purpose — it is proxied through the main
      process rather than fetched from the renderer. -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' file: __SCRIPT_HASH__; style-src 'self' file: 'unsafe-inline'; img-src 'self' file: data: blob:; font-src 'self' file: data:; connect-src 'self' https://clinicaltrials.gov https://api.fda.gov https://data.sec.gov https://api.platform.opentargets.org https://www.ebi.ac.uk; form-action 'none'; base-uri 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' file: __SCRIPT_HASH__; style-src 'self' file: 'unsafe-inline'; img-src 'self' file: data: blob:; font-src 'self' file: data:; connect-src 'self' https://clinicaltrials.gov https://api.fda.gov https://data.sec.gov https://api.platform.opentargets.org https://www.ebi.ac.uk https://data.cms.gov; form-action 'none'; base-uri 'none'; object-src 'none'">
 <title>RxNPV — Biotech Valuation Sandbox</title>
 <style>
 /* Fonts embedded locally (base64 woff2) so the desktop app always renders

@@ -22,7 +22,7 @@ Practical implication for how work should be sequenced: don't let more than one 
 
 ## Architecture — read this before touching the build
 
-**This is not built with a real bundler.** No webpack, no esbuild, no Vite, no ES module imports/exports anywhere. It's 36 plain JavaScript files, concatenated in a specific order into one giant inline `<script>` block inside `shell.html`, producing `electron/rxnpv.html` — the single file the Electron shell actually loads.
+**This is not built with a real bundler.** No webpack, no esbuild, no Vite, no ES module imports/exports anywhere. It's 38 plain JavaScript files, concatenated in a specific order into one giant inline `<script>` block inside `shell.html`, producing `electron/rxnpv.html` — the single file the Electron shell actually loads.
 
 This was a pragmatic choice made out of necessity: the app was originally built entirely inside a Claude chat conversation, in a sandboxed environment with no real bundler tooling available. It works, it's been thoroughly tested in that form, and **changing it is a legitimate future improvement but a real, deliberate architecture decision** — not something to fix in passing while doing something else. If you do it, do it as its own isolated change with full re-verification, not bundled into a feature or bug fix.
 
@@ -51,7 +51,7 @@ Quit the running app first if using `--install` — it overwrites the app bundle
 ### Project layout
 
 ```
-src/            36 source modules — see MODULE_ORDER in build.js for the authoritative list/order
+src/            38 source modules — see MODULE_ORDER in build.js for the authoritative list/order
 shell.html      HTML template with a __SCRIPT__ placeholder
 build.js        reassembles src/ into electron/rxnpv.html
 electron/       main.js, preload.js, package.json (electron-builder config), icon.icns/icon.svg, vendor/ (React UMD builds, committed)
@@ -74,6 +74,7 @@ docs/           design-decision history and feature documentation — see below
 - **Reference Sheet** (9 tabs: How This Works, Revenue Build, Cost Structure, R&D & Timeline, Probability of Success, Discount Rate, Valuation & Dilution, M&A Comps, **Trial Glossary**) — every benchmark the app uses, sourced, with a comprehensive "How This Works" guide covering every feature across all five views, including export/pinning, storage protection, and delete safety.
 - **Tools** (15 tabs across 3 groups — *Benchmarks*: M&A Premium, Peak Sales Comps, Licensing Comps; *Your Case*: Diluted Market Cap, Cash Runway, Runway vs. Catalyst, Binary Event, Sensitivity; *Live Research*: Company Lookup, Catalyst Calendar, **Trial Decoder**, Trial Explorer, FDA Lookup, Exclusivity/LOE, **Target Dossier**).
 - **Simulation** (6 top-level tabs: Trial Outcome/PoS assurance — including drawn survival curves for time-to-event endpoints, not just the hazard ratio number; Phase 2→3 Translator; Trial Statistics, itself 7 sub-tools — Fragility Index, Sample Size/Power (with an assumption-stress panel under every result: how power moves if the control arm behaves differently, under both a constant-absolute and a constant-relative effect model, and what dropout costs), P-value↔CI, Single-Arm CI, 2×2 Outcome Analysis, Non-Inferiority, Multiplicity Adjustment; Meta-Analysis; Peak Sales Monte Carlo; PK/PD, which also carries a standalone Receptor Occupancy Calculator for when you already have a concentration in hand and don't need the full dosing simulation). Chemistry/RDKit was built, then removed entirely after the user judged it not worth keeping — no trace of it remains in `src/` or `electron/`, and it should not be treated as a gap to fill back in.
+- **Commercial** (Tools → Your case, two sub-tools). The half of the app that assumes a drug is already selling. **Launch tracker** reads CMS's Medicare Part D/Part B drug spending — which publishes *quarterly*, about one quarter behind, not the 1–2 years the scoping assumed — as a live uptake proxy, with up to three analogs indexed to each drug's first Medicare year. **Actual vs modelled** puts reported product revenue next to the case's own projection. Both refuse to compare a partial period to a full one: three quarters against a modelled year shows a 25% miss on a drug exactly on plan, so a partial period is compared on an explicitly-labelled run rate or not at all.
 - **Portfolio** — cross-case aggregation.
 - **Report** — PDF export with a section picker, now including a "Pinned Analyses" section: Simulation and Tools results are computed on demand and have no persistent model to re-render from, so results can be explicitly pinned (capturing the rendered panel) onto a case so they travel with that case's report.
 
@@ -102,7 +103,9 @@ A deliberate product decision made in September 2026: **not every feature has to
 - **Literature shelf** (Europe PMC). Previously declined as duplicating Google Scholar; reversed in September 2026 for one specific reason — a general search engine cannot tell you *what kind* of paper it just handed you, and Europe PMC returns MEDLINE's own publication types on every record. A primary randomised trial report, a meta-analysis, a narrative review, a conference abstract and an unreviewed preprint arrive already separated, and the composition of a result set ("4 primary papers, 15 reviews") is more informative than any single title. Two entry points: a standalone search tab, and a "what has been published about this trial" panel in the Decoder that searches the NCT number. **On the name, because it misleads:** Europe PMC is *not* a European database — its `MED` source is MEDLINE/PubMed in full, plus PMC full text, plus bioRxiv/medRxiv/Research Square preprints. Verified live: 96 of 100 records in a broad query come from MED. Adding a second general literature API alongside it would return the same MEDLINE records twice, which is why there is one.
 - **Trial Glossary** (Reference Sheet). The vocabulary the decoder assumes, each term with a "why it matters" line, plus what each phase can and cannot establish.
 
-### Four API lessons, all found only by calling the live service
+### Five API lessons, all found only by calling the live service
+
+-1. **CMS appends a footnote asterisk to some drug names, inconsistently between its own datasets.** Selexipag is `Uptravi` in the quarterly file and `Uptravi*` in the annual one, and the API filter is exact-match — so an exact query returned the recent quarters and silently dropped the entire annual history. On a launch-curve chart that leaves a mature drug's plateau sitting exactly where a new drug's ramp belongs, which reads backwards rather than merely imprecise. Names are compared with the marker stripped, and the fetch retries with `name + "*"` when the exact query finds nothing.
 
 0. **CT.gov v2 drops a top-level field when you pass `fields` and don't ask for it.** `hasResults` lives outside `protocolSection`, and a filtered query omits it entirely — while `parseStudy` coerces the missing value to `false`. The consequence was not a blank but a confident false sentence. Any field a view reads has to be in its field list, and the list is worth asserting in a test.
 
@@ -136,7 +139,7 @@ If a future request seems to want one of these, say so plainly and ask before bu
 
 ## Known limitations — real gaps, not modesty
 
-- **The original 38-check core-engine regression suite from the earliest build sessions did not survive a sandbox reset** and was never reconstructed as such — but treat this as closed, not open: `test/math_verification.js` is not a "leaner replacement," it now independently verifies 964 hand-derived checks across the full engine (revenue build, cost chain, capital structure, every trial-statistics formula, chart axis logic, storage accounting), each checked against a value worked out longhand in its own comment rather than recorded from the app's own output. Read `test/README.md` for the exact scope/rules of what this suite does and doesn't claim.
+- **The original 38-check core-engine regression suite from the earliest build sessions did not survive a sandbox reset** and was never reconstructed as such — but treat this as closed, not open: `test/math_verification.js` is not a "leaner replacement," it now independently verifies 1,030 hand-derived checks across the full engine (revenue build, cost chain, capital structure, every trial-statistics formula, chart axis logic, storage accounting), each checked against a value worked out longhand in its own comment rather than recorded from the app's own output. Read `test/README.md` for the exact scope/rules of what this suite does and doesn't claim.
 - **No formal accessibility audit** (screen reader support, keyboard-only navigation) has been done. Contrast has been checked rigorously (WCAG relative-luminance, both themes) but that is a different, narrower claim than full accessibility.
 
 ## Coding conventions actually followed throughout this build
