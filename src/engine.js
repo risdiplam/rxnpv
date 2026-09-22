@@ -130,6 +130,59 @@ function computeTreatedPopulation(pop) {
   return { addressable, diagnosed, treated, eligible };
 }
 
+// ── Gross-to-net: converting an entered price to the one the model should use ──
+// The Reference Sheet has always said the right thing here ("ASP — net of
+// rebates and discounts, use this in models"), and the model had no way to act
+// on it: there was one price field, no basis attached to it, and nothing
+// flagging a list price entered into it. In US pharma that is one of the
+// largest single sources of error in a retail revenue model — entering AWP
+// where ASP belongs overstates revenue by roughly a quarter, all the way
+// through the DCF, silently.
+//
+// This uses the app's own sourced interconversion table (Table 4-1) rather than
+// an invented gross-to-net percentage, and defaults to an ASP basis with no
+// adjustment, so every case saved before this existed values identically.
+const PRICE_BASIS_OPTIONS = [
+  { value: "ASP", label: "ASP — net of rebates (what the model wants)" },
+  { value: "WAC", label: "WAC — wholesaler list price" },
+  { value: "AWP", label: "AWP — published sticker price" },
+  { value: "Retail", label: "Retail — price to the end user" }
+];
+
+// "an AWP basis", "a WAC basis" — AWP and ASP are read out letter by letter and
+// start with a vowel sound; WAC is read as a word and does not.
+function priceBasisArticle(basis) {
+  return /^[AEFHILMNORSX]/.test(String(basis || "").charAt(0).toUpperCase()) && String(basis).length <= 3 ? "an" : "a";
+}
+
+// ASP expressed as a percentage of the chosen basis, straight from Table 4-1.
+function aspPctOfBasis(basis) {
+  const row = PRICING_CONVERSION_MATRIX["ref" + (basis || "ASP") + "100"];
+  return (row && row.ASP != null) ? row.ASP : 100;
+}
+
+// Returns the price the revenue build should actually multiply patients by,
+// plus everything needed to explain it. An explicit realisation override always
+// wins — Table 4-1's averages are across all drugs and understate gross-to-net
+// badly for a modern specialty brand, so a user with a real number for their
+// own drug must be able to use it.
+function resolveNetPrice(pricing) {
+  pricing = pricing || {};
+  const entered = numOr(pricing.usAnnualPrice, 0);
+  const basis = pricing.priceBasis || "ASP";
+  const raw = pricing.netPriceRealizationPct;
+  const hasOverride = raw !== "" && raw != null && isFinite(Number(raw));
+  const realizationPct = hasOverride ? Number(raw) : aspPctOfBasis(basis);
+  return {
+    entered, basis, realizationPct,
+    fromOverride: hasOverride,
+    // The complement, because "gross-to-net" is the term everyone actually uses.
+    grossToNetPct: 100 - realizationPct,
+    adjusted: realizationPct !== 100,
+    netPrice: entered * realizationPct / 100
+  };
+}
+
 // ── Full program revenue build → returns array of {year, usRevenue, exUSRevenue, totalRevenue, onDrugPatients} ──
 // program.revenueBuild = {
 //   population: {...}, adherencePct, marketShare: {numDrugs, orderOfEntry, peakShareOverridePct},
@@ -150,7 +203,8 @@ function computeProgramRevenue(rb, projectionYears) {
   const ramp = launchCurveForYears(rb.launchCurve.yearsToPeak, rb.launchCurve.profile);
   const yearsToPeak = ramp.length;
 
-  const usPrice0 = numOr(rb.pricing.usAnnualPrice, 0);
+  const priceBasis = resolveNetPrice(rb.pricing);
+  const usPrice0 = priceBasis.netPrice;
   const usGrowth = (numOr(rb.pricing.usAnnualGrowthPct, 0)) / 100;
   const includeExUS = !!rb.pricing.includeExUS;
   const exUSFactor = (numOr(rb.pricing.exUSPriceFactorPct, 0)) / 100;
@@ -171,7 +225,11 @@ function computeProgramRevenue(rb, projectionYears) {
 
     let exUSRevenue = 0;
     if (includeExUS) {
-      const exUSPrice = usPrice0 * exUSFactor * Math.pow(1 + exUSGrowth, y - 1);
+      // Deliberately the ENTERED price, not the US net price. The published
+      // cross-country factors (Table 4-2) compare list prices, so applying the
+      // factor to a US net price would discount twice. Ex-US markets have their
+      // own gross-to-net, much smaller than the US's, and this does not model it.
+      const exUSPrice = priceBasis.entered * exUSFactor * Math.pow(1 + exUSGrowth, y - 1);
       const exUSPatients = patientsThisYear * exUSPatientPct;
       exUSRevenue = exUSPatients * exUSPrice;
     }
@@ -192,6 +250,7 @@ function computeProgramRevenue(rb, projectionYears) {
 
   return {
     funnel, peakPatients: Math.round(peakPatients), peakShare: share,
+    pricing: priceBasis,
     peakUSRevenue: Math.round(Math.max(...out.map(r => r.usRevenue))),
     peakTotalRevenue: Math.round(Math.max(...out.map(r => r.totalRevenue))),
     years: out
@@ -306,7 +365,7 @@ const DEFAULT_REVENUE_BUILD = {
   adherencePct: "",
   marketShare: { numDrugs: 2, orderOfEntry: 1, peakShareOverridePct: "" },
   launchCurve: { yearsToPeak: 6, profile: "median" },
-  pricing: { usAnnualPrice: "", usAnnualGrowthPct: "3", includeExUS: true, exUSPriceFactorPct: "50", exUSAnnualGrowthPct: "0", exUSPatientMultiplierPct: "100" },
+  pricing: { usAnnualPrice: "", priceBasis: "ASP", netPriceRealizationPct: "", usAnnualGrowthPct: "3", includeExUS: true, exUSPriceFactorPct: "50", exUSAnnualGrowthPct: "0", exUSPatientMultiplierPct: "100" },
   exclusivity: { yearsToLOE: "13", modality: "smallMolecule", volumeRetainedPct: "", priceDeclinePct: "" }
 };
 
@@ -320,7 +379,9 @@ function getRevenueBuild(program) {
     adherencePct: rb.adherencePct != null ? rb.adherencePct : DEFAULT_REVENUE_BUILD.adherencePct,
     marketShare: rb.marketShare || DEFAULT_REVENUE_BUILD.marketShare,
     launchCurve: rb.launchCurve || DEFAULT_REVENUE_BUILD.launchCurve,
-    pricing: rb.pricing || DEFAULT_REVENUE_BUILD.pricing,
+    // Merged rather than taken wholesale, so a case saved before priceBasis
+    // existed gets the ASP default (no adjustment) instead of undefined.
+    pricing: rb.pricing ? Object.assign({}, DEFAULT_REVENUE_BUILD.pricing, rb.pricing) : DEFAULT_REVENUE_BUILD.pricing,
     exclusivity: rb.exclusivity || DEFAULT_REVENUE_BUILD.exclusivity
   };
 }

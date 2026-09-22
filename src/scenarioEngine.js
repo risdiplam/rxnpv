@@ -818,7 +818,27 @@ function computeRedFlags(theCase) {
         }
       }
     }
-    // 5. Both PoS-modifier axes set at once, with no explicit override.
+    // 5. A list price entered on a list basis, converted with Table 4-1's
+    // all-drugs average. That average is the app's own sourced number and is
+    // the right default, but it is an average across every drug in the book
+    // and understates gross-to-net badly for a modern specialty brand, where
+    // 40-50% deductions are ordinary. Only fires once the basis says the entered
+    // number really is a list price and the user has not supplied their own
+    // realisation figure — so the intended resolution stops the flag.
+    if (program.revenueMode === "full" && program.revenueBuild && program.revenueBuild.pricing) {
+      const pr = program.revenueBuild.pricing;
+      const basis = pr.priceBasis || "ASP";
+      const noOverride = pr.netPriceRealizationPct === "" || pr.netPriceRealizationPct == null;
+      if (basis !== "ASP" && noOverride && numOr(pr.usAnnualPrice, 0) > 0) {
+        const pb = resolveNetPrice(pr);
+        flags.push({
+          programId: program.id, programName: progName, severity: "low",
+          message: `Price is entered on ${priceBasisArticle(basis)} ${basis} basis and converted to net using Table 4-1's ${pb.grossToNetPct.toFixed(0)}% average gross-to-net. That table averages across all drugs in the source; for a modern US specialty brand, deductions of 40-50% are ordinary, and the difference flows straight through peak revenue into the valuation. If you have a real gross-to-net for a close comparable, enter it as the net price realisation.`
+        });
+      }
+    }
+
+    // 6. Both PoS-modifier axes set at once, with no explicit override.
     // computePoSModifiers multiplies the two ratios, which assumes the
     // attributes are independent — a real assumption the source doesn't
     // support, and one that compounds into every downstream number. Only
@@ -837,7 +857,7 @@ function computeRedFlags(theCase) {
     }
   });
 
-  // 6. Case-level: cash runway shorter than the nearest program's own launch timeline.
+  // 7. Case-level: cash runway shorter than the nearest program's own launch timeline.
   // Only runs once cash has actually been entered — an unset field defaults
   // through as $0, which would make every brand-new, not-yet-filled-out case
   // "flag" on a runway of zero. That's not a real tension, just an empty form.

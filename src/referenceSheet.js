@@ -206,7 +206,11 @@ function ReferenceSheet({ activeCase }) {
         ["Retail", PRICING_CONVERSION_MATRIX.refAWP100.Retail, PRICING_CONVERSION_MATRIX.refRetail100.Retail, PRICING_CONVERSION_MATRIX.refWAC100.Retail, PRICING_CONVERSION_MATRIX.refASP100.Retail],
         ["WAC", PRICING_CONVERSION_MATRIX.refAWP100.WAC, PRICING_CONVERSION_MATRIX.refRetail100.WAC, PRICING_CONVERSION_MATRIX.refWAC100.WAC, PRICING_CONVERSION_MATRIX.refASP100.WAC],
         ["ASP", PRICING_CONVERSION_MATRIX.refAWP100.ASP, PRICING_CONVERSION_MATRIX.refRetail100.ASP, PRICING_CONVERSION_MATRIX.refWAC100.ASP, PRICING_CONVERSION_MATRIX.refASP100.ASP]
-      ])
+      ]),
+      h("div", { style: { fontSize: 11.5, fontFamily: "var(--sans)", color: "var(--ink-2)", lineHeight: 1.7, marginTop: 10 } },
+        "This table is what the Workspace's price-basis control uses. Enter whatever price you have, say which basis it is on, and the revenue build converts it to ASP before multiplying by patients — so a list price no longer silently inflates peak revenue by roughly a quarter. ",
+        h("b", null, "Treat these as a floor on the deduction, not a forecast of it."),
+        " They are averages across every drug in the source. US gross-to-net has widened a great deal since, and for a modern specialty or rare-disease brand, deductions of 40-50% off list are ordinary. If you have a real figure for a close comparable, enter it as the net price realisation and it overrides the table.")
     ]),
     card([ label("Ex-US price factor by country (vs. US = 1.00)"),
       table(["Country", "Factor"], Object.entries(EXUS_COUNTRY_PRICE_FACTORS).filter(([k]) => k !== "source").map(([k,v]) => [k, v.toFixed(2)]))

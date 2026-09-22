@@ -25,7 +25,7 @@ function newProgram() {
       adherencePct: "",
       marketShare: { numDrugs: 2, orderOfEntry: 1, peakShareOverridePct: "" },
       launchCurve: { yearsToPeak: 6, profile: "median" },
-      pricing: { usAnnualPrice: "", usAnnualGrowthPct: "3", includeExUS: true, exUSPriceFactorPct: "50", exUSAnnualGrowthPct: "0", exUSPatientMultiplierPct: "100" },
+      pricing: { usAnnualPrice: "", priceBasis: "ASP", netPriceRealizationPct: "", usAnnualGrowthPct: "3", includeExUS: true, exUSPriceFactorPct: "50", exUSAnnualGrowthPct: "0", exUSPatientMultiplierPct: "100" },
       exclusivity: { yearsToLOE: "13", modality: "smallMolecule", volumeRetainedPct: "", priceDeclinePct: "" }
     },
     costStructure: {
@@ -351,9 +351,33 @@ function ProgramEditor({ program, onChange, onDelete, discountRatePct, terminalV
     ),
 
     // ── 5. Pricing ──
-    h(SectionCard, { title: "Step 5 of 5 · Pricing", subtitle: "US annual price per patient; ASP is the right basis, not list/AWP" },
-      h(BenchField, { label: "US annual price per patient (ASP basis)", value: rb.pricing.usAnnualPrice, onChange: v => set("revenueBuild.pricing.usAnnualPrice", v), suffix: "$/yr", placeholder: "e.g. 150000",
-        help: "ASP ≈ 74% of AWP on average. Anchor to a comparable marketed drug." }),
+    h(SectionCard, { title: "Step 5 of 5 · Pricing", subtitle: "US annual price per patient — and which price basis that number is on" },
+      h(BenchField, { label: "US annual price per patient", value: rb.pricing.usAnnualPrice, onChange: v => set("revenueBuild.pricing.usAnnualPrice", v), suffix: "$/yr", placeholder: "e.g. 150000",
+        help: "Whatever number you have — list or net. Tell the model which basis it's on below and it converts." }),
+      h("div", { style: { flex: "1 1 220px" } },
+        h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-2)", marginBottom: 5 } }, "That price is on a…"),
+        h("select", { "aria-label": "Price basis", value: rb.pricing.priceBasis || "ASP", onChange: e => set("revenueBuild.pricing.priceBasis", e.target.value),
+          style: { width: "100%", padding: "7px 10px", borderRadius: 6, border: "1.5px solid var(--rule)", background: "var(--surface)", color: "var(--ink-1)", fontFamily: "var(--mono)", fontSize: 13 } },
+          PRICE_BASIS_OPTIONS.map(o => h("option", { key: o.value, value: o.value }, o.label)))),
+      h(BenchField, { label: "Net price realisation", value: rb.pricing.netPriceRealizationPct, onChange: v => set("revenueBuild.pricing.netPriceRealizationPct", v), suffix: "%",
+        placeholder: String(aspPctOfBasis(rb.pricing.priceBasis || "ASP")),
+        help: "What share of the entered price the manufacturer actually keeps — the other side of gross-to-net (45% gross-to-net = 55% realisation). Leave blank to use Table 4-1's average for the basis above. Override it if you have a real figure: that table averages across all drugs and understates gross-to-net badly for a modern specialty brand, where 40-50% deductions are ordinary." }),
+      (() => {
+        // Show the conversion as it will actually be applied. A price basis
+        // control that silently changes the valuation would be worse than not
+        // having one — the point is that the deduction becomes visible.
+        const pb = resolveNetPrice(rb.pricing);
+        if (!pb.entered) return null;
+        return h("div", { style: { flex: "1 1 100%", marginTop: -2, marginBottom: 8, fontSize: 11, fontFamily: "var(--mono)", lineHeight: 1.7,
+            color: pb.adjusted ? "var(--teal)" : "var(--ink-3)" } },
+          pb.adjusted
+            ? "$" + Math.round(pb.entered).toLocaleString() + " on " + priceBasisArticle(pb.basis) + " " + pb.basis + " basis → $" + Math.round(pb.netPrice).toLocaleString()
+              + " net per patient-year, a " + pb.grossToNetPct.toFixed(0) + "% gross-to-net deduction"
+              + (pb.fromOverride ? " (your figure)." : " (Table 4-1 average — ASP is " + pb.realizationPct + "% of " + pb.basis + ").")
+              + "  Ex-US revenue still prices off the $" + Math.round(pb.entered).toLocaleString() + " you entered, because the published cross-country factors compare list prices."
+            : "No gross-to-net deduction applied — the model is treating $" + Math.round(pb.entered).toLocaleString() + " as already net of rebates and discounts. If that number came off a price list, change the basis above."
+        );
+      })(),
       h(BenchField, { label: "Annual US price growth", value: rb.pricing.usAnnualGrowthPct, onChange: v => set("revenueBuild.pricing.usAnnualGrowthPct", v), suffix: "%",
         bench: { value: 3, source: PRICING_DEFS.source + " — 2-3% conservative base case, tracks inflation" } }),
       h("div", { style: { flex: "1 1 100%", marginTop: 4, marginBottom: 10 } },

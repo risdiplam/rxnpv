@@ -80,6 +80,7 @@ const EXPORTS = [
   "revenueChartYScale", "selectPeakSalesCompWindow",
   "measureStorage", "STORAGE_ASSUMED_QUOTA_BYTES", "STORAGE_WARN_FRACTION", "STORAGE_CRITICAL_FRACTION",
   "computeTreatedPopulation", "launchCurveForYears", "erosionMultiplier", "computeProgramRevenue",
+  "resolveNetPrice", "aspPctOfBasis", "PRICE_BASIS_OPTIONS", "getRevenueBuild", "PRICING_CONVERSION_MATRIX", "priceBasisArticle",
   "computeQuickProgramRevenue", "resolveErosionParams", "LAUNCH_CURVE", "LAUNCH_CURVE_EXACT", "scaleRevenueResult",
   "computeCOGS", "computeSalesForceCost", "computeMarketingCost", "computeCorporateGA", "computeProgramPnL",
   "SALES_REP_COST", "SGA_BENCHMARKS", "SALES_FORCE_COMP_GROWTH_PCT",
@@ -2886,6 +2887,88 @@ section("Trial results — parsing primitives and reporting delay");
       .some(f => f.label.indexOf("months after primary completion") !== -1));
   ok("a study with no results section parses to null", api.parseTrialResults({ protocolSection: {} }) === null);
   ok("a null study does not throw", api.parseTrialResults(null) === null);
+}
+report();
+
+section("Gross-to-net — an entered price converted to the one the model uses");
+{
+  // Table 4-1 states ASP as a percentage of each basis directly. These are the
+  // source's own figures, not derived ratios, and nothing here may "correct" them.
+  near("ASP is 74% of AWP", api.aspPctOfBasis("AWP"), 74, 0);
+  near("ASP is 88% of WAC", api.aspPctOfBasis("WAC"), 88, 0);
+  near("ASP is 79% of retail", api.aspPctOfBasis("Retail"), 79, 0);
+  near("ASP against itself is 100%", api.aspPctOfBasis("ASP"), 100, 0);
+  near("an unrecognised basis applies no adjustment", api.aspPctOfBasis("nonsense"), 100, 0);
+  ok("AWP and ASP take 'an', WAC and Retail take 'a'",
+    api.priceBasisArticle("AWP") === "an" && api.priceBasisArticle("ASP") === "an"
+    && api.priceBasisArticle("WAC") === "a" && api.priceBasisArticle("Retail") === "a");
+  ok("every offered basis has a conversion figure behind it",
+    api.PRICE_BASIS_OPTIONS.every(o => api.aspPctOfBasis(o.value) > 0 && api.aspPctOfBasis(o.value) <= 100));
+
+  // $200,000 entered on an AWP basis -> 200,000 x 0.74 = $148,000 net.
+  const awp = api.resolveNetPrice({ usAnnualPrice: "200000", priceBasis: "AWP" });
+  near("an AWP price converts to 74% of itself", awp.netPrice, 148000, 1e-9);
+  near("and reports the deduction as 26% gross-to-net", awp.grossToNetPct, 26, 1e-12);
+  ok("the conversion is marked as coming from the benchmark", awp.fromOverride === false && awp.adjusted === true);
+
+  // An explicit realisation always wins over the table. 55% realisation is a
+  // 45% gross-to-net, which is ordinary for a modern US specialty brand and
+  // nothing like Table 4-1's all-drugs average.
+  const own = api.resolveNetPrice({ usAnnualPrice: "200000", priceBasis: "WAC", netPriceRealizationPct: "55" });
+  near("an explicit realisation overrides the table", own.netPrice, 110000, 1e-9);
+  near("and its complement is the gross-to-net", own.grossToNetPct, 45, 1e-12);
+  ok("the override is marked as the user's own", own.fromOverride === true);
+  // 0% realisation is a legitimate (if extreme) input and must not be read as
+  // "blank, fall back to the benchmark".
+  near("a zero realisation is honoured, not treated as missing",
+    api.resolveNetPrice({ usAnnualPrice: "200000", priceBasis: "AWP", netPriceRealizationPct: "0" }).netPrice, 0, 0);
+
+  // ── Backward compatibility. This is the whole reason the default is ASP with
+  // no adjustment: a case saved before any of this existed must value the same.
+  const legacyPricing = { usAnnualPrice: "200000", usAnnualGrowthPct: "3", includeExUS: true, exUSPriceFactorPct: "50", exUSAnnualGrowthPct: "0", exUSPatientMultiplierPct: "100" };
+  const legacy = api.resolveNetPrice(legacyPricing);
+  near("a price saved before the basis field existed is used unchanged", legacy.netPrice, 200000, 0);
+  ok("and is reported as unadjusted", legacy.adjusted === false && legacy.basis === "ASP");
+  const backfilled = api.getRevenueBuild({ revenueBuild: { pricing: legacyPricing } });
+  ok("the normalizer backfills the basis without touching what was saved",
+    backfilled.pricing.priceBasis === "ASP" && backfilled.pricing.netPriceRealizationPct === ""
+    && backfilled.pricing.usAnnualPrice === "200000" && backfilled.pricing.exUSPriceFactorPct === "50");
+
+  // ── End to end through the revenue build ──
+  // 100,000 prevalent, all diagnosed/treated/eligible, 100% adherence, a 10%
+  // peak share override -> 10,000 patients at peak.
+  //   ASP basis:  10,000 x 200,000           = $2.000B US at peak
+  //   AWP basis:  10,000 x 200,000 x 0.74    = $1.480B US at peak
+  //   ex-US:      10,000 x 200,000 x 0.50    = $1.000B, off the ENTERED price
+  //               in both cases, because Table 4-2's country factors compare
+  //               list prices and discounting twice would be wrong.
+  const build = (pricing) => api.computeProgramRevenue({
+    population: { mode: "prevalence", prevalence: "100000", diagnosisRatePct: "100", treatmentRatePct: "100", eligiblePct: "100" },
+    adherencePct: "100",
+    marketShare: { numDrugs: 2, orderOfEntry: 1, peakShareOverridePct: "10" },
+    launchCurve: { yearsToPeak: 6, profile: "median" },
+    pricing: pricing,
+    exclusivity: { yearsToLOE: "30", modality: "smallMolecule", volumeRetainedPct: "", priceDeclinePct: "" }
+  }, 20);
+  const base = { usAnnualPrice: "200000", usAnnualGrowthPct: "0", includeExUS: true, exUSPriceFactorPct: "50", exUSAnnualGrowthPct: "0", exUSPatientMultiplierPct: "100" };
+  const asp = build(Object.assign({}, base, { priceBasis: "ASP" }));
+  const awpBuild = build(Object.assign({}, base, { priceBasis: "AWP" }));
+  near("10,000 patients at peak", asp.peakPatients, 10000, 0);
+  near("an ASP basis prices peak US revenue at 10,000 x $200k", asp.peakUSRevenue, 2.0e9, 1);
+  near("an AWP basis nets it down to 10,000 x $148k", awpBuild.peakUSRevenue, 1.48e9, 1);
+  // The whole point of the feature, stated as a ratio: entering a list price
+  // where a net one belongs overstates US revenue by 1/0.74 = 35.1%.
+  near("the overstatement from entering AWP as if it were ASP is 1/0.74",
+    asp.peakUSRevenue / awpBuild.peakUSRevenue, 1 / 0.74, 1e-6);
+  near("ex-US prices off the entered figure, not the netted one",
+    Math.max.apply(null, awpBuild.years.map(y => y.exUSRevenue)), 1.0e9, 1);
+  ok("ex-US is identical either way, so nothing is discounted twice",
+    Math.max.apply(null, asp.years.map(y => y.exUSRevenue)) === Math.max.apply(null, awpBuild.years.map(y => y.exUSRevenue)));
+  ok("the result carries the conversion so the UI can explain it",
+    awpBuild.pricing.basis === "AWP" && awpBuild.pricing.netPrice === 148000);
+  // A case with no basis field at all values exactly as it did before.
+  near("a legacy pricing object still produces the unadjusted $2.0B",
+    build(base).peakUSRevenue, 2.0e9, 1);
 }
 report();
 

@@ -57,7 +57,7 @@ Used for a genuine bottoms-up build. Report each of these separately if research
 - **Adherence %** — whole-number percentage.
 - **Market share:** number of competing drugs expected at peak, this drug's order of entry (1st, 2nd, etc.), and an optional peak-share override % if a benchmark based on order-of-entry alone would be misleading for a specific competitive situation.
 - **Launch curve:** years from launch to peak share.
-- **Pricing:** US annual price per patient (raw dollars, e.g., `180000`), annual price growth %, whether to include ex-US revenue, ex-US price as a % of US price, ex-US patient-count multiplier relative to US.
+- **Pricing:** US annual price per patient (raw dollars, e.g., `180000`), **which price basis that number is on** (ASP / WAC / AWP / Retail — the model converts to ASP using Table 4-1 before multiplying by patients), an optional net price realisation % that overrides that conversion with your own gross-to-net, annual price growth %, whether to include ex-US revenue, ex-US price as a % of US price, ex-US patient-count multiplier relative to US. The basis defaults to ASP with no adjustment, so a price supplied without a basis is treated as already net.
 - **Exclusivity:** years from launch to loss of exclusivity, and — if known — expected volume-retained % and price-decline % after generic/biosimilar entry.
 - This section draws heavily on `BiotechAgent.md` Section 2 (population funnel and natural history) and Section 8 (competition, market access, pricing precedent, payer evidence threshold).
 

@@ -88,7 +88,7 @@ The app assumes pre-revenue. A user modelling an early-commercial name (launched
 
 **Gross-to-net.** The Reference Sheet correctly says *"ASP — net of rebates/discounts, use this in models. Median ~74% of AWP."* But the revenue model has a single `usAnnualPrice` field and **no gross-to-net adjustment anywhere**. The app dispenses the right advice and then provides no mechanism to follow it, so anyone entering a list price overstates revenue by roughly 25–30% with nothing flagging it. In US pharma, gross-to-net is one of the largest single sources of error in a retail revenue model.
 
-**DECIDED — build**, and treat it as an accuracy fix on the existing valuation, not a new feature.
+**BUILT** (Phase 18), as an accuracy fix on the existing valuation rather than a new feature. The price field now carries a basis (ASP / WAC / AWP / Retail) and converts to ASP using the app's own sourced Table 4-1 before multiplying by patients, with an optional net-price-realisation override for anyone who has a real gross-to-net for a close comparable. The default is ASP with no adjustment, so every case saved before this existed values identically — verified, not assumed.
 
 ### The rest of the workbench
 
@@ -155,8 +155,8 @@ Each of these has been considered and declined on the merits. Recording them her
 ## 10. Build order
 
 1. ~~**Results reader** (outcomes, dropout, adverse events)~~ — **done**, Phase 17
-2. **Gross-to-net** — accuracy fix on existing valuation ← next
-3. **Cheap completions batch** — thin-win vs analogs, change classification, Form 4 derivatives, multi-trial view, control-arm stress
+2. ~~**Gross-to-net** — accuracy fix on existing valuation~~ — **done**, Phase 18
+3. **Cheap completions batch** — thin-win vs analogs, change classification, Form 4 derivatives, multi-trial view, control-arm stress ← next
 4. **Commercial workbench** — launch trajectory, actual vs modelled
 5. **Tab consolidation** — after the tools exist, not before
 6. **Electron upgrade** — deferred by the user; needs ~10 minutes of their time (PDF export, panel capture, window resize)
