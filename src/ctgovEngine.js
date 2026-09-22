@@ -51,12 +51,11 @@ function parseStudy(study) {
     // description/timeFrame detail) since that's what changing would actually
     // mean something to a reader comparing two snapshots.
     primaryOutcomes: (outcomes.primaryOutcomes || []).map(o => o.measure).filter(Boolean),
-    // Whether CT.gov has posted actual outcome data for this trial — surfaced
-    // as a flag + link only, deliberately NOT parsed/summarized here. The
-    // resultsSection (participant flow, outcome measures, adverse events)
-    // has genuinely complex, variable statistical structure; getting an
-    // extraction or summary subtly wrong in a valuation tool is a real risk,
-    // not a cosmetic one, so this points the user to read it themselves.
+    // Whether CT.gov has posted actual outcome data. The resultsSection itself
+    // is NOT parsed here — it has genuinely complex, variable statistical
+    // structure and this shape is what the snapshot/diff watch persists, so it
+    // stays protocol-only. Reading the results is trialResults.js's job, and
+    // fetchStudyByNctId() below returns both from the one response.
     hasResults: !!study.hasResults,
 
     // ── Design fields ──────────────────────────────────────────────────────
@@ -184,7 +183,12 @@ async function fetchStudyByNctId(nctId) {
     if (res.status === 404) return { ok: false, error: "No study found for " + id + " on ClinicalTrials.gov." };
     if (!res.ok) throw new Error("HTTP " + res.status);
     const study = await res.json();
-    return { ok: true, study: parseStudy(study) };
+    // The single-study endpoint returns the whole record including
+    // resultsSection, so reading the posted results costs no extra call. It is
+    // parsed separately (trialResults.js) and returned alongside rather than
+    // folded into parseStudy(), because the snapshot/diff watch stores the
+    // protocol shape and has no business carrying an adverse-event table.
+    return { ok: true, study: parseStudy(study), results: parseTrialResults(study) };
   } catch (e) {
     clearTimeout(timeout);
     return { ok: false, error: "ClinicalTrials.gov fetch failed: " + e.message };

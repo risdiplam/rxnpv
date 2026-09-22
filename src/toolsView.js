@@ -2005,12 +2005,250 @@ function h0(n) { return String(n); }
 // Everything shown is derived from registered CT.gov fields only — see
 // trialDecoder.js. Nothing here predicts success, and nothing is inferred
 // from the sponsor or the drug.
+// ── Trial results reader — the panels the decoder gains once a trial has
+// actually reported. Deliberately rendered below the design cards, in that
+// order, because the whole point is to read the architecture first and the
+// outcome second. Engine in trialResults.js; this file only lays it out.
+function TrialResultsPanels({ results, study }) {
+  const h = React.createElement;
+  const [openSecondary, setOpenSecondary] = React.useState(false);
+  const [openPeriods, setOpenPeriods] = React.useState(false);
+  const [aeView, setAeView] = React.useState("serious");
+
+  const pct = (x) => x == null ? "—" : (x * 100).toFixed(1) + "%";
+  const num = (x) => x == null ? "—" : x.toLocaleString();
+  const sevColor = (s) => s === "high" ? "var(--red)" : s === "medium" ? "var(--amber)" : "var(--ink-2)";
+  const thS = { padding: "6px 10px", background: "var(--surface-2)", borderBottom: "1px solid var(--rule)", fontSize: 10, color: "var(--ink-3)", fontWeight: 500, textAlign: "right", whiteSpace: "nowrap" };
+  const thL = Object.assign({}, thS, { textAlign: "left" });
+  const tdS = { padding: "6px 10px", borderBottom: "1px solid var(--rule)", fontSize: 11, color: "var(--ink-1)", textAlign: "right", whiteSpace: "nowrap" };
+  const tdL = Object.assign({}, tdS, { textAlign: "left", whiteSpace: "normal", minWidth: 170 });
+  const caveat = (t) => h("div", { style: { fontSize: 10, fontFamily: "var(--sans)", color: "var(--ink-3)", lineHeight: 1.6, marginTop: 8 } }, t);
+  const scroll = (child) => h("div", { style: { overflowX: "auto" } }, child);
+
+  // "NA" is a real, meaningful answer for a median — it means the endpoint was
+  // not reached — so the registered string is shown when it isn't a number,
+  // rather than a dash that reads as missing data.
+  const armValue = (a) => {
+    if (a.value == null) return a.rawValue || "—";
+    let s = String(a.value);
+    if (a.lower != null && a.upper != null) s += "  [" + a.lower + " – " + a.upper + "]";
+    else if (a.spread != null) s += "  ± " + a.spread;
+    return s;
+  };
+
+  const analysisLine = (a, groupsById) => {
+    const bits = [];
+    bits.push((a.paramType || "Estimate") + " " + (a.value != null ? a.value : "—"));
+    if (a.lower != null && a.upper != null) bits.push("(" + (a.ciPct || "95") + "% CI " + a.lower + " – " + a.upper + ")");
+    if (a.pValue) bits.push("p " + (/^[<>=]/.test(a.pValue.trim()) ? a.pValue : "= " + a.pValue));
+    const compared = (a.groupIds || []).map(g => groupsById[g]).filter(Boolean);
+    return h("div", { style: { marginTop: 8, paddingLeft: 10, borderLeft: "2px solid var(--teal)" } },
+      h("div", { style: { fontSize: 12, fontFamily: "var(--mono)", color: "var(--ink-1)" } }, bits.join("   ")),
+      h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginTop: 3 } },
+        [compared.length ? compared.join(" vs ") : null,
+         a.method || null,
+         a.comparisonType ? a.comparisonType.toLowerCase().replace(/_/g, " ") : null].filter(Boolean).join("  ·  ")),
+      a.crossesNull === true && h("div", { style: { fontSize: 10.5, fontFamily: "var(--sans)", color: "var(--amber)", marginTop: 4, lineHeight: 1.5 } },
+        "This interval spans " + a.nullValue + ", the value meaning no difference — the data are consistent with no effect."),
+      a.crossesNull === false && h("div", { style: { fontSize: 10.5, fontFamily: "var(--sans)", color: "var(--ink-3)", marginTop: 4, lineHeight: 1.5 } },
+        "The interval excludes " + a.nullValue + " (no difference). That is a statement about this endpoint only."),
+      a.comment && h("div", { style: { fontSize: 10, fontFamily: "var(--sans)", color: "var(--ink-3)", marginTop: 4, lineHeight: 1.5 } }, a.comment)
+    );
+  };
+
+  const outcomeBlock = (o, key) => {
+    const groupsById = {};
+    (o.groups || []).forEach(g => { groupsById[g.id] = g.title; });
+    return h("div", { key: key, style: { paddingTop: 12, marginTop: 12, borderTop: "1px solid var(--rule)" } },
+      h("div", { style: { fontSize: 12.5, fontFamily: "var(--sans)", fontWeight: 600, color: "var(--ink-1)", lineHeight: 1.5 } }, o.title),
+      h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginTop: 3 } },
+        [o.timeFrame ? "at " + o.timeFrame : null,
+         o.estimateType ? o.estimateType + (o.unit ? " (" + o.unit + ")" : "") : null,
+         o.dispersionType || null].filter(Boolean).join("  ·  ")),
+      o.population && h("div", { style: { fontSize: 10, fontFamily: "var(--sans)", color: "var(--ink-3)", marginTop: 3, lineHeight: 1.5 } }, o.population),
+
+      !o.posted
+        ? h("div", { style: { fontSize: 11.5, fontFamily: "var(--sans)", color: "var(--amber)", marginTop: 8, lineHeight: 1.6 } },
+            "Registered as an endpoint but not reported in the results record. That is a gap, not a null result.")
+      : o.layout === "simple"
+        ? scroll(h("table", { style: { borderCollapse: "collapse", marginTop: 8, fontFamily: "var(--mono)", minWidth: 380 } },
+            h("thead", null, h("tr", null, h("th", { style: thL }, "Arm"), h("th", { style: thS }, "n"), h("th", { style: thS }, o.unit || "Value"))),
+            h("tbody", null, (o.arms || []).map((a, i) => h("tr", { key: i },
+              h("td", { style: tdL }, groupsById[a.groupId] || a.groupId),
+              h("td", { style: tdS }, num(a.n)),
+              h("td", { style: tdS }, armValue(a)))))))
+      : o.layout === "categories"
+        ? scroll(h("table", { style: { borderCollapse: "collapse", marginTop: 8, fontFamily: "var(--mono)", minWidth: 380 } },
+            h("thead", null, h("tr", null, h("th", { style: thL }, "Category"),
+              (o.groups || []).map(g => h("th", { key: g.id, style: thS }, g.title)))),
+            h("tbody", null, o.categoryRows.slice(0, 12).map((c, i) => h("tr", { key: i },
+              h("td", { style: tdL }, c.title || "—"),
+              (o.groups || []).map(g => {
+                const m = (c.arms || []).find(a => a.groupId === g.id);
+                return h("td", { key: g.id, style: tdS }, m ? armValue(m) : "—");
+              }))))))
+      : o.layout === "stratified"
+        ? h("div", { style: { fontSize: 11.5, fontFamily: "var(--sans)", color: "var(--ink-2)", marginTop: 8, lineHeight: 1.6 } },
+            "Reported across " + o.classCount + " separate strata rather than as one number. Collapsing those into a single headline would be inventing a result the sponsor did not register — open the record to read them.")
+        : h("div", { style: { fontSize: 11.5, fontFamily: "var(--sans)", color: "var(--ink-3)", marginTop: 8 } }, "No measurements registered."),
+
+      o.categoryRows && o.categoryRows.length > 12 && caveat("Showing the first 12 of " + o.categoryRows.length + " categories."),
+      (o.analyses || []).map((a, i) => h("div", { key: i }, analysisLine(a, groupsById))),
+      o.posted && o.analyses.length === 0 && o.layout !== "stratified" && caveat("No between-group comparison was registered for this endpoint — the arms above are reported, the difference between them is not.")
+    );
+  };
+
+  const flow = results.flow;
+  const safety = results.safety;
+  const flagList = resultsRedFlags(results, study);
+  const aeRows = aeView === "serious"
+    ? (safety && (safety.comparable ? safety.biggestSeriousGaps : safety.topSerious))
+    : (safety && (safety.comparable ? safety.biggestOtherGaps : safety.topOther));
+
+  const flowTable = (period) => scroll(h("table", { style: { borderCollapse: "collapse", fontFamily: "var(--mono)", minWidth: 620 } },
+    h("thead", null, h("tr", null,
+      h("th", { style: thL }, "Arm"), h("th", { style: thS }, "Started"), h("th", { style: thS }, "Completed"),
+      h("th", { style: thS }, "Left (excl. deaths)"), h("th", { style: thS }, "Deaths"),
+      h("th", { style: thS }, "Left for an AE"), h("th", { style: thS }, "Lost to f/u"))),
+    h("tbody", null, period.rows.map((r, i) => h("tr", { key: i },
+      h("td", { style: tdL }, r.title),
+      h("td", { style: tdS }, num(r.started)),
+      h("td", { style: tdS }, num(r.completed) + (r.completionRate != null ? "  (" + pct(r.completionRate) + ")" : "")),
+      h("td", { style: Object.assign({}, tdS, { color: r.nonDeathDiscontinuationRate != null && r.nonDeathDiscontinuationRate >= 0.2 ? "var(--amber)" : "var(--ink-1)" }) },
+        num(r.nonDeathDiscontinued) + (r.nonDeathDiscontinuationRate != null ? "  (" + pct(r.nonDeathDiscontinuationRate) + ")" : "")),
+      h("td", { style: tdS }, num(r.deaths)),
+      h("td", { style: tdS }, r.withdrewForAE == null ? "not registered" : num(r.withdrewForAE) + "  (" + pct(r.aeWithdrawalRate) + ")"),
+      h("td", { style: tdS }, num(r.lostToFollowUp)))))));
+
+  return h("div", null,
+    h("div", { style: { display: "flex", alignItems: "center", gap: 10, margin: "26px 0 14px" } },
+      h("div", { style: { height: 1, background: "var(--rule)", flex: 1 } }),
+      h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--teal)", textTransform: "uppercase", letterSpacing: "0.09em" } }, "What it actually reported"),
+      h("div", { style: { height: 1, background: "var(--rule)", flex: 1 } })),
+
+    toolCard(h, [
+      h(Note, { summary: "How to read the results below" },
+        h("div", { style: { lineHeight: 1.6 } }, "Everything above this line is the design as the sponsor registered it before the trial ran. Everything below is what got posted afterwards. The numbers are read straight out of ClinicalTrials.gov's structured results fields — nothing is inferred, and nothing here knows which arm is the investigational drug, so arms are named exactly as the sponsor named them and any difference is shown signed rather than described as good or bad. A measure reported across several strata is not collapsed into one headline number. Deaths are separated from every other reason for leaving, because in a serious indication most of an arm can be “did not complete — death”, and folding that into a dropout rate produces a large, confident, meaningless figure.")),
+      caveat("Posted results are the sponsor's own submission. They are not peer reviewed, not audited, and often thinner than the eventual publication.")
+    ]),
+
+    toolCard(h, [
+      toolLabel(h, "Primary endpoint" + (results.primaryOutcomes.length > 1 ? "s (" + results.primaryOutcomes.length + ")" : "")),
+      results.primaryOutcomes.length === 0
+        ? h("div", { style: { fontSize: 11.5, fontFamily: "var(--sans)", color: "var(--ink-3)", lineHeight: 1.6 } },
+            "No outcome is registered as primary in the results record.")
+        : h("div", null, results.primaryOutcomes.slice(0, 8).map((o, i) => outcomeBlock(o, i))),
+      results.primaryOutcomes.length > 8 && caveat("Showing the first 8 of " + results.primaryOutcomes.length
+        + " registered primary endpoints. A record with this many is usually a master protocol covering several sub-studies rather than one comparison.")
+    ]),
+
+    results.secondaryOutcomes.length > 0 && toolCard(h, [
+      h("button", { onClick: () => setOpenSecondary(v => !v),
+        style: { background: "none", border: "none", padding: 0, cursor: "pointer", fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.07em" } },
+        (openSecondary ? "▾" : "▸") + " Secondary endpoints (" + results.secondaryOutcomes.length + ")"),
+      openSecondary
+        ? h("div", null, results.secondaryOutcomes.slice(0, 10).map((o, i) => outcomeBlock(o, i)),
+            results.secondaryOutcomes.length > 10 && caveat("Showing the first 10 of " + results.secondaryOutcomes.length + "."))
+        : caveat("A secondary endpoint is not what the trial was powered on. It is worth reading and it is not what the trial proved.")
+    ]),
+
+    flow && flow.primaryPeriod && toolCard(h, [
+      toolLabel(h, "Who finished — " + (flow.primaryPeriod.title || "participant flow")),
+      flowTable(flow.primaryPeriod),
+      caveat("“Left (excl. deaths)” removes deaths and any move into an open-label or extension period from the not-completed count, because neither is someone dropping out. The other columns are the sponsor's own registered reasons and can overlap with each other; “not registered” means the sponsor filed no such reason at all, which is not the same as filing zero."
+        + (flow.primaryPeriod.groupsNotInPeriod ? "  " + flow.primaryPeriod.groupsNotInPeriod + " registered group(s) belong to a different period of this record and are not shown here." : "")),
+      flow.multiPeriod && h("div", { style: { marginTop: 10 } },
+        h("button", { onClick: () => setOpenPeriods(v => !v),
+          style: { background: "none", border: "none", padding: 0, cursor: "pointer", fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)" } },
+          (openPeriods ? "▾" : "▸") + " This record has " + flow.periods.length + " periods — show the others"),
+        openPeriods && h("div", null, flow.periods.filter(p => p !== flow.primaryPeriod).map((p, i) =>
+          h("div", { key: i, style: { marginTop: 14 } },
+            h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-2)", marginBottom: 6 } }, p.title || "(untitled period)"),
+            flowTable(p))))),
+      flow.preAssignmentDetails && caveat("Before assignment: " + flow.preAssignmentDetails)
+    ]),
+
+    safety && toolCard(h, [
+      toolLabel(h, "Safety as reported"),
+      scroll(h("table", { style: { borderCollapse: "collapse", fontFamily: "var(--mono)", minWidth: 520 } },
+        h("thead", null, h("tr", null,
+          h("th", { style: thL }, "Group"), h("th", { style: thS }, "Serious AE"),
+          h("th", { style: thS }, "Other AE"), h("th", { style: thS }, "Deaths"))),
+        h("tbody", null, safety.groups.map((g, i) => h("tr", { key: i },
+          h("td", { style: tdL }, g.title),
+          h("td", { style: tdS }, pct(g.serious.rate) + (g.serious.atRisk ? "  (" + num(g.serious.affected) + "/" + num(g.serious.atRisk) + ")" : "")),
+          h("td", { style: tdS }, pct(g.other.rate) + (g.other.atRisk ? "  (" + num(g.other.affected) + "/" + num(g.other.atRisk) + ")" : "")),
+          h("td", { style: tdS }, pct(g.deaths.rate) + (g.deaths.atRisk ? "  (" + num(g.deaths.affected) + "/" + num(g.deaths.atRisk) + ")" : ""))))))),
+      caveat("For a drug that is not approved, this is the only real safety data that exists — FAERS has no denominator and a label does not exist yet. Denominators are the safety population, which is not the randomised population. Deaths are every death recorded in the safety window, not deaths attributed to the drug."
+        + (safety.timeFrame ? "  Collected over: " + safety.timeFrame + "." : "")
+        + (safety.comparable ? "" : "  This record registers " + safety.groups.length + " event groups, which usually means crossover or extension cohorts are included alongside the randomised arms — so these rows are not a clean two-arm comparison.")),
+
+      h("div", { style: { display: "flex", gap: 8, marginTop: 16, marginBottom: 8, flexWrap: "wrap" } },
+        ["serious", "other"].map(v => h("button", { key: v, onClick: () => setAeView(v),
+          style: { padding: "5px 12px", borderRadius: 6, fontSize: 10, fontFamily: "var(--mono)", cursor: "pointer",
+            border: "1px solid " + (aeView === v ? "var(--teal)" : "var(--rule)"),
+            background: aeView === v ? "var(--teal-bg)" : "transparent",
+            color: aeView === v ? "var(--teal)" : "var(--ink-3)" } },
+          v === "serious" ? "Serious events (" + safety.seriousTermCount + ")" : "Other events (" + safety.otherTermCount + ")"))),
+
+      (aeRows && aeRows.length)
+        ? scroll(h("table", { style: { borderCollapse: "collapse", fontFamily: "var(--mono)", minWidth: 560 } },
+            h("thead", null, h("tr", null,
+              h("th", { style: thL }, "Event"),
+              safety.primaryGroups.map(g => h("th", { key: g.id, style: thS }, g.title.length > 26 ? g.title.slice(0, 24) + "…" : g.title)),
+              safety.comparable && h("th", { style: thS }, "Difference"))),
+            h("tbody", null, aeRows.map((e, i) => h("tr", { key: i },
+              h("td", { style: tdL },
+                h("div", null, e.term),
+                e.organSystem && h("div", { style: { fontSize: 9.5, color: "var(--ink-3)" } }, e.organSystem)),
+              safety.primaryGroups.map(g => h("td", { key: g.id, style: tdS },
+                e.byGroup[g.id] ? pct(e.byGroup[g.id].rate) : "—")),
+              safety.comparable && h("td", { style: Object.assign({}, tdS, { color: e.pairDiff == null ? "var(--ink-3)" : Math.abs(e.pairDiff) >= 0.05 ? "var(--amber)" : "var(--ink-2)" }) },
+                e.pairDiff == null ? "—" : (e.pairDiff > 0 ? "+" : "") + (e.pairDiff * 100).toFixed(1) + " pt"))))))
+        : h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-3)" } }, "No events of this kind are registered."),
+
+      caveat((safety.comparable
+          ? "Ranked by the biggest gap between the two groups, signed as “" + safety.groups[0].title + "” minus “" + safety.groups[1].title + "”. CT.gov does not mark which group is the investigational arm — read that from the titles."
+          : "Ranked by the highest rate in any group, because with more than two groups there is no single comparison to sign.")
+        + (safety.frequencyThreshold != null
+          ? "  Non-serious events only have to be listed once they reached " + safety.frequencyThreshold + "% of a group, so that list is a floor on what occurred, never a census."
+          : "")
+        + (safety.groups.length > safety.primaryGroups.length
+          ? "  Showing the " + safety.primaryGroups.length + " groups with the largest safety populations, of " + safety.groups.length
+            + " registered — and ranking against those, so a nine-patient re-treatment cohort cannot decide what the top row is."
+          : ""))
+    ]),
+
+    toolCard(h, [
+      toolLabel(h, "Results flags (" + flagList.length + ")"),
+      flagList.length === 0
+        ? h("div", { style: { fontSize: 11.5, fontFamily: "var(--sans)", color: "var(--ink-2)", lineHeight: 1.6 } },
+            "Nothing in the posted results tripped a flag — no differential dropout, no unreported primary, no interval spanning no-effect, no large safety gap between arms. That is a statement about the reported data only. It does not mean the effect is large, durable, or commercially relevant.")
+        : h("div", { style: { display: "flex", flexDirection: "column", gap: 12 } },
+            flagList.map((f, i) => h("div", { key: i, style: { borderLeft: "3px solid " + sevColor(f.severity), paddingLeft: 10 } },
+              h("div", { style: { fontSize: 12, fontFamily: "var(--mono)", fontWeight: 700, color: sevColor(f.severity), marginBottom: 3 } }, f.label),
+              h("div", { style: { fontSize: 11.5, fontFamily: "var(--sans)", color: "var(--ink-2)", lineHeight: 1.6 } }, f.detail)))),
+      caveat("These check the posted results. They are separate from the design flags above, which check the registered protocol, and from the red-flag checks on the Workspace, which check your own modelling inputs.")
+    ]),
+
+    (results.limitations || results.agreementRestriction) && toolCard(h, [
+      toolLabel(h, "The sponsor's own caveats"),
+      results.limitations && h("div", { style: { fontSize: 11.5, fontFamily: "var(--sans)", color: "var(--ink-2)", lineHeight: 1.6 } }, results.limitations),
+      results.agreementRestriction && h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-3)", marginTop: 8, lineHeight: 1.6 } },
+        "Publication agreement: " + results.agreementRestriction.toLowerCase().replace(/_/g, " ")
+        + " — the sponsor retains some right to review or delay what investigators publish, which affects how quickly independent analysis of this trial appears."),
+      caveat("This is the one caveat in the record written by the people who ran the trial, and it is routinely more candid than the press release was.")
+    ])
+  );
+}
+
 function TrialDecoderTool({ initialNctId, onConsumedInitialNctId }) {
   const h = React.createElement;
   const [nctInput, setNctInput] = React.useState("");
   const [loading, setLoading] = React.useState(false);
   const [decoded, setDecoded] = React.useState(null);
   const [raw, setRaw] = React.useState(null);
+  const [results, setResults] = React.useState(null);
   const [error, setError] = React.useState(null);
   const [showRaw, setShowRaw] = React.useState(false);
   const seq = React.useRef(0);
@@ -2019,12 +2257,15 @@ function TrialDecoderTool({ initialNctId, onConsumedInitialNctId }) {
     const id = (nctId || nctInput).trim();
     if (!id) return;
     const mine = ++seq.current;
-    setLoading(true); setError(null); setDecoded(null); setRaw(null);
+    setLoading(true); setError(null); setDecoded(null); setRaw(null); setResults(null);
     const r = await fetchStudyByNctId(id);
     if (mine !== seq.current) return;      // superseded by a newer lookup
     if (!r.ok) { setError(r.error); setLoading(false); return; }
     setRaw(r.study);
     setDecoded(decodeTrial(r.study));
+    // The same response carries the results section when one exists, so the
+    // readout costs no second call.
+    setResults(r.results || null);
     setLoading(false);
   };
 
@@ -2116,6 +2357,18 @@ function TrialDecoderTool({ initialNctId, onConsumedInitialNctId }) {
                 h("div", { style: { fontSize: 12, fontFamily: "var(--mono)", fontWeight: 700, color: sevColor(f.severity), marginBottom: 3 } }, f.label),
                 h("div", { style: { fontSize: 11.5, fontFamily: "var(--sans)", color: "var(--ink-2)", lineHeight: 1.6 } }, f.detail)
               )))
+      ]),
+
+      results && h(TrialResultsPanels, { results: results, study: raw }),
+
+      !results && decoded.hasResults && toolCard(h, [
+        h("div", { style: { fontSize: 11.5, fontFamily: "var(--sans)", color: "var(--amber)", lineHeight: 1.6 } },
+          "ClinicalTrials.gov marks this trial as having posted results, but the results section could not be read from the record. That is a parsing gap on this side, not a finding about the trial — open the record directly.")
+      ]),
+
+      !results && !decoded.hasResults && toolCard(h, [
+        h("div", { style: { fontSize: 11.5, fontFamily: "var(--sans)", color: "var(--ink-2)", lineHeight: 1.6 } },
+          "No results are posted for this trial yet. When they are, this page gains what the endpoints returned, who finished and who left by arm, and the adverse events as reported — read against the design above rather than after it.")
       ]),
 
       raw && toolCard(h, [

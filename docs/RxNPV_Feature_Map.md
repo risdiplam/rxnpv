@@ -20,14 +20,14 @@ The intended flow: decode the design → watch it for changes → read the resul
 | Trial change watch (snapshot/diff) | **BUILT** | Diffs 5 fields today |
 | Analog effect-size board | **BUILT** | Posted effect sizes in an indication, with honest denominators |
 | Comparable-trial landscape | **BUILT** | Status/duration/enrolment rollup |
-| **Results reader** | **DECIDED — build** | *The biggest hole in the app.* See below |
+| **Results reader** | **BUILT** | Outcomes, participant flow and adverse events, inside the decoder. See below |
 | **Richer change classification** | **DECIDED — build** | Add eligibility, arms, masking; split routine vs red-flag |
 | **Thin-win detector** | **DECIDED — build** | Percentile of the analog distribution, not an arbitrary threshold |
 | **Multi-trial program view** | **DECIDED — build** | Every NCT for one asset, in one place |
 
-### Results reader — the priority
+### Results reader — built (Phase 17)
 
-Right now, when a readout lands — the single most important moment for an investor — the app offers a hyperlink. `ctgovEngine.js` deliberately does not parse `resultsSection`, and that was the right call when the extraction machinery didn't exist. It does now (the analog board reads the same schema).
+When a readout lands — the single most important moment for an investor — the app used to offer a hyperlink. `ctgovEngine.js` deliberately did not parse `resultsSection`, and that was the right call when the extraction machinery didn't exist. It does now (the analog board reads the same schema). Engine: `src/trialResults.js`. Full account in the tracker, Phase 17.
 
 Three panels, one fetch:
 - **Outcomes** — what the primary actually returned, with CI and p-value. Reuses the analog extractor.
@@ -154,8 +154,8 @@ Each of these has been considered and declined on the merits. Recording them her
 
 ## 10. Build order
 
-1. **Results reader** (outcomes, dropout, adverse events) — the one real hole
-2. **Gross-to-net** — accuracy fix on existing valuation
+1. ~~**Results reader** (outcomes, dropout, adverse events)~~ — **done**, Phase 17
+2. **Gross-to-net** — accuracy fix on existing valuation ← next
 3. **Cheap completions batch** — thin-win vs analogs, change classification, Form 4 derivatives, multi-trial view, control-arm stress
 4. **Commercial workbench** — launch trajectory, actual vs modelled
 5. **Tab consolidation** — after the tools exist, not before

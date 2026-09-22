@@ -32,7 +32,7 @@ You must run `node build.js` from the project root first — `setup.js` reads `e
 
 This project's original, deepest test coverage — a 38-check suite covering hand-verified DCF math to the cent — did not survive an earlier sandbox reset during development. `final_regression_pass.js` is a leaner behavioural replacement covering the core valuation paths plus every top-level view, but it asserts "nothing crashed and the right text appeared," not "the arithmetic is right."
 
-**`math_verification.js` (650 checks) now covers that gap** and goes wider than the original did — every numerical primitive in the app checked against an independently-derived value.
+**`math_verification.js` (793 checks) now covers that gap** and goes wider than the original did — every numerical primitive in the app checked against an independently-derived value.
 
 ### What it does and does not check — read this before adding to it
 
@@ -47,7 +47,7 @@ When the suite was first written it reported 4 failures — all four turned out 
 ## What each file does
 
 - `setup.js` — generates `test_desktop.html` (see above)
-- `math_verification.js` — 650 numerical checks against independently-derived reference values; needs no DOM, runs straight against the engine source (see "The lost coverage" above for scope and rules)
+- `math_verification.js` — 793 numerical checks against independently-derived reference values; needs no DOM, runs straight against the engine source (see "The lost coverage" above for scope and rules)
 - `final_regression_pass.js` — the main sweep: creates a case, exercises every core valuation path and every top-level view, asserts zero console errors
 - `final_sweep.js` — navigation-only sweep across all Tools/Simulation tabs
 - `recovery_errorboundary_test.js` — deliberately crashes a case (`programs: null`) and verifies the two-layer error boundary catches it, the case-list sidebar stays functional, and switching to a working case recovers cleanly

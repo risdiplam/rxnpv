@@ -27,7 +27,7 @@ const FILES = [
   "data.js", "engine.js", "costEngine.js", "rdEngine.js", "posEngine.js",
   "dcfEngine.js", "capitalEngine.js", "scenarioEngine.js", "helpers.js",
   "ts_statsEngine.js", "ts_simulationEngine.js", "ts_peakSalesEngine.js", "ts_pkpdEngine.js",
-  "ts_chart.js", "edgarEngine.js", "ctgovEngine.js", "trialDecoder.js", "openTargetsEngine.js", "ts_ctgovEngine.js", "fdaEngine.js", "chart.js", "ts_fdaEngine.js"
+  "ts_chart.js", "edgarEngine.js", "ctgovEngine.js", "trialDecoder.js", "trialResults.js", "openTargetsEngine.js", "ts_ctgovEngine.js", "fdaEngine.js", "chart.js", "ts_fdaEngine.js"
 ];
 global.React = { createElement: () => null, useState: () => [null, () => {}], useEffect: () => {}, Fragment: "F", Component: class {} };
 global.document = { createElement: () => ({ style: {} }), getElementById: () => null };
@@ -86,6 +86,8 @@ const EXPORTS = [
   "tsFdaQueryString", "computeDilutionPath",
   "extractAnalogEffects", "tsClassifyEffectParam", "summarizeDossier",
   "decodeTrial", "decodeTrialRedFlags", "classifyAllocation", "classifyMasking", "classifyComparator", "classifyPrimaryEndpoint",
+  "parseTrialResults", "parseResultOutcomes", "summarizeParticipantFlow", "summarizeAdverseEvents",
+  "resultsRedFlags", "trUnescape", "trNum", "trRate", "trMonthsBetweenDates",
   "applyPartnershipToRevenue", "getProgramRevenueResult", "computePartnershipContribution", "distributeRnDCostByYear",
   "computeSimpleMultipleValuation", "computeSOTPBreakdown",
   "periodMonths", "sumTranchesAtLatestDate", "calcRunwayFromFacts", "extractDebt",
@@ -2561,6 +2563,329 @@ section("PK/PD half-life formats a zero elimination rate");
   // "Infinityhr" is not a readable answer.
   ok("Ke = 0 does not print 'Infinityhr'", api.formatHalfLife(0).indexOf("Infinity") === -1);
   ok("Ke = 0 says what actually happened", api.formatHalfLife(0) === "none (Ke = 0, no elimination modelled)");
+}
+report();
+
+// ════════════════════════════════════════════════════════════════════════════
+// TRIAL RESULTS READER
+// Fixtures are shaped exactly like the live CT.gov v2 responses these were
+// written against (NCT02578680 and a 60-study multiple-sclerosis sweep):
+// numSubjects/value/numAffected are STRINGS, milestone types are free text
+// apart from the three standard ones, and event groups can include crossover
+// cohorts that are not the randomised arms. Every expected number below is
+// worked out longhand in the comment above it.
+// ════════════════════════════════════════════════════════════════════════════
+section("Trial results — participant flow, with death separated from dropout");
+{
+  // 200 started / 140 completed / 60 did not, of which 30 were deaths,
+  // 20 adverse events, 10 lost to follow-up.
+  //   completion            140/200 = 0.70
+  //   discontinuation        60/200 = 0.30
+  //   non-death dropout  (60-30)/200 = 0.15
+  //   AE withdrawal          20/200 = 0.10
+  // Control: 100 / 90 / 10, of which 5 deaths, 2 AEs, 3 lost.
+  //   completion             90/100 = 0.90
+  //   discontinuation        10/100 = 0.10
+  //   non-death dropout   (10-5)/100 = 0.05
+  //   AE withdrawal           2/100 = 0.02
+  const flowSection = {
+    participantFlowModule: {
+      groups: [{ id: "FG000", title: "Drug" }, { id: "FG001", title: "Placebo" }],
+      periods: [{
+        title: "Overall Study",
+        milestones: [
+          { type: "STARTED", achievements: [{ groupId: "FG000", numSubjects: "200" }, { groupId: "FG001", numSubjects: "100" }] },
+          { type: "COMPLETED", achievements: [{ groupId: "FG000", numSubjects: "140" }, { groupId: "FG001", numSubjects: "90" }] },
+          { type: "NOT COMPLETED", achievements: [{ groupId: "FG000", numSubjects: "60" }, { groupId: "FG001", numSubjects: "10" }] },
+          // Free-text bookkeeping milestone — must be ignored, not mistaken
+          // for a completion step.
+          { type: "Safety Population", achievements: [{ groupId: "FG000", numSubjects: "198" }] }
+        ],
+        dropWithdraws: [
+          { type: "Death", reasons: [{ groupId: "FG000", numSubjects: "30" }, { groupId: "FG001", numSubjects: "5" }] },
+          { type: "Adverse Event", reasons: [{ groupId: "FG000", numSubjects: "20" }, { groupId: "FG001", numSubjects: "2" }] },
+          { type: "Lost to Follow-up", reasons: [{ groupId: "FG000", numSubjects: "10" }, { groupId: "FG001", numSubjects: "3" }] }
+        ]
+      }]
+    }
+  };
+  const flow = api.summarizeParticipantFlow(flowSection);
+  const drug = flow.primaryPeriod.rows[0], pbo = flow.primaryPeriod.rows[1];
+  near("completion rate is completed/started", drug.completionRate, 0.70, 1e-12);
+  near("raw discontinuation is notCompleted/started", drug.discontinuationRate, 0.30, 1e-12);
+  near("non-death dropout removes the 30 deaths", drug.nonDeathDiscontinuationRate, 0.15, 1e-12);
+  near("AE withdrawal rate is 20/200", drug.aeWithdrawalRate, 0.10, 1e-12);
+  near("control non-death dropout is (10-5)/100", pbo.nonDeathDiscontinuationRate, 0.05, 1e-12);
+  ok("string numSubjects parse to numbers", drug.started === 200 && pbo.started === 100);
+  ok("a non-standard milestone is not read as completion", drug.completed === 140);
+  ok("deaths are bucketed separately from other reasons", drug.deaths === 30 && drug.withdrewForAE === 20 && drug.lostToFollowUp === 10);
+  // KEYNOTE-189 registers Death, Lost to Follow-up, Physician Decision, Protocol
+  // Violation, Sponsor Decision and Withdrawal by Subject — and no Adverse Event
+  // row at all. Printing 0.0% there turns a gap in the record into a clean
+  // tolerability result.
+  const noAeRow = api.summarizeParticipantFlow({ participantFlowModule: {
+    groups: [{ id: "FG000", title: "Drug" }],
+    periods: [{ title: "Overall Study", milestones: [
+      { type: "STARTED", achievements: [{ groupId: "FG000", numSubjects: "410" }] },
+      { type: "NOT COMPLETED", achievements: [{ groupId: "FG000", numSubjects: "410" }] }
+    ], dropWithdraws: [{ type: "Death", reasons: [{ groupId: "FG000", numSubjects: "329" }] }] }]
+  } });
+  ok("a reason the sponsor never registered reads as unknown, not as zero",
+    noAeRow.primaryPeriod.rows[0].withdrewForAE === null && noAeRow.primaryPeriod.rows[0].aeWithdrawalRate === null);
+  ok("a reason the sponsor did register still reports its count", noAeRow.primaryPeriod.rows[0].deaths === 329);
+
+  // NOT COMPLETED is sometimes not registered. 200 started, 150 completed
+  // leaves 50, which is arithmetic on the sponsor's own two numbers.
+  const derived = api.summarizeParticipantFlow({ participantFlowModule: {
+    groups: [{ id: "FG000", title: "Only arm" }],
+    periods: [{ title: "Overall Study", milestones: [
+      { type: "STARTED", achievements: [{ groupId: "FG000", numSubjects: "200" }] },
+      { type: "COMPLETED", achievements: [{ groupId: "FG000", numSubjects: "150" }] }
+    ] }]
+  } });
+  near("missing NOT COMPLETED is derived as started - completed", derived.primaryPeriod.rows[0].notCompleted, 50, 0);
+
+  // Multi-period records: the flagged period is the one most people were in,
+  // not whichever came first. Run-in 40, randomised 300.
+  const multi = api.summarizeParticipantFlow({ participantFlowModule: {
+    groups: [{ id: "FG000", title: "A" }],
+    periods: [
+      { title: "Run-in", milestones: [{ type: "STARTED", achievements: [{ groupId: "FG000", numSubjects: "40" }] }] },
+      { title: "Randomised phase", milestones: [{ type: "STARTED", achievements: [{ groupId: "FG000", numSubjects: "300" }] }] }
+    ]
+  } });
+  ok("the primary period is the largest, not the first", multi.primaryPeriod.title === "Randomised phase");
+  ok("multi-period records are marked as such", multi.multiPeriod === true);
+
+  // Real record, NCT04368728: 22,071 started the blinded period, 21 are marked
+  // completed, and ~22,000 "did not complete" because they moved into the
+  // open-label period. Counting that as dropout produced a 99.8% attrition
+  // flag on a trial whose real dropout was about 2%.
+  const extension = api.summarizeParticipantFlow({ participantFlowModule: {
+    groups: [{ id: "FG000", title: "Vaccine" }, { id: "FG001", title: "Placebo" }],
+    periods: [{ title: "Blinded Period", milestones: [
+      { type: "STARTED", achievements: [{ groupId: "FG000", numSubjects: "1000" }, { groupId: "FG001", numSubjects: "1000" }] },
+      { type: "COMPLETED", achievements: [{ groupId: "FG000", numSubjects: "10" }, { groupId: "FG001", numSubjects: "10" }] },
+      { type: "NOT COMPLETED", achievements: [{ groupId: "FG000", numSubjects: "990" }, { groupId: "FG001", numSubjects: "990" }] }
+    ], dropWithdraws: [
+      { type: "Participants entered open label period", reasons: [{ groupId: "FG000", numSubjects: "950" }, { groupId: "FG001", numSubjects: "950" }] },
+      { type: "Death", reasons: [{ groupId: "FG000", numSubjects: "10" }, { groupId: "FG001", numSubjects: "10" }] },
+      { type: "Withdrawal by Subject", reasons: [{ groupId: "FG000", numSubjects: "30" }, { groupId: "FG001", numSubjects: "30" }] }
+    ] }]
+  } });
+  const extRow = extension.primaryPeriod.rows[0];
+  near("entering an open-label extension is not dropout", extRow.transitioned, 950, 0);
+  // (990 not completed - 10 deaths - 950 transitions) / 1000 = 30/1000 = 0.03
+  near("real dropout is what is left after deaths and transitions", extRow.nonDeathDiscontinuationRate, 0.03, 1e-12);
+  ok("a 99% 'not completed' period does not trip high attrition when it is a protocol transition",
+    !api.resultsRedFlags({ outcomes: [], flow: extension, safety: null }, null)
+      .some(f => f.label.indexOf("High overall attrition") !== -1));
+
+  // A multi-period record registers one group list spanning every period, so
+  // groups belonging to another period appear here with nothing in them.
+  const spanning = api.summarizeParticipantFlow({ participantFlowModule: {
+    groups: [{ id: "FG000", title: "Phase 1 cohort" }, { id: "FG001", title: "Phase 3 drug" }, { id: "FG002", title: "Phase 3 placebo" }],
+    periods: [{ title: "Phase 3", milestones: [
+      { type: "STARTED", achievements: [{ groupId: "FG000", numSubjects: "0" }, { groupId: "FG001", numSubjects: "500" }, { groupId: "FG002", numSubjects: "500" }] }
+    ] }]
+  } });
+  ok("groups that are not part of a period are dropped from its table", spanning.primaryPeriod.rows.length === 2);
+  near("and counted so the omission is visible", spanning.primaryPeriod.groupsNotInPeriod, 1, 0);
+
+  // ── The flags that come out of this flow ──
+  const flags = api.resultsRedFlags({ outcomes: [], flow, safety: null }, null);
+  const spread = flags.find(f => f.label.indexOf("Differential dropout") !== -1);
+  ok("a 0.15 vs 0.05 non-death gap trips differential dropout at the 10pt threshold", !!spread);
+  ok("the differential-dropout flag is high severity", spread && spread.severity === "high");
+  ok("a 10% vs 2% AE-withdrawal gap trips its own flag",
+    flags.some(f => f.label.indexOf("adverse events differ by arm") !== -1));
+  // The whole point of separating death: 30% of the drug arm did not complete,
+  // but only 15% left for a reason other than dying, so the 20% high-attrition
+  // flag must NOT fire.
+  ok("30% not-completed does not trip high attrition when half of it is deaths",
+    !flags.some(f => f.label.indexOf("High overall attrition") !== -1));
+}
+report();
+
+section("Trial results — outcome measures and registered analyses");
+{
+  const mk = (analyses, classes) => ({ outcomeMeasuresModule: { outcomeMeasures: [{
+    type: "PRIMARY", title: "Progression-free survival", reportingStatus: "POSTED",
+    paramType: "MEDIAN", dispersionType: "95% Confidence Interval", unitOfMeasure: "Months",
+    groups: [{ id: "OG000", title: "Drug" }, { id: "OG001", title: "Control" }],
+    denoms: [{ units: "Participants", counts: [{ groupId: "OG000", value: "410" }, { groupId: "OG001", value: "206" }] },
+             { units: "Events", counts: [{ groupId: "OG000", value: "9999" }] }],
+    classes: classes, analyses: analyses
+  }] } });
+  const simpleClasses = [{ categories: [{ measurements: [
+    { groupId: "OG000", value: "8.8", lowerLimit: "7.6", upperLimit: "9.2" },
+    { groupId: "OG001", value: "4.9", lowerLimit: "4.7", upperLimit: "5.5" }
+  ] }] }];
+
+  // HR 0.52, 95% CI 0.43–0.64. The null for a ratio is 1, which is outside
+  // [0.43, 0.64], so the interval excludes no-effect.
+  const win = api.parseResultOutcomes(mk([{ groupIds: ["OG000", "OG001"], paramType: "Hazard Ratio (HR)",
+    paramValue: "0.52", ciPctValue: "95", ciLowerLimit: "0.43", ciUpperLimit: "0.64", pValue: "<0.00001",
+    statisticalMethod: "Log Rank", nonInferiorityType: "SUPERIORITY",
+    estimateComment: "PD-L1 status (\\<1%) \\& smoking" }], simpleClasses))[0];
+  ok("a single class with a single category reads as a plain per-arm result", win.layout === "simple");
+  near("the drug arm's point estimate is read", win.arms[0].value, 8.8, 1e-12);
+  near("its interval is read", win.arms[0].lower, 7.6, 1e-12);
+  near("the arm n comes from the participants denominator, not the events one", win.arms[0].n, 410, 0);
+  near("the hazard ratio is parsed from its string", win.analyses[0].value, 0.52, 1e-12);
+  ok("a ratio scale is recognised with a null of 1", win.analyses[0].scale === "ratio" && win.analyses[0].nullValue === 1);
+  ok("0.43-0.64 excludes 1, so the interval does not cross the null", win.analyses[0].crossesNull === false);
+  ok("the p-value stays a string so '<0.00001' survives", win.analyses[0].pValue === "<0.00001");
+  ok("CT.gov's backslash escapes are removed from free text", win.analyses[0].comment.indexOf("\\") === -1);
+  ok("the measure's own paramType is prettified, not shown as MEDIAN", win.estimateType === "Median");
+
+  // HR 0.90, 95% CI 0.75–1.08. 1 lies inside the interval.
+  const miss = api.parseResultOutcomes(mk([{ groupIds: ["OG000", "OG001"], paramType: "Hazard Ratio (HR)",
+    paramValue: "0.90", ciPctValue: "95", ciLowerLimit: "0.75", ciUpperLimit: "1.08" }], simpleClasses))[0];
+  ok("0.75-1.08 contains 1, so the interval crosses the null", miss.analyses[0].crossesNull === true);
+  const missFlags = api.resultsRedFlags({ outcomes: [miss], flow: null, safety: null }, null);
+  ok("an interval spanning no-effect is flagged high", missFlags.some(f => f.label === "Primary interval includes no effect" && f.severity === "high"));
+
+  // A four-category measure must not collapse to its first category.
+  const cats = api.parseResultOutcomes(mk([], [{ categories: [
+    { title: "Grade 1", measurements: [{ groupId: "OG000", value: "10" }] },
+    { title: "Grade 2", measurements: [{ groupId: "OG000", value: "20" }] },
+    { title: "Grade 3", measurements: [{ groupId: "OG000", value: "5" }] },
+    { title: "Grade 4", measurements: [{ groupId: "OG000", value: "1" }] }
+  ] }]))[0];
+  ok("a multi-category measure is reported as categories, not one headline", cats.layout === "categories" && cats.arms === null);
+  ok("all four categories survive", cats.categoryRows.length === 4 && cats.categoryRows[2].title === "Grade 3");
+
+  // Several strata — no single number is claimed at all.
+  const strat = api.parseResultOutcomes(mk([], [
+    { title: "PD-L1 >= 50%", categories: [{ measurements: [{ groupId: "OG000", value: "1" }] }] },
+    { title: "PD-L1 1-49%", categories: [{ measurements: [{ groupId: "OG000", value: "2" }] }] },
+    { title: "PD-L1 < 1%", categories: [{ measurements: [{ groupId: "OG000", value: "3" }] }] }
+  ]))[0];
+  ok("a stratified measure claims no headline value", strat.layout === "stratified" && strat.arms === null && strat.classCount === 3);
+
+  // A registered-but-unreported primary is a gap in the record, not a null result.
+  const deferred = api.parseResultOutcomes({ outcomeMeasuresModule: { outcomeMeasures: [
+    { type: "PRIMARY", title: "Overall survival", reportingStatus: "NOT_POSTED", groups: [], denoms: [], classes: [], analyses: [] }
+  ] } })[0];
+  ok("NOT_POSTED is carried through as not posted", deferred.posted === false);
+  ok("an unreported primary is flagged high",
+    api.resultsRedFlags({ outcomes: [deferred], flow: null, safety: null }, null)
+      .some(f => f.label.indexOf("registered but not posted") !== -1 && f.severity === "high"));
+
+  // Per-arm numbers with no comparison registered.
+  ok("a primary with no registered analysis is flagged",
+    api.resultsRedFlags({ outcomes: [api.parseResultOutcomes(mk([], simpleClasses))[0]], flow: null, safety: null }, null)
+      .some(f => f.label.indexOf("No between-group analysis") !== -1));
+
+  // Non-inferiority read as superiority is the classic over-read.
+  const ni = api.parseResultOutcomes(mk([{ groupIds: ["OG000", "OG001"], paramType: "Hazard Ratio (HR)",
+    paramValue: "0.95", ciLowerLimit: "0.80", ciUpperLimit: "1.12", nonInferiorityType: "NON_INFERIORITY" }], simpleClasses))[0];
+  ok("a non-inferiority comparison is called out as not superiority",
+    api.resultsRedFlags({ outcomes: [ni], flow: null, safety: null }, null)
+      .some(f => f.label.indexOf("not superiority") !== -1));
+
+  // A master protocol registers the same analysis across dozens of sub-studies.
+  // Sixty copies of one sentence is not sixty findings.
+  ok("an identical flag raised by many endpoints is stated once",
+    api.resultsRedFlags({ outcomes: [ni, ni, ni, ni], flow: null, safety: null }, null)
+      .filter(f => f.label.indexOf("not superiority") !== -1).length === 1);
+}
+report();
+
+section("Trial results — adverse events");
+{
+  // Two arms. Serious: 60/200 = 0.30 vs 20/100 = 0.20, a 10pt gap.
+  // Deaths:  40/200 = 0.20 vs 10/100 = 0.10, a 10pt gap.
+  // Neutropenia: 40/200 = 0.20 vs 5/100 = 0.05 -> pair difference +0.15.
+  // Nausea:      10/200 = 0.05 vs 12/100 = 0.12 -> pair difference -0.07.
+  const aeSection = { adverseEventsModule: {
+    frequencyThreshold: 5, timeFrame: "Up to 24 months",
+    eventGroups: [
+      { id: "EG000", title: "Drug", seriousNumAffected: 60, seriousNumAtRisk: 200, otherNumAffected: 190, otherNumAtRisk: 200, deathsNumAffected: 40, deathsNumAtRisk: 200 },
+      { id: "EG001", title: "Placebo", seriousNumAffected: 20, seriousNumAtRisk: 100, otherNumAffected: 80, otherNumAtRisk: 100, deathsNumAffected: 10, deathsNumAtRisk: 100 }
+    ],
+    seriousEvents: [
+      { term: "Neutropenia", organSystem: "Blood", stats: [
+        { groupId: "EG000", numEvents: 90, numAffected: 40, numAtRisk: 200 },
+        { groupId: "EG001", numEvents: 6, numAffected: 5, numAtRisk: 100 }] },
+      { term: "Nausea", organSystem: "GI", stats: [
+        { groupId: "EG000", numEvents: 10, numAffected: 10, numAtRisk: 200 },
+        { groupId: "EG001", numEvents: 12, numAffected: 12, numAtRisk: 100 }] }
+    ],
+    otherEvents: []
+  } };
+  const ae = api.summarizeAdverseEvents(aeSection);
+  near("serious AE rate is affected/at-risk", ae.groups[0].serious.rate, 0.30, 1e-12);
+  near("the control serious rate is 20/100", ae.groups[1].serious.rate, 0.20, 1e-12);
+  near("death rate is 40/200", ae.groups[0].deaths.rate, 0.20, 1e-12);
+  const neut = ae.seriousEvents[0];
+  // 90 episodes across 40 people: a rate built from numEvents would be 0.45.
+  near("an event rate counts people, not episodes", neut.byGroup.EG000.rate, 0.20, 1e-12);
+  near("the pair difference is drug minus control", neut.pairDiff, 0.15, 1e-12);
+  near("a difference favouring the control arm comes out negative", ae.seriousEvents[1].pairDiff, -0.07, 1e-12);
+  ok("the biggest gap is ranked by absolute difference", ae.biggestSeriousGaps[0].term === "Neutropenia");
+  ok("two event groups are comparable", ae.comparable === true);
+  near("the frequency threshold is kept so the 'other events' list is not read as complete", ae.frequencyThreshold, 5, 0);
+
+  const aeFlags = api.resultsRedFlags({ outcomes: [], flow: null, safety: ae }, null);
+  ok("a 10pt serious-AE gap is flagged", aeFlags.some(f => f.label.indexOf("Serious adverse events differ") !== -1));
+  ok("a death-rate gap is flagged", aeFlags.some(f => f.label.indexOf("All-cause deaths differ") !== -1));
+
+  // Five event groups (crossover + extension cohorts, as in KEYNOTE-189) is
+  // not a two-arm comparison and must not be presented as one.
+  const many = api.summarizeAdverseEvents({ adverseEventsModule: {
+    eventGroups: [0, 1, 2, 3, 4].map(i => ({ id: "EG00" + i, title: "Cohort " + i, seriousNumAffected: 10 * (i + 1), seriousNumAtRisk: 100 })),
+    seriousEvents: [{ term: "Anaemia", stats: [{ groupId: "EG000", numAffected: 50, numAtRisk: 100 }, { groupId: "EG001", numAffected: 1, numAtRisk: 100 }] }]
+  } });
+  ok("five event groups are not treated as comparable", many.comparable === false);
+  // KEYNOTE-189 again: three of its five event groups are crossover and
+  // re-treatment cohorts, one with nine patients. Ranking across all five put a
+  // 2-of-9 event at the top of a table whose every visible column read 0.0%.
+  const lopsided = api.summarizeAdverseEvents({ adverseEventsModule: {
+    eventGroups: [
+      { id: "EG000", title: "Drug", seriousNumAffected: 200, seriousNumAtRisk: 405 },
+      { id: "EG001", title: "Control", seriousNumAffected: 100, seriousNumAtRisk: 202 },
+      { id: "EG002", title: "Second course", seriousNumAffected: 2, seriousNumAtRisk: 9 }
+    ],
+    seriousEvents: [
+      { term: "Rare thing in a tiny cohort", stats: [
+        { groupId: "EG000", numAffected: 0, numAtRisk: 405 },
+        { groupId: "EG001", numAffected: 0, numAtRisk: 202 },
+        { groupId: "EG002", numAffected: 2, numAtRisk: 9 }] },
+      { term: "Pneumonia", stats: [
+        { groupId: "EG000", numAffected: 40, numAtRisk: 405 },
+        { groupId: "EG001", numAffected: 10, numAtRisk: 202 }] }
+    ]
+  } });
+  ok("the two largest safety populations are the ones shown", lopsided.primaryGroups.length === 2
+    && lopsided.primaryGroups[0].id === "EG000" && lopsided.primaryGroups[1].id === "EG001");
+  // 2/9 = 22.2% is the highest rate anywhere, but it is invisible in the table,
+  // so it must not outrank 40/405 = 9.9% in the arms actually shown.
+  ok("a tiny unshown cohort does not decide the top row", lopsided.topSerious[0].term === "Pneumonia");
+  near("and the ranking rate comes from the shown groups", lopsided.topSerious[0].maxRate, 40 / 405, 1e-12);
+  ok("no pair difference is computed when there are not exactly two groups", many.seriousEvents[0].pairDiff === null);
+  ok("and no two-arm safety flag is produced",
+    api.resultsRedFlags({ outcomes: [], flow: null, safety: many }, null).length === 0);
+}
+report();
+
+section("Trial results — parsing primitives and reporting delay");
+{
+  near("a thousands separator parses", api.trNum("1,234"), 1234, 0);
+  ok("an empty string is null, never zero", api.trNum("") === null);
+  ok("a non-numeric value is null, never zero", api.trNum("NA") === null);
+  ok("a zero denominator gives null rather than Infinity", api.trRate(5, 0) === null);
+  ok("CT.gov's escaped less-than is unescaped", api.trUnescape("PD-L1 \\<1%") === "PD-L1 <1%");
+  // 2023-06 to 2025-01 is (2025-2023)*12 + (0-5) = 24 - 5 = 19 months.
+  near("a YYYY-MM gap is counted in whole months", api.trMonthsBetweenDates("2023-06", "2025-01"), 19, 0);
+  ok("a missing date gives null", api.trMonthsBetweenDates(null, "2025-01") === null);
+  ok("19 months from primary completion to posting is flagged",
+    api.resultsRedFlags({ outcomes: [], flow: null, safety: null },
+      { primaryCompletionDate: "2023-06", resultsFirstPostDate: "2025-01" })
+      .some(f => f.label.indexOf("months after primary completion") !== -1));
+  ok("a study with no results section parses to null", api.parseTrialResults({ protocolSection: {} }) === null);
+  ok("a null study does not throw", api.parseTrialResults(null) === null);
 }
 report();
 

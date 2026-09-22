@@ -3,7 +3,7 @@
 // RxNPV build script
 //
 // This app is NOT built with a real bundler (webpack/esbuild/vite). It's
-// built by concatenating 32 plain <script>-style JS files, in a specific
+// built by concatenating 34 plain <script>-style JS files, in a specific
 // order, into one giant inline <script> block inside shell.html. There are
 // no import/export statements anywhere — every file relies on the global
 // scope and on files earlier in MODULE_ORDER having already defined
@@ -37,7 +37,7 @@ const MODULE_ORDER = [
   'data.js', 'engine.js', 'costEngine.js', 'rdEngine.js', 'posEngine.js',
   'dcfEngine.js', 'capitalEngine.js', 'scenarioEngine.js',
   // External data integrations (EDGAR, ClinicalTrials.gov, openFDA)
-  'edgarEngine.js', 'ctgovEngine.js', 'trialDecoder.js', 'fdaEngine.js', 'openTargetsEngine.js',
+  'edgarEngine.js', 'ctgovEngine.js', 'trialDecoder.js', 'trialResults.js', 'fdaEngine.js', 'openTargetsEngine.js',
   // Export utilities — must precede the UI files that attach export controls
   'exportEngine.js',
   // Shared UI building blocks

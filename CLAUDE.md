@@ -22,7 +22,7 @@ Practical implication for how work should be sequenced: don't let more than one 
 
 ## Architecture — read this before touching the build
 
-**This is not built with a real bundler.** No webpack, no esbuild, no Vite, no ES module imports/exports anywhere. It's 33 plain JavaScript files, concatenated in a specific order into one giant inline `<script>` block inside `shell.html`, producing `electron/rxnpv.html` — the single file the Electron shell actually loads.
+**This is not built with a real bundler.** No webpack, no esbuild, no Vite, no ES module imports/exports anywhere. It's 34 plain JavaScript files, concatenated in a specific order into one giant inline `<script>` block inside `shell.html`, producing `electron/rxnpv.html` — the single file the Electron shell actually loads.
 
 This was a pragmatic choice made out of necessity: the app was originally built entirely inside a Claude chat conversation, in a sandboxed environment with no real bundler tooling available. It works, it's been thoroughly tested in that form, and **changing it is a legitimate future improvement but a real, deliberate architecture decision** — not something to fix in passing while doing something else. If you do it, do it as its own isolated change with full re-verification, not bundled into a feature or bug fix.
 
@@ -51,7 +51,7 @@ Quit the running app first if using `--install` — it overwrites the app bundle
 ### Project layout
 
 ```
-src/            33 source modules — see MODULE_ORDER in build.js for the authoritative list/order
+src/            34 source modules — see MODULE_ORDER in build.js for the authoritative list/order
 shell.html      HTML template with a __SCRIPT__ placeholder
 build.js        reassembles src/ into electron/rxnpv.html
 electron/       main.js, preload.js, package.json (electron-builder config), icon.icns/icon.svg, vendor/ (React UMD builds, committed)
@@ -92,6 +92,7 @@ docs/           design-decision history and feature documentation — see below
 A deliberate product decision made in September 2026: **not every feature has to feed the DCF.** The app is a conviction sandbox, and a tool that helps a retail investor understand the science or the trial earns its place whether or not a number flows from it into a valuation. Several of these deliberately do not.
 
 - **Trial Decoder** (Tools → Live research). Paste an NCT; get the design in plain English — allocation, masking, comparator, arms, primary endpoint — plus what the architecture can and cannot establish, and design red flags. Filled a real hole: the app could already *search* trials and *watch* them for changes but could never *explain* one. All derived from registered CT.gov fields that were already arriving in every response and being discarded; where CT.gov is silent it says "not stated" rather than defaulting, so an unregistered masking field never reads as open label. Engine in `trialDecoder.js`, pure and unit-tested.
+- **Results reader**, also inside the decoder, below a divider so the design is read first and the outcome second. One fetch, three panels: what the registered endpoints returned (with the sponsor's own effect estimate, interval, p-value and — surfaced deliberately — whether the comparison was superiority or non-inferiority), who finished and who left by arm, and the adverse events. Engine in `trialResults.js`, pure and unit-tested. Four rules make it safe: nothing infers which arm is the drug (groups are named as the sponsor named them, differences are signed, never editorialised); a measure reported across strata or categories is never collapsed into a headline the sponsor did not register; **deaths are never counted as dropout**, and neither is moving into an open-label extension; and every rate carries its denominator, with a reason the sponsor never filed shown as "not registered" rather than 0.0%.
 - **Trial-design red flags**, inside the decoder. Note these are *separate from* `computeRedFlags()`, which checks the user's own modelling inputs and says nothing about the study. Don't merge them.
 - **Target Dossier** (Open Targets). Human genetic support for a target, disease associations split by whether the evidence is genetic or inferred, and what drugs already exist against it. **Deliberately not wired into PoS** — an Open Targets association score is a weighted aggregate over very heterogeneous evidence, and presenting it as a probability input would be exactly the false precision this project avoids. If that ever changes it should be a deliberate decision, not a drift.
 - **Analog effect-size board** (inside Trial Explorer). What effect sizes actually got *posted* in an indication — the reference class a modelled hazard ratio should be read against. Always reports its own denominators ("17 extractable of 50 with results") because a board that quietly drops what it cannot parse reads as the whole landscape.
@@ -103,6 +104,8 @@ Both new integrations were written against assumed API shapes and **both were wr
 
 1. **Open Targets v4 has moved.** `knownDrugs` no longer exists (it is `drugAndClinicalCandidates`), a clinical row's `diseases` are wrapper objects with no `name`, and stages arrive as `"PHASE_3"`. Introspect the live schema before trusting any query here.
 2. **CT.gov's `paramType` is free text, not an enum.** Real values include `"Hazard Ratio (HR)"` and `"CMH ESTIMATE OF COMMON ODDS RATIO"`. It must be pattern-matched — and narrowly: anything on a transformed scale (a log hazard ratio) is refused outright, because its null value is 0 rather than 1 and mixing the two would corrupt every summary on the board.
+
+3. **A results record's denominators are not the arms you think they are.** KEYNOTE-189 registers five adverse-event groups, three of them crossover and re-treatment cohorts — one with nine patients, one with two. Ranking events by their highest rate across all five put a 2-of-9 event at the top of a table where every visible column read 0.0%. Rank and display against the groups with the real denominators, not all of them. The same record registers ~44,000 "not completed" participants whose reason is *entering the open-label period*, and NCT04368728 the same: read as attrition that is 99.8% dropout on a trial whose real dropout was about 2%.
 
 Corollary, learned the same way: **test a new CT.gov feature against a real mega-trial.** NCT04368728 registers 64 primary endpoints and 20 arms, which broke the decoder's rendering and made its co-primary red flag produce nonsense. No synthetic fixture would have suggested those numbers were possible.
 
@@ -121,7 +124,7 @@ If a future request seems to want one of these, say so plainly and ask before bu
 
 ## Known limitations — real gaps, not modesty
 
-- **The original 38-check core-engine regression suite from the earliest build sessions did not survive a sandbox reset** and was never reconstructed as such — but treat this as closed, not open: `test/math_verification.js` is not a "leaner replacement," it now independently verifies 568 hand-derived checks across the full engine (revenue build, cost chain, capital structure, every trial-statistics formula, chart axis logic, storage accounting), each checked against a value worked out longhand in its own comment rather than recorded from the app's own output. Read `test/README.md` for the exact scope/rules of what this suite does and doesn't claim.
+- **The original 38-check core-engine regression suite from the earliest build sessions did not survive a sandbox reset** and was never reconstructed as such — but treat this as closed, not open: `test/math_verification.js` is not a "leaner replacement," it now independently verifies 793 hand-derived checks across the full engine (revenue build, cost chain, capital structure, every trial-statistics formula, chart axis logic, storage accounting), each checked against a value worked out longhand in its own comment rather than recorded from the app's own output. Read `test/README.md` for the exact scope/rules of what this suite does and doesn't claim.
 - **No formal accessibility audit** (screen reader support, keyboard-only navigation) has been done. Contrast has been checked rigorously (WCAG relative-luminance, both themes) but that is a different, narrower claim than full accessibility.
 
 ## Coding conventions actually followed throughout this build
