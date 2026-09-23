@@ -127,6 +127,53 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
     root.unmount(); host.remove();
   }
 
+  // ── FIN-005 — Company Lookup: the Form 4 panel never outlives its company ──
+  // SEC calls are stubbed. Company A's insider is "Alice Alpha"; after a search
+  // for company B her trades must not appear — neither from a panel left
+  // standing (the reported bug) nor from a Form 4 fetch that lands late.
+  {
+    const saved = { e: w.electronAPI, pull: w.pullEdgarFinancials, ins: w.fetchInsiderTransactions, tr: w.searchTrialsBySponsor };
+    w.electronAPI = Object.assign({}, w.electronAPI || {}, { isDesktop: true });
+    const edgar = (q) => ({ ok: true, name: q === "AAA" ? "Alpha Bio" : "Beta Bio", ticker: q, cik: q === "AAA" ? "1" : "2",
+      cash: 1e8, debt: 0, basicShares: 1e7, dilutedShares: 1.1e7, options: null, warrants: null,
+      sourceFilingUrl: "https://www.sec.gov/x", sourceFilingLabel: "10-Q" });
+    w.pullEdgarFinancials = async (q) => edgar(q);
+    w.searchTrialsBySponsor = async () => ({ ok: true, studies: [], totalCount: 0 });
+    const txns = [{ ownerName: "Alice Alpha", role: "Chief Executive Officer", filingDate: "2026-09-01", sourceUrl: "https://www.sec.gov/f",
+      date: "2026-09-01", code: "P", codeLabel: "Open-market purchase", securityTitle: "Common Stock",
+      shares: 1000, pricePerShare: 10, acquiredDisposed: "A", valueUsd: 10000, sharesOwnedAfter: 5000 }];
+    const insiders = { ok: true, filingsChecked: 1, transactions: txns, derivativeTransactions: [], openMarketSummary: w.summarizeOpenMarketActivity(txns) };
+    let release = null;
+    w.fetchInsiderTransactions = async () => insiders;
+
+    click(btn("Tools")); await wait(400); click(btn("Company")); await wait(300); click(btn("Company Lookup")); await wait(400);
+    const q = d.querySelector('input[aria-label="Company name or ticker"]');
+    const searchFor = async (t) => { setVal(q, t); await wait(100); click(btn("Search")); await wait(500); };
+    const shown = () => /Alice Alpha/.test(d.body.textContent);
+
+    await searchFor("AAA");
+    click(btn("Load insider activity (Form 4)")); await wait(500);
+    ok(shown(), "FIN-005: company A's Form 4 insiders load");
+    await searchFor("BBB");
+    ok(/Beta Bio/.test(d.body.textContent), "FIN-005: company B's EDGAR block is showing");
+    ok(!shown(), "FIN-005: a new search unmounts company A's insider panel");
+
+    // The late-landing fetch: load A's Form 4s, search B before they arrive.
+    await searchFor("AAA");
+    w.fetchInsiderTransactions = () => new Promise(res => { release = () => res(insiders); });
+    click(btn("Load insider activity (Form 4)")); await wait(200);
+    ok(typeof release === "function", "FIN-005: after a fresh search for A, its Form 4 load can be started (no stale panel in the way)");
+    await searchFor("BBB");
+    if (release) release();
+    await wait(400);
+    ok(!shown(), "FIN-005: a Form 4 fetch that lands after a newer search is dropped");
+    ok(/Beta Bio/.test(d.body.textContent), "FIN-005: and company B is still what is shown");
+
+    Object.assign(w, { pullEdgarFinancials: saved.pull, fetchInsiderTransactions: saved.ins, searchTrialsBySponsor: saved.tr });
+    w.electronAPI = saved.e;
+    click(btn("Workspace")); await wait(400);
+  }
+
   if (errors.length) { console.log(errors.slice(0, 40).join("\n")); console.log("\n" + errors.length + " FAILURE(S) across " + checks + " checks"); process.exit(1); }
   console.log("ALL AUDIT REGRESSION CHECKS PASSED — " + checks + " checks");
   process.exit(0);

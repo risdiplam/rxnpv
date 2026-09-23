@@ -324,11 +324,18 @@ function CompanyLookupTool({ cases, updateCase, activeCase, onWatchTrial }) {
   // company's data under another company's name with nothing to indicate it.
   const searchSeq = React.useRef(0);
   const compSeq = React.useRef(0);
+  // The Form 4 panel had neither: it survived a new search, so company A's
+  // insiders rendered inside company B's EDGAR block, and a slow Form 4 fetch
+  // could land after the user had moved on (FIN-005). A new search clears it
+  // and advances insiderSeq, which drops any fetch still in flight.
+  const insiderSeq = React.useRef(0);
 
   const search = async () => {
     if (!query.trim()) return;
     const myReq = ++searchSeq.current;
+    insiderSeq.current++;
     setLoading(true); setEdgarError(null); setTrialsError(null); setEdgarResult(null); setTrialsResult(null); setExportMsg(null);
+    setInsiderResult(null); setInsiderError(null); setInsiderLoading(false);
     const [edgarR, trialsR] = await Promise.all([
       isDesktop ? pullEdgarFinancials(query.trim(), false) : Promise.resolve({ ok: false, error: "EDGAR requires the desktop app." }),
       searchTrialsBySponsor(query.trim(), 20)
@@ -377,8 +384,12 @@ function CompanyLookupTool({ cases, updateCase, activeCase, onWatchTrial }) {
 
   const loadInsiderActivity = async () => {
     if (!edgarResult || !edgarResult.cik) return;
+    const myReq = ++insiderSeq.current;
     setInsiderLoading(true); setInsiderError(null); setInsiderResult(null);
-    const r = await fetchInsiderTransactions(edgarResult.cik, 20);
+    let r;
+    try { r = await fetchInsiderTransactions(edgarResult.cik, 20); }
+    catch (e) { r = { ok: false, error: e.message }; }
+    if (myReq !== insiderSeq.current) return; // a newer search or load has replaced this one
     if (r.ok) setInsiderResult(r); else setInsiderError(r.error || "Couldn't load insider activity.");
     setInsiderLoading(false);
   };
