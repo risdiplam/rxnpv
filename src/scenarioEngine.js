@@ -1066,6 +1066,7 @@ function computeFullCaseMonteCarlo(theCase, discountRateBasePct, terminalValuePa
   iterations = iterations || 3000;
   const bear = getEffectiveScenarioPreset(theCase, "bear");
   const bull = getEffectiveScenarioPreset(theCase, "bull");
+  const base = getEffectiveScenarioPreset(theCase, "base");
   const valMethod = theCase.valuationMethod || "dcf";
   const multipleAssumptions = theCase.multipleAssumptions || { bear: "3", base: "3", bull: "3" };
 
@@ -1076,10 +1077,18 @@ function computeFullCaseMonteCarlo(theCase, discountRateBasePct, terminalValuePa
   const perShares = [], posSamples = [], shareSamples = [], drSamples = [];
   let errors = 0;
 
+  // Triangular between the Bear and Bull bounds with Base as the most likely
+  // value. Two ways this used to go wrong (FIN-010): equal bounds returned a
+  // hardcoded 100 (or 0) instead of the bound, and the mode was hardcoded too —
+  // so with a case-level Base-PoS adjustment of 50% (Bear 35, Base 50, Bull 65)
+  // the mode sat at 100, outside its own range, and sampleTriangular drew
+  // values up to ~79, past Bull. The mode is now the case's effective Base,
+  // clamped into [low, high]; equal bounds return the bound.
+  const tri = (lo, mode, hi) => lo === hi ? lo : sampleTriangular(lo, Math.min(hi, Math.max(lo, mode)), hi);
   for (let i = 0; i < iterations; i++) {
-    const sampledPos = posLow === posHigh ? 100 : sampleTriangular(posLow, 100, posHigh);
-    const sampledShare = shareLow === shareHigh ? 100 : sampleTriangular(shareLow, 100, shareHigh);
-    const sampledDR = drLow === drHigh ? 0 : sampleTriangular(drLow, 0, drHigh);
+    const sampledPos = tri(posLow, base.posMultiplierPct, posHigh);
+    const sampledShare = tri(shareLow, base.shareMultiplierPct, shareHigh);
+    const sampledDR = tri(drLow, base.discountRateAddPct, drHigh);
     const trialScenario = { label: "mc", shareMultiplierPct: sampledShare, posMultiplierPct: sampledPos, discountRateAddPct: sampledDR, color: "" };
     try {
       const result = valMethod === "multiple"

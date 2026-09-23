@@ -3684,6 +3684,60 @@ section("FIN-003: Peak Sales rates are entered as whole percents");
 }
 report();
 
+section("FIN-009/010: full-case Monte Carlo bounds and degenerate cases");
+{
+  const mkCase = (extra) => Object.assign({
+    name: "MC", currentPrice: "10",
+    capitalStructure: { mode: "simple", dilutedSharesSimple: "10000000", cash: "50000000", debt: "0" },
+    corporateGA: { preCommercialAnnualM: "0", gaShareOfMatureSgaPct: "0" },
+    programs: [{ id: "p1", name: "Asset", currentPhase: "phase2", therapeuticArea: "Oncology", modality: "smallMolecule",
+      revenueMode: "quick", quickRevenue: { peakRevenue: "800000000", yearsToPeak: "6", profile: "median" } }]
+  }, extra || {});
+  const tv = { enabled: false };
+  const at = (c, pos, share, dr) => api.computeCaseValuation(c,
+    { label: "x", shareMultiplierPct: share, posMultiplierPct: pos, discountRateAddPct: dr, color: "" }, null, 12, tv).equity.perShare;
+
+  // FIN-010 (a): Bear = Bull = 80 on PoS, share and discount rate held equal
+  // too. Every draw must BE the bound, so the whole distribution collapses to
+  // the deterministic valuation at PoS 80%. f49689f drew 100 instead.
+  const flat80 = mkCase({ scenarioOverrides: {
+    bear: { posMultiplierPct: "80", shareMultiplierPct: "100", discountRateAddPct: "0" },
+    bull: { posMultiplierPct: "80", shareMultiplierPct: "100", discountRateAddPct: "0" } } });
+  const mc80 = api.computeFullCaseMonteCarlo(flat80, 12, tv, 200);
+  const want80 = at(flat80, 80, 100, 0);
+  near("Bear = Bull = 80: p10 is the valuation at PoS 80%", mc80.percentiles.p10, want80, 1e-6);
+  near("Bear = Bull = 80: p90 is the same value", mc80.percentiles.p90, want80, 1e-6);
+  ok("and differs from the value at 100% (so the test can tell them apart)", Math.abs(want80 - at(flat80, 100, 100, 0)) > 1e-3);
+
+  // FIN-010 (b): a 50% case-level Base-PoS adjustment scales all three presets:
+  // Bear 70 x 0.5 = 35, Base 100 x 0.5 = 50, Bull 130 x 0.5 = 65. Per-share
+  // value rises with PoS, so every trial must land within
+  // [value at 35%, value at 65%]. With the mode stuck at 100, f49689f drew up
+  // to 35 + sqrt(1 x 30 x 65) = 35 + 44.2 = ~79, past Bull.
+  const adj = mkCase({ basePosAdjustmentPct: "50", scenarioOverrides: {
+    bear: { shareMultiplierPct: "100", discountRateAddPct: "0" },
+    bull: { shareMultiplierPct: "100", discountRateAddPct: "0" } } });
+  const lo = at(adj, 35, 100, 0), hi = at(adj, 65, 100, 0);
+  const mcAdj = api.computeFullCaseMonteCarlo(adj, 12, tv, 600);
+  const vals = mcAdj.sortedValues;
+  ok("with a Base-PoS adjustment every trial stays at or above the Bear value", vals[0] >= lo - 1e-6);
+  ok("and at or below the Bull value", vals[vals.length - 1] <= hi + 1e-6);
+  ok("600 trials, none failed", mcAdj.validTrials === 600 && mcAdj.errors === 0);
+
+  // FIN-009: everything degenerate AT Base (Bear = Base = Bull on all three
+  // dials) — the Monte Carlo must reproduce the deterministic Base per-share
+  // value at every percentile and in the mean.
+  const flatBase = mkCase({ scenarioOverrides: {
+    bear: { posMultiplierPct: "100", shareMultiplierPct: "100", discountRateAddPct: "0" },
+    bull: { posMultiplierPct: "100", shareMultiplierPct: "100", discountRateAddPct: "0" } } });
+  const det = api.computeCaseValuation(flatBase, api.getEffectiveScenarioPreset(flatBase, "base"), "base", 12, tv).equity.perShare;
+  const mcB = api.computeFullCaseMonteCarlo(flatBase, 12, tv, 150);
+  ["p10", "p25", "p50", "p75", "p90"].forEach(k => near("degenerate at Base: " + k + " = deterministic Base per-share", mcB.percentiles[k], det, 1e-6));
+  near("degenerate at Base: the mean too", mcB.mean, det, 1e-6);
+  ok("the requested iteration count is honoured", mcB.iterations === 150 && mcB.validTrials === 150);
+}
+report();
+
 // ════════════════════════════════════════════════════════════════════════════
 console.log("\n" + "═".repeat(64));
 if (fail === 0) {
