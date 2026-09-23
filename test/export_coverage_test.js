@@ -118,8 +118,27 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
   }
   ok(/Open report/.test(firstCard.textContent), "Tools: the confirmation offers a way to open the report");
   const openLink = [...firstCard.querySelectorAll("button")].find(b => /Open report/.test(b.textContent));
-  click(openLink); await wait(500);
-  ok(/Pinned analyses|Added sections|Report/i.test(d.body.textContent) && !d.querySelector("[data-export-context^='Tools']"), "Tools: “Open report →” goes to the report");
+  click(openLink); await wait(800);
+  ok(!d.querySelector("[data-export-context^='Tools']") && !!btn("Export as PDF"), "Tools: “Open report →” goes to the report");
+  // The report renders the snapshot as real content, re-themed to the page.
+  const added = d.getElementById("report-added");
+  const snap = added && added.querySelector(".report-snapshot");
+  ok(!!snap, "Report: the added section is rendered in an “Added Sections” block");
+  ok(snap && /M&A|premium/i.test(snap.textContent), "Report: it contains the card's own content, not a placeholder");
+  ok(snap && (snap.classList.contains("theme-scope-light") || snap.classList.contains("theme-scope-dark")), "Report: it is wrapped in the report's theme scope");
+  ok(snap && !snap.querySelector("script,iframe,[onclick],[onerror]"), "Report: nothing executable survives into the rendered snapshot");
+  ok(snap && !snap.querySelector(".section-export-bar"), "Report: the export bar itself is not part of the snapshot");
+  // Choosing what appears.
+  const sectionsBtn = [...d.querySelectorAll("button")].find(b => /^Sections \(/.test(b.textContent.trim()));
+  click(sectionsBtn); await wait(300);
+  const picker = d.getElementById("report-added-picker");
+  ok(picker && /1 of 1 included/.test(picker.textContent), "Report: the Sections panel lists the added section as included");
+  const incBox = picker && picker.querySelector('input[type="checkbox"]');
+  click(incBox); await wait(400);
+  ok(!d.getElementById("report-added"), "Report: unticking it takes it out of the report");
+  ok(storedCase().pinnedResults[0].included === false, "Report: that choice is saved on the case");
+  click(d.getElementById("report-added-picker").querySelector('input[type="checkbox"]')); await wait(400);
+  ok(!!d.getElementById("report-added"), "Report: ticking it again brings it back");
   click(btn("Workspace")); await wait(400);
   ok(/1 added/.test(d.body.textContent), "Workspace: the Generate Report button shows “1 added”");
 
@@ -154,6 +173,22 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
     click(b); await wait(350);
     refSections += audit("Reference Sheet / " + name, 1);
   }
+
+  // Add a second section from here, then reorder the two in the report.
+  const refCard = d.querySelector("[data-export-context='Reference Sheet'] [data-export-section]");
+  const refAdd = [...refCard.querySelectorAll("button")].find(b => sectionOf(b) === refCard && b.textContent.trim() === "+ Report");
+  click(refAdd); await wait(800);
+  const before = storedCase().pinnedResults.map(p => p.id);
+  ok(before.length === 2, "Reference Sheet: “+ Report” added a second section (" + before.length + ")");
+  ok(/Reference Sheet/.test(storedCase().pinnedResults[1].source || ""), "Reference Sheet: its source is recorded");
+  click([...refCard.querySelectorAll("button")].find(b => /Open report/.test(b.textContent))); await wait(800);
+  const sb = [...d.querySelectorAll("button")].find(b => /^Sections \(/.test(b.textContent.trim()));
+  if (!d.getElementById("report-added-picker")) { click(sb); await wait(300); }
+  const down = d.getElementById("report-added-picker").querySelector('button[aria-label="Move down"]');
+  click(down); await wait(400);
+  const after = storedCase().pinnedResults.map(p => p.id);
+  ok(after[0] === before[1] && after[1] === before[0], "Report: “↓” swaps the order of the added sections");
+  ok(d.querySelectorAll("#report-added .report-snapshot").length === 2, "Report: both added sections render");
 
   console.log("Sections audited — Workspace " + wsCount + ", Tools " + toolSections + ", Simulation " + simSections + ", Reference Sheet " + refSections);
   if (errors.length) { console.log(errors.slice(0, 40).join("\n")); console.log("\n" + errors.length + " FAILURE(S) across " + checks + " checks"); process.exit(1); }

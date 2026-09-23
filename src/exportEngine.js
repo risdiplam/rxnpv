@@ -233,71 +233,13 @@ async function exportChartAsPng(container, name, scale) {
 }
 
 // ── Pin to report ──────────────────────────────────────────────────────────
-// Simulation and Tools results are computed on demand and live only on screen
-// — the PDF report could therefore only ever contain Workspace/valuation
-// content, even though a trial-statistics result or a comp lookup is often the
-// evidence a valuation rests on. Pinning captures the rendered panel and
-// stores it on the case, so the report can include analyses from any section.
-//
-// Capped and downscaled on purpose: these are persisted in localStorage
-// alongside the user's cases, and an uncapped pile of full-resolution PNGs
-// would consume the quota the cases themselves need.
-const PINNED_MAX_PER_CASE = 12;
-const PINNED_CAPTURE_MAX_WIDTH = 900;
-
-async function capturePanelDataUrl(container, maxWidth) {
-  if (!isDesktopExport() || !window.electronAPI.capturePanelData) {
-    return { ok: false, error: "Pinning a result needs the desktop app (it captures the rendered panel)." };
-  }
-  if (!container) return { ok: false, error: "Nothing to capture." };
-  const r = container.getBoundingClientRect();
-  if (r.width < 2 || r.height < 2) return { ok: false, error: "Nothing visible to capture — scroll the result into view first." };
-  return await window.electronAPI.capturePanelData(
-    { x: r.left, y: r.top, width: r.width, height: r.height },
-    maxWidth || PINNED_CAPTURE_MAX_WIDTH
-  );
-}
-
+// Sections added to a case's report with "+ Report". Newer entries are HTML
+// snapshots (kind: "html", see buildSectionSnapshot below); older ones are
+// screen-capture images from the previous "Pin to report", which the report
+// still renders. The capture path that made those images is gone — a
+// screenshot of the screen could not include anything scrolled out of view.
 function pinnedResultsOf(theCase) {
   return (theCase && Array.isArray(theCase.pinnedResults)) ? theCase.pinnedResults : [];
-}
-
-// Returns { ok, error?, pinnedResults? } — never mutates; the caller commits.
-async function buildPinnedResult(container, meta) {
-  const cap = await capturePanelDataUrl(container);
-  if (!cap.ok) return cap;
-  return {
-    ok: true,
-    pin: {
-      id: "pin_" + Math.random().toString(36).slice(2, 9),
-      title: meta.title || "Analysis",
-      source: meta.source || "",
-      note: meta.note || "",
-      capturedAt: Date.now(),
-      // Captures are pixels of the live screen, so they carry whatever theme
-      // was active. Recorded so the report can flag a dark capture sitting on
-      // a light (print-oriented) page rather than leaving the user to wonder.
-      theme: (typeof document !== "undefined" && document.documentElement.getAttribute("data-theme")) || "unknown",
-      dataUrl: cap.dataUrl,
-      width: cap.width,
-      height: cap.height
-    }
-  };
-}
-
-// Whole-panel capture, including text/tables — desktop only, since it needs
-// Chromium's compositor. Reports that plainly rather than failing silently.
-async function exportPanelAsImage(container, name) {
-  if (!isDesktopExport() || !window.electronAPI.capturePanel) {
-    return { ok: false, error: "Full-panel capture needs the desktop app. The chart itself can still be saved as SVG or PNG." };
-  }
-  if (!container) return { ok: false, error: "Nothing to capture." };
-  const r = container.getBoundingClientRect();
-  if (r.width < 2 || r.height < 2) return { ok: false, error: "Nothing visible to capture." };
-  return await window.electronAPI.capturePanel(
-    { x: r.left, y: r.top, width: r.width, height: r.height },
-    slugifyExportName(name) + ".png"
-  );
 }
 
 // ════════════════════════════════════════════════════════════════════════════

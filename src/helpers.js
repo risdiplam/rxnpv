@@ -151,49 +151,6 @@ function BenchField({ label, value, onChange, bench, suffix, placeholder, step, 
 // First click arms the button ("Sure?"), second click deletes. Auto-disarms
 // after 3s so a half-pressed button never sits armed waiting to catch a
 // later, unrelated click. Escape disarms immediately.
-// ── Pin to report (React side) ─────────────────────────────────────────────
-// Sits next to the existing PNG/SVG export controls. Export saves a file for
-// use elsewhere; pinning attaches the result to a case so it travels with that
-// case's PDF report. Different jobs, so both are offered rather than one
-// replacing the other.
-function PinToReportButton({ targetRef, title, source, note, cases, updateCase, defaultCaseId, compact }) {
-  const h = React.createElement;
-  const [busy, setBusy] = React.useState(false);
-  const [msg, setMsg] = React.useState(null);
-  const list = cases || [];
-  const [caseId, setCaseId] = React.useState(defaultCaseId || (list[0] && list[0].id) || "");
-  const target = list.find(c => c.id === caseId);
-
-  const run = async () => {
-    if (!target) { setMsg({ tone: "err", text: "Pick a case first." }); return; }
-    const existing = pinnedResultsOf(target);
-    if (existing.length >= PINNED_MAX_PER_CASE) {
-      setMsg({ tone: "err", text: "That case already holds " + PINNED_MAX_PER_CASE + " pinned analyses — remove one in the report first." });
-      return;
-    }
-    setBusy(true); setMsg(null);
-    const r = await buildPinnedResult(targetRef.current, { title, source, note });
-    setBusy(false);
-    if (!r.ok) { setMsg({ tone: "err", text: r.error }); setTimeout(() => setMsg(null), 5000); return; }
-    updateCase({ ...target, pinnedResults: existing.concat([r.pin]), updatedAt: Date.now() });
-    setMsg({ tone: "ok", text: "Pinned to " + (target.name || "case") });
-    setTimeout(() => setMsg(null), 4000);
-  };
-
-  if (!list.length) return null;
-  return h("div", { style: { display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" } },
-    h("button", { onClick: run, disabled: busy, title: "Attach this result to a case so it appears in that case's PDF report",
-      style: { padding: compact ? "4px 8px" : "5px 10px", borderRadius: 5, border: "1px solid var(--rule)",
-        background: "transparent", color: busy ? "var(--teal)" : "var(--ink-3)",
-        fontFamily: "var(--mono)", fontSize: compact ? 9 : 10, cursor: busy ? "default" : "pointer" } },
-      busy ? "…" : "📌 Pin to report"),
-    list.length > 1 && h("select", { "aria-label": "Case to pin this result to", value: caseId, onChange: e => setCaseId(e.target.value),
-      style: { padding: "3px 6px", borderRadius: 5, border: "1px solid var(--rule)", background: "var(--surface)", color: "var(--ink-3)", fontFamily: "var(--mono)", fontSize: 9 } },
-      list.map(c => h("option", { key: c.id, value: c.id }, c.name || "Untitled"))),
-    msg && h("span", { style: { fontSize: 9, fontFamily: "var(--mono)", color: msg.tone === "ok" ? "var(--teal)" : "var(--red)" } }, msg.text)
-  );
-}
-
 // ── Section export — the one export bar every section carries ─────────────
 // Replaces the chart-only export rows. It exports the SECTION it sits in —
 // title, headline figures, chart, tables, notes — rather than just the chart,
@@ -1373,64 +1330,6 @@ function WorkspaceNav({ sections }) {
   );
 }
 
-// ── Export controls ────────────────────────────────────────────────────────
-// Drop this next to any chart or panel. It attaches to the DOM subtree via a
-// ref rather than needing the chart to know anything about exporting, so a
-// chart component stays a chart component. Deliberately understated until
-// hovered — these sit beside a lot of charts, and a row of loud buttons on
-// every one of them would compete with the data for attention.
-function ExportControls({ targetRef, name, showPanelCapture, compact, panelOnly }) {
-  const h = React.createElement;
-  const [busy, setBusy] = React.useState(null);
-  const [msg, setMsg] = React.useState(null);
-  const [hovered, setHovered] = React.useState(false);
-
-  const run = async (kind, fn) => {
-    setBusy(kind); setMsg(null);
-    try {
-      const r = await fn();
-      if (r && r.ok) setMsg({ tone: "ok", text: r.viaBrowser ? "Downloaded" : "Saved" });
-      else if (r && r.canceled) setMsg(null);
-      else setMsg({ tone: "err", text: (r && r.error) || "Export failed." });
-    } catch (e) { setMsg({ tone: "err", text: e.message }); }
-    setBusy(null);
-    setTimeout(() => setMsg(null), 4000);
-  };
-
-  const btn = (label, kind, fn, title) => h("button", {
-    key: kind, title, disabled: busy != null,
-    onClick: () => run(kind, fn),
-    style: {
-      padding: compact ? "4px 8px" : "5px 10px", borderRadius: 5,
-      border: "1px solid var(--rule)", background: "transparent",
-      color: busy === kind ? "var(--teal)" : "var(--ink-3)",
-      fontFamily: "var(--mono)", fontSize: compact ? 9 : 10,
-      cursor: busy ? "default" : "pointer", transition: "color 120ms, border-color 120ms"
-    }
-  }, busy === kind ? "…" : label);
-
-  return h("div", {
-    "data-no-export": "",
-    onMouseEnter: () => setHovered(true), onMouseLeave: () => setHovered(false),
-    style: { display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap",
-             opacity: hovered || msg || busy ? 1 : 0.45, transition: "opacity 150ms" }
-  },
-    h("span", { style: { fontSize: 9, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.04em" } }, "Export"),
-    // PNG/SVG both work by finding an <svg> in the subtree. Some panels are
-    // built from styled HTML instead (the runway timeline, comp ranking bars,
-    // the sensitivity tornado), where those two buttons could only ever fail —
-    // panelOnly hides them rather than offering an action that always errors.
-    !panelOnly && btn("PNG", "png", () => exportChartAsPng(targetRef.current, name, 3), "High-resolution PNG (3x) of the chart"),
-    !panelOnly && btn("SVG", "svg", () => exportChartAsSvg(targetRef.current, name), "Vector SVG — scales to any size, editable in design tools"),
-    // Desktop only: a PDF needs Chromium's print engine in the main process.
-    !panelOnly && isDesktopExport() && btn("PDF", "pdf", () => exportChartAsPdf(targetRef.current, name), "Vector PDF of the chart, sized to its own aspect — for dropping into a document"),
-    (showPanelCapture || panelOnly) && btn("Panel", "panel", () => exportPanelAsImage(targetRef.current, name), "Capture the whole panel including its text and tables (desktop app)"),
-    msg && h("span", { style: { fontSize: 9, fontFamily: "var(--mono)", color: msg.tone === "ok" ? "var(--teal)" : "var(--red)" } }, msg.text)
-  );
-}
-
-// Wraps a chart (or any panel) so it can be exported, without the wrapped
-// component needing to know. Renders a plain div + the controls beneath.
 // Wraps a chart. It used to carry its own PNG/SVG/Panel row, which exported the
 // chart alone — without the title, the figures above it or the caveats under
 // it, which is what a reader needs to make sense of it. Now the enclosing

@@ -60,68 +60,6 @@ ipcMain.handle('export-pdf', async (event, suggestedName) => {
   }
 });
 
-// ── Panel capture ───────────────────────────────────────────────────────────
-// Uses Chromium's own compositor (webContents.capturePage) rather than
-// redrawing the DOM into a canvas. That matters: a redraw approach has to
-// re-implement CSS layout and inevitably drifts from what's on screen, while
-// this is pixel-identical to what the user sees, at the display's real device
-// pixel ratio (so 2x on a Retina panel without asking for it).
-// Same capture as capture-panel, but returns the image inline instead of
-// writing it to a file. Used by "Pin to report", which stores a snapshot of a
-// Simulation/Tools result on the case so the PDF report can include analyses
-// that are computed on demand and otherwise live only on screen.
-// Downscaled deliberately: these are embedded in a report and persisted in
-// localStorage alongside the user's cases, where a full-resolution PNG would
-// eat the storage quota that the cases themselves need.
-ipcMain.handle('capture-panel-data', async (event, rect, maxWidth) => {
-  if (!mainWindow) return { ok: false, error: "No window available" };
-  try {
-    const bounds = mainWindow.getContentBounds();
-    const r = {
-      x: Math.max(0, Math.round(rect.x)),
-      y: Math.max(0, Math.round(rect.y)),
-      width: Math.min(Math.round(rect.width), bounds.width - Math.max(0, Math.round(rect.x))),
-      height: Math.min(Math.round(rect.height), bounds.height - Math.max(0, Math.round(rect.y)))
-    };
-    if (r.width <= 0 || r.height <= 0) return { ok: false, error: "Nothing visible to capture — scroll the panel into view first." };
-    let image = await mainWindow.webContents.capturePage(r);
-    if (image.isEmpty()) return { ok: false, error: "Capture came back empty — the panel may be scrolled off screen." };
-    const cap = maxWidth || 900;
-    const size = image.getSize();
-    if (size.width > cap) image = image.resize({ width: cap, quality: 'good' });
-    return { ok: true, dataUrl: image.toDataURL(), width: image.getSize().width, height: image.getSize().height };
-  } catch (e) {
-    return { ok: false, error: e.message };
-  }
-});
-
-ipcMain.handle('capture-panel', async (event, rect, suggestedName) => {
-  if (!mainWindow) return { ok: false, error: "No window available" };
-  try {
-    // capturePage wants integer, in-bounds device-independent pixels; a rect
-    // that runs past the viewport edge silently returns an empty image.
-    const bounds = mainWindow.getContentBounds();
-    const r = {
-      x: Math.max(0, Math.round(rect.x)),
-      y: Math.max(0, Math.round(rect.y)),
-      width: Math.min(Math.round(rect.width), bounds.width - Math.max(0, Math.round(rect.x))),
-      height: Math.min(Math.round(rect.height), bounds.height - Math.max(0, Math.round(rect.y)))
-    };
-    if (r.width <= 0 || r.height <= 0) return { ok: false, error: "Nothing visible to capture — scroll the panel into view first." };
-    const image = await mainWindow.webContents.capturePage(r);
-    if (image.isEmpty()) return { ok: false, error: "Capture came back empty — the panel may be scrolled off screen." };
-    const { canceled, filePath } = await dialog.showSaveDialog(mainWindow, {
-      title: 'Save image',
-      defaultPath: suggestedName || 'RxNPV-panel.png',
-      filters: [{ name: 'PNG image', extensions: ['png'] }]
-    });
-    if (canceled || !filePath) return { ok: false, canceled: true };
-    fs.writeFileSync(filePath, image.toPNG());
-    return { ok: true, filePath };
-  } catch (e) {
-    return { ok: false, error: e.message };
-  }
-});
 
 // ── Save a renderer-produced asset (SVG text or a PNG data URL) ─────────────
 // ── Chart → PDF ─────────────────────────────────────────────────────────────

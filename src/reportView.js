@@ -28,10 +28,11 @@ const REPORT_SECTIONS = [
   { id: "sensitivity",  label: "Sensitivity tornado",      defaultOn: false, group: "Appendices" },
   { id: "peakSalesComps", label: "Peak sales comps",       defaultOn: false, group: "Appendices" },
   { id: "cashRunway",   label: "Cash runway chart",        defaultOn: false, group: "Appendices" },
-  // Analyses pinned from Simulation/Tools. Defaults ON because a pin is an
-  // explicit act — if the user went to the trouble of attaching a result to
-  // this case, the report should include it without further opt-in.
-  { id: "pinned",       label: "Pinned analyses",          defaultOn: true,  group: "Appendices" }
+  // Sections added with "+ Report" from anywhere in the app. Defaults ON
+  // because adding one is an explicit act. The id stays "pinned" so existing
+  // cases keep their saved choice; which added sections appear, and in what
+  // order, is chosen per item in the Sections panel.
+  { id: "pinned",       label: "Added sections",           defaultOn: true,  group: "Appendices" }
 ];
 
 function ReportView({ theCase, onBack, updateCase }) {
@@ -170,22 +171,30 @@ function ReportView({ theCase, onBack, updateCase }) {
           "Nothing selected — the report is empty. Pick at least one section, or use Everything."),
         h("div", { style: { fontSize: 10, fontFamily: "monospace", color: rpt.ink3, marginTop: 8, lineHeight: 1.6 } },
           "Sections that don't apply to this case stay hidden even when ticked — Sum-of-the-parts needs more than one program, and the year-by-year charts need DCF mode rather than Simple Multiple."),
-        // Pinned-analysis management. Lives here rather than in the report
-        // body because removing one is an editing action, not part of the
-        // document — and pins are the only report content the user can
-        // actually delete from this screen.
+        // Added-section management: include or leave out each one, put them
+        // in order, remove them. Lives here rather than in the report body
+        // because these are editing actions, not part of the document.
         (() => {
           const pins = pinnedResultsOf(theCase);
-          if (!pins.length) return null;
-          return h("div", { style: { marginTop: 12, paddingTop: 10, borderTop: "1px solid " + rpt.rule } },
+          const save = next => updateCase({ ...theCase, pinnedResults: next, updatedAt: Date.now() });
+          const move = (i, by) => { const next = pins.slice(); const [x] = next.splice(i, 1); next.splice(i + by, 0, x); save(next); };
+          const arrow = (label, tip, disabled, onClick) => h("button", { type: "button", title: tip, "aria-label": tip, disabled, onClick,
+            style: { padding: "1px 6px", borderRadius: 4, border: "1px solid " + rpt.rule, background: "transparent", color: disabled ? rpt.rule : rpt.ink2, fontFamily: "monospace", fontSize: 10, cursor: disabled ? "default" : "pointer" } }, label);
+          return h("div", { id: "report-added-picker", style: { marginTop: 12, paddingTop: 10, borderTop: "1px solid " + rpt.rule } },
             h("div", { style: { fontSize: 9, fontFamily: "monospace", color: rpt.ink3, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6 } },
-              "Pinned analyses (" + pins.length + "/" + PINNED_MAX_PER_CASE + ")"),
+              "Added sections (" + pins.filter(p => p.included !== false).length + " of " + pins.length + " included · up to " + PINNED_MAX_PER_CASE_V2 + ")"),
+            !pins.length && h("div", { style: { fontSize: 11, fontFamily: "monospace", color: rpt.ink3, lineHeight: 1.6 } },
+              "None yet. Every section in Tools, Simulation, the Reference Sheet, Portfolio and the Workspace has a “+ Report” button — each one you click lands here, and you choose and order them."),
             h("div", { style: { display: "flex", flexDirection: "column", gap: 4 } },
-              pins.map(pin => h("div", { key: pin.id, style: { display: "flex", alignItems: "center", gap: 8, fontSize: 11, fontFamily: "monospace", color: rpt.ink2 } },
-                h("span", { style: { flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } },
+              pins.map((pin, i) => h("div", { key: pin.id || i, style: { display: "flex", alignItems: "center", gap: 8, fontSize: 11, fontFamily: "monospace", color: pin.included === false ? rpt.ink3 : rpt.ink2 } },
+                h("input", { type: "checkbox", checked: pin.included !== false, "aria-label": "Include " + (pin.title || "this section"),
+                  onChange: () => save(pins.map(x => x === pin ? { ...x, included: x.included === false } : x)) }),
+                h("span", { style: { flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textDecoration: pin.included === false ? "line-through" : "none" } },
                   pin.title, pin.source ? h("span", { style: { color: rpt.ink3 } }, " · " + pin.source) : null),
-                h(ConfirmXButton, { onConfirm: () => updateCase({ ...theCase, pinnedResults: pins.filter(x => x.id !== pin.id), updatedAt: Date.now() }),
-                  title: "Remove this pinned analysis", style: { padding: "2px 8px", fontSize: 10 } })
+                arrow("↑", "Move up", i === 0, () => move(i, -1)),
+                arrow("↓", "Move down", i === pins.length - 1, () => move(i, 1)),
+                h(ConfirmXButton, { onConfirm: () => save(pins.filter(x => x !== pin)),
+                  title: "Remove this section from the report", style: { padding: "2px 8px", fontSize: 10 } })
               ))
             ));
         })()
@@ -378,36 +387,35 @@ function ReportView({ theCase, onBack, updateCase }) {
           );
         })(),
 
-        // Pinned Simulation/Tools analyses. Rendered as captured images
-        // because the underlying results are computed on demand and have no
-        // persistent model to re-render from — the capture IS the record.
+        // Sections added with "+ Report" from anywhere in the app, in the order
+        // chosen in the Sections panel. Snapshots are real HTML, re-themed to
+        // this page, so a section added in dark mode prints cleanly on a light
+        // report. Older image pins still render as the images they are.
         inc("pinned") && (() => {
-          const pins = pinnedResultsOf(theCase);
+          const pins = pinnedResultsOf(theCase).filter(p => p.included !== false);
           if (!pins.length) return null;
-          return h("div", { style: cardStyle },
-            h("div", { style: { fontSize: 13, fontWeight: 700, marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.05em", color: rpt.ink2 } }, "Pinned Analyses"),
+          const imgs = pins.filter(p => p.kind !== "html");
+          const mism = imgs.filter(p => p.theme && p.theme !== (reportDark ? "dark" : "light"));
+          return h("div", { id: "report-added", style: { marginBottom: 16 } },
+            h("div", { style: { fontSize: 13, fontWeight: 700, marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.05em", color: rpt.ink2 } }, "Added Sections"),
             h("div", { style: { fontSize: 11, color: rpt.ink3, marginBottom: 12 } },
-              pins.length + " analysis" + (pins.length === 1 ? "" : "es") + " pinned from Simulation and Tools."),
-            // A capture is pixels of the live screen, so a pin taken in dark
-            // mode lands dark on a light, print-oriented report page. Flagged
-            // rather than silently re-coloured — re-pinning in the matching
-            // theme is the only way to actually fix it.
-            (() => {
-              const mism = pins.filter(p => p.theme && p.theme !== (reportDark ? "dark" : "light"));
-              if (!mism.length) return null;
-              return h("div", { style: { fontSize: 10, color: rpt.amber, marginBottom: 10, lineHeight: 1.5 } },
-                "⚠ " + mism.length + " of these " + (mism.length === 1 ? "was" : "were") + " captured in " +
-                (reportDark ? "light" : "dark") + " mode and will print against a " + (reportDark ? "dark" : "light") +
-                " page. Switch the app to " + (reportDark ? "dark" : "light") + " mode and re-pin for a clean match.");
-            })(),
-            pins.map((pin, i) => h("div", { key: pin.id || i, style: { marginBottom: 18, pageBreakInside: "avoid" } },
-              h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10, marginBottom: 6 } },
-                h("div", { style: { fontSize: 12, fontWeight: 700, color: rpt.ink1 } }, pin.title || "Analysis"),
+              pins.length + " section" + (pins.length === 1 ? "" : "s") + " added from across the app.",
+              updateCase && h("span", { className: "no-print" }, " Choose which appear, and their order, under Sections ▼.")),
+            // An older image pin is pixels of the screen, so one taken in the
+            // other theme cannot be re-coloured. Flagged rather than hidden.
+            mism.length > 0 && h("div", { className: "no-print", style: { fontSize: 10, color: rpt.amber, marginBottom: 10, lineHeight: 1.5 } },
+              "⚠ " + mism.length + " older image pin" + (mism.length === 1 ? " was" : "s were") + " captured in " + (reportDark ? "light" : "dark") +
+              " mode and will print that way. Re-adding it with “+ Report” stores it as a section that follows this page’s theme."),
+            pins.map((pin, i) => h("div", { key: pin.id || i, style: { ...cardStyle, pageBreakInside: "avoid" } },
+              h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10, marginBottom: 8 } },
+                h("div", { style: { fontSize: 12, fontWeight: 700, color: rpt.ink1 } }, pin.title || "Section"),
                 h("div", { style: { fontSize: 10, color: rpt.ink3, flexShrink: 0 } },
-                  (pin.source ? pin.source + " · " : "") + new Date(pin.capturedAt).toLocaleDateString())),
+                  (pin.source ? pin.source + " · " : "") + (pin.capturedAt ? "captured " + new Date(pin.capturedAt).toLocaleDateString() : ""))),
               pin.note && h("div", { style: { fontSize: 11, color: rpt.ink2, marginBottom: 6, lineHeight: 1.5 } }, pin.note),
-              h("img", { src: pin.dataUrl, alt: pin.title || "Pinned analysis",
-                style: { width: "100%", maxWidth: (pin.width || 900) + "px", border: "1px solid " + rpt.rule, borderRadius: 6, display: "block" } })
+              pin.kind === "html"
+                ? h(ReportSnapshot, { pin, dark: reportDark })
+                : h("img", { src: pin.dataUrl, alt: pin.title || "Added section",
+                    style: { width: "100%", maxWidth: (pin.width || 900) + "px", border: "1px solid " + rpt.rule, borderRadius: 6, display: "block" } })
             ))
           );
         })(),
@@ -429,4 +437,44 @@ function ReportView({ theCase, onBack, updateCase }) {
       )
     )
   );
+}
+
+// One added section, rendered from its stored HTML. The snapshot was
+// sanitised when it was captured and is sanitised again here, because stored
+// data is only as trustworthy as whatever last wrote localStorage — and the
+// page CSP (hash-only scripts, no remote loads) backstops both. This is the
+// one deliberate dangerouslySetInnerHTML in the app, bounded to content the
+// app itself serialised.
+//
+// It is wrapped in a theme scope matching the REPORT, not the theme it was
+// captured in: the snapshot's colours are CSS variables, so it re-themes. And
+// it is scaled to fit the report column, since a section captured at the full
+// app width is wider than a printed page.
+function ReportSnapshot({ pin, dark }) {
+  const h = React.createElement;
+  const boxRef = React.useRef(null);
+  const [html, setHtml] = React.useState(null);
+  const [err, setErr] = React.useState(null);
+  const [avail, setAvail] = React.useState(0);
+  React.useEffect(() => {
+    let live = true;
+    decompressSnapshotText(pin.enc, pin.html)
+      .then(t => { if (live) setHtml(sanitizeSnapshotHtml(t)); })
+      .catch(e => { if (live) setErr(e.message || "unreadable"); });
+    return () => { live = false; };
+  }, [pin.id, pin.html]);
+  React.useLayoutEffect(() => {
+    const measure = () => { if (boxRef.current) setAvail(boxRef.current.clientWidth); };
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, []);
+  if (err) return h("div", { style: { fontSize: 11, fontFamily: "monospace", color: "#b45309" } }, "This section could not be read back (" + err + "). Remove it and add it again.");
+  const w = pin.width || 0;
+  const scale = (w && avail && w > avail) ? avail / w : 1;
+  return h("div", { ref: boxRef, style: { width: "100%", overflow: "hidden" } },
+    html == null ? h("div", { style: { fontSize: 11, fontFamily: "monospace", opacity: 0.6 } }, "Loading…")
+      : h("div", { className: "report-snapshot " + (dark ? "theme-scope-dark" : "theme-scope-light"),
+          style: { width: w ? w + "px" : "100%", zoom: scale, color: "var(--ink-1)", fontFamily: "var(--sans)" },
+          dangerouslySetInnerHTML: { __html: html } }));
 }
