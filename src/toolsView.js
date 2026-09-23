@@ -2820,8 +2820,10 @@ function TrialResultsPanels({ results, study }) {
               h("td", { style: tdL },
                 h("div", null, e.term),
                 e.organSystem && h("div", { style: { fontSize: 9.5, color: "var(--ink-3)" } }, e.organSystem)),
-              safety.primaryGroups.map(g => h("td", { key: g.id, style: tdS },
-                e.byGroup[g.id] ? pct(e.byGroup[g.id].rate) : "—")),
+              // Every rate carries its denominator, as in the summary table
+              // above: 50% of 4 and 50% of 400 are not the same finding (FIN-004).
+              safety.primaryGroups.map(g => { const c = e.byGroup[g.id]; return h("td", { key: g.id, style: tdS },
+                c ? pct(c.rate) + (c.atRisk ? "  (" + num(c.affected) + "/" + num(c.atRisk) + ")" : "") : "—"); }),
               safety.comparable && h("td", { style: Object.assign({}, tdS, { color: e.pairDiff == null ? "var(--ink-3)" : Math.abs(e.pairDiff) >= 0.05 ? "var(--amber)" : "var(--ink-2)" }) },
                 e.pairDiff == null ? "—" : (e.pairDiff > 0 ? "+" : "") + (e.pairDiff * 100).toFixed(1) + " pt"))))))
         : h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-3)" } }, "No events of this kind are registered."),

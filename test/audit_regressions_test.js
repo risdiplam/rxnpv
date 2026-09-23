@@ -92,6 +92,41 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
     click(btn("Workspace")); await wait(400);
   }
 
+  // ── FIN-004 — per-event adverse-event rates carry their denominators ──
+  // Fixture from math_verification's AE section: Neutropenia 40/200 = 20.0%
+  // vs 5/100 = 5.0%; Nausea 10/200 = 5.0% vs 12/100 = 12.0%.
+  {
+    const aeSection = { adverseEventsModule: {
+      frequencyThreshold: 5, timeFrame: "Up to 24 months",
+      eventGroups: [
+        { id: "EG000", title: "Drug", seriousNumAffected: 60, seriousNumAtRisk: 200, otherNumAffected: 190, otherNumAtRisk: 200, deathsNumAffected: 40, deathsNumAtRisk: 200 },
+        { id: "EG001", title: "Placebo", seriousNumAffected: 20, seriousNumAtRisk: 100, otherNumAffected: 80, otherNumAtRisk: 100, deathsNumAffected: 10, deathsNumAtRisk: 100 }
+      ],
+      seriousEvents: [
+        { term: "Neutropenia", organSystem: "Blood", stats: [
+          { groupId: "EG000", numEvents: 90, numAffected: 40, numAtRisk: 200 },
+          { groupId: "EG001", numEvents: 6, numAffected: 5, numAtRisk: 100 }] },
+        { term: "Nausea", organSystem: "GI", stats: [
+          { groupId: "EG000", numEvents: 10, numAffected: 10, numAtRisk: 200 },
+          { groupId: "EG001", numEvents: 12, numAffected: 12, numAtRisk: 100 }] }
+      ],
+      otherEvents: []
+    } };
+    const host = d.createElement("div"); d.body.appendChild(host);
+    const results = w.parseTrialResults({ resultsSection: aeSection });
+    const root = w.ReactDOM.createRoot(host);
+    root.render(w.React.createElement(w.TrialResultsPanels, { results, study: { protocolSection: {} } }));
+    await wait(400);
+    const row = [...host.querySelectorAll("tr")].find(tr => /Neutropenia/.test(tr.textContent));
+    const cells = row ? [...row.querySelectorAll("td")].map(td => td.textContent.trim()) : [];
+    ok(!!row, "FIN-004: the Neutropenia event row renders");
+    ok(cells.some(c => /20\.0%/.test(c) && /40\/200/.test(c)), "FIN-004: the drug-arm cell shows 20.0% with 40/200 (" + cells.join(" | ") + ")");
+    ok(cells.some(c => /5\.0%/.test(c) && /5\/100/.test(c)), "FIN-004: the placebo cell shows 5.0% with 5/100");
+    const nausea = [...host.querySelectorAll("tr")].find(tr => /Nausea/.test(tr.textContent));
+    ok(nausea && /12\/100/.test(nausea.textContent), "FIN-004: every event row carries its denominators");
+    root.unmount(); host.remove();
+  }
+
   if (errors.length) { console.log(errors.slice(0, 40).join("\n")); console.log("\n" + errors.length + " FAILURE(S) across " + checks + " checks"); process.exit(1); }
   console.log("ALL AUDIT REGRESSION CHECKS PASSED — " + checks + " checks");
   process.exit(0);
