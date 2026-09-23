@@ -3738,6 +3738,31 @@ section("FIN-009/010: full-case Monte Carlo bounds and degenerate cases");
 }
 report();
 
+section("FIN-007: implied PoS is expressed against the override baseline");
+{
+  // A 30% PoS override means "my assumption is 30%" — by definition, whatever
+  // the Oncology Phase 2 benchmark says. The solver finds the multiplier M that
+  // makes fair value equal the price; the implied absolute PoS is then
+  // 30% x M/100. Round trip: re-valuing the case with the override SET TO that
+  // implied figure must reproduce the market price (equity = price x shares).
+  const c = {
+    name: "IP", currentPrice: "12",
+    capitalStructure: { mode: "simple", dilutedSharesSimple: "10000000", cash: "20000000", debt: "0" },
+    corporateGA: { preCommercialAnnualM: "0", gaShareOfMatureSgaPct: "0" },
+    programs: [{ id: "p1", name: "Asset", currentPhase: "phase2", therapeuticArea: "Oncology", modality: "smallMolecule",
+      revenueMode: "quick", quickRevenue: { peakRevenue: "800000000", yearsToPeak: "6", profile: "median" }, posOverridePct: "30" }]
+  };
+  const tv = { enabled: false };
+  const sol = api.solveImpliedPoSMultiplier(c, 12, tv);
+  ok("the fixture solves without hitting a range limit", sol.ok && !sol.degenerate);
+  near("'your PoS assumption' is the 30% override, not the benchmark", sol.baseAbsolutePct, 30, 1e-9);
+  near("implied absolute = 30% x multiplier", sol.impliedAbsolutePct, 30 * sol.multiplierPct / 100, 1e-9);
+  const c2 = JSON.parse(JSON.stringify(c)); c2.programs[0].posOverridePct = String(sol.impliedAbsolutePct);
+  const ps = api.computeCaseValuation(c2, { label: "b", shareMultiplierPct: 100, posMultiplierPct: 100, discountRateAddPct: 0, color: "" }, null, 12, tv).equity.perShare;
+  near("valuing at the implied PoS reproduces the $12 price", ps, 12, 1e-4);
+}
+report();
+
 // ════════════════════════════════════════════════════════════════════════════
 console.log("\n" + "═".repeat(64));
 if (fail === 0) {

@@ -507,8 +507,13 @@ function solveImpliedPoSMultiplier(theCase, discountRateBasePct, terminalValuePa
   // For a single-program case, also express as an absolute probability (not
   // just a multiplier) since there's one unambiguous base PoS to scale.
   let impliedAbsolutePct = null, baseAbsolutePct = null;
+  // The multiplier above is relative to the EFFECTIVE PoS — computeCaseValuation
+  // composes the program's override with it — so the absolute figure must be
+  // too. It used to be the raw benchmark, so a case with a 30% override and a
+  // 9% benchmark reported "your assumption 9%" and an implied PoS a third of
+  // what the price actually implies (FIN-007).
   if (theCase.programs.length === 1) {
-    const posInfo = computePoSWeighting(theCase.programs[0]);
+    const posInfo = computeEffectivePoS(theCase.programs[0], { posMultiplierPct: 100 });
     baseAbsolutePct = posInfo.posToLaunch * 100;
     impliedAbsolutePct = Math.min(100, baseAbsolutePct * (impliedMultiplierPct / 100));
   }
