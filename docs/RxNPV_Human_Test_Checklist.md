@@ -1,3 +1,5 @@
+> **Historical — superseded.** This checklist was written for the early Simulation build and predates most of the app (including features since removed, such as RDKit). For current manual test steps see "Feature overview, and how to test each feature" in the root `README.md`.
+
 # RxNPV — Human Test Checklist for the Simulation Build
 
 Everything below is either brand new (the Simulation tab, merged in from TrialSim) or specifically flagged as something I could not verify from my sandbox. This is not a re-test of the core valuation app — that was already tested extensively and you were already mid-testing it separately. This list is focused on what's actually new or actually unverified.

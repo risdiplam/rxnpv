@@ -1,10 +1,11 @@
 {
   "name": "rxnpv-tests",
   "private": true,
-  "description": "jsdom-based functional tests for RxNPV. Not a real browser — see README.md for what this can and can't verify.",
+  "description": "jsdom-based functional tests for RxNPV. Not a real browser \u2014 see README.md for what this can and can't verify.",
   "scripts": {
     "setup": "node setup.js",
-    "test": "node final_regression_pass.js"
+    "test": "node run_all.js",
+    "test:dev": "node run_all.js --dev"
   },
   "dependencies": {
     "jsdom": "^30.0.1",

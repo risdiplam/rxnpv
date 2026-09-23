@@ -8,7 +8,6 @@ Every test here runs the *entire app* inside jsdom — a JavaScript DOM implemen
 
 ## What jsdom cannot do — read this before assuming something is "verified"
 
-- **No real WebAssembly execution.** Chemistry's RDKit analysis has never been confirmed to actually run end-to-end. The binary is confirmed present and byte-correct inside every packaged build, but "the file is there" and "it executes correctly" are different claims. This is the single most important gap in this whole test suite, and it's exactly the kind of thing Claude Code running on a real Mac can now close — it has a real browser (or at least real Electron) available to it, which this sandboxed environment never did.
 - **No real network calls.** Every EDGAR, ClinicalTrials.gov, and openFDA call in every test here is mocked, and the `fetch()` calls inside the running app never execute inside a test. Note this is a statement about *this suite*, not about the app: the integrations have separately been exercised against the live APIs by hand, outside these tests. Both claims are true and they are not in conflict — `CLAUDE.md` describes the manual verification, this file describes what the automated suite covers.
 - **No CSP enforcement.** jsdom ignores `Content-Security-Policy` entirely, so a policy that would block the real app in Electron will not fail anything here. A CSP change must be verified against the packaged app — a broken one produces a blank window while this whole suite stays green.
 - **No real visual rendering.** jsdom does no layout and no CSS. These tests can tell you a value is present in the DOM; they cannot tell you it looks right, is positioned sensibly, or is legible. A UI/UX pass has never been done with these tests, and can't be — that needs eyes on a real screen.
@@ -16,17 +15,20 @@ Every test here runs the *entire app* inside jsdom — a JavaScript DOM implemen
 ## Setup
 
 ```bash
+node build.js          # from the project root, first
 cd test
 npm install
-node setup.js          # generates test_desktop.html from ../electron/rxnpv.html
-node final_regression_pass.js
+npm test               # runs setup.js, then all 12 suites; exits 1 if any fail
+npm run test:dev       # the same against React's development build (stricter)
 ```
+
+Every suite exits non-zero on failure. Until September 2026 eight of them always exited 0 and only printed their results, so an automated runner read them as passing whatever they printed. Two had in fact been failing silently since the project rename and the Tools regrouping: a storage test simulating a full disk on the pre-rename key, and a smoke test clicking a tool without opening its workbench.
 
 You must run `node build.js` from the project root first — `setup.js` reads `electron/rxnpv.html`, which `build.js` produces. Re-run `setup.js` after every `build.js` run; it doesn't auto-detect staleness.
 
 ## Why setup.js exists and what it's protecting against
 
-`setup.js` swaps the app's CDN-hosted React `<script src>` tags for the locally-installed React build, so tests can run with no network access. This sounds trivial and isn't — see the comments inside `setup.js` and `build.js` for the full story of two real bugs this exact process caught: React's own production build contains a literal `</script>` inside an internal error-message string (an HTML-parsing gotcha when embedding arbitrary JS as inline script content), and a separate, more serious bug in `build.js` itself, where JavaScript's `String.prototype.replace()` silently reinterprets `$`-prefixed sequences in a plain-string replacement argument — and the app's own source code contains such a sequence (ordinary currency-formatting code: `'$' + formatNumber(...)`). Both are fixed, both fixes are load-bearing, and both are exactly the kind of thing that looks like it should be safe until you actually run it against real content at real scale. If either script ever needs modifying, understand why the current approach works before changing it.
+`setup.js` swaps the app's React `<script src>` tags (which point at the vendored copies in `electron/vendor/`, a path jsdom does not resolve) for the npm-installed React build, so tests can run with no network access. This sounds trivial and isn't — see the comments inside `setup.js` and `build.js` for the full story of two real bugs this exact process caught: React's own production build contains a literal `</script>` inside an internal error-message string (an HTML-parsing gotcha when embedding arbitrary JS as inline script content), and a separate, more serious bug in `build.js` itself, where JavaScript's `String.prototype.replace()` silently reinterprets `$`-prefixed sequences in a plain-string replacement argument — and the app's own source code contains such a sequence (ordinary currency-formatting code: `'$' + formatNumber(...)`). Both are fixed, both fixes are load-bearing, and both are exactly the kind of thing that looks like it should be safe until you actually run it against real content at real scale. If either script ever needs modifying, understand why the current approach works before changing it.
 
 ## The lost coverage — now substantially rebuilt
 
@@ -46,6 +48,7 @@ When the suite was first written it reported 4 failures — all four turned out 
 
 ## What each file does
 
+- `run_all.js` — what `npm test` runs: regenerates the harness, runs every suite, prints PASS/FAIL per suite and exits 1 if any failed (`--dev` for React's development build)
 - `setup.js` — generates `test_desktop.html` (see above)
 - `math_verification.js` — 1,032 numerical checks against independently-derived reference values; needs no DOM, runs straight against the engine source (see "The lost coverage" above for scope and rules)
 - `export_test.js` — the section-export serialiser and sanitiser: form values carried into an export, export chrome removed, truncated titles restored, and — the part that matters most, since snapshots are stored and rendered back later — that nothing executable or remote survives sanitising. jsdom does no layout, so scroll-box expansion and export width are verified live in Electron instead

@@ -1,6 +1,12 @@
 const { JSDOM } = require("jsdom");
 const html = require("fs").readFileSync("test_desktop.html","utf8");
 const errors=[];
+// Checks print as "label: true|false". Any false, or any caught app error,
+// fails the run with a non-zero exit code — this file used to always exit 0,
+// so an automated runner read it as passing whatever it printed.
+let failedChecks = 0;
+const printCheck = console.log;
+console.log = (...a) => { if (a.length > 1 && a[a.length - 1] === false) failedChecks++; printCheck(...a); };
 const dom = new JSDOM(html,{runScripts:"dangerously",pretendToBeVisual:true,url:"https://localhost/",
   beforeParse(w){w.matchMedia=()=>({matches:false,addEventListener(){},removeEventListener(){}});
   w.console.warn=()=>{};w.console.error=(...a)=>errors.push("ERROR: "+a.join(" ").slice(0,250));
@@ -33,10 +39,15 @@ function findLeafInput(container, labelText) {
 
   console.log("\n=== Simulate a full storage quota, then try to add a custom entry ===");
   // Override localStorage.setItem for JUST this key to throw, simulating quota exceeded
-  const origSetItem = w.localStorage.setItem.bind(w.localStorage);
-  w.localStorage.setItem = (key, val) => {
-    if (key === "pdcf_custom_licensing") throw new Error("QuotaExceededError");
-    return origSetItem(key, val);
+  // On the prototype, because assigning to localStorage.setItem on the
+  // instance is not a reliable override. The key matches CUSTOM_LICENSING_KEY:
+  // this used to name "pdcf_custom_licensing", from before the rename, so the
+  // simulated failure never fired and the check below printed false while the
+  // file still exited 0.
+  const origSetItem = w.Storage.prototype.setItem;
+  w.Storage.prototype.setItem = function (key, val) {
+    if (key === "rxnpv_custom_licensing") throw new Error("QuotaExceededError");
+    return origSetItem.call(this, key, val);
   };
 
   click(btn("+ Add custom deal")); await wait(300);
@@ -51,7 +62,7 @@ function findLeafInput(container, labelText) {
   console.log("Warning now shown:", t.includes("Couldn't save that"));
 
   console.log("\n=== Restore storage, add another entry, confirm warning clears ===");
-  w.localStorage.setItem = origSetItem;
+  w.Storage.prototype.setItem = origSetItem;
   click(btn("+ Add custom deal")); await wait(300);
   setVal(findLeafInput(form,"Licensor"),"Second Co");
   setVal(findLeafInput(form,"Licensee"),"Second Pharma");
@@ -63,5 +74,6 @@ function findLeafInput(container, labelText) {
 
   console.log("\nErrors:", errors.length);
   [...new Set(errors)].forEach(e=>console.log("  "+e));
-  process.exit(0);
+  if (failedChecks) printCheck("\n" + failedChecks + " CHECK(S) FAILED");
+  process.exit(errors.length || failedChecks ? 1 : 0);
 })();

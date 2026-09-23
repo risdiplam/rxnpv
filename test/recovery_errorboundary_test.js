@@ -1,6 +1,13 @@
 const { JSDOM } = require("jsdom");
 const html = require("fs").readFileSync("test_desktop.html","utf8");
+const devBuild = html.includes("react-dom.development");
 const errors=[];
+// Checks print as "label: true|false". Any false, or any caught app error,
+// fails the run with a non-zero exit code — this file used to always exit 0,
+// so an automated runner read it as passing whatever it printed.
+let failedChecks = 0;
+const printCheck = console.log;
+console.log = (...a) => { if (a.length > 1 && a[a.length - 1] === false) failedChecks++; printCheck(...a); };
 const broken = { id:"crash1", name:"Deliberately Broken", currentPrice:"3.00", programs: null,
   capitalStructure:{mode:"simple",dilutedSharesSimple:"100000000",cash:"40000000",debt:""},
   discountRatePct:"12", terminalValue:{enabled:false} };
@@ -15,7 +22,13 @@ const good = { id:"good1", name:"Healthy Case", currentPrice:"2.00", programs:[{
 const dom = new JSDOM(html,{runScripts:"dangerously",pretendToBeVisual:true,url:"https://localhost/",
   beforeParse(w){w.matchMedia=()=>({matches:false,addEventListener(){},removeEventListener(){}});
   w.console.warn=()=>{};w.console.error=()=>{};
-  w.addEventListener("error",e=>errors.push("UNCAUGHT: "+(e.error&&e.error.message||e.message)));
+  // React's DEVELOPMENT build re-reports an error its boundary already caught
+  // to window.onerror; production does not. Under `npm run test:dev` the one
+  // deliberate crash below (programs: null) is therefore expected here and is
+  // not counted — anything else still is.
+  w.addEventListener("error",e=>{ const m=(e.error&&e.error.message||e.message);
+    if (devBuild && /reading '0'|of null/.test(m)) return;
+    errors.push("UNCAUGHT: "+m); });
   w.localStorage.setItem("pdcf_cases_v1", JSON.stringify([broken, good]));
   w.fetch=async()=>({ok:false,status:404});
   }});
@@ -33,6 +46,7 @@ function wait(ms){return new Promise(r=>setTimeout(r,ms));}
   click(healthyRow ? healthyRow.parentElement : null); await wait(500);
   t = root.textContent;
   console.log("Switching to healthy case recovers:", !t.includes("hit a problem") && t.includes("GoodDrug"));
-  console.log("No window-level uncaught errors (production build):", errors.length === 0);
-  process.exit(0);
+  console.log("No window-level uncaught errors" + (devBuild ? " (dev build: deliberate crash excluded)" : "") + ":", errors.length === 0);
+  if (failedChecks) printCheck("\n" + failedChecks + " CHECK(S) FAILED");
+  process.exit(errors.length || failedChecks ? 1 : 0);
 })();

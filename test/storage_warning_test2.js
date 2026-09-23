@@ -1,6 +1,12 @@
 const { JSDOM } = require("jsdom");
 const html = require("fs").readFileSync("test_desktop.html","utf8");
 const errors=[];
+// Checks print as "label: true|false". Any false, or any caught app error,
+// fails the run with a non-zero exit code — this file used to always exit 0,
+// so an automated runner read it as passing whatever it printed.
+let failedChecks = 0;
+const printCheck = console.log;
+console.log = (...a) => { if (a.length > 1 && a[a.length - 1] === false) failedChecks++; printCheck(...a); };
 const dom = new JSDOM(html,{runScripts:"dangerously",pretendToBeVisual:true,url:"https://localhost/",
   beforeParse(w){w.matchMedia=()=>({matches:false,addEventListener(){},removeEventListener(){}});
   w.console.warn=()=>{};w.console.error=(...a)=>errors.push("ERROR: "+a.join(" ").slice(0,250));
@@ -56,5 +62,6 @@ function findLeafInput(container, labelText) {
 
   console.log("\nErrors:", errors.length);
   [...new Set(errors)].forEach(e=>console.log("  "+e));
-  process.exit(0);
+  if (failedChecks) printCheck("\n" + failedChecks + " CHECK(S) FAILED");
+  process.exit(errors.length || failedChecks ? 1 : 0);
 })();
