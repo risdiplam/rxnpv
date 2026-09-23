@@ -17,7 +17,7 @@ The intended flow: decode the design → watch it for changes → read the resul
 | Tool | Status | Notes |
 |---|---|---|
 | Trial Decoder | **BUILT** | Design in plain English, can/cannot prove, design red flags |
-| Trial change watch (snapshot/diff) | **BUILT** | Diffs 14 fields, each ranked by what the change means (Phase 19) |
+| Trial change watch (snapshot/diff) | **BUILT** | Diffs 13 fields, each ranked by what the change means (Phase 19) |
 | Analog effect-size board | **BUILT** | Posted effect sizes in an indication, with honest denominators |
 | Comparable-trial landscape | **BUILT** | Status/duration/enrolment rollup |
 | **Results reader** | **BUILT** | Outcomes, participant flow and adverse events, inside the decoder. See below |
@@ -160,4 +160,4 @@ Each of these has been considered and declined on the merits. Recording them her
 3. ~~**Cheap completions batch**~~ — **all done**: thin-win and change classification (Phase 19), Form 4 derivatives (Phase 20), literature shelf (Phase 21), multi-trial view + evidence checklist (Phase 22), control-arm/dropout stress (Phase 23)
 4. ~~**Commercial workbench** — launch trajectory, actual vs modelled~~ — **done**, Phase 24
 5. ~~**Tab consolidation**~~ — **done**, Phase 25. Six workbenches (Trial / Science / Company / Commercial / Valuation / Benchmarks), 18 tools.
-6. **Electron upgrade** — deferred by the user; needs ~10 minutes of their time (PDF export, panel capture, window resize) ← **the only item left on this list**
+6. ~~**Electron upgrade**~~ — **done** 2026-09-22: Electron 33.4.11 → **44.4.4** (Phase 27). Every item on this list is now done.

@@ -31,10 +31,10 @@ cd rxnpv
 node build.js              # assembles src/ into electron/rxnpv.html
 cd test
 npm install                # jsdom + React, for the test harness only
-npm test                   # regenerates the harness, runs all 12 suites
+npm test                   # regenerates the harness, runs all 13 suites
 ```
 
-Expected output ends with `All 12 suites passed`, and the exit code is 0. Any failure exits 1 and prints the failing suite's last 25 lines. `npm run test:dev` runs the same suite against React's development build. That run is stricter: warnings the production build hides, such as missing list keys, fail it.
+Expected output ends with `All 13 suites passed`, and the exit code is 0. Any failure exits 1 and prints the failing suite's last 25 lines. `npm run test:dev` runs the same suite against React's development build. That run is stricter: warnings the production build hides, such as missing list keys, fail it.
 
 ### Running the app itself
 
@@ -97,13 +97,13 @@ Suggested real-world inputs, most of them the cases used against the live servic
 | **Evidence Log, Calibration Log** | Sources behind judgement calls; your PoS call against the market's, Brier-scored after the outcome. | Add an entry to each, then delete one. Deletion needs two clicks. |
 | **Sum-of-the-parts, risk waterfalls** | Per-program value contribution (needs 2+ programs); unrisked → risked NPV. | Add a second program. The SOTP and pipeline waterfall appear. |
 
-**Automated:** `final_regression_pass.js` covers the core valuation paths. `math_verification.js` (1,032 checks) covers every formula against hand-derived values.
+**Automated:** `final_regression_pass.js` covers the core valuation paths. `math_verification.js` (1,090 checks) covers every formula against hand-derived values.
 
 ### Tools: six workbenches, 18 tools, grouped by the question being asked
 
 | Workbench | Tools | Test |
 |---|---|---|
-| **Trial** | **Trial Decoder**: paste an NCT and get the design in plain English, what it can and can't establish, design red flags, then the posted results, dropout by arm and adverse events. **Asset Program**: every trial for one drug by phase, with stopped trials and an evidence-base checklist of counts (deliberately no composite score). **Trial Explorer**: search, competitor landscape, Trial Watch (snapshot, then diff 14 fields ranked by significance), an analog effect-size board and positioning. **FDA Lookup**: approvals, labels, adverse event reports (FAERS). | Decode NCT03036124, click *Load what these trials actually reported*, and check that the hazard ratio shows with its interval. Decode NCT04368728: it should render without layout breakage. In Asset Program, search `dapagliflozin`. |
+| **Trial** | **Trial Decoder**: paste an NCT and get the design in plain English, what it can and can't establish, design red flags, then the posted results, dropout by arm and adverse events. **Asset Program**: every trial for one drug by phase, with stopped trials and an evidence-base checklist of counts (deliberately no composite score). **Trial Explorer**: search, competitor landscape, Trial Watch (snapshot, then diff 13 fields ranked by significance), an analog effect-size board and positioning. **FDA Lookup**: approvals, labels, adverse event reports (FAERS). | Decode NCT03036124, click *Load what these trials actually reported*, and check that the hazard ratio shows with its interval. Decode NCT04368728: it should render without layout breakage. In Asset Program, search `dapagliflozin`. |
 | **Science** | **Target Dossier** (Open Targets): genetic support, disease associations, existing drugs. Deliberately *not* wired into PoS. **Literature** (Europe PMC, which is all of MEDLINE plus preprints): results split by publication type. | Look up `PCSK9`. Search the literature for `NCT03036124`. |
 | **Company** | **Company Lookup** (SEC EDGAR financials, full-text search, Form 4 insider transactions split into market buys/sells and awards/vesting). **Catalyst Calendar**. **Cash Runway**. **Runway vs. Catalyst**: does modelled cash reach the next catalyst? | Search a ticker, then *Load insider activity (Form 4)*. Only P/S transaction codes should appear under "bought & sold". |
 | **Commercial** | **Launch & Actuals**: CMS Medicare Part D/B spend as a quarterly uptake proxy with analogs, and reported revenue against your model. It never compares a partial year to a full one. **Exclusivity / LOE** (Orange Book). | Launch tracker: `Uptravi`. It needs the asterisk-name fallback to get annual history. Exclusivity: `Farxiga`. |
@@ -178,8 +178,9 @@ A cross-case summary: fair value against price, runway, modelled against implied
 
 | Suite | Covers |
 |---|---|
-| `math_verification.js` | 1,032 checks of engine math against values derived by hand, from closed forms or from published constants. Never against the app's own output. Needs no DOM. |
+| `math_verification.js` | 1,090 checks of engine math against values derived by hand, from closed forms or from published constants. Never against the app's own output. Needs no DOM. |
 | `export_test.js` | Section serialiser: form state carried over, export controls removed, truncated text restored, sanitiser strips scripts, handlers, remote resources and `javascript:` URLs. |
+| `audit_regressions_test.js` | The UI-level fixes from the September 2026 Muse audit ([`docs/RxNPV_MUSE_AUDIT.md`](docs/RxNPV_MUSE_AUDIT.md)): override display round-trip, percent inputs, AE denominators, stale Form 4 / Exclusivity responses, the bridge convertible line, PK/PD notation, and the documented Trial Watch field count held to the code. Each check was confirmed to fail on the audited tree. |
 | `export_coverage_test.js` | Every section in every view has its own export bar; + Report (snapshot and live toggle); report rendering, include/exclude, reorder. |
 | `final_regression_pass.js` | Core valuation paths and every top-level view, with zero console errors. |
 | `final_sweep.js` | Every Tools workbench and tool, Simulation tab and sub-tool, and Reference Sheet tab. |
@@ -296,5 +297,6 @@ docs/       design history and decisions
 | [`docs/RxNPV_Feature_Map.md`](docs/RxNPV_Feature_Map.md) | The decided scope: built, committed, rejected with reasons |
 | [`docs/RxNPV_External_Suggestions_Tracker.md`](docs/RxNPV_External_Suggestions_Tracker.md) | The build log: every phase, what was verified, every bug found |
 | [`docs/RxNPV_Findings_TODO.md`](docs/RxNPV_Findings_TODO.md) | The running audit and fix list, including what is deliberately still open |
+| [`docs/RxNPV_MUSE_AUDIT.md`](docs/RxNPV_MUSE_AUDIT.md) | The September 2026 external static audit, with the disposition of every finding in its §13 |
 | [`test/README.md`](test/README.md) | What the automated suite does and does not verify |
 | [`docs/RxNPV_Field_Reference.md`](docs/RxNPV_Field_Reference.md) | Every model input explained |

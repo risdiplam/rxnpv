@@ -239,6 +239,25 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
     click(btn("Workspace")); await wait(400);
   }
 
+  // ── Doc drift — the documented Trial Watch field count is held to the code ──
+  // Four docs said "14 fields"; the code diffs 13 (nine CTGOV_DIFF_FIELDS
+  // entries plus four list comparisons). Counted from the source, so a new
+  // field updates the expected number and the docs must follow it.
+  {
+    const fs = require("fs"), path = require("path"), root = path.join(__dirname, "..");
+    const src = fs.readFileSync(path.join(root, "src", "ctgovEngine.js"), "utf8");
+    const table = src.slice(src.indexOf("const CTGOV_DIFF_FIELDS"), src.indexOf("];", src.indexOf("const CTGOV_DIFF_FIELDS")));
+    const fn = src.slice(src.indexOf("function diffTrialSnapshots"));
+    const body = fn.slice(0, fn.indexOf("\n}\n"));
+    const n = (table.match(/\{ key: "/g) || []).length + (body.match(/listDiff\("/g) || []).length + (body.match(/field: "/g) || []).length;
+    ok(n === 13, "Doc drift: the code diffs " + n + " Trial Watch fields (the docs say 13)");
+    const words = { 13: "thirteen" };
+    [["README.md", /diff (\d+) fields/], ["CLAUDE.md", /snapshot diff covers (\w+) fields/], [path.join("docs", "RxNPV_Feature_Map.md"), /Diffs (\d+) fields/]].forEach(([f, re]) => {
+      const m = fs.readFileSync(path.join(root, f), "utf8").match(re);
+      ok(m && (m[1] === String(n) || m[1] === words[n]), "Doc drift: " + f + " states the Trial Watch field count as " + (m && m[1]) + ", the code has " + n);
+    });
+  }
+
   if (errors.length) { console.log(errors.slice(0, 40).join("\n")); console.log("\n" + errors.length + " FAILURE(S) across " + checks + " checks"); process.exit(1); }
   console.log("ALL AUDIT REGRESSION CHECKS PASSED — " + checks + " checks");
   process.exit(0);

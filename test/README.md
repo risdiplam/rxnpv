@@ -18,7 +18,7 @@ Every test here runs the *entire app* inside jsdom — a JavaScript DOM implemen
 node build.js          # from the project root, first
 cd test
 npm install
-npm test               # runs setup.js, then all 12 suites; exits 1 if any fail
+npm test               # runs setup.js, then all 13 suites; exits 1 if any fail
 npm run test:dev       # the same against React's development build (stricter)
 ```
 
@@ -34,7 +34,7 @@ You must run `node build.js` from the project root first — `setup.js` reads `e
 
 This project's original, deepest test coverage — a 38-check suite covering hand-verified DCF math to the cent — did not survive an earlier sandbox reset during development. `final_regression_pass.js` is a leaner behavioural replacement covering the core valuation paths plus every top-level view, but it asserts "nothing crashed and the right text appeared," not "the arithmetic is right."
 
-**`math_verification.js` (1,032 checks) now covers that gap** and goes wider than the original did — every numerical primitive in the app checked against an independently-derived value.
+**`math_verification.js` (1,090 checks) now covers that gap** and goes wider than the original did — every numerical primitive in the app checked against an independently-derived value.
 
 ### What it does and does not check — read this before adding to it
 
@@ -48,9 +48,10 @@ When the suite was first written it reported 4 failures — all four turned out 
 
 ## What each file does
 
+- `audit_regressions_test.js` — one section per UI-level fix from the September 2026 Muse audit (`docs/RxNPV_MUSE_AUDIT.md`); every check was run against the audited tree (`f49689f`) and confirmed to fail there. Engine-side audit fixes are in `math_verification.js` under `FIN-0xx` section headers, derived longhand like everything else in that file
 - `run_all.js` — what `npm test` runs: regenerates the harness, runs every suite, prints PASS/FAIL per suite and exits 1 if any failed (`--dev` for React's development build)
 - `setup.js` — generates `test_desktop.html` (see above)
-- `math_verification.js` — 1,032 numerical checks against independently-derived reference values; needs no DOM, runs straight against the engine source (see "The lost coverage" above for scope and rules)
+- `math_verification.js` — 1,090 numerical checks against independently-derived reference values; needs no DOM, runs straight against the engine source (see "The lost coverage" above for scope and rules)
 - `export_test.js` — the section-export serialiser and sanitiser: form values carried into an export, export chrome removed, truncated titles restored, and — the part that matters most, since snapshots are stored and rendered back later — that nothing executable or remote survives sanitising. jsdom does no layout, so scroll-box expansion and export width are verified live in Electron instead
 - `export_coverage_test.js` — every section in every view (Workspace, all 18 tools, every Simulation tab and Trial Statistics sub-tool, all 9 Reference Sheet tabs, Portfolio) carries its **own** export bar and a usable title; no old chart-only export row survives; "+ Report" stores a snapshot for an ordinary card and toggles a live section for one the report already renders; the report renders the snapshot's real content in its theme scope with nothing executable in it; include/exclude and reordering are saved on the case. Output PNG/PDF and the SVG picker's chart detection need layout, so they are verified live
 - `final_regression_pass.js` — the main sweep: creates a case, exercises every core valuation path and every top-level view, asserts zero console errors
