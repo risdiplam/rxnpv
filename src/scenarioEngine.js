@@ -854,7 +854,14 @@ function computeRedFlags(theCase) {
       if (ms.peakShareOverridePct !== "" && ms.peakShareOverridePct != null) {
         const overrideShare = Number(ms.peakShareOverridePct);
         const benchShare = peakShareForEntry(ms.numDrugs, ms.orderOfEntry);
-        if (benchShare > 0 && overrideShare > benchShare * 2) {
+        if (overrideShare > 100) {
+          // Not a judgement call: a share of the treated population above 100%
+          // cannot exist. The revenue engine caps it at 100%; this says so.
+          flags.push({
+            programId: program.id, programName: progName, severity: "high",
+            message: `Peak share override of ${overrideShare.toFixed(0)}% is above 100% — a drug cannot reach more than all of its eligible patients, so the model caps it at 100%. Worth checking for a typo (150 where 15 was meant).`
+          });
+        } else if (benchShare > 0 && overrideShare > benchShare * 2) {
           flags.push({
             programId: program.id, programName: progName, severity: overrideShare > benchShare * 3 ? "high" : "medium",
             message: `Peak share override of ${overrideShare.toFixed(0)}% is well above what the order-of-entry model would predict for the ${ms.orderOfEntry}${ms.orderOfEntry === 1 ? "st" : ms.orderOfEntry === 2 ? "nd" : ms.orderOfEntry === 3 ? "rd" : "th"} entrant among ${ms.numDrugs} drugs (${benchShare.toFixed(0)}%) — real differentiation (efficacy, safety, dosing convenience) would need to be unusually strong to clear a bar this high.`

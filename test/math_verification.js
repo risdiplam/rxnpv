@@ -66,7 +66,7 @@ const EXPORTS = [
   "SCENARIO_PRESETS", "getEffectiveScenarioPreset", "applyBasePosAdjustment",
   "computeProgramValuation", "computeCaseValuation", "computeProgramRiskWaterfall",
   "computeEffectivePoS", "computeRnDToLaunch", "resolveLaunchYearOffset",
-  "computeFullCaseMonteCarlo", "solveImpliedPoSMultiplier", "computeEquityBridgeSteps",
+  "computeFullCaseMonteCarlo", "solveImpliedPoSMultiplier", "computeEquityBridgeSteps", "computeRedFlags",
   "computePortfolioSummary", "shrinkBinaryResponseRate", "shrinkHazardRatio",
   "BINARY_SHRINKAGE_FACTOR", "HR_SHRINKAGE_FACTOR",
   "MODALITY_OPTIONS", "getCogsBenchmark", "getErosionDefaults", "resolveErosionParams",
@@ -3836,6 +3836,36 @@ section("FIN-011: the EV -> equity bridge foots");
   near("converting: equity = EV + $110M", r2.equity.equityValue - r2.npvResult.npv, 110e6, 1e-3);
   // 10M basic + 10M from conversion + 30M / $10 = 3M from the raise = 23M.
   near("converting: diluted shares = 10M + 10M + 3M", r2.equity.dilutedShares, 23e6, 1e-6);
+}
+report();
+
+section("FIN-012: a Workspace peak-share override above 100% is capped and flagged");
+{
+  // 100,000 prevalent x 100% diagnosed x 100% treated x 100% eligible =
+  // 100,000 eligible; adherence 80%.
+  //   share 60%  -> 100,000 x 0.60 x 0.80 = 48,000 peak patients
+  //   share 150% -> impossible; capped at 100% -> 100,000 x 1.00 x 0.80 = 80,000
+  //   (f49689f computed 100,000 x 1.50 x 0.80 = 120,000)
+  const rb = (share) => ({
+    population: { mode: "prevalence", prevalence: "100000", diagnosisRatePct: "100", treatmentRatePct: "100", eligiblePct: "100" },
+    adherencePct: "80",
+    marketShare: { numDrugs: 2, orderOfEntry: 1, peakShareOverridePct: share },
+    launchCurve: { yearsToPeak: 6, profile: "median" },
+    pricing: { usAnnualPrice: "10000", usAnnualGrowthPct: "0", includeExUS: false },
+    exclusivity: { yearsToLOE: "13", modality: "smallMolecule", volumeRetainedPct: "", priceDeclinePct: "" }
+  });
+  near("share 60% -> 48,000 peak patients", api.computeProgramRevenue(rb("60"), 20).peakPatients, 48000, 1e-6);
+  near("share 150% is capped: 80,000 peak patients, not 120,000", api.computeProgramRevenue(rb("150"), 20).peakPatients, 80000, 1e-6);
+  near("share 100% is the cap itself", api.computeProgramRevenue(rb("100"), 20).peakPatients, 80000, 1e-6);
+  const mkCase = (share) => ({ name: "S", capitalStructure: { mode: "simple", dilutedSharesSimple: "1" },
+    programs: [{ id: "p1", name: "Asset", currentPhase: "phase2", therapeuticArea: "Oncology", modality: "smallMolecule",
+      revenueMode: "full", revenueBuild: rb(share) }] });
+  const f150 = api.computeRedFlags(mkCase("150"));
+  ok("a 150% override raises a high-severity flag that names the cap",
+    f150.some(f => f.severity === "high" && /above 100%/.test(f.message) && /caps it at 100%/.test(f.message)));
+  ok("and not a second, contradictory 'above benchmark' flag for the same field",
+    f150.filter(f => /Peak share override/.test(f.message)).length === 1);
+  ok("an override within 100% does not raise the cap flag", !api.computeRedFlags(mkCase("60")).some(f => /above 100%/.test(f.message)));
 }
 report();
 

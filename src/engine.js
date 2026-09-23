@@ -194,9 +194,13 @@ function resolveNetPrice(pricing) {
 function computeProgramRevenue(rb, projectionYears) {
   projectionYears = projectionYears || 20;
   const funnel = computeTreatedPopulation(rb.population);
-  const share = rb.marketShare.peakShareOverridePct != null && rb.marketShare.peakShareOverridePct !== ""
+  const rawShare = rb.marketShare.peakShareOverridePct != null && rb.marketShare.peakShareOverridePct !== ""
     ? Number(rb.marketShare.peakShareOverridePct)
     : peakShareForEntry(rb.marketShare.numDrugs, rb.marketShare.orderOfEntry);
+  // A share of the eligible population cannot exceed 100% (or go below 0),
+  // so an override outside that range is capped here — and computeRedFlags
+  // says so loudly, so the cap is never silent (FIN-012).
+  const share = Math.min(100, Math.max(0, rawShare));
   const adherence = (rb.adherencePct !== "" && rb.adherencePct != null ? Number(rb.adherencePct) : 100) / 100;
   const peakPatients = funnel.eligible * (share / 100) * adherence;
 
