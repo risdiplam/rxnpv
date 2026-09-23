@@ -3869,6 +3869,34 @@ section("FIN-012: a Workspace peak-share override above 100% is capped and flagg
 }
 report();
 
+section("NEW-001: Simple Multiple includes the PRV");
+{
+  // Same voucher as FIN-008: $150M x 10% P(launch) / 1.12^3 = $10,676,703.72.
+  // It is granted on approval whichever method values the asset, so Simple
+  // Multiple must add exactly the same amount the DCF does. f49689f added none.
+  const c = {
+    name: "PRV-SM", currentPrice: "10",
+    capitalStructure: { mode: "simple", dilutedSharesSimple: "10000000", cash: "0", debt: "0" },
+    corporateGA: { preCommercialAnnualM: "0", gaShareOfMatureSgaPct: "0" },
+    programs: [{ id: "p1", name: "Asset", currentPhase: "phase3", therapeuticArea: "Oncology", modality: "smallMolecule",
+      revenueMode: "quick", quickRevenue: { peakRevenue: "400000000", yearsToPeak: "6", profile: "median" },
+      posOverridePct: "10", launchYearOffset: "3", prv: { enabled: true, valueM: "150" } }]
+  };
+  const base = { label: "base", shareMultiplierPct: 100, posMultiplierPct: 100, discountRateAddPct: 0, color: "" };
+  const sm = api.computeSimpleMultipleValuation(c, base, null, 3, 12);
+  near("Simple Multiple adds the PRV: $10,676,703.72", sm.equity.prvValueAdded, 10676703.72, 0.01);
+  const off = JSON.parse(JSON.stringify(c)); off.programs[0].prv = { enabled: false, valueM: "150" };
+  near("and it is exactly the equity difference", sm.equity.equityValue - api.computeSimpleMultipleValuation(off, base, null, 3, 12).equity.equityValue, 10676703.72, 0.01);
+  near("the two methods add the identical PRV", sm.equity.prvValueAdded,
+    api.computeCaseValuation(c, base, null, 12, { enabled: false }).equity.prvValueAdded, 1e-6);
+  // Bear PoS 70% scales the voucher like the asset: 10% x 0.7 = 7% -> 0.7x.
+  const bear = { label: "bear", shareMultiplierPct: 100, posMultiplierPct: 70, discountRateAddPct: 0, color: "" };
+  near("Simple Multiple Bear: the PRV scales by exactly 0.7", api.computeSimpleMultipleValuation(c, bear, null, 3, 12).equity.prvValueAdded / sm.equity.prvValueAdded, 0.7, 1e-9);
+  const steps = api.computeEquityBridgeSteps(c, sm);
+  ok("and the bridge shows it as a line", steps.some(st => st.key === "prv" && Math.abs(st.value - 10676703.72) < 0.01));
+}
+report();
+
 // ════════════════════════════════════════════════════════════════════════════
 console.log("\n" + "═".repeat(64));
 if (fail === 0) {

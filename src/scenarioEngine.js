@@ -229,15 +229,7 @@ function computeCaseValuation(theCase, scenario, scenarioKey, discountRateBasePc
   // undiscounted windfall. If the drug doesn't get approved, there's no PRV
   // either; this makes that explicit rather than overstating the case.
   const r = discountRate / 100;
-  const prvContribution = programVals.reduce((sum, pv) => {
-    const prog = theCase.programs.find(p => p.id === pv.id);
-    const prv = prog && prog.prv;
-    if (!prv || !prv.enabled) return sum;
-    const prvRaw = (numOr(prv.valueM, 0)) * 1e6;
-    const riskAdjusted = prvRaw * pv.posToLaunch;
-    const discounted = pv.launchYearOffset > 0 ? riskAdjusted / Math.pow(1 + r, pv.launchYearOffset) : riskAdjusted;
-    return sum + discounted;
-  }, 0);
+  const prvContribution = computePrvContribution(theCase, programVals, r);
   if (prvContribution > 0) {
     const newEquityValue = equity.equityValue + prvContribution;
     equity = { ...equity, equityValue: newEquityValue, perShare: equity.dilutedShares > 0 ? newEquityValue / equity.dilutedShares : null, prvValueAdded: prvContribution };
@@ -250,6 +242,25 @@ function computeCaseValuation(theCase, scenario, scenarioKey, discountRateBasePc
   }
 
   return { programVals, calendar, discountRateUsed: discountRate, npvResult, capResult, equity };
+}
+
+// ── Priority review vouchers, as cash to add on top of equity value ──
+// programVals: each program's { id, posToLaunch, launchYearOffset } under the
+// scenario being valued — the DCF and Simple Multiple program valuations both
+// carry these. `r` is the discount rate as a fraction. Used to live inline in
+// computeCaseValuation only, so Simple Multiple (the Napkin preset) silently
+// dropped every PRV — the same shape as the partnership bug documented at
+// computePartnershipContribution (NEW-001, September 2026 audit pass).
+function computePrvContribution(theCase, programVals, r) {
+  return programVals.reduce((sum, pv) => {
+    const prog = theCase.programs.find(p => p.id === pv.id);
+    const prv = prog && prog.prv;
+    if (!prv || !prv.enabled) return sum;
+    const prvRaw = (numOr(prv.valueM, 0)) * 1e6;
+    const riskAdjusted = prvRaw * pv.posToLaunch;
+    const discounted = pv.launchYearOffset > 0 ? riskAdjusted / Math.pow(1 + r, pv.launchYearOffset) : riskAdjusted;
+    return sum + discounted;
+  }, 0);
 }
 
 // ── The EV -> equity bridge as line items that sum to the equity value ──
@@ -464,6 +475,13 @@ function computeSimpleMultipleValuation(theCase, scenario, scenarioKey, multiple
   const dilutionPath2 = computeDilutionPath(theCase, scenario, discountRateBasePct);
   if (dilutionPath2.enabled) capResult = { ...capResult, dilutedShares: dilutionPath2.finalDilutedShares };
   let equity = computeEquityValue(npv, capResult);
+
+  // A PRV is granted on approval whichever method values the asset (NEW-001).
+  const prvContribution = computePrvContribution(theCase, programVals, r);
+  if (prvContribution > 0) {
+    const newEquityValue = equity.equityValue + prvContribution;
+    equity = { ...equity, equityValue: newEquityValue, perShare: equity.dilutedShares > 0 ? newEquityValue / equity.dilutedShares : null, prvValueAdded: prvContribution };
+  }
 
   // Upfront and milestone cash is real regardless of which valuation method
   // values the underlying asset, and used to be dropped entirely here — see
