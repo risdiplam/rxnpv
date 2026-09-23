@@ -197,6 +197,20 @@ A cross-case summary: fair value against price, runway, modelled against implied
 
 A CSP mistake can blank the real app while the whole suite stays green. [`test/README.md`](test/README.md) spells out exactly what is and isn't verified. Read it before trusting coverage.
 
+**Beyond jsdom — two checks that need a Mac or the network** (neither is part of `npm test`):
+
+```bash
+cd test && npm run packaged -- --mode=offline   # then --mode=reopen, --mode=live
+```
+
+Drives the installed app's real main process, IPC, CSP and print engine (only the save dialog is replaced), against a throwaway profile: offline launch, PNG/PDF/SVG export, the report builder, resize and relaunch, and the live integrations. Needs `cd electron && npm install` once.
+
+```bash
+cd test && npm run canary
+```
+
+Checks the ClinicalTrials.gov parsers against three live reference trials and a stored baseline, so an API change is noticed before it misleads the decoder.
+
 **Running one suite:**
 
 ```bash

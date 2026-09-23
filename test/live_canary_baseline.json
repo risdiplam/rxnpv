@@ -1,0 +1,68 @@
+{
+  "_written": "2026-09-23",
+  "NCT03036124": {
+    "phase": "PHASE3",
+    "allocation": "RANDOMIZED",
+    "masking": "QUADRUPLE",
+    "armCount": 2,
+    "registeredPrimaryEndpoints": 1,
+    "hasResults": true,
+    "parsedPrimaryResults": 1,
+    "firstEffect": {
+      "paramType": "Hazard Ratio (HR)",
+      "scale": "ratio",
+      "value": 0.74,
+      "lower": 0.65,
+      "upper": 0.85
+    },
+    "safetyGroups": 2,
+    "safetyPrimaryGroups": 2,
+    "safetyComparable": true,
+    "seriousTerms": 624,
+    "flowGroups": 2,
+    "designFlags": []
+  },
+  "NCT02578680": {
+    "phase": "PHASE3",
+    "allocation": "RANDOMIZED",
+    "masking": "QUADRUPLE",
+    "armCount": 2,
+    "registeredPrimaryEndpoints": 2,
+    "hasResults": true,
+    "parsedPrimaryResults": 2,
+    "firstEffect": {
+      "paramType": "Hazard Ratio (HR)",
+      "scale": "ratio",
+      "value": 0.52,
+      "lower": 0.43,
+      "upper": 0.64
+    },
+    "safetyGroups": 5,
+    "safetyPrimaryGroups": 3,
+    "safetyComparable": false,
+    "seriousTerms": 259,
+    "flowGroups": 2,
+    "designFlags": [
+      "2 co-primary endpoints"
+    ]
+  },
+  "NCT04368728": {
+    "phase": "PHASE2/PHASE3",
+    "allocation": "RANDOMIZED",
+    "masking": "TRIPLE",
+    "armCount": 20,
+    "registeredPrimaryEndpoints": 64,
+    "hasResults": true,
+    "parsedPrimaryResults": 64,
+    "firstEffect": null,
+    "safetyGroups": 28,
+    "safetyPrimaryGroups": 4,
+    "safetyComparable": false,
+    "seriousTerms": 628,
+    "flowGroups": 17,
+    "designFlags": [
+      "64 registered primary endpoints",
+      "Accepts healthy volunteers at a therapeutic phase"
+    ]
+  }
+}

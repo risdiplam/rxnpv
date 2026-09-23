@@ -851,14 +851,35 @@ Do not delete Muse findings above. Update this table as you land commits.
 | Drift: 14 fields | CONFIRMED 13 | **FIXED** | `528b2cb` | 9 + 4 = 13 verified from source. Four sites corrected (build log annotated, not rewritten). New test counts fields from source and fails if README/CLAUDE.md/Feature Map disagree. |
 | Drift: Human Test Checklist | CONFIRMED stale | **FIXED** | `528b2cb` | Body replaced with a pointer to README test steps and §11 here. |
 | Drift: Findings TODO "Still open: Nothing" | Conditional | **FIXED** | this commit | "Still open" now lists the packaged-app worklist and NEW-001/NEW-002 below; the FIN items are recorded under Fixed. |
-| B-001 … B-013 | Packaged / live | **OPEN — not closable in jsdom** | — | Left for Caleb + Claude on the Mac. Nothing here claims them. |
+| B-001 … B-013 | Packaged / live | **CLOSED — run in the packaged app** | `7e719a0` | New `test/packaged/packaged_check.js` runs the installed app's own main.js/preload from `app.asar` (real IPC, CSP, printToPDF, offscreen renderer), replacing only the native save dialog, on a throwaway profile. Final run against the installed build: **offline 26/26, reopen 4/4, live 21/21.** Per-item results below. |
+
+### B-worklist results (installed build, 2026-09-23)
+
+| ID | Result | Evidence |
+|---|---|---|
+| B-001 | **PASS** | Every http(s) request cancelled at the session (the harness verifies the block holds): React loads from the vendored copy, the app renders, zero CSP violations. |
+| B-002 | **PASS** | Valuation card (2,866px tall vs an 839px window) exports as a complete 4648×10720 PNG and a vector PDF with embedded fonts and **no images**; chart PDF via `export-chart-pdf`; SVG via `save-asset`. The first run found every PDF carrying box-shadow bitmaps (fixed, `7e719a0`). |
+| B-003 | **PASS** | DAPA-HF decodes live; primary HR **0.74 (0.65–0.85)**. The audit's "0.52 (0.43–0.64)" is KEYNOTE-189's primary HR, which also parses correctly. Live AE rates carry denominators (FIN-004). NCT04368728 decodes. |
+| B-004 | **PASS** | VRTX: EDGAR financials and 20 Form 4 filings load live; codes A/G/S/D, with only P/S counted as market trades. FIN-005 repro on live data: the first company's Form 4 panel is gone after searching MRNA. |
+| B-005 | **PASS** | Uptravi: full-year history 2020–2025 present (the asterisk fallback works) plus 2026 Q1 as a 1-quarter partial, only ever compared with a same-length period. |
+| B-006 | **PASS** | PCSK9 and TTR resolve through the target picker and render genetic evidence and associations from the live API. |
+| B-007 | **PASS** | Two sections added, both render, reorder saved, dark retheme applied to snapshots, light and dark report PDFs exported through `export-pdf`. Found the app's navigation bar printed across page 1 of the report (fixed, `7e719a0`; now checked under print media). |
+| B-008 | **PASS** | No sideways scroll in any view at the 900×600 minimum; Tools at 1240px on a 1470px window; after a full relaunch the case, its Bear override and both report sections are intact. Window bounds are not persisted by design (opens at 1400×900, fitted to the screen). |
+| B-009 | **PASS (reviewed by eye)** | Five views × two themes captured and reviewed; labels carry units, Bear/Base/Bull are named in text. Found the reverse-solve panel printing "$14,417,500,064" (fixed, `7e719a0`). |
+| B-010 | **PASS** | A nonsense name reads "No openFDA data found for that name"; with the network cut the same search reads "Couldn't reach openFDA … connection problem, not a result". |
+| B-011 | **PASS** | FIN-001 (override shows 1000, stores $1e9), FIN-002 (5× / 0.7×), FIN-003 ($7.50B), FIN-006 (race) all confirmed in the packaged renderer. |
+| B-012 | **BUILT** | `test/live_canary.js` (`npm run canary`): the three reference trials through the app's own fetch and parsers, invariants for past API lessons, diff against `test/live_canary_baseline.json`. Clean on 2026-09-23; shown to flag a changed value. Running it **on a schedule** is not set up — that would be standing configuration on the user's machine and needs their say-so. |
+| B-013 | **PASS** | NCT04368728 live: no sideways page scroll, and every table wider than the window sits in its own scroll box. |
 
 ### Found during this pass (not in the Muse audit)
 
 | ID | Severity | Status | Notes |
 |---|---|---|---|
-| NEW-001 | P1 (money, documented path) | **OPEN — for Caleb's decision** | **Simple Multiple adds no PRV at all.** `computeCaseValuation` adds a risk-adjusted, discounted PRV; `computeSimpleMultipleValuation` has no PRV step, so a PRV-enabled case loses that value when switched to Napkin / Simple Multiple. Same class as the fixed "Simple Multiple dropped partnership value" bug. Not fixed because it is outside this packet; the fix is small (reuse the PRV block with the Simple Multiple program valuations) and would take a longhand test like FIN-008's. |
-| NEW-002 | P3 (edge) | **OPEN — observation** | Scenario share multipliers scale patients linearly (`scaleRevenueResult`), so a Full-mode share near the cap can exceed 100% of eligible patients under Bull (90% × 130% = 117%). FIN-012 caps the *override*, not the scenario-scaled result. Rare in practice; noted rather than fixed. |
+| NEW-001 | P1 (money, documented path) | **FIXED** `33375ab` | Simple Multiple added no PRV. The PRV block is now `computePrvContribution()`, used by both methods; Simple Multiple adds the same $10,676,703.72 as the DCF on the FIN-008 fixture. 5 longhand checks, all failing without the fix. |
+| NEW-002 | P3 (edge) | **FIXED** `2e12d21` | `cappedShareMultiplier()` limits a scenario share multiplier to 100 / share for Full-mode programs, in both methods (and so the case Monte Carlo). A 90% share under Bull scales by exactly 100/90. |
+| NEW-005 | P2 | **FIXED** `7e719a0` | Every printed PDF carried box-shadow bitmaps (~3400×2000 per card). Print CSS drops shadows; PDFs are pure vector and about half the size. Found by B-002. |
+| NEW-006 | P2 | **FIXED** `7e719a0` | The app's navigation bar printed across page 1 of every report PDF. Now `no-print`. Found by B-007. |
+| NEW-007 | P3 | **FIXED** `7e719a0` | Reverse-solve printed money as an 11-digit figure; now `fmtMoney`. Found by B-009. |
 | NEW-003 | — | **FIXED with FIN-011** | Modelled future raise missing from both bridges (see FIN-011). |
 | NEW-004 | — | **FIXED with FIN-010** | Base-PoS adjustment pushing the MC mode outside its own range (see FIN-010). |
 
@@ -866,8 +887,9 @@ Do not delete Muse findings above. Update this table as you land commits.
 
 ### Release go / no-go
 
-- Static + P1 code: **all six P1s FIXED and tested** (`97a6934` … `dec29ef`). One newly found P1-class item, **NEW-001, is open** pending Caleb's call.
-- Product release bar: **still NO-GO.** B-001 (offline packaged launch), B-002 (PNG/PDF export), B-007 (report pin/reorder/retheme) and B-008 (resize/quit/reopen) have not been re-run on a Mac against this tree. Parts of B-002 and B-007 were exercised in the packaged app during the export work just before this audit (tracker, Phases 28–29), but none of the four has been re-run since these fixes, and jsdom cannot close them.
+- Static + P1 code: **all six P1s FIXED and tested** (`97a6934` … `dec29ef`); the newly found NEW-001 is fixed too (`33375ab`).
+- Packaged-app bar: **B-001, B-002, B-007 and B-008 PASS** on the installed build, by the harness above — offline 26/26, reopen 4/4, live 21/21. Every other B item passes or is built (B-012).
+- What remains is the user's own call, not an open defect: a person clicking the real macOS save sheet once (the one step the harness replaces), and whether to schedule the live canary. The release decision is Caleb's (§0).
 - Vanilla DCF path: still green; do not confuse that with release-ready.
 
 ---

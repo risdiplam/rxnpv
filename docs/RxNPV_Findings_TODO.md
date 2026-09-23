@@ -10,16 +10,13 @@ The bulk of this list came out of an exhaustive audit pass (September 2026) cove
 
 ## Still open
 
-The September 2026 external audit (`RxNPV_MUSE_AUDIT.md`) reopened this list. Its fourteen findings are dispositioned in that file's §13 and recorded under Fixed below. What remains:
+The September 2026 external audit (`RxNPV_MUSE_AUDIT.md`) reopened this list. Its fourteen findings, the packaged-app worklist B-001–B-013, and seven further items found while working through them are all dispositioned in that file's §13 and recorded under Fixed below. What remains is two small things that need the user rather than code:
 
-### 🔴 NEW-001 — Simple Multiple adds no PRV
-Found while fixing FIN-002. `computeCaseValuation` adds a risk-adjusted, discounted priority review voucher; `computeSimpleMultipleValuation` has no PRV step at all, so a PRV-enabled case silently loses that value in Napkin / Simple Multiple mode — the same class as the "Simple Multiple dropped partnership value" bug fixed earlier. Small fix (reuse the PRV block against the Simple Multiple program valuations, test it longhand like FIN-008). Left open only because it was outside the audit packet; awaiting the user's go-ahead.
+### 🔵 Schedule the live canary — needs the user's go-ahead
+`npm run canary` (B-012) is built and clean. Running it on a schedule would be standing configuration on the user's machine, so it waits for a yes. Until then, run it before trusting the decoder on new trials.
 
-### 🔵 NEW-002 — a scenario share multiplier can push patients past 100% of eligible
-`scaleRevenueResult` scales patients linearly, so a Full-mode share near 100% under Bull (130%) exceeds the eligible population. FIN-012 caps the typed override, not the scenario-scaled result. Edge case; noted, not fixed.
-
-### 🔵 Packaged-app worklist B-001 – B-013
-In §11 of `RxNPV_MUSE_AUDIT.md`. Offline packaged launch, PNG/PDF export, report pin/reorder/retheme and resize/quit/reopen (B-001, B-002, B-007, B-008) gate a release claim; none has been re-run against the post-audit tree. They need the real app on the Mac, not jsdom.
+### 🔵 One manual click
+The packaged-app harness replaces only the native save sheet. Clicking **Export as PDF** once in the real app and choosing a location is the single step it cannot perform.
 
 The two standing limitations are in CLAUDE.md under "Known limitations", and `RxNPV_Feature_Map.md` holds what is deliberately not built.
 
@@ -30,7 +27,7 @@ One small thing that is not a finding but is worth not forgetting: `npm install`
 ## Fixed
 
 ### 🟢 September 2026 external audit — six P1s, six P2s, two P3s, four doc-drift rows
-Dispositions and commits are in §13 of `RxNPV_MUSE_AUDIT.md`; this is the short version. **P1:** Bear/Bull peak-revenue override displayed stored dollars as $M and compounded on edit (`97a6934`) · partnership milestones ignored scenario PoS and the per-program override (`d88ab6a`) · Peak Sales rates were unlabelled fractions that clamped a typed 60 to 100% (`2a0eafb`) · per-event adverse-event rates had no denominators (`97997c3`) · Company Lookup's Form 4 panel survived a new search (`8f67b70`) · Exclusivity lookup had no stale-response guard (`dec29ef`). **P2:** implied PoS used the benchmark instead of the override (`5734324`) · PRV longhand check added (`d0f0bc8`) · case Monte Carlo drew outside its own bounds, worst with a Base-PoS adjustment (`5738c1c`) · the EV→equity bridge omitted a non-converting convertible and a modelled raise (`be1acf0`) · a peak-share override above 100% flowed into revenue (`f8a390f`). **P3:** dead no-timeout fetcher deleted, PK/PD message notation (`7bc764d`; the label half was a false positive). **Docs:** 13 Trial Watch fields not 14, Electron item done, stale checklist retired (`528b2cb`). Every P1 test was confirmed to fail on the audited tree `f49689f`.
+Dispositions and commits are in §13 of `RxNPV_MUSE_AUDIT.md`; this is the short version. **P1:** Bear/Bull peak-revenue override displayed stored dollars as $M and compounded on edit (`97a6934`) · partnership milestones ignored scenario PoS and the per-program override (`d88ab6a`) · Peak Sales rates were unlabelled fractions that clamped a typed 60 to 100% (`2a0eafb`) · per-event adverse-event rates had no denominators (`97997c3`) · Company Lookup's Form 4 panel survived a new search (`8f67b70`) · Exclusivity lookup had no stale-response guard (`dec29ef`). **P2:** implied PoS used the benchmark instead of the override (`5734324`) · PRV longhand check added (`d0f0bc8`) · case Monte Carlo drew outside its own bounds, worst with a Base-PoS adjustment (`5738c1c`) · the EV→equity bridge omitted a non-converting convertible and a modelled raise (`be1acf0`) · a peak-share override above 100% flowed into revenue (`f8a390f`). **P3:** dead no-timeout fetcher deleted, PK/PD message notation (`7bc764d`; the label half was a false positive). **Docs:** 13 Trial Watch fields not 14, Electron item done, stale checklist retired (`528b2cb`). Every P1 test was confirmed to fail on the audited tree `f49689f`. **Found while working through it:** Simple Multiple dropped the PRV (`33375ab`) · a Bull share multiplier could exceed 100% of patients (`2e12d21`) · PDFs carried shadow bitmaps, the report printed the nav bar, and a money figure was unformatted (`7e719a0`). **Packaged app:** B-001–B-013 run in the installed build by `test/packaged/packaged_check.js` — offline 26/26, reopen 4/4, live 21/21; live canary built (`npm run canary`).
 
 ### 🟢 Electron upgraded 33.4.11 → 44.4.4 (eleven majors), and what it actually changed
 Deferred by the user on 2026-09-21 because it needed their time; done 2026-09-22 with almost all of the verification automated after all.

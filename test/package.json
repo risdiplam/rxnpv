@@ -5,7 +5,9 @@
   "scripts": {
     "setup": "node setup.js",
     "test": "node run_all.js",
-    "test:dev": "node run_all.js --dev"
+    "test:dev": "node run_all.js --dev",
+    "canary": "node live_canary.js",
+    "packaged": "../electron/node_modules/electron/dist/Electron.app/Contents/MacOS/Electron packaged/packaged_check.js"
   },
   "dependencies": {
     "jsdom": "^30.0.1",
