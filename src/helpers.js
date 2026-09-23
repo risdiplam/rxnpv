@@ -194,6 +194,193 @@ function PinToReportButton({ targetRef, title, source, note, cases, updateCase, 
   );
 }
 
+// ── Section export — the one export bar every section carries ─────────────
+// Replaces the chart-only export rows. It exports the SECTION it sits in —
+// title, headline figures, chart, tables, notes — rather than just the chart,
+// and it finds that section by walking up the DOM to the nearest
+// [data-export-section], so a card only has to declare itself; nothing has to
+// be threaded down to the button.
+//
+// "+ Report" does one of two things, deliberately:
+//   · on a Workspace section the report already renders LIVE from the model
+//     (it declares data-report-section), it switches that live section on —
+//     a frozen copy of something the report recomputes anyway would only
+//     drift out of date next to it;
+//   · everywhere else it stores a snapshot of exactly what is on screen, which
+//     is the only option for a result computed on demand from an API call.
+// Either way it then says WHERE it went and links straight there, because the
+// previous version said "Pinned" and nothing else, and the user reasonably
+// asked where pinned things were supposed to go.
+//
+// The case list and the navigation come from context rather than props, so
+// the ~100 cards that carry this bar did not all need rewiring.
+const ReportContext = (typeof React !== "undefined" && React.createContext) ? React.createContext(null) : null;
+
+const SNAPSHOT_MAX_STORED_BYTES = 400000;
+const PINNED_MAX_PER_CASE_V2 = 40;
+
+function exportContextOf(el) {
+  let n = el;
+  while (n && n.getAttribute) {
+    const c = n.getAttribute("data-export-context");
+    if (c) return c;
+    n = n.parentNode;
+  }
+  return "";
+}
+
+function reportSectionIncluded(theCase, id) {
+  const stored = ((theCase && theCase.reportInclusions) || {})[id];
+  if (stored != null) return !!stored;
+  const def = (typeof REPORT_SECTIONS !== "undefined") ? REPORT_SECTIONS.find(x => x.id === id) : null;
+  return !!(def && def.defaultOn);
+}
+
+function SectionExportBar({ title, reportSection, source }) {
+  const h = React.createElement;
+  const ref = React.useRef(null);
+  const reactCtx = (ReportContext && React.useContext) ? React.useContext(ReportContext) : null;
+  // Simulation panels are vanilla DOM with the bar mounted in its own small
+  // React root, outside the provider — they read the same data off the bridge.
+  const ctx = reactCtx || (typeof window !== "undefined" ? window.rxnpvSimBridge : null) || null;
+  // Always the CURRENT source, read at click time rather than render time: a
+  // bar mounted into a Simulation panel is not re-rendered when cases change,
+  // and writing back a stale case object would silently discard newer edits.
+  const liveSource = () => reactCtx || (typeof window !== "undefined" ? window.rxnpvSimBridge : null);
+  const [busy, setBusy] = React.useState(null);
+  const [msg, setMsg] = React.useState(null);
+  const [chartCount, setChartCount] = React.useState(0);
+  const [pickChart, setPickChart] = React.useState(false);
+  const cases = (ctx && ctx.cases) || [];
+  const [pickedCaseId, setPickedCaseId] = React.useState(null);
+  const targetId = pickedCaseId || (ctx && ctx.activeCaseId) || (cases[0] && cases[0].id);
+  const target = cases.find(c => c.id === targetId) || null;
+
+  // The charts in this section, to offer as SVG — anything drawn at least
+  // 120px wide, which excludes icons. Re-checked after every render because a
+  // section's chart usually arrives after its data does.
+  const chartsIn = (sec) => sec ? Array.prototype.filter.call(sec.querySelectorAll("svg"), n => (n.getBoundingClientRect().width || 0) >= 120) : [];
+  React.useEffect(() => {
+    const n = chartsIn(ref.current && closestExportSection(ref.current)).length;
+    if (n !== chartCount) setChartCount(n);
+  });
+
+  const section = () => ref.current && closestExportSection(ref.current);
+  const sectionTitle = () => title || sectionTitleOf(section());
+  const flash = (m, ms) => { setMsg(m); if (ms) setTimeout(() => setMsg(cur => cur === m ? null : cur), ms); };
+
+  const doExport = async (kind, chartIndex) => {
+    const sec = section();
+    if (!sec) { flash({ tone: "err", text: "Couldn't find the section to export." }, 4000); return; }
+    setBusy(kind); setMsg(null);
+    let r;
+    try {
+      if (kind === "svg") {
+        const charts = chartsIn(sec);
+        const svg = charts[chartIndex || 0];
+        r = svg ? await exportChartAsSvg(svg, sectionTitle() + (charts.length > 1 ? " chart " + ((chartIndex || 0) + 1) : ""))
+                : { ok: false, error: "No chart found to export here." };
+      } else {
+        r = await exportSectionAs(sec, kind, { title: sectionTitle(), context: exportContextOf(sec) });
+      }
+    } catch (e) { r = { ok: false, error: e.message }; }
+    setBusy(null);
+    if (r && r.ok) flash({ tone: "ok", text: r.viaBrowser ? "Downloaded" : "Saved" }, 3500);
+    else if (!(r && r.canceled)) flash({ tone: "err", text: (r && r.error) || "Export failed." }, 6000);
+  };
+
+  const inReport = !!(reportSection && target && reportSectionIncluded(target, reportSection));
+
+  const doReport = async () => {
+    const src = liveSource();
+    const live = src && (src.cases || []).find(c => c.id === targetId);
+    if (!src || !live) return;
+    const sec = section();
+    if (reportSection) {
+      const was = reportSectionIncluded(live, reportSection);
+      src.updateCase({ ...live, reportInclusions: { ...(live.reportInclusions || {}), [reportSection]: !was }, updatedAt: Date.now() });
+      flash(was
+        ? { tone: "ok", text: "Removed from " + (live.name || "case") + "'s report" }
+        : { tone: "ok", text: "In " + (live.name || "case") + "'s report", caseId: live.id }, 7000);
+      return;
+    }
+    const existing = pinnedResultsOf(live);
+    if (existing.length >= PINNED_MAX_PER_CASE_V2) {
+      flash({ tone: "err", text: (live.name || "This case") + "'s report already holds " + PINNED_MAX_PER_CASE_V2 + " added sections — remove one there first.", caseId: live.id }, 8000);
+      return;
+    }
+    setBusy("report");
+    const r = await buildSectionSnapshot(sec, { title: sectionTitle(), source: source || exportContextOf(sec) });
+    setBusy(null);
+    if (!r.ok) { flash({ tone: "err", text: r.error }, 6000); return; }
+    if (r.pin.html.length > SNAPSHOT_MAX_STORED_BYTES) {
+      flash({ tone: "err", text: "That section is too large to store in a report (" + Math.round(r.pin.html.length / 1024) + "KB). Export it as a PDF instead." }, 8000);
+      return;
+    }
+    // Re-read once more after the async snapshot, for the same reason.
+    const src2 = liveSource();
+    const fresh = (src2.cases || []).find(c => c.id === targetId) || live;
+    src2.updateCase({ ...fresh, pinnedResults: pinnedResultsOf(fresh).concat([r.pin]), updatedAt: Date.now() });
+    flash({ tone: "ok", text: "Added to " + (fresh.name || "case") + "'s report", caseId: fresh.id }, 9000);
+  };
+
+  const btn = (label, kind, onClick, tip, extra) => h("button", Object.assign({
+    key: kind, type: "button", title: tip, disabled: busy != null, onClick,
+    style: { padding: "3px 9px", borderRadius: 5, border: "1px solid var(--rule)", background: "transparent",
+      color: busy === kind ? "var(--teal)" : "var(--ink-3)", fontFamily: "var(--mono)", fontSize: 10,
+      cursor: busy ? "default" : "pointer", whiteSpace: "nowrap" }
+  }, extra || {}), busy === kind ? "…" : label);
+
+  const noCase = !cases.length;
+  return h("div", {
+    ref, "data-no-export": "", className: "section-export-bar" + (msg || busy ? " is-active" : ""),
+    style: { display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 6, flexWrap: "wrap", marginTop: 12 }
+  },
+    msg && h("span", { role: "status", style: { fontSize: 10, fontFamily: "var(--mono)", color: msg.tone === "ok" ? "var(--teal)" : "var(--red)", marginRight: 4 } },
+      msg.text,
+      msg.caseId && ctx && ctx.openReport && h("button", { type: "button", onClick: () => { const src = liveSource(); if (src && src.openReport) src.openReport(msg.caseId); },
+        style: { marginLeft: 8, background: "none", border: "none", padding: 0, color: "var(--teal)", textDecoration: "underline", fontFamily: "var(--mono)", fontSize: 10, cursor: "pointer" } },
+        "Open report →")),
+    h("span", { style: { fontSize: 9, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.05em" } }, "Export"),
+    btn("PNG", "png", () => doExport("png"), "This whole section as a PNG image — title, figures, charts, tables and notes, at full height"),
+    btn("PDF", "pdf", () => doExport("pdf"), "This whole section as a PDF — vector, with selectable text and working links"),
+    chartCount === 1 && btn("SVG", "svg", () => doExport("svg", 0), "Just the chart, as an editable vector SVG"),
+    // Several charts in one section: SVG opens a picker so each can be taken
+    // out on its own, in the order they appear.
+    chartCount > 1 && !pickChart && btn("SVG ▾", "svg", () => setPickChart(true), "Save one of the " + chartCount + " charts in this section as an editable vector SVG"),
+    chartCount > 1 && pickChart && Array.from({ length: chartCount }, (_, i) =>
+      btn("Chart " + (i + 1), "svg" + i, () => { setPickChart(false); doExport("svg", i); }, "Chart " + (i + 1) + " of " + chartCount + ", top to bottom, as SVG")),
+    h("span", { style: { width: 1, height: 14, background: "var(--rule)", margin: "0 2px" } }),
+    btn(reportSection ? (inReport ? "✓ In report" : "+ Report") : "+ Report", "report",
+      noCase ? undefined : doReport,
+      noCase ? "Reports belong to a case — create one in Workspace first, then sections can be added to its report"
+        : reportSection
+          ? (inReport ? "This section is in " + (target && target.name) + "'s report — click to take it out" : "Include this section in " + (target && target.name) + "'s report (it renders live from the model there)")
+          : "Add a snapshot of exactly this section to " + (target && target.name) + "'s report, to build a PDF of only what you choose",
+      noCase ? { disabled: true, style: { padding: "3px 9px", borderRadius: 5, border: "1px dashed var(--rule)", background: "transparent", color: "var(--ink-3)", fontFamily: "var(--mono)", fontSize: 10, opacity: 0.6, cursor: "not-allowed" } }
+        : (inReport ? { style: { padding: "3px 9px", borderRadius: 5, border: "1px solid var(--teal)", background: "var(--teal-bg)", color: "var(--teal)", fontFamily: "var(--mono)", fontSize: 10, cursor: busy ? "default" : "pointer", whiteSpace: "nowrap" } } : null)),
+    cases.length > 1 && h("select", { "aria-label": "Case whose report this goes to", value: targetId || "", onChange: e => setPickedCaseId(e.target.value),
+      style: { padding: "2px 6px", borderRadius: 5, border: "1px solid var(--rule)", background: "var(--surface)", color: "var(--ink-3)", fontFamily: "var(--mono)", fontSize: 9, maxWidth: 150 } },
+      cases.map(c => h("option", { key: c.id, value: c.id }, c.name || "Untitled")))
+  );
+}
+
+// Wraps any block as its own exportable section — used for the sub-sections
+// packed inside larger cards (the scenario comparison, the bridge, Monte
+// Carlo), which a reader should be able to take out on their own.
+function ExportSection({ title, reportSection, source, style, className, id, children }) {
+  const h = React.createElement;
+  return h.apply(null, ["div", {
+    id: id || undefined,
+    className: "export-section" + (className ? " " + className : ""),
+    // Present even when empty: the attribute is what marks the boundary, and an
+    // empty value means "take the title from the section's own heading".
+    "data-export-section": title || "",
+    "data-report-section": reportSection || undefined,
+    style: style || null
+  }].concat(React.Children.toArray(children), [h(SectionExportBar, { key: "__export", title, reportSection, source })]));
+}
+
 // ── Storage headroom ───────────────────────────────────────────────────────
 // Browsers/Electron expose no reliable synchronous quota API, and the real
 // limit varies (commonly ~5MB per origin). Rather than guess a number and be
@@ -428,7 +615,10 @@ function MillionsField({ label, value, onChange, bench, help, wide }) {
 function SectionCard({ title, subtitle, children, defaultOpen }) {
   const h = React.createElement;
   const [open, setOpen] = React.useState(defaultOpen !== false);
-  return h("div", { style: { background: "var(--surface)", border: "1px solid var(--rule)", borderRadius: 10, marginBottom: 14, overflow: "hidden", boxShadow: "0 1px 2px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.03)" } },
+  // An exportable section like any other card — the inputs as set ARE the
+  // relevant information for an assumptions card. The bar only shows while the
+  // card is open, since a collapsed card has nothing in it to export.
+  return h("div", { className: open ? "export-section" : undefined, "data-export-section": open ? (typeof title === "string" ? title : "") : undefined, style: { background: "var(--surface)", border: "1px solid var(--rule)", borderRadius: 10, marginBottom: 14, overflow: "hidden", boxShadow: "0 1px 2px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.03)" } },
     h("div", {
       onClick: () => setOpen(!open),
       style: { padding: "13px 18px", display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer", background: "var(--surface-2)" }
@@ -439,7 +629,8 @@ function SectionCard({ title, subtitle, children, defaultOpen }) {
       ),
       h("span", { style: { color: "var(--ink-3)", fontSize: 12, fontFamily: "var(--mono)" } }, open ? "▾" : "▸")
     ),
-    open && h("div", { style: { padding: "16px 18px", display: "flex", flexWrap: "wrap", gap: "0 16px" } }, children)
+    open && h("div", { style: { padding: "16px 18px", display: "flex", flexWrap: "wrap", gap: "0 16px" } }, children,
+      h("div", { style: { flexBasis: "100%" } }, h(SectionExportBar, { title: typeof title === "string" ? title : undefined })))
   );
 }
 
@@ -741,7 +932,7 @@ function MonteCarloBox({ theCase, discountRatePct, tv }) {
   const maxP90 = result ? result.percentiles.p90 : 1;
   const barStyle = (v, color) => ({ height: "100%", borderRadius: 3, width: Math.max(2, (v / maxP90) * 100) + "%", background: color });
 
-  return h("div", { style: { marginTop: 16, padding: "14px 16px", borderRadius: 10, background: "var(--surface-2)", border: "1.5px solid var(--teal)" } },
+  return h(ExportSection, { title: "Full-case Monte Carlo", style: { marginTop: 16, padding: "14px 16px", borderRadius: 10, background: "var(--surface-2)", border: "1.5px solid var(--teal)" } },
     h("div", { style: { fontSize: 13, fontFamily: "var(--display)", fontWeight: 700, color: "var(--ink-1)", marginBottom: 4 } }, "Full-case Monte Carlo"),
     h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-2)", marginBottom: 10, lineHeight: 1.6 } },
       "3,000 trials, sampling PoS, peak share, and discount rate continuously between your Bear and Bull bounds (Base as the most likely value) instead of only the three fixed points — a full fair-value distribution, not just three scenarios."),
@@ -1240,13 +1431,23 @@ function ExportControls({ targetRef, name, showPanelCapture, compact, panelOnly 
 
 // Wraps a chart (or any panel) so it can be exported, without the wrapped
 // component needing to know. Renders a plain div + the controls beneath.
-function ExportableBlock({ name, showPanelCapture, compact, panelOnly, style, children }) {
+// Wraps a chart. It used to carry its own PNG/SVG/Panel row, which exported the
+// chart alone — without the title, the figures above it or the caveats under
+// it, which is what a reader needs to make sense of it. Now the enclosing
+// section's bar exports the whole card, so inside a section this renders only
+// its children. A chart that sits in no section at all promotes itself to one,
+// so nothing is ever left without an export path.
+function ExportableBlock({ style, children }) {
   const h = React.createElement;
   const ref = React.useRef(null);
-  return h("div", { style: style || null },
-    h("div", { ref }, children),
-    h("div", { style: { marginTop: 6 } }, h(ExportControls, { targetRef: ref, name, showPanelCapture, compact, panelOnly }))
-  );
+  const [standalone, setStandalone] = React.useState(false);
+  React.useLayoutEffect(() => {
+    const parent = ref.current && ref.current.parentNode;
+    setStandalone(!(parent && closestExportSection(parent)));
+  }, []);
+  return standalone
+    ? h("div", { ref, className: "export-section", "data-export-section": "", style: style || null }, children, h(SectionExportBar, {}))
+    : h("div", { ref, style: style || null }, children);
 }
 
 function ReverseSolveBox({ theCase, discountRatePct, tv, options }) {
@@ -1262,7 +1463,7 @@ function ReverseSolveBox({ theCase, discountRatePct, tv, options }) {
 
   const fmtVal = (v, suffix) => suffix === "$" ? "$" + Math.round(v).toLocaleString() : v.toFixed(suffix === "yr" ? 0 : 1) + suffix;
 
-  return h("div", { style: { marginTop: 16, padding: "14px 16px", borderRadius: 10, background: "var(--amber-bg)", border: "1.5px solid var(--amber)" } },
+  return h(ExportSection, { title: "What else " + caseLabel + "'s price implies", style: { marginTop: 16, padding: "14px 16px", borderRadius: 10, background: "var(--amber-bg)", border: "1.5px solid var(--amber)" } },
     h("div", { style: { fontSize: 13, fontFamily: "var(--display)", fontWeight: 700, color: "var(--ink-1)", marginBottom: 4 } }, "What else " + caseLabel + "'s price implies"),
     h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-2)", marginBottom: 10 } }, "Same idea as Implied PoS above, holding every other assumption fixed and solving for this one instead."),
     options.length > 1 && h("div", { style: { display: "flex", gap: 6, marginBottom: 10 } },

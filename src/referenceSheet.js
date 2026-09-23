@@ -8,8 +8,9 @@ function ReferenceSheet({ activeCase }) {
   const [tab, setTab] = React.useState("guide");
   const [rampYears, setRampYears] = React.useState(6);
 
-  const card = (children) => h.apply(null, ["div", { style: { background: "var(--surface)", border: "1px solid var(--rule)", borderRadius: 10, padding: "18px 20px", marginBottom: 16 } }].concat(Array.isArray(children) ? children : [children]));
-  const label = (t) => h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 10 } }, t);
+  // Each card is its own exportable section, like the tool cards.
+  const card = (children, key) => h.apply(null, ["div", { key, className: "export-section", "data-export-section": "", style: { background: "var(--surface)", border: "1px solid var(--rule)", borderRadius: 10, padding: "18px 20px", marginBottom: 16 } }].concat(Array.isArray(children) ? children : [children]).concat([h(SectionExportBar, { key: "__export" })]));
+  const label = (t) => h("div", { "data-section-title": "", style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 10 } }, t);
   const src = (t) => h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginTop: 10, fontStyle: "italic", lineHeight: 1.5 } }, t);
   const table = (headers, rows) => h("div", { style: { overflowX: "auto" } },
     h("table", { style: { width: "100%", borderCollapse: "collapse", fontSize: 12, fontFamily: "var(--mono)" } },
@@ -629,7 +630,7 @@ function ReferenceSheet({ activeCase }) {
           h("div", { style: { fontFamily: "var(--sans)", fontSize: 12, color: "var(--ink-2)", marginTop: 3, lineHeight: 1.6 } }, it.plain),
           h("div", { style: { fontFamily: "var(--sans)", fontSize: 11.5, color: "var(--ink-3)", marginTop: 4, lineHeight: 1.6 } }, it.why)
         )))
-    ])),
+    ], group.group)),
     card([
       label("What each phase can and cannot establish"),
       h("div", { style: { fontSize: 11.5, fontFamily: "var(--sans)", color: "var(--ink-3)", marginBottom: 12, lineHeight: 1.6 } },
@@ -651,7 +652,7 @@ function ReferenceSheet({ activeCase }) {
 
   const tabs = [["guide","How This Works"],["revenue","Revenue Build"],["cost","Cost Structure"],["rd","R&D & Timeline"],["pos","Probability of Success"],["discount","Discount Rate"],["valuation","Valuation & Dilution"],["ma","M&A Comps"],["glossary","Trial Glossary"]];
 
-  return h("div", { style: { maxWidth: 880, margin: "0 auto", padding: "24px 20px 60px" } },
+  return h("div", { "data-export-context": "Reference Sheet", style: { maxWidth: 880, margin: "0 auto", padding: "24px 20px 60px" } },
     h("div", { style: { fontFamily: "var(--display)", fontSize: 24, fontWeight: 700, color: "var(--ink-1)", marginBottom: 4 } }, "Reference Sheet"),
     h("div", { style: { fontFamily: "var(--mono)", fontSize: 12, color: "var(--ink-3)", marginBottom: 20 } }, "Every benchmark the engine uses (and a few it will use next), sourced. This is what stands in for napkin math."),
     h("div", { style: { display: "flex", gap: 6, marginBottom: 20, flexWrap: "wrap" } },

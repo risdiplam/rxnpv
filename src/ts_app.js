@@ -161,61 +161,23 @@ function selectInput(id, options, selected) {
 function val(id) { const el = document.getElementById(id); return el ? el.value : ""; }
 function numVal(id) { const el = document.getElementById(id); return el ? parseFloat(el.value) : NaN; }
 
-// ── Chart export for the Simulation tab ────────────────────────────────────
-// This half of the app is vanilla DOM with no React, so it can't use the
-// ExportControls component the React views use. Same exportEngine underneath,
-// just wired up by hand — one small function that wraps a chart element and
-// appends its own export row, so every Simulation chart gets the same PNG/SVG
-// options as the rest of the app without duplicating the export logic.
+// ── Export for the Simulation tab ──────────────────────────────────────────
+// Every Simulation panel is an exportable section, exactly like a card in the
+// React views: the same SectionExportBar, mounted into the panel by
+// attachSimExportBars() below, exports the WHOLE panel — title, explanation,
+// the inputs as set, the result, every chart and any note that is open.
+// These charts used to carry their own PNG/SVG/Panel/Pin row, which exported
+// the chart alone and left a reader with no idea what produced it; that row is
+// gone, and this now only places the chart.
 function appendChartWithExport(parent, chartHtml, exportName) {
   const wrap = el('div', {});
-  const chartBox = el('div', { html: chartHtml });
-  wrap.appendChild(chartBox);
-
-  const row = el('div', { class: 'chart-export-row' });
-  const status = el('span', { class: 'chart-export-status' });
-  const mkBtn = (label, title, fn) => {
-    const b = el('button', { class: 'chart-export-btn', title }, label);
-    b.addEventListener('click', async () => {
-      const prev = b.textContent;
-      b.textContent = '…'; b.disabled = true; status.textContent = '';
-      try {
-        const r = await fn();
-        if (r && r.ok) { status.textContent = r.viaBrowser ? 'Downloaded' : 'Saved'; status.className = 'chart-export-status ok'; }
-        else if (r && r.canceled) { status.textContent = ''; }
-        else { status.textContent = (r && r.error) || 'Export failed.'; status.className = 'chart-export-status err'; }
-      } catch (e) { status.textContent = e.message; status.className = 'chart-export-status err'; }
-      b.textContent = prev; b.disabled = false;
-      setTimeout(() => { status.textContent = ''; }, 4000);
-    });
-    return b;
-  };
-  row.appendChild(el('span', { class: 'chart-export-label' }, 'Export'));
-  row.appendChild(mkBtn('PNG', 'High-resolution PNG (3x) of this chart', () => exportChartAsPng(chartBox, exportName, 3)));
-  row.appendChild(mkBtn('SVG', 'Vector SVG — scales to any size, editable in design tools', () => exportChartAsSvg(chartBox, exportName)));
-  row.appendChild(mkBtn('Panel', 'Capture this whole result panel including its numbers (desktop app)', () => exportPanelAsImage(parent, exportName + '-panel')));
-  row.appendChild(status);
-  appendPinToReport(row, wrap, { title: humanizeExportName(exportName), source: 'Simulation' });
-  wrap.appendChild(row);
+  wrap.appendChild(el('div', { html: chartHtml }));
   parent.appendChild(wrap);
   return wrap;
 }
 
-// Lighter sibling of appendChartWithExport for tools with no chart to save —
-// the four Trial Statistics calculators only ever produce a numeric
-// headline, so PNG/SVG vector export doesn't apply; a one-click panel
-// capture (screenshot the result, including its numbers) is the same
-// "get this out of the app" affordance in the only form that makes sense
-// here. Previously these results had no export path at all — computed,
-// then only ever visible on screen, unlike every chart-bearing tool.
-// Vanilla-DOM twin of the React PinToReportButton. Simulation has no React,
-// so it reads the same window.rxnpvSimBridge the Peak Sales export already uses
-// to reach the case list. Appended to the existing export row rather than
-// given its own control block — exporting a file and pinning to a report are
-// the same "get this out of here" moment.
-// Export names are file slugs ("fragility-index"); a report needs a readable
-// heading, so they're humanised here rather than every call site being made to
-// pass a second, near-duplicate string.
+// Export names are file slugs ("fragility-index"); a heading needs a readable
+// form. Still used by the Peak Sales case export.
 function humanizeExportName(slug) {
   return String(slug || "Analysis")
     .replace(/[-_]+/g, " ")
@@ -224,62 +186,55 @@ function humanizeExportName(slug) {
     .replace(/\bNnt\b/g, "NNT").replace(/\b2X2\b/i, "2x2").replace(/\bP Value\b/i, "P-value");
 }
 
-function appendPinToReport(row, resultsDiv, meta) {
-  const bridge = window.rxnpvSimBridge;
-  if (!bridge || !bridge.cases || !bridge.cases.length) return;
-  const wrap = el('span', { style: 'display:inline-flex;align-items:center;gap:6px;margin-left:8px' });
-  const sel = bridge.cases.length > 1
-    ? selectInput('pinCaseSel_' + Math.random().toString(36).slice(2, 7),
-        bridge.cases.map(c => ({ value: c.id, label: c.name || 'Untitled' })), bridge.cases[0].id)
-    : null;
-  if (sel) sel.style.cssText = 'padding:3px 6px;border-radius:5px;border:1px solid var(--rule);background:var(--surface);color:var(--ink-3);font-family:var(--mono);font-size:9px';
-  const status = el('span', { class: 'chart-export-status' });
-  const btn = el('button', { class: 'chart-export-btn', title: 'Attach this result to a case so it appears in that case’s PDF report' }, '📌 Pin to report');
-  btn.addEventListener('click', async () => {
-    const live = window.rxnpvSimBridge;
-    const id = sel ? sel.value : live.cases[0].id;
-    const target = live.cases.find(c => c.id === id);
-    if (!target) return;
-    const existing = pinnedResultsOf(target);
-    if (existing.length >= PINNED_MAX_PER_CASE) {
-      status.textContent = 'That case is full (' + PINNED_MAX_PER_CASE + ')'; status.className = 'chart-export-status err';
-      setTimeout(() => { status.textContent = ''; }, 5000); return;
-    }
-    btn.disabled = true; const prev = btn.textContent; btn.textContent = '…';
-    const r = await buildPinnedResult(resultsDiv, meta);
-    btn.textContent = prev; btn.disabled = false;
-    if (!r.ok) { status.textContent = r.error; status.className = 'chart-export-status err'; setTimeout(() => { status.textContent = ''; }, 5000); return; }
-    live.updateCase({ ...target, pinnedResults: existing.concat([r.pin]), updatedAt: Date.now() });
-    status.textContent = 'Pinned to ' + (target.name || 'case'); status.className = 'chart-export-status ok';
-    setTimeout(() => { status.textContent = ''; }, 4000);
-  });
-  wrap.appendChild(btn);
-  if (sel) wrap.appendChild(sel);
-  wrap.appendChild(status);
-  row.appendChild(wrap);
-}
+// Results with no chart used to get their own "Capture result" row. The panel's
+// export bar covers them now; kept as a no-op so the call sites read the same.
+function appendResultCapture(resultsDiv, exportName) {}
 
-function appendResultCapture(resultsDiv, exportName) {
-  const row = el('div', { class: 'chart-export-row' });
-  const status = el('span', { class: 'chart-export-status' });
-  const btn = el('button', { class: 'chart-export-btn', title: 'Capture this result as a PNG (desktop app)' }, 'Capture result');
-  btn.addEventListener('click', async () => {
-    const prev = btn.textContent;
-    btn.textContent = '…'; btn.disabled = true; status.textContent = '';
-    try {
-      const r = await exportPanelAsImage(resultsDiv, exportName);
-      if (r && r.ok) { status.textContent = r.viaBrowser ? 'Downloaded' : 'Saved'; status.className = 'chart-export-status ok'; }
-      else if (r && r.canceled) { status.textContent = ''; }
-      else { status.textContent = (r && r.error) || 'Export failed.'; status.className = 'chart-export-status err'; }
-    } catch (e) { status.textContent = e.message; status.className = 'chart-export-status err'; }
-    btn.textContent = prev; btn.disabled = false;
-    setTimeout(() => { status.textContent = ''; }, 4000);
+// Mounts one export bar into every .panel under root, after its results area
+// (so it sits next to what it exports) or at the end when there is none. Each
+// bar is a small React root: this half of the app has no React tree, so the bar
+// reads cases through window.rxnpvSimBridge instead of context. Panels are
+// rebuilt wholesale on every tab switch, so a MutationObserver keeps this
+// current, and roots whose host has left the page are unmounted.
+const simExportRoots = new Set();
+function attachSimExportBars(root) {
+  if (!root || typeof ReactDOM === "undefined" || !ReactDOM.createRoot || typeof SectionExportBar !== "function") return;
+  simExportRoots.forEach(entry => {
+    // Deferred: this can run inside a React commit (bootTrialSim is called
+    // from an effect), and React refuses a synchronous unmount mid-render.
+    if (!entry.host.isConnected) { simExportRoots.delete(entry); setTimeout(() => { try { entry.root.unmount(); } catch (e) {} }, 0); }
   });
-  row.appendChild(el('span', { class: 'chart-export-label' }, 'Export'));
-  row.appendChild(btn);
-  row.appendChild(status);
-  appendPinToReport(row, resultsDiv, { title: humanizeExportName(exportName), source: 'Simulation' });
-  resultsDiv.appendChild(row);
+  root.querySelectorAll('.panel').forEach(panel => {
+    // The run button is a control, not content — a reader of the export has
+    // nothing to press.
+    panel.querySelectorAll('.runbtn').forEach(b => b.setAttribute('data-no-export', ''));
+    if (panel.hasAttribute('data-export-section')) return;
+    panel.setAttribute('data-export-section', '');
+    panel.classList.add('export-section');
+    const host = el('div', { class: 'sim-export-host' });
+    const results = Array.prototype.find.call(panel.children, c => c.classList && c.classList.contains('results'));
+    if (results) results.after(host); else panel.appendChild(host);
+    const r = ReactDOM.createRoot(host);
+    r.render(React.createElement(SectionExportBar, { source: 'Simulation' }));
+    simExportRoots.add({ host, root: r });
+  });
+}
+let simExportObserver = null, simExportObserved = null;
+function watchSimExportBars(root) {
+  attachSimExportBars(root);
+  // Leaving Simulation and coming back mounts a fresh #ts-root; follow it.
+  if (simExportObserver && simExportObserved === root) return;
+  if (simExportObserver) simExportObserver.disconnect();
+  if (!root || typeof MutationObserver === "undefined") return;
+  simExportObserved = root;
+  let pending = false;
+  simExportObserver = new MutationObserver(() => {
+    if (pending) return;
+    pending = true;
+    // Batched to one pass per frame — a single render can add hundreds of nodes.
+    (window.requestAnimationFrame || setTimeout)(() => { pending = false; attachSimExportBars(document.getElementById('ts-root')); });
+  });
+  simExportObserver.observe(root, { childList: true, subtree: true });
 }
 
 // ── Root render ──────────────────────────────────────────────────────────
@@ -1943,4 +1898,5 @@ function runPkpd() {
 
 function bootTrialSim() {
   renderApp();
+  watchSimExportBars(document.getElementById('ts-root'));
 }

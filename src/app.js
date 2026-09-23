@@ -105,6 +105,10 @@ function App() {
   }, [dark]);
 
   const activeCase = cases.find(c => c.id === activeCaseId);
+  // Where "Open report →" goes after adding a section: that case's report,
+  // made active so the report is the one it was just added to.
+  const openReport = (caseId) => { if (caseId) setActiveCaseId(caseId); setView("report"); window.scrollTo(0, 0); };
+  const reportCtx = { cases, updateCase: (next) => setCases(prev => prev.map(c => c.id === next.id ? next : c)), activeCaseId, openReport };
 
   const createCase = () => {
     const c = newCase();
@@ -132,7 +136,7 @@ function App() {
     setActiveCaseId(copy.id);
   };
 
-  return h("div", { style: { minHeight: "100vh", background: "var(--bg)", color: "var(--ink-1)", fontFamily: "var(--sans)" } },
+  return h(ReportContext.Provider, { value: reportCtx }, h("div", { style: { minHeight: "100vh", background: "var(--bg)", color: "var(--ink-1)", fontFamily: "var(--sans)" } },
     // Save-failure banner — deliberately loud and persistent. Silently failing
     // to persist a user's work is the single worst failure mode this app has,
     // so it must never be swallowed quietly.
@@ -210,7 +214,14 @@ function App() {
           activeCase
             ? h(React.Fragment, null,
                 h("div", { style: { display: "flex", justifyContent: "flex-end", marginBottom: 4 } },
-                  h("button", { onClick: () => setView("report"), style: { padding: "6px 14px", borderRadius: 7, border: "1px solid var(--amber)", background: "transparent", color: "var(--amber)", fontFamily: "var(--mono)", fontSize: 11, fontWeight: 700, cursor: "pointer" } }, "📄 Generate Report")
+                  h("button", { onClick: () => setView("report"),
+                    title: "Build and export a PDF of this case — every Workspace section, plus anything added from Tools, Simulation, the Reference Sheet or Portfolio with “+ Report”",
+                    style: { padding: "6px 14px", borderRadius: 7, border: "1px solid var(--amber)", background: "transparent", color: "var(--amber)", fontFamily: "var(--mono)", fontSize: 11, fontWeight: 700, cursor: "pointer" } },
+                    "📄 Generate Report",
+                    (() => {
+                      const n = pinnedResultsOf(activeCase).length;
+                      return n ? h("span", { style: { marginLeft: 8, padding: "1px 7px", borderRadius: 10, background: "var(--amber-bg)", fontSize: 10 } }, n + " added") : null;
+                    })())
                 ),
                 h(CaseView, { theCase: activeCase, onChange: updateCase, onDelete: () => deleteCase(activeCase.id), onNavigateToTools: navigateToTools })
               )
@@ -222,7 +233,7 @@ function App() {
         )
       )
     )
-  );
+  ));
 }
 function navBtnStyle(active) {
   return { padding: "7px 14px", borderRadius: 7, border: "none", background: active ? "var(--surface-2)" : "transparent", color: active ? "var(--ink-1)" : "var(--ink-3)", fontFamily: "var(--mono)", fontSize: 12, fontWeight: active ? 700 : 400, cursor: "pointer" };

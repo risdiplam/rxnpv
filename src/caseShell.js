@@ -114,7 +114,8 @@ function CaseView({ theCase, onChange, onDelete, onNavigateToTools }) {
 
   const activeProg = theCase.programs.find(p => p.id === activeProgId) || theCase.programs[0];
 
-  return h("div", null,
+  // Names the case in the footer of anything exported from this page.
+  return h("div", { "data-export-context": "Workspace · " + (theCase.name || "Untitled case") },
     // Case header
     h("div", { style: { display: "flex", alignItems: "center", gap: 12, marginBottom: 6, flexWrap: "wrap" } },
       h("input", { value: theCase.name, onChange: e => update({ name: e.target.value }), "aria-label": "Case name",
@@ -239,7 +240,7 @@ function CaseView({ theCase, onChange, onDelete, onNavigateToTools }) {
     ].filter(Boolean) }),
 
     // Company-level aggregate
-    theCase.programs.length > 0 && h("div", { id: "ws-revenue", style: { background: "var(--surface)", border: "1px solid var(--rule)", borderRadius: 10, padding: "16px 18px", marginBottom: 22, marginTop: 16 } },
+    theCase.programs.length > 0 && h(ExportSection, { id: "ws-revenue", title: "Company revenue rollup — all programs", reportSection: "revenueChart", style: { background: "var(--surface)", border: "1px solid var(--rule)", borderRadius: 10, padding: "16px 18px", marginBottom: 22, marginTop: 16 } },
       h("div", { style: { display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 10, flexWrap: "wrap", gap: 8 } },
         h("div", { style: { fontFamily: "var(--display)", fontSize: 16, fontWeight: 600, color: "var(--ink-1)" } }, "Company revenue rollup — all programs"),
         peakCalendarYear && h("div", { style: { fontSize: 12, fontFamily: "var(--mono)", color: "var(--ink-2)" } },
@@ -254,7 +255,7 @@ function CaseView({ theCase, onChange, onDelete, onNavigateToTools }) {
     ),
 
     // Company-level P&L / EBIT panel
-    companyPnL.length > 0 && h("div", { id: "ws-pnl", style: { background: "var(--surface)", border: "1px solid var(--rule)", borderRadius: 10, padding: "16px 18px", marginBottom: 22 } },
+    companyPnL.length > 0 && h(ExportSection, { id: "ws-pnl", title: "Company P&L — costs applied", style: { background: "var(--surface)", border: "1px solid var(--rule)", borderRadius: 10, padding: "16px 18px", marginBottom: 22 } },
       h("div", { style: { display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 12, flexWrap: "wrap", gap: 8 } },
         h("div", { style: { fontFamily: "var(--display)", fontSize: 16, fontWeight: 600, color: "var(--ink-1)" } }, "Company P&L — costs applied"),
         peakEbitYear && h("div", { style: { fontSize: 12, fontFamily: "var(--mono)", color: "var(--ink-2)" } },

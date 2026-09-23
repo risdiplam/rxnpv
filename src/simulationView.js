@@ -23,8 +23,14 @@ function SimulationView({ cases, updateCase }) {
   const h = React.createElement;
   const containerRef = React.useRef(null);
   const bootedRef = React.useRef(false);
+  const ctx = (ReportContext && React.useContext) ? React.useContext(ReportContext) : null;
 
-  window.rxnpvSimBridge = { cases, updateCase };
+  // The vanilla half reaches the case list through this bridge. It now also
+  // carries the active case and report navigation, so the export bars on
+  // Simulation panels can say where an added section went and open it.
+  window.rxnpvSimBridge = { cases, updateCase,
+    activeCaseId: ctx ? ctx.activeCaseId : null,
+    openReport: ctx ? ctx.openReport : null };
 
   React.useEffect(() => {
     if (bootedRef.current) return; // guard against any double-invoke (e.g. StrictMode-style double effects)
@@ -34,7 +40,7 @@ function SimulationView({ cases, updateCase }) {
     }
   }, []);
 
-  return h("div", { style: { minHeight: "calc(100vh - 54px)" } },
+  return h("div", { "data-export-context": "Simulation", style: { minHeight: "calc(100vh - 54px)" } },
     h("div", { id: "ts-root", ref: containerRef })
   );
 }

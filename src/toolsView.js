@@ -75,7 +75,8 @@ function ToolsView({ cases, updateCase, activeCase, navRequest }) {
 
   const bench = workbenchForTool(tab);
 
-  return h("div", { style: { maxWidth: "var(--app-max-width)", margin: "0 auto", padding: "24px 28px 60px" } },
+  const toolEntry = bench.tools.find(([id]) => id === tab);
+  return h("div", { "data-export-context": "Tools · " + bench.label + (toolEntry ? " · " + toolEntry[1] : ""), style: { maxWidth: "var(--app-max-width)", margin: "0 auto", padding: "24px 28px 60px" } },
     h("div", { style: { display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 } },
       TOOL_WORKBENCHES.map(w => h("button", { key: w.id,
         // Selecting a workbench lands on its first tool, which is the one most
@@ -120,11 +121,15 @@ function ToolsView({ cases, updateCase, activeCase, navRequest }) {
 }
 
 // ── Shared helpers for tool cards (used by every tool component below) ──
+// Every tool card is its own exportable section: PNG / PDF of the whole card
+// (inputs as set, results, chart, caveats) and "+ Report" to snapshot it into
+// a case's report. The title comes from the card's toolLabel heading.
 function toolCard(h, children) {
-  return h.apply(null, ["div", { style: { background: "var(--surface)", border: "1px solid var(--rule)", borderRadius: 10, padding: "18px 20px", marginBottom: 16, boxShadow: "0 1px 2px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.03)" } }].concat(Array.isArray(children) ? children : [children]));
+  const kids = (Array.isArray(children) ? children : [children]).concat([h(SectionExportBar, { key: "__export" })]);
+  return h.apply(null, ["div", { className: "export-section", "data-export-section": "", style: { background: "var(--surface)", border: "1px solid var(--rule)", borderRadius: 10, padding: "18px 20px", marginBottom: 16, boxShadow: "0 1px 2px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.03)" } }].concat(kids));
 }
 function toolLabel(h, t) {
-  return h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 10 } }, t);
+  return h("div", { "data-section-title": "", style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 10 } }, t);
 }
 
 // ── M&A Target Premium calculator ──
@@ -916,8 +921,7 @@ function RunwayVsCatalystTool({ cases, activeCase }) {
             ))
           ),
           h("div", { style: { display: "flex", justifyContent: "space-between", fontFamily: "var(--mono)", fontSize: 9, color: "var(--ink-3)", marginTop: 4 } },
-            h("span", null, "today"), h("span", null, "+" + (horizon / 2).toFixed(0) + " mo"), h("span", null, "+" + horizon.toFixed(0) + " mo")),
-          h(ExportControls, { targetRef: rvcRef, name: (theCase ? theCase.name : "case") + "-runway-vs-catalyst", panelOnly: true, compact: true })
+            h("span", null, "today"), h("span", null, "+" + (horizon / 2).toFixed(0) + " mo"), h("span", null, "+" + horizon.toFixed(0) + " mo"))
         );
       })(),
 
@@ -1037,14 +1041,10 @@ function ExclusivityTool({ cases, updateCase }) {
         ))
       ),
 
-      h("div", { style: { marginTop: 12 } },
-        h(PinToReportButton, { targetRef: exRef, title: "Exclusivity / LOE — " + (res.brandName || "").toUpperCase(), source: "Tools", cases, updateCase, compact: true })),
       h("div", { style: { marginTop: 14 } },
         h(Note, { summary: "Patent expiry is not the same as loss of exclusivity" },
           h("div", { style: { lineHeight: 1.6 } },
-            "A generic can challenge a patent before it expires (Paragraph IV), settle for an earlier agreed entry date, or design around a formulation patent entirely. Separately, regulatory exclusivities — new chemical entity, orphan — can run past a patent. This is the published patent landscape: a sourced starting point, not the verdict."))),
-      h("div", { style: { marginTop: 10 } },
-        h(ExportControls, { targetRef: exRef, name: "exclusivity-" + (res.brandName || "drug").toLowerCase(), panelOnly: true, compact: true }))
+            "A generic can challenge a patent before it expires (Paragraph IV), settle for an earlier agreed entry date, or design around a formulation patent entirely. Separately, regulatory exclusivities — new chemical entity, orphan — can run past a patent. This is the published patent landscape: a sourced starting point, not the verdict.")))
     ]))
   );
 }
@@ -1167,9 +1167,7 @@ function BinaryEventTool({ cases, activeCase }) {
       h("div", { style: { marginTop: 14 } },
         h(Note, { summary: "When the binary frame stops holding" },
           h("div", { style: { lineHeight: 1.6 } },
-            "This treats the readout as the only thing that matters — exactly true for a single-asset company, progressively less true otherwise. A pipeline, a partner, or a cash-rich balance sheet all put a floor under failure and blur the binary. And the implied probability is only as good as the two values you anchored it with: it is arithmetic on your assumptions, not an independent read on the market."))),
-      h("div", { style: { marginTop: 10 } },
-        h(ExportControls, { targetRef: beRef, name: "binary-event-implied-probability", panelOnly: true, compact: true }))
+            "This treats the readout as the only thing that matters — exactly true for a single-asset company, progressively less true otherwise. A pipeline, a partner, or a cash-rich balance sheet all put a floor under failure and blur the binary. And the implied probability is only as good as the two values you anchored it with: it is arithmetic on your assumptions, not an independent read on the market.")))
     ]))
   );
 }
@@ -1850,6 +1848,13 @@ function CatalystCalendarTool({ cases, updateCase, activeCase }) {
 // runFdaLookup with no functional change; the fuller version (all dates,
 // complete label detail) is planned as a separate deepening pass. ──
 function truncateText(str, n) { return str.length > n ? str.slice(0, n) + "…" : str; }
+// On-screen truncation that exports don't inherit: the full text rides along in
+// data-full-text, which serializeSection() restores, and in a hover title.
+function truncatedSpan(h, str, n) {
+  str = str == null ? "" : String(str);
+  if (str.length <= n) return str;
+  return h("span", { title: str, "data-full-text": str }, str.slice(0, n) + "…");
+}
 
 function fmtFdaSubmissionDate(yyyymmdd) {
   if (!yyyymmdd || yyyymmdd.length !== 8) return yyyymmdd || "—";
@@ -1942,18 +1947,18 @@ function FdaLookupTool() {
 
     hasLabel && toolCard(h, [
       toolLabel(h, "Label summary"),
-      label.boxedWarning && h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--red)", padding: "8px 10px", borderRadius: 6, background: "var(--red-bg)", marginBottom: 10, lineHeight: 1.6 } }, truncateText(label.boxedWarning, 3000)),
+      label.boxedWarning && h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--red)", padding: "8px 10px", borderRadius: 6, background: "var(--red-bg)", marginBottom: 10, lineHeight: 1.6 } }, truncatedSpan(h, label.boxedWarning, 3000)),
       label.indicationsAndUsage && h("div", { style: { marginBottom: 10 } },
         h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 } }, "Indications and usage"),
-        h("div", { style: { fontSize: 11, fontFamily: "var(--sans)", color: "var(--ink-2)", lineHeight: 1.6 } }, truncateText(label.indicationsAndUsage, 3000))
+        h("div", { style: { fontSize: 11, fontFamily: "var(--sans)", color: "var(--ink-2)", lineHeight: 1.6 } }, truncatedSpan(h, label.indicationsAndUsage, 3000))
       ),
       label.warningsAndPrecautions && h("div", { style: { marginBottom: 10 } },
         h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 } }, "Warnings and precautions"),
-        h("div", { style: { fontSize: 11, fontFamily: "var(--sans)", color: "var(--ink-2)", lineHeight: 1.6 } }, truncateText(label.warningsAndPrecautions, 3000))
+        h("div", { style: { fontSize: 11, fontFamily: "var(--sans)", color: "var(--ink-2)", lineHeight: 1.6 } }, truncatedSpan(h, label.warningsAndPrecautions, 3000))
       ),
       label.adverseReactionsSummary && h("div", null,
         h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 } }, "Adverse reactions (from label)"),
-        h("div", { style: { fontSize: 11, fontFamily: "var(--sans)", color: "var(--ink-2)", lineHeight: 1.6 } }, truncateText(label.adverseReactionsSummary, 3000))
+        h("div", { style: { fontSize: 11, fontFamily: "var(--sans)", color: "var(--ink-2)", lineHeight: 1.6 } }, truncatedSpan(h, label.adverseReactionsSummary, 3000))
       )
     ]),
 
@@ -2032,7 +2037,7 @@ function TargetDossierTool() {
         candidates.map(c => h("button", { key: c.ensemblId, onClick: () => load(c.ensemblId),
           style: { textAlign: "left", padding: "8px 10px", borderRadius: 6, border: "1px solid var(--rule)", background: "var(--surface)", cursor: "pointer", fontFamily: "var(--mono)", fontSize: 11, color: "var(--ink-1)" } },
           h("b", null, c.symbol), " · ", h("span", { style: { color: "var(--ink-3)" } }, c.ensemblId),
-          c.description && h("div", { style: { fontFamily: "var(--sans)", fontSize: 10.5, color: "var(--ink-3)", marginTop: 3, lineHeight: 1.5 } }, truncateText(c.description, 160)))))
+          c.description && h("div", { style: { fontFamily: "var(--sans)", fontSize: 10.5, color: "var(--ink-3)", marginTop: 3, lineHeight: 1.5 } }, truncatedSpan(h, c.description, 160)))))
     ]),
 
     dossier && h("div", null,
@@ -2085,7 +2090,7 @@ function TargetDossierTool() {
               h("span", { style: { color: d.maxPhase >= 4 ? "var(--teal)" : "var(--ink-2)", whiteSpace: "nowrap" } }, phaseLabel(d))),
             d.mechanism && h("div", { style: { fontSize: 10, fontFamily: "var(--sans)", color: "var(--ink-3)", marginTop: 2 } }, d.mechanism),
             d.indications.length > 0 && h("div", { style: { fontSize: 10, fontFamily: "var(--sans)", color: "var(--ink-3)", marginTop: 2 } },
-              truncateText(d.indications.slice(0, 4).join(", ") + (d.indications.length > 4 ? " +" + (d.indications.length - 4) + " more" : ""), 150)))))
+              truncatedSpan(h, d.indications.slice(0, 4).join(", ") + (d.indications.length > 4 ? " +" + (d.indications.length - 4) + " more" : ""), 150)))))
       ])
     )
   );
@@ -2441,7 +2446,7 @@ function AssetProgramTool({ onDecodeTrial, onWatchTrial }) {
           summary.stopped.map((s, i) => h("div", { key: i, style: { borderLeft: "3px solid var(--red)", paddingLeft: 10 } },
             h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-1)" } },
               s.nctId + " · " + s.phase + " · " + s.status + (s.enrollment ? " · n=" + s.enrollment.toLocaleString() : "")),
-            h("div", { style: { fontSize: 11.5, fontFamily: "var(--sans)", color: "var(--ink-2)", lineHeight: 1.5, marginTop: 2 } }, truncateText(s.title || "", 110)),
+            h("div", { style: { fontSize: 11.5, fontFamily: "var(--sans)", color: "var(--ink-2)", lineHeight: 1.5, marginTop: 2 } }, truncatedSpan(h, s.title || "", 110)),
             h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: s.whyStopped ? "var(--amber)" : "var(--ink-3)", marginTop: 3 } },
               s.whyStopped ? "Reason given: " + s.whyStopped : "No reason registered.")))),
         h("div", { className: "prose", style: { fontSize: 10, fontFamily: "var(--sans)", color: "var(--ink-3)", lineHeight: 1.6, marginTop: 10 } },
@@ -2466,7 +2471,7 @@ function AssetProgramTool({ onDecodeTrial, onWatchTrial }) {
                   s.hasResults && h("span", { style: { color: "var(--teal)", fontSize: 9.5, fontWeight: 700 } }, "RESULTS POSTED"),
                   s.allocation === "RANDOMIZED" && h("span", { style: { color: "var(--ink-3)", fontSize: 9.5 } }, "randomised"),
                   s.masking && s.masking !== "NONE" && h("span", { style: { color: "var(--ink-3)", fontSize: 9.5 } }, "blinded")),
-                h("div", { style: { fontSize: 11, fontFamily: "var(--sans)", color: "var(--ink-2)", lineHeight: 1.5, marginTop: 2 } }, truncateText(s.title || "", 110)),
+                h("div", { style: { fontSize: 11, fontFamily: "var(--sans)", color: "var(--ink-2)", lineHeight: 1.5, marginTop: 2 } }, truncatedSpan(h, s.title || "", 110)),
                 h("div", { style: { fontSize: 10, color: "var(--ink-3)", marginTop: 2 } },
                   [s.sponsor, (s.conditions || []).slice(0, 2).join(", "), s.startDate ? "started " + s.startDate : null].filter(Boolean).join(" · ")),
                 h("div", { style: { display: "flex", gap: 10, marginTop: 3, flexWrap: "wrap" } },

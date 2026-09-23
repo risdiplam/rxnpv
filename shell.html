@@ -100,6 +100,12 @@
      max-width still wins over these, which is why the Reference Sheet's own
      capped paragraphs are untouched. */
   .prose, .note-body, .subtle { max-width: var(--prose-width); }
+  /* Section export bar: present on every section, quiet until the section is
+     hovered, so it is always findable without competing with the content. */
+  .section-export-bar { opacity: 0.5; transition: opacity 150ms ease; }
+  .export-section:hover > .section-export-bar,
+  .export-section:hover > * > .section-export-bar,
+  .section-export-bar:hover, .section-export-bar:focus-within, .section-export-bar.is-active { opacity: 1; }
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; background: var(--bg); }
   body { font-family: var(--sans); }

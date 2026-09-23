@@ -100,7 +100,12 @@ function ValuationPanel({ theCase, onChange }) {
     } catch (e) { impliedSolveError = e.message; }
   }
 
-  return h("div", { id: "ws-valuation", style: { background: "var(--surface)", border: "1px solid var(--rule)", borderRadius: 10, padding: "16px 18px", marginBottom: 22 } },
+  // The whole card is one exportable section, and each distinct analysis packed
+  // inside it is its own as well, so a reader can take out just the bridge or
+  // just the scenarios. Where the report already renders the same analysis live
+  // from the model, "+ Report" switches that section on rather than storing a
+  // snapshot of it.
+  return h(ExportSection, { id: "ws-valuation", title: "Valuation", style: { background: "var(--surface)", border: "1px solid var(--rule)", borderRadius: 10, padding: "16px 18px", marginBottom: 22 } },
     h("div", { style: { fontFamily: "var(--display)", fontSize: 16, fontWeight: 600, color: "var(--ink-1)", marginBottom: 14 } }, "Valuation"),
 
     // Red flags — cross-checks this case's own inputs against the same
@@ -473,6 +478,7 @@ function ValuationPanel({ theCase, onChange }) {
     // Scenario comparison
     error ? h("div", { style: { padding: 14, borderRadius: 8, background: "var(--red-bg)", border: "1px solid var(--red)", color: "var(--red)", fontFamily: "var(--mono)", fontSize: 12 } }, "Calculation error: " + error)
     : h("div", null,
+        h(ExportSection, { title: "Scenario comparison", reportSection: "summary" },
         h("div", { id: "ws-scenarios", style: { fontSize: 13, fontFamily: "var(--display)", fontWeight: 600, color: "var(--ink-1)", marginBottom: 10, borderTop: "1px dashed var(--rule)", paddingTop: 14 } }, "Scenario comparison"),
 
         h(SectionCard, { title: "Case-level Base-PoS adjustment", subtitle: "An overarching view on this whole case's odds, distinct from any single program's PoS override or the Bear/Bull scenario multipliers below", defaultOpen: false },
@@ -541,8 +547,8 @@ function ValuationPanel({ theCase, onChange }) {
             h("div", { style: { fontSize: 20, fontFamily: "var(--mono)", fontWeight: 800, color: s.preset.color } },
               fmtShare(s.result.equity.perShare))
           ))
-        ),
-        h("div", { style: { marginTop: 16 } },
+        )),
+        h(ExportSection, { title: "Base-case risk-adjusted cash flow by year", reportSection: "cashFlow", style: { marginTop: 16 } },
           h("div", { style: { fontSize: 12, fontFamily: "var(--mono)", color: "var(--ink-2)", marginBottom: 6 } }, "Base-case risk-adjusted cash flow by year"),
           h(ExportableBlock, { name: (theCase.name || "case") + "-risk-adjusted-cash-flow", showPanelCapture: true },
             h(RevenueChart, { series: cfSeries, showLegend: false, height: 180 })),
@@ -565,7 +571,7 @@ function ValuationPanel({ theCase, onChange }) {
           if (solveError || !solved) return null;
           const caseLabel = theCase.name || "This case";
           if (!solved.ok) return h("div", { style: { marginTop: 16, padding: "12px 14px", borderRadius: 8, background: "var(--amber-bg)", border: "1px solid var(--amber)", fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-2)" } }, "Implied PoS: " + solved.error);
-          return h("div", { style: { marginTop: 16, padding: "14px 16px", borderRadius: 10, background: "var(--amber-bg)", border: "1.5px solid var(--amber)" } },
+          return h(ExportSection, { title: "What " + caseLabel + "'s price implies", style: { marginTop: 16, padding: "14px 16px", borderRadius: 10, background: "var(--amber-bg)", border: "1.5px solid var(--amber)" } },
             h("div", { style: { fontSize: 13, fontFamily: "var(--display)", fontWeight: 700, color: "var(--ink-1)", marginBottom: 4 } }, "What " + caseLabel + "'s price implies"),
             h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-2)", marginBottom: 10 } }, "The PoS the current price requires, given your assumptions — the reverse of fair value."),
             solved.degenerate
@@ -617,7 +623,7 @@ function ValuationPanel({ theCase, onChange }) {
           if (prvAdded) steps.push({ label: "PRV (risk-adj.)", value: prvAdded, op: "+" });
           if (partnershipAdded) steps.push({ label: "Partnership (upfront + milestones)", value: partnershipAdded, op: "+" });
           steps.push({ label: "Equity Value", value: baseR.equity.equityValue, op: "=" });
-          return h("div", { id: "ws-bridge", style: { marginTop: 16, borderTop: "1px dashed var(--rule)", paddingTop: 14 } },
+          return h(ExportSection, { id: "ws-bridge", title: "Enterprise Value → Per-Share bridge (Base case)", reportSection: "bridge", style: { marginTop: 16, borderTop: "1px dashed var(--rule)", paddingTop: 14 } },
             h("div", { style: { fontSize: 13, fontFamily: "var(--display)", fontWeight: 600, color: "var(--ink-1)", marginBottom: 10 } }, "Enterprise Value → Per-Share bridge (Base case)"),
             h("div", { style: { display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" } },
               steps.map((s, i) => h(React.Fragment, { key: i },
@@ -656,7 +662,7 @@ function ValuationPanel({ theCase, onChange }) {
               h("span", { style: { color, fontWeight: 700 } }, fmtMoney(value))),
             h("div", { style: { height: 7, borderRadius: 4, background: "var(--surface-2)", overflow: "hidden" } },
               h("div", { style: { height: "100%", width: (Math.abs(value) / maxAbs) * 100 + "%", background: color, borderRadius: 4, opacity: 0.8 } })));
-          return h("div", { style: { marginTop: 16, borderTop: "1px dashed var(--rule)", paddingTop: 14 } },
+          return h(ExportSection, { title: "Sum-of-the-Parts (Base case)", reportSection: "sotp", style: { marginTop: 16, borderTop: "1px dashed var(--rule)", paddingTop: 14 } },
             h("div", { style: { fontSize: 13, fontFamily: "var(--display)", fontWeight: 600, color: "var(--ink-1)", marginBottom: 4 } }, "Sum-of-the-Parts (Base case)"),
             h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginBottom: 12 } }, "Which program actually drives total value — each run standalone, G&A shown separately. Bar width is proportional to size."),
             h("div", null,
@@ -691,8 +697,8 @@ function ValuationPanel({ theCase, onChange }) {
             unriskedNPV = computeCaseValuation(unriskedCase, SCENARIO_PRESETS.base, "base", drBase, tvParams).npvResult.npv;
           } catch (e) { rwError = e.message; }
           if (rwError) return h("div", { style: { color: "var(--red)", fontSize: 11, fontFamily: "var(--mono)" } }, "Pipeline risk waterfall error: " + rwError);
-          return h("div", { style: { marginTop: 16, borderTop: "1px dashed var(--rule)", paddingTop: 14 } },
-            h("div", { style: { fontSize: 13, fontFamily: "var(--display)", fontWeight: 600, color: "var(--ink-1)", marginBottom: 4 } }, "Pipeline risk waterfall (Base case)"),
+          return h(ExportSection, { style: { marginTop: 16, borderTop: "1px dashed var(--rule)", paddingTop: 14 } },
+            h("div", { "data-section-title": "", style: { fontSize: 13, fontFamily: "var(--display)", fontWeight: 600, color: "var(--ink-1)", marginBottom: 4 } }, "Pipeline risk waterfall (Base case)"),
             h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginBottom: 12 } }, "The whole pipeline's value if every program succeeded for certain, vs. the actual risk-adjusted total — shared G&A included both ways. Each asset's own version is in its own editor above."),
             h(RiskWaterfallChart, { unriskedNPV, riskedNPV, posToLaunchPct: null, height: 190 })
           );

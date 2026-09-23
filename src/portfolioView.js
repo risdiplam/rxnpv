@@ -25,13 +25,13 @@ function PortfolioView({ cases }) {
   const fmtYears = (v) => v == null ? "—" : v.toFixed(1) + "yr";
   const fmtPrice = (v) => v == null || v === 0 ? "—" : fmtShare(v);
 
-  return h("div", { style: { padding: "20px 24px", maxWidth: "var(--app-max-width)", margin: "0 auto" } },
+  return h("div", { "data-export-context": "Portfolio", style: { padding: "20px 24px", maxWidth: "var(--app-max-width)", margin: "0 auto" } },
     h("div", { style: { fontFamily: "var(--display)", fontSize: 18, fontWeight: 700, color: "var(--ink-1)", marginBottom: 4 } }, "Portfolio"),
     h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-3)", marginBottom: 20 } },
       valid.length + " case" + (valid.length === 1 ? "" : "s") + (broken.length ? ", " + broken.length + " couldn't be computed (see below)" : "")),
 
     // ── Summary table ──
-    h("div", { style: { background: "var(--surface)", border: "1px solid var(--rule)", borderRadius: 10, padding: "16px 18px", marginBottom: 18, overflowX: "auto" } },
+    h(ExportSection, { title: "Portfolio summary", style: { background: "var(--surface)", border: "1px solid var(--rule)", borderRadius: 10, padding: "16px 18px", marginBottom: 18, overflowX: "auto" } },
       h("table", { style: { width: "100%", borderCollapse: "collapse", fontSize: 12, fontFamily: "var(--mono)" } },
         h("thead", null, h("tr", { style: { borderBottom: "1px solid var(--rule)" } },
           ["Case", "Program", "Price", "Fair value", "Upside", "Runway", "Modeled PoS", "Implied PoS"].map(col =>
@@ -56,7 +56,7 @@ function PortfolioView({ cases }) {
 
     h("div", { style: { display: "flex", gap: 18, flexWrap: "wrap" } },
       // ── PoS dispersion ──
-      h("div", { style: { flex: "1 1 320px", background: "var(--surface)", border: "1px solid var(--rule)", borderRadius: 10, padding: "16px 18px" } },
+      h(ExportSection, { title: "PoS across the portfolio", style: { flex: "1 1 320px", background: "var(--surface)", border: "1px solid var(--rule)", borderRadius: 10, padding: "16px 18px" } },
         h("div", { style: { fontSize: 13, fontFamily: "var(--display)", fontWeight: 600, color: "var(--ink-1)", marginBottom: 12 } }, "PoS across the portfolio"),
         (() => {
           const withPoS = valid.filter(s => s.modeledPoSPct != null).sort((a, b) => b.modeledPoSPct - a.modeledPoSPct);
@@ -72,7 +72,7 @@ function PortfolioView({ cases }) {
       ),
 
       // ── Cash runway ranking ──
-      h("div", { style: { flex: "1 1 320px", background: "var(--surface)", border: "1px solid var(--rule)", borderRadius: 10, padding: "16px 18px" } },
+      h(ExportSection, { title: "Cash runway, shortest first", style: { flex: "1 1 320px", background: "var(--surface)", border: "1px solid var(--rule)", borderRadius: 10, padding: "16px 18px" } },
         h("div", { style: { fontSize: 13, fontFamily: "var(--display)", fontWeight: 600, color: "var(--ink-1)", marginBottom: 4 } }, "Cash runway, shortest first"),
         h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginBottom: 12 } }, "Under 12 months flagged — worth checking against any near-term catalyst."),
         (() => {
@@ -101,7 +101,7 @@ function PortfolioView({ cases }) {
       if (!withBoth.length) return null;
       const points = withBoth.map(s => ({ x: s.modeledPoSPct, y: s.impliedPoSPct, label: s.name }));
       const maxAxis = Math.max(...points.map(p => Math.max(p.x, p.y)), 10) * 1.15;
-      return h("div", { style: { marginTop: 18, background: "var(--surface)", border: "1px solid var(--rule)", borderRadius: 10, padding: "16px 18px" } },
+      return h(ExportSection, { title: "Your PoS vs. what the market implies", style: { marginTop: 18, background: "var(--surface)", border: "1px solid var(--rule)", borderRadius: 10, padding: "16px 18px" } },
         h("div", { style: { fontSize: 13, fontFamily: "var(--display)", fontWeight: 600, color: "var(--ink-1)", marginBottom: 4 } }, "Your PoS vs. what the market implies"),
         h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginBottom: 12 } }, "Single-program cases with a price set only. Below the diagonal: you're more bullish than the market. Above: less."),
         h(ExportableBlock, { name: "portfolio-modeled-vs-implied-pos", showPanelCapture: true },

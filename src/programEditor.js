@@ -426,7 +426,7 @@ function ProgramEditor({ program, onChange, onDelete, discountRatePct, terminalV
 
     // ── Output readout ──
     error ? h("div", { style: { padding: 14, borderRadius: 8, background: "var(--red-bg)", border: "1px solid var(--red)", color: "var(--red)", fontFamily: "var(--mono)", fontSize: 12 } }, "Calculation error: " + error)
-    : h("div", { style: { background: "var(--surface)", border: "1px solid var(--rule)", borderRadius: 10, padding: "16px 18px" } },
+    : h(ExportSection, { title: (program.drugName || program.name || "Program") + " — revenue build output", style: { background: "var(--surface)", border: "1px solid var(--rule)", borderRadius: 10, padding: "16px 18px" } },
         h("div", { style: { display: "flex", gap: 24, flexWrap: "wrap", marginBottom: 14 } },
           h("div", null,
             h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.06em" } }, "Peak patients on drug (US)"),
@@ -550,7 +550,7 @@ function ProgramEditor({ program, onChange, onDelete, discountRatePct, terminalV
           { enabled: tv.enabled, method: tv.method, growthPct: tv.growthPct, exitMultiple: tv.exitMultiple });
       } catch (e) { wfError = e.message; }
       if (wfError) return null;
-      return h("div", { style: { marginTop: 14, padding: "12px 14px", borderRadius: 8, background: "var(--surface)", border: "1px solid var(--rule)" } },
+      return h(ExportSection, { title: "Risk waterfall — " + (program.drugName || program.name || "this asset"), style: { marginTop: 14, padding: "12px 14px", borderRadius: 8, background: "var(--surface)", border: "1px solid var(--rule)" } },
         h("div", { style: { fontSize: 11, fontFamily: "var(--display)", fontWeight: 600, color: "var(--ink-1)", marginBottom: 4 } }, "Risk waterfall — this asset only"),
         h(Note, { summary: "What \"unrisked\" means, and why it can look worse" },
           "\"Unrisked\" means 100% PoS on both sides — the full peak revenue AND the full R&D cost paid with certainty, not just revenue scaled up. For early-stage assets this can come out more negative than the risk-adjusted number: paying the full R&D cost for certain can outweigh a distant, heavily time-discounted payoff — that's a real feature of rNPV, not an error.",
