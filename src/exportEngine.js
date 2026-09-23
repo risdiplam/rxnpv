@@ -406,7 +406,14 @@ function sectionTitleOf(root) {
   const declared = root.getAttribute && root.getAttribute("data-export-section");
   if (declared) return declared;
   const heading = root.querySelector && root.querySelector("h1,h2,h3,h4,[data-section-title]");
-  if (heading && heading.textContent.trim()) return heading.textContent.trim().slice(0, 90);
+  if (heading) {
+    // A heading can carry a badge ("→ Forward-looking") that is decoration,
+    // not part of the name.
+    const copy = heading.cloneNode(true);
+    copy.querySelectorAll(".badge,[data-no-export]").forEach(n => n.remove());
+    const t = copy.textContent.trim();
+    if (t) return t.slice(0, 90);
+  }
   const first = (root.textContent || "").trim().split("\n")[0];
   return (first || "Section").slice(0, 90);
 }

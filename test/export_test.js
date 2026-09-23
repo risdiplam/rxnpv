@@ -85,6 +85,9 @@ const dom = new JSDOM(html, { runScripts: "dangerously", pretendToBeVisual: true
   const untitled = d.createElement("div");
   untitled.innerHTML = "<h3>Company P&amp;L — costs applied</h3><p>body</p>";
   ok("an undeclared section falls back to its heading", w.sectionTitleOf(untitled) === "Company P&L — costs applied");
+  const badged = d.createElement("div");
+  badged.innerHTML = '<h2>Trial-outcome assurance (Bayesian PoS)<span class="badge info">→ Forward-looking</span></h2>';
+  ok("a heading's badge is not part of the title", w.sectionTitleOf(badged) === "Trial-outcome assurance (Bayesian PoS)");
   const inner = d.createElement("span"); card.appendChild(inner);
   ok("a control finds the section it sits inside", w.closestExportSection(inner) === card);
 
