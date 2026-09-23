@@ -687,3 +687,26 @@ The chart-only PNG/SVG/Panel rows, `PinToReportButton`, `ExportControls`, the sc
 
 New `test/export_coverage_test.js`: **403 checks**. Walks every view and fails if any section lacks its own bar, then exercises "+ Report" both ways, the report rendering, include/exclude and reordering. `export_test.js` is up to 28 checks. Full 12-file suite clean.
 
+## Phase 30 — Exports that looked done and were not, and exporting any chart on its own
+
+🔴 → ✅. The user reported that the Fragility Index and 2×2 charts ran off the page, that Sample Size, P-value ↔ CI and Single-Arm CI exported "everything BUT the chart", and that every export was "an image of the inputs". All true, and all shipped after Phase 29 was declared verified — because that verification exported Workspace cards, which do not animate, and never opened a Simulation export.
+
+### What was actually wrong (each found by exporting and looking at the file)
+
+1. **Results and charts printed at zero opacity.** `.results`, `.fade-in` and `.content` fade in over 0.15–0.2s; the offscreen export page was captured the moment it loaded. Section PDFs showed the inputs and a blank space; PNGs showed a faint ghost. Animations and transitions are now off in the export page and in print.
+2. **Text that inherits its colour printed near-black on dark.** The app sets `color`/`font-family` on its root div, not `body`; the export page did not, so table cells and subheadings fell back to the browser default.
+3. **Chart PDFs printed pale text on white** — the report's print rule (`body: white`) applied inside the export page.
+4. **Tall section PNGs repeated their top half** — the 16,000px cap was in CSS pixels, not device pixels (2× on Retina).
+5. **38 section/chart PDFs put the footer on a near-empty second page** — pages were sized from the screen layout; now from the print layout, and re-printed larger if they still spill.
+6. **Simulation charts ballooned** — viewBox-only SVGs stretched to the 1240px layout (the icon array drew 1158×869). Capped at 1.25× their designed width; icon-array captions wrap instead of being clipped at both ends.
+7. **The report cropped wide added sections in print** — an on-screen zoom factor was too large for the narrower printed page. Added sections now reflow to the column.
+8. **Titles** built from run-together text or from the export row's own label ("Export section · Export section · …") — fixed at the source; headings added to cards that had none.
+
+### Export any chart on its own
+
+Every chart now has its own **Export chart** row (PNG / PDF / SVG / + Report) exporting that chart alone with its title; every **Export section** row exports everything. Section rows on Simulation panels moved to the top of the panel so a panel's row and a nested card's row never stack.
+
+### How it was verified
+
+New `test/packaged/export_sweep.js` clicks every export button in every view of the packaged app with live data (799 checks over 324 exported images), compares each file with the screen, renders every PDF page with `pdf_pages.swift` (PDFKit), requires single sections to fit one page, builds a report from three single charts and two sections, and writes contact sheets that were opened and read. The final score flags (5) were each opened and matched the screen. Then, in the user's installed app, through the real macOS save dialog: the Fragility Index chart PDF, the Fragility Index section PDF and the Sample Size section PNG — all three opened and correct.
+

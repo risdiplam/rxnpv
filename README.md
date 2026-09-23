@@ -135,9 +135,10 @@ A cross-case summary: fair value against price, runway, modelled against implied
 
 ### Export and the PDF report
 
-- **Every section exports in full.** Every card, tool, Simulation panel, Reference Sheet card and Portfolio card has an **Export** row along its bottom edge.
-  - **PNG / PDF** save the *whole* section at full height, even when it is taller than the window. That includes the title, figures, inputs as set, tables, charts and any open notes, plus a footer naming where it came from. The PDF is vector with selectable text.
-  - **SVG** saves one chart; a picker appears when a section has several.
+- **Every section exports in full, and every chart exports on its own.** Each card, tool, Simulation panel, Reference Sheet card and Portfolio card has an **Export section** row; each chart has its own **Export chart** row directly under it.
+  - **Export section → PNG / PDF** saves the *whole* section at full height, even when it is taller than the window: title, inputs as set, results, every chart, tables and any open notes, plus a footer naming where it came from. The PDF is vector with selectable text.
+  - **Export chart → PNG / PDF / SVG** saves just that chart, with its title. SVG is editable in design tools.
+  - Either row's **+ Report** adds that section, or just that chart, to a case's report.
 - **+ Report** adds a section to a case's PDF report.
   - For sections the report already builds live from the model (revenue chart, cash flow, bridge, SOTP, scenarios), it toggles them on or off instead of copying them.
   - Everything else is stored as a sanitised HTML snapshot.
