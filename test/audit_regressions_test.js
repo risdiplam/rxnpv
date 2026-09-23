@@ -239,6 +239,18 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
     click(btn("Workspace")); await wait(400);
   }
 
+  // ── Found in the packaged-app review — money on the reverse-solve panel ──
+  // "What else … price implies" printed peak revenue as $14,417,500,064; every
+  // other figure on the panel is compact ($14.42B). With a price set on a
+  // single Quick program the panel is showing; no figure may run to 10+ digits.
+  {
+    click(btn("Workspace")); await wait(400);
+    const val = d.getElementById("ws-valuation");
+    const box = val && [...val.querySelectorAll("[data-export-section]")].find(n => /What else .* price implies/.test(n.getAttribute("data-export-section") || ""));
+    ok(!!box, "Reverse-solve: the panel is showing for this case");
+    ok(box && !/\$\d{1,3}(,\d{3}){3,}/.test(box.textContent), "Reverse-solve: money is shown compactly, not as a 10+ digit figure (" + (box && box.textContent.match(/\$[\d,.]+[BMK]?/g) || []).slice(0, 4).join(" ") + ")");
+  }
+
   // ── Doc drift — the documented Trial Watch field count is held to the code ──
   // Four docs said "14 fields"; the code diffs 13 (nine CTGOV_DIFF_FIELDS
   // entries plus four list comparisons). Counted from the source, so a new

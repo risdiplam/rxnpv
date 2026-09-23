@@ -140,13 +140,14 @@ function App() {
     // Save-failure banner — deliberately loud and persistent. Silently failing
     // to persist a user's work is the single worst failure mode this app has,
     // so it must never be swallowed quietly.
-    saveFailed && h("div", { style: { background: "var(--red-fill)", color: "#fff", padding: "10px 20px", fontFamily: "var(--mono)", fontSize: 12, fontWeight: 700, textAlign: "center" } },
+    saveFailed && h("div", { className: "no-print", style: { background: "var(--red-fill)", color: "#fff", padding: "10px 20px", fontFamily: "var(--mono)", fontSize: 12, fontWeight: 700, textAlign: "center" } },
       "⚠ Could not save your changes — this device's local storage is full. Export anything important (PDF or CSV) now, then delete some saved cases to free space."),
     // Proactive counterpart to the banner above: warns while there is still
     // room to act, instead of only once a save has already failed.
     h(StorageWarningBanner, { onCleared: () => setSaveFailed(!saveCases(cases)) }),
-    // Top bar
-    h("div", { style: { position: "sticky", top: 0, zIndex: 10, background: "var(--bg-2)", borderBottom: "1px solid var(--rule)", padding: "0 20px", display: "flex", alignItems: "center", height: 54, gap: 20 } },
+    // Top bar. no-print: app navigation is not part of a printed report — it
+    // used to appear across the top of page 1 of every exported report PDF.
+    h("div", { className: "no-print", style: { position: "sticky", top: 0, zIndex: 10, background: "var(--bg-2)", borderBottom: "1px solid var(--rule)", padding: "0 20px", display: "flex", alignItems: "center", height: 54, gap: 20 } },
       h("div", { style: { fontFamily: "var(--display)", fontSize: 18, fontWeight: 700, color: "var(--ink-1)", letterSpacing: "-0.01em" } },
         "Rx", h("span", { style: { color: "var(--amber)" } }, "NPV")),
       h("div", { style: { display: "flex", gap: 4 } },

@@ -1360,7 +1360,9 @@ function ReverseSolveBox({ theCase, discountRatePct, tv, options }) {
     solved = solveImpliedVariable(theCase, drBase, { enabled: tv.enabled, method: tv.method, growthPct: tv.growthPct, exitMultiple: tv.exitMultiple }, variable);
   } catch (e) { solveError = e.message; }
 
-  const fmtVal = (v, suffix) => suffix === "$" ? "$" + Math.round(v).toLocaleString() : v.toFixed(suffix === "yr" ? 0 : 1) + suffix;
+  // Money in the same compact form as every other figure on the panel: an
+  // eleven-digit "$14,417,500,064" is easy to misread by a factor of ten.
+  const fmtVal = (v, suffix) => suffix === "$" ? fmtMoney(v) : v.toFixed(suffix === "yr" ? 0 : 1) + suffix;
 
   return h(ExportSection, { title: "What else " + caseLabel + "'s price implies", style: { marginTop: 16, padding: "14px 16px", borderRadius: 10, background: "var(--amber-bg)", border: "1.5px solid var(--amber)" } },
     h("div", { style: { fontSize: 13, fontFamily: "var(--display)", fontWeight: 700, color: "var(--ink-1)", marginBottom: 4 } }, "What else " + caseLabel + "'s price implies"),

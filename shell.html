@@ -126,7 +126,13 @@
     body { background: white !important; }
     /* Export affordances are interactive chrome — never part of a printed
        page or an exported PDF, where they'd read as stray UI artefacts. */
-    .chart-export-row { display: none !important; }
+    .chart-export-row, .section-export-bar { display: none !important; }
+    /* Chromium's print engine rasterises every box-shadow into a bitmap the
+       size of the box (a pair of ~3400x2000 images for one Valuation card),
+       so a "vector" PDF quietly carried full-page pictures. The shadows are
+       decoration, so a printed page — the report, and every section PDF,
+       which is printed too — goes without them and stays pure vector. */
+    *, *::before, *::after { box-shadow: none !important; text-shadow: none !important; }
   }
 
   /* ── Chart export controls (Simulation view; the React views use the
