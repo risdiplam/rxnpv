@@ -72,7 +72,7 @@ const EXPORTS = [
   "MODALITY_OPTIONS", "getCogsBenchmark", "getErosionDefaults", "resolveErosionParams",
   "COGS_BENCHMARKS", "EXCLUSIVITY_BENCHMARKS",
   "samplePrior", "priorQuantile", "simulateTimeToEventReplicate", "runAssuranceSimulation",
-  "runPeakSalesSimulation", "driverSensitivity", "percentSpecToFraction", "percentSpecError",
+  "runPeakSalesSimulation", "driverSensitivity", "percentSpecToFraction", "percentSpecError", "renderIconArray",
   "niceTicks", "formatTick", "renderLineChart", "renderHistogram", "renderForestPlot",
   "treasuryMethodShares", "ifConvertedShares", "computeEquityValue", "applyFutureRaise",
   "classifyCatalystFunding", "monthsUntil", "parseCatalystDate", "RUNWAY_CUSHION_MONTHS_DEFAULT",
@@ -3929,6 +3929,23 @@ section("NEW-002: a scenario share multiplier cannot push share past 100%");
   const bear = { label: "bear", shareMultiplierPct: 70, posMultiplierPct: 100, discountRateAddPct: 0, color: "" };
   near("Bear scales a 90% share by the full 0.7",
     api.computeProgramValuation(full("90"), bear, null).peakRevenue / api.computeProgramValuation(full("90"), base, null).peakRevenue, 0.7, 1e-3);
+}
+report();
+
+section("Icon-array captions wrap instead of being clipped");
+{
+  // A 400-wide chart holds ~61 characters of 11px text per line
+  // ((400 - 20) / 6.2). The 2x2 caption is ~90 characters; drawn as one
+  // centred line it was cut off at both ends.
+  const cap = "For every 100 treated with Treatment, about 20.0 more benefit than would have with Control";
+  const svg = api.renderIconArray(0.2, { title: "NNT = 5", subtitle: cap });
+  const lines = (svg.match(/<text[^>]*font-size="11"[^>]*>([^<]*)<\/text>/g) || []).map(t => t.replace(/<[^>]+>/g, ""));
+  ok("a long caption is split over more than one line", lines.length >= 2);
+  ok("no caption line is longer than fits (61 characters)", lines.every(l => l.length <= 61));
+  ok("no words are lost", lines.join(" ") === cap);
+  const vb = +(svg.match(/viewBox="0 0 \d+ (\d+)"/) || [])[1];
+  ok("the chart grows to make room (taller than the 300 default)", vb > 300);
+  ok("a short caption stays on one line", (api.renderIconArray(0.5, { subtitle: "Half" }).match(/font-size="11"/g) || []).length === 1);
 }
 report();
 

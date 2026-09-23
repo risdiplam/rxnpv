@@ -285,7 +285,7 @@ function MaPremiumTool({ cases, updateCase, activeCase }) {
       toolLabel(h, "Deal value vs. premium — where do you sit among real comps"),
       h("div", { style: { fontSize: 11, fontFamily: "var(--sans)", color: "var(--ink-2)", marginBottom: 12, lineHeight: 1.6 } },
         "Each dot is a real M&A deal with a disclosed premium. Import a case above to plot it as the highlighted point — a visual sanity check for whether your assumed premium is reasonable for a deal of that size, not just a table to scroll."),
-      h(ExportableBlock, { name: "ma-premium-vs-deal-size", showPanelCapture: true },
+      h(ExportableBlock, { title: "M&A premium vs. deal size" },
         h(ScatterChart, {
           points: allDeals.filter(d => d.premiumPct != null).map(d => ({ x: d.valueB, y: d.premiumPct, label: d.acquirer + "→" + d.target })),
           highlightPoint: (caseValueB != null && start > 0) ? { x: caseValueB, y: pct, label: "Your case" } : null,
@@ -799,7 +799,7 @@ function RunwayTool({ cases, updateCase, activeCase }) {
               h("div", { style: { fontSize: 22, fontFamily: "var(--mono)", fontWeight: 800, color: fr.runwayMonths != null && fr.runwayMonths < 12 ? "var(--red)" : "var(--teal)" } },
                 fr.runwayMonths != null ? fr.runwayMonths.toFixed(0) + " mo" : "25yr+ (beyond projection window)"))
           ),
-          h(ExportableBlock, { name: (fc ? fc.name : "case") + "-cash-runway", showPanelCapture: true, compact: true },
+          h(ExportableBlock, { title: (fc ? fc.name + " — " : "") + "cash runway" },
             h(RevenueChart, {
               series: [{ name: "Projected cash balance", color: "var(--teal)", points: fr.path.map(p => ({ v: p.balanceEnd, label: p.year })) }],
               height: 160, showLegend: false
@@ -867,6 +867,7 @@ function RunwayVsCatalystTool({ cases, activeCase }) {
     ]),
 
     theCase && res && res.ok && h("div", { ref: rvcRef }, toolCard(h, [
+      toolLabel(h, (theCase.name || "This case") + " — does the cash reach the next catalyst?"),
       h("div", { style: { display: "flex", gap: 26, flexWrap: "wrap", marginBottom: 14 } },
         h("div", null,
           h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)" } }, "MODELED RUNWAY"),
@@ -915,7 +916,7 @@ function RunwayVsCatalystTool({ cases, activeCase }) {
         if (!res.rows.length) return null;
         const horizon = (res.beyondHorizon ? Math.max(...res.rows.map(r => r.monthsAway)) : Math.max(res.runwayMonths, ...res.rows.map(r => r.monthsAway))) * 1.15 || 12;
         const pct = m => Math.max(0, Math.min(100, (m / horizon) * 100));
-        return h("div", { style: { marginTop: 18 } },
+        return h(ExportableBlock, { title: (theCase.name || "Case") + " — cash runway vs. catalysts", style: { marginTop: 18 } },
           h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 8 } }, "Timeline from today"),
           h("div", { style: { position: "relative", height: 26, borderRadius: 5, background: "var(--surface-2)", overflow: "hidden", marginBottom: 6 } },
             h("div", { title: res.beyondHorizon ? "Cash never runs out in the projection window" : "Modeled runway: " + res.runwayMonths.toFixed(1) + " months",
@@ -1220,9 +1221,10 @@ function SensitivityTool({ cases, updateCase, activeCase }) {
     ]),
     error && h("div", { style: { padding: 14, borderRadius: 8, background: "var(--red-bg)", border: "1px solid var(--red)", color: "var(--red)", fontFamily: "var(--mono)", fontSize: 12, marginBottom: 16 } }, "Calculation error: " + error),
     theCase && !error && toolCard(h, [
+      toolLabel(h, "Tornado — which assumption moves fair value most"),
       h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-2)", marginBottom: 14 } },
         "Base fair value: ", h("b", { style: { color: "var(--teal)" } }, fmtShare(baseline))),
-      h(ExportableBlock, { name: (theCase ? theCase.name : "case") + "-sensitivity-tornado", panelOnly: true, compact: true },
+      h(ExportableBlock, { title: (theCase ? theCase.name + " — " : "") + "sensitivity tornado" },
         h("div", { style: { display: "flex", flexDirection: "column", gap: 14 } },
           rows.map((r, i) => h("div", { key: i },
             h("div", { style: { display: "flex", justifyContent: "space-between", fontSize: 12, fontFamily: "var(--mono)", marginBottom: 4 } },
@@ -1434,7 +1436,7 @@ function PeakSalesCompsTool({ cases, updateCase, activeCase }) {
 
       h("div", { style: { marginBottom: 14, paddingBottom: 14, borderBottom: "1px solid var(--rule)" } },
         h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 8 } }, "Where this case sits among real comps"),
-        h(ExportableBlock, { name: (exportCase ? exportCase.name : "case") + "-peak-sales-rank", panelOnly: true, compact: true },
+        h(ExportableBlock, { title: "Peak sales comps — where this lands" },
           h(PeakSalesCompsChart, { ownDrugs: ownPeakDrugs, allDrugs: allPeakSalesDrugs }))
       ),
 
@@ -2249,7 +2251,7 @@ function LaunchTrackerTool() {
           })).filter(x => x.points.length);
           const predating = indexed.filter(x => x.points[0].launchPredatesData);
           return h("div", null,
-            h(ExportableBlock, { name: primary.brand.toLowerCase().replace(/\s+/g, "-") + "-medicare-spend", showPanelCapture: true, compact: true },
+            h(ExportableBlock, { title: primary.brand + " — Medicare spending" },
               h(RevenueChart, {
                 xPrefix: "", xAxisPrefix: "",
                 series: indexed.map(x => ({
@@ -2375,7 +2377,7 @@ function ActualVsModelTool({ cases, updateCase, activeCase }) {
 
       toolCard(h, [
         toolLabel(h, "Modelled against reported"),
-        h(ExportableBlock, { name: (theCase.name || "case") + "-actual-vs-modelled", showPanelCapture: true, compact: true },
+        h(ExportableBlock, { title: (theCase.name || "Case") + " — actual vs. modelled revenue" },
           h(RevenueChart, {
             xPrefix: "", xAxisPrefix: "",
             series: [

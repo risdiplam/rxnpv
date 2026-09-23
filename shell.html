@@ -102,10 +102,12 @@
   .prose, .note-body, .subtle { max-width: var(--prose-width); }
   /* Section export bar: present on every section, quiet until the section is
      hovered, so it is always findable without competing with the content. */
-  .section-export-bar { opacity: 0.5; transition: opacity 150ms ease; }
+  .section-export-bar, .chart-export-bar { opacity: 0.5; transition: opacity 150ms ease; }
   .export-section:hover > .section-export-bar,
   .export-section:hover > * > .section-export-bar,
-  .section-export-bar:hover, .section-export-bar:focus-within, .section-export-bar.is-active { opacity: 1; }
+  [data-export-chart]:hover > .chart-export-bar, [data-export-chart]:hover > * > .chart-export-bar,
+  .section-export-bar:hover, .section-export-bar:focus-within, .section-export-bar.is-active,
+  .chart-export-bar:hover, .chart-export-bar:focus-within, .chart-export-bar.is-active { opacity: 1; }
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; background: var(--bg); }
   body { font-family: var(--sans); }
@@ -121,18 +123,26 @@
   a { color: var(--teal); }
   .fade-in { animation: fadeIn 0.15s ease; }
   @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  /* A section added to the report reflows to the report column (see
+     ReportSnapshot): nothing in it may be wider than the column, on screen
+     or on a printed page. */
+  .report-snapshot { width: 100%; overflow-wrap: anywhere; }
+  .report-snapshot *, .report-snapshot *::before, .report-snapshot *::after { max-width: 100%; box-sizing: border-box; }
+  .report-snapshot table { width: 100% !important; min-width: 0 !important; }
+  .report-snapshot th, .report-snapshot td { white-space: normal !important; }
+  .report-snapshot svg { max-width: 100%; }
   @media print {
     .no-print { display: none !important; }
     body { background: white !important; }
     /* Export affordances are interactive chrome — never part of a printed
        page or an exported PDF, where they'd read as stray UI artefacts. */
-    .chart-export-row, .section-export-bar { display: none !important; }
+    .chart-export-row, .section-export-bar, .chart-export-bar { display: none !important; }
     /* Chromium's print engine rasterises every box-shadow into a bitmap the
        size of the box (a pair of ~3400x2000 images for one Valuation card),
        so a "vector" PDF quietly carried full-page pictures. The shadows are
        decoration, so a printed page — the report, and every section PDF,
        which is printed too — goes without them and stays pure vector. */
-    *, *::before, *::after { box-shadow: none !important; text-shadow: none !important; }
+    *, *::before, *::after { box-shadow: none !important; text-shadow: none !important; animation: none !important; transition: none !important; }
   }
 
   /* ── Chart export controls (Simulation view; the React views use the

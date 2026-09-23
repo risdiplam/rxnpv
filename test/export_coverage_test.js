@@ -39,14 +39,21 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
   const hasOwnBar = sec => [...sec.querySelectorAll(".section-export-bar")].some(b => sectionOf(b) === sec);
   const titleOf = sec => (w.sectionTitleOf ? w.sectionTitleOf(sec) : "?");
 
-  // Every visible section at this stop has its own bar and a usable title.
+  // Every visible section at this stop has its own bar and a usable title,
+  // and every chart block has its own "Export chart" row.
+  const chartOf = el => { let n = el; while (n && n !== d.body) { if (n.hasAttribute && n.hasAttribute("data-export-chart")) return n; n = n.parentNode; } return null; };
   const audit = (where, minSections) => {
+    [...d.querySelectorAll("[data-export-chart]")].forEach(ch => {
+      ok([...ch.querySelectorAll(".chart-export-bar")].some(b => chartOf(b) === ch), where + ": chart “" + titleOf(ch) + "” has no export row of its own");
+      ok(!/Export (section|chart)/.test(titleOf(ch)), where + ": a chart title contains export-row text");
+    });
     const secs = [...d.querySelectorAll("[data-export-section]")];
     ok(secs.length >= minSections, where + ": expected at least " + minSections + " exportable section(s), found " + secs.length);
     secs.forEach(sec => {
       ok(hasOwnBar(sec), where + ": section “" + titleOf(sec) + "” has no export bar of its own");
       const t = titleOf(sec);
       ok(t && t !== "Section" && t.length > 2, where + ": a section has no usable title (" + JSON.stringify(t) + ")");
+      ok(!/Export (section|chart)/.test(t), where + ": section title contains export-row text (" + t.slice(0, 60) + ")");
     });
     ok(!d.querySelector(".chart-export-row"), where + ": an old chart-only export row is still rendered");
     ok(![...d.querySelectorAll("button")].some(b => /Pin to report/.test(b.textContent)), where + ": an old “Pin to report” button is still rendered");

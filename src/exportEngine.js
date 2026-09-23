@@ -403,18 +403,26 @@ function serializeSection(root, opts) {
 // its first heading-like line. Used for file names and report headings.
 function sectionTitleOf(root) {
   if (!root) return "Section";
-  const declared = root.getAttribute && root.getAttribute("data-export-section");
+  const declared = root.getAttribute && (root.getAttribute("data-export-section") || root.getAttribute("data-export-chart"));
   if (declared) return declared;
-  const heading = root.querySelector && root.querySelector("h1,h2,h3,h4,[data-section-title]");
-  if (heading) {
-    // A heading can carry a badge ("→ Forward-looking") that is decoration,
-    // not part of the name.
-    const copy = heading.cloneNode(true);
-    copy.querySelectorAll(".badge,[data-no-export]").forEach(n => n.remove());
-    const t = copy.textContent.trim();
-    if (t) return t.slice(0, 90);
+  // Read from a copy without export controls: a section's own export row says
+  // "Export section · <title>", and reading the title out of text that includes
+  // it fed the label back into itself ("Export section · Export section · …").
+  const copy = root.cloneNode ? root.cloneNode(true) : root;
+  if (copy.querySelectorAll) copy.querySelectorAll("[data-no-export], .badge").forEach(n => n.remove());
+  const heading = copy.querySelector && copy.querySelector("h1,h2,h3,h4,[data-section-title]");
+  if (heading && heading.textContent.trim()) return heading.textContent.trim().slice(0, 90);
+  // A panel whose heading sits just before it (Simulation's Meta-Analysis).
+  const prev = root.previousElementSibling;
+  if (prev && /^H[1-4]$/.test(prev.tagName)) {
+    const p = prev.cloneNode(true); p.querySelectorAll(".badge").forEach(n => n.remove());
+    if (p.textContent.trim()) return p.textContent.trim().slice(0, 90);
   }
-  const first = (root.textContent || "").trim().split("\n")[0];
+  // Last resort: the first line of text. innerText keeps line breaks (the
+  // live copy is used, since a detached clone has no layout); textContent
+  // would run every line together ("Base fair value: -$0.10Peak market…").
+  const live = (root.innerText || "").split("\n").map(t => t.trim()).find(t => t && !/^Export (section|chart)/.test(t));
+  const first = live || (copy.textContent || "").trim().split("\n")[0];
   return (first || "Section").slice(0, 90);
 }
 
@@ -437,7 +445,7 @@ async function exportSectionAs(root, format, opts) {
   const snap = serializeSection(root, opts);
   if (!snap.ok) return snap;
   return await window.electronAPI.renderSection({
-    html: snap.html, width: snap.width, theme: snap.theme, format: format,
+    html: withExportHeading(snap.html, opts.heading), width: snap.width, theme: snap.theme, format: format,
     title: snap.title, context: opts.context || "",
     suggestedName: slugifyExportName(opts.fileName || snap.title) + (format === "pdf" ? ".pdf" : ".png"),
     returnData: !!opts.returnData
@@ -470,6 +478,15 @@ async function decompressSnapshotText(enc, data) {
 }
 
 // Builds a stored report item from a live section.
+// A chart exported on its own loses the heading that sits above it on screen
+// (React charts keep their titles outside the chart), so the export carries it.
+// Simulation charts draw their own title inside the SVG and pass no heading.
+function withExportHeading(html, heading) {
+  if (!heading) return html;
+  const esc = String(heading).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  return '<div style="font-family:var(--display);font-size:15px;font-weight:600;color:var(--ink-1);margin:0 0 10px 0">' + esc + '</div>' + html;
+}
+
 async function buildSectionSnapshot(root, meta) {
   meta = meta || {};
   const snap = serializeSection(root, meta);

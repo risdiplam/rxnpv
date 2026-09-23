@@ -144,9 +144,22 @@ async function renderSectionToBuffer(payload) {
     + '<style>'
     + 'html, body { margin: 0; padding: 0; background: var(--bg); }'
     + 'body { width: ' + w + 'px; padding: ' + pad + 'px; box-sizing: content-box; }'
+    // The app sets its base text colour and font on its root container, not on
+    // body, and much of the app's text (table cells, subheadings) inherits
+    // them. Without this the export fell back to the browser's near-black on
+    // the dark theme's background, and whole table columns all but vanished.
+    + 'body { color: var(--ink-1); font-family: var(--sans); }'
     + '[data-no-export] { display: none !important; }'
+    // The app fades results in (.results, .fade-in, .content). This page is
+    // captured the moment it loads, so an animation here meant the capture
+    // caught content at or near zero opacity: section PDFs showed the inputs
+    // and a blank space where the result and every chart should be.
+    + '*, *::before, *::after { animation: none !important; transition: none !important; }'
     + '@page { margin: 0; }'
-    + '@media print { html, body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }'
+    // The app's own print CSS whitens the page for the report (body: white);
+    // here the page must keep the theme's background, or a chart exported on
+    // its own prints the dark theme's pale text on white and all but vanishes.
+    + '@media print { html, body { -webkit-print-color-adjust: exact; print-color-adjust: exact; background: var(--bg) !important; } }'
     + '</style></head><body><div id="rxnpv-export-root">' + html + footer + '</div></body></html>';
 
   const tmpFile = path.join(app.getPath('temp'), 'rxnpv-section-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7) + '.html');
@@ -165,18 +178,51 @@ async function renderSectionToBuffer(payload) {
     // Measured from the content wrapper, not the document: the document is
     // never shorter than the window, so measuring it left a band of empty
     // background under every short section.
-    const dims = await win.webContents.executeJavaScript(
+    const measure = () => win.webContents.executeJavaScript(
       '(() => { const r = document.getElementById("rxnpv-export-root").getBoundingClientRect();'
       + ' return { w: Math.ceil(r.width) + ' + (pad * 2) + ', h: Math.ceil(r.height) + ' + (pad * 2) + ' }; })()');
+    let dims = await measure();
 
     if (format === 'pdf') {
-      return await win.webContents.printToPDF({
-        printBackground: true,
-        pageSize: { width: dims.w / 96, height: Math.min(SECTION_PDF_MAX_IN, dims.h / 96) },
-        margins: { top: 0, bottom: 0, left: 0, right: 0 }
-      });
+      // Size the page from the PRINT layout, not the screen one: print media
+      // lays the same content out a few pixels taller, and a page cut to the
+      // screen height pushed the last line (the footer) onto a near-empty
+      // second page in 38 of the app's section and chart exports. A small
+      // margin on top absorbs sub-pixel rounding.
+      const pdbg = win.webContents.debugger;
+      try {
+        pdbg.attach('1.3');
+        await pdbg.sendCommand('Emulation.setEmulatedMedia', { media: 'print' });
+        const printed = await measure();
+        dims = { w: dims.w, h: Math.max(dims.h, printed.h) + 6 };
+        await pdbg.sendCommand('Emulation.setEmulatedMedia', { media: '' });
+      } catch (e) { dims = { w: dims.w, h: dims.h + 6 }; }
+      finally { try { pdbg.detach(); } catch (e) {} }
+      // And then check the result rather than trust the measurement: a very
+      // tall section can still lay out a little longer in print. One section
+      // is one page, so if the PDF came out with more, the page is enlarged
+      // and it is printed again. (Sections past the 200in page cap do run to
+      // several pages, by design.)
+      const pageCount = (buf) => (buf.toString('latin1').match(/\/Type\s*\/Page[^s]/g) || []).length;
+      let h = dims.h, pdf = null;
+      for (let attempt = 0; attempt < 4; attempt++) {
+        pdf = await win.webContents.printToPDF({
+          printBackground: true,
+          pageSize: { width: dims.w / 96, height: Math.min(SECTION_PDF_MAX_IN, h / 96) },
+          margins: { top: 0, bottom: 0, left: 0, right: 0 }
+        });
+        if (pageCount(pdf) <= 1 || h / 96 >= SECTION_PDF_MAX_IN) break;
+        h = Math.ceil(h * 1.04) + 24;
+      }
+      return pdf;
     }
-    const scale = Math.max(0.5, Math.min(2, SECTION_PNG_MAX_DEVICE_PX / Math.max(1, dims.h)));
+    // The limit is in DEVICE pixels, and the capture is taken at the display's
+    // pixel ratio on top of `scale` (2x on a Retina panel). Counting only CSS
+    // pixels let a tall section (Peak Sales Comps with its full drug list,
+    // ~5,400px) reach 21,672 device pixels, past Chromium's ~16,384 texture
+    // limit, and the capture repeated its own top half at the bottom.
+    const dpr = Number(await win.webContents.executeJavaScript('window.devicePixelRatio || 1')) || 1;
+    const scale = Math.max(0.2, Math.min(2, SECTION_PNG_MAX_DEVICE_PX / (Math.max(1, dims.h) * dpr), SECTION_PNG_MAX_DEVICE_PX / (Math.max(1, dims.w) * dpr)));
     const dbg = win.webContents.debugger;
     dbg.attach('1.3');
     try {

@@ -193,8 +193,27 @@ function reportSectionIncluded(theCase, id) {
   return !!(def && def.defaultOn);
 }
 
-function SectionExportBar({ title, reportSection, source }) {
+// Nearest enclosing chart block — [data-export-chart] — for a chart-scoped bar.
+function closestChartBlock(el) {
+  let n = el;
+  while (n && n !== document.body) {
+    if (n.hasAttribute && n.hasAttribute("data-export-chart")) return n;
+    n = n.parentNode;
+  }
+  return null;
+}
+
+// Two scopes, one component, so a reader can take out either or both:
+//   scope "section" — the whole card or panel: title, inputs as set, results,
+//     every chart, tables and open notes;
+//   scope "chart"   — one chart on its own, with its title, as PNG / PDF / SVG,
+//     or into the report on its own.
+// Each bar says which it is and names what it will export, because two
+// unlabelled rows of identical buttons one above the other (a chart inside a
+// section inside a panel) was impossible to tell apart.
+function ExportBar({ scope, title, heading, reportSection, source }) {
   const h = React.createElement;
+  const isChart = scope === "chart";
   const ref = React.useRef(null);
   const reactCtx = (ReportContext && React.useContext) ? React.useContext(ReportContext) : null;
   // Simulation panels are vanilla DOM with the bar mounted in its own small
@@ -206,39 +225,39 @@ function SectionExportBar({ title, reportSection, source }) {
   const liveSource = () => reactCtx || (typeof window !== "undefined" ? window.rxnpvSimBridge : null);
   const [busy, setBusy] = React.useState(null);
   const [msg, setMsg] = React.useState(null);
-  const [chartCount, setChartCount] = React.useState(0);
-  const [pickChart, setPickChart] = React.useState(false);
+  const [hasSvg, setHasSvg] = React.useState(false);
+  const [label, setLabel] = React.useState(title || "");
   const cases = (ctx && ctx.cases) || [];
   const [pickedCaseId, setPickedCaseId] = React.useState(null);
   const targetId = pickedCaseId || (ctx && ctx.activeCaseId) || (cases[0] && cases[0].id);
   const target = cases.find(c => c.id === targetId) || null;
 
-  // The charts in this section, to offer as SVG — anything drawn at least
-  // 120px wide, which excludes icons. Re-checked after every render because a
-  // section's chart usually arrives after its data does.
-  const chartsIn = (sec) => sec ? Array.prototype.filter.call(sec.querySelectorAll("svg"), n => (n.getBoundingClientRect().width || 0) >= 120) : [];
+  const block = () => ref.current && (isChart ? closestChartBlock(ref.current) : closestExportSection(ref.current));
+  const blockTitle = () => title || sectionTitleOf(block());
+  // The name shown on the bar and whether an SVG exists, re-checked after
+  // every render because a section's content usually arrives after its data.
   React.useEffect(() => {
-    const n = chartsIn(ref.current && closestExportSection(ref.current)).length;
-    if (n !== chartCount) setChartCount(n);
+    const b = block();
+    const t = title || (b ? sectionTitleOf(b) : "");
+    if (t !== label) setLabel(t);
+    const svg = isChart && b && Array.prototype.some.call(b.querySelectorAll("svg"), n => (n.getBoundingClientRect().width || 0) >= 120);
+    if (!!svg !== hasSvg) setHasSvg(!!svg);
   });
 
-  const section = () => ref.current && closestExportSection(ref.current);
-  const sectionTitle = () => title || sectionTitleOf(section());
   const flash = (m, ms) => { setMsg(m); if (ms) setTimeout(() => setMsg(cur => cur === m ? null : cur), ms); };
+  const noun = isChart ? "chart" : "section";
 
-  const doExport = async (kind, chartIndex) => {
-    const sec = section();
-    if (!sec) { flash({ tone: "err", text: "Couldn't find the section to export." }, 4000); return; }
+  const doExport = async (kind) => {
+    const b = block();
+    if (!b) { flash({ tone: "err", text: "Couldn't find the " + noun + " to export." }, 4000); return; }
     setBusy(kind); setMsg(null);
     let r;
     try {
       if (kind === "svg") {
-        const charts = chartsIn(sec);
-        const svg = charts[chartIndex || 0];
-        r = svg ? await exportChartAsSvg(svg, sectionTitle() + (charts.length > 1 ? " chart " + ((chartIndex || 0) + 1) : ""))
-                : { ok: false, error: "No chart found to export here." };
+        const svg = Array.prototype.find.call(b.querySelectorAll("svg"), n => (n.getBoundingClientRect().width || 0) >= 120);
+        r = svg ? await exportChartAsSvg(svg, blockTitle()) : { ok: false, error: "No chart found to export here." };
       } else {
-        r = await exportSectionAs(sec, kind, { title: sectionTitle(), context: exportContextOf(sec) });
+        r = await exportSectionAs(b, kind, { title: blockTitle(), context: exportContextOf(b), heading: isChart && heading !== false ? blockTitle() : null });
       }
     } catch (e) { r = { ok: false, error: e.message }; }
     setBusy(null);
@@ -252,7 +271,7 @@ function SectionExportBar({ title, reportSection, source }) {
     const src = liveSource();
     const live = src && (src.cases || []).find(c => c.id === targetId);
     if (!src || !live) return;
-    const sec = section();
+    const b = block();
     if (reportSection) {
       const was = reportSectionIncluded(live, reportSection);
       src.updateCase({ ...live, reportInclusions: { ...(live.reportInclusions || {}), [reportSection]: !was }, updatedAt: Date.now() });
@@ -263,15 +282,15 @@ function SectionExportBar({ title, reportSection, source }) {
     }
     const existing = pinnedResultsOf(live);
     if (existing.length >= PINNED_MAX_PER_CASE_V2) {
-      flash({ tone: "err", text: (live.name || "This case") + "'s report already holds " + PINNED_MAX_PER_CASE_V2 + " added sections — remove one there first.", caseId: live.id }, 8000);
+      flash({ tone: "err", text: (live.name || "This case") + "'s report already holds " + PINNED_MAX_PER_CASE_V2 + " added items — remove one there first.", caseId: live.id }, 8000);
       return;
     }
     setBusy("report");
-    const r = await buildSectionSnapshot(sec, { title: sectionTitle(), source: source || exportContextOf(sec) });
+    const r = await buildSectionSnapshot(b, { title: blockTitle(), source: source || exportContextOf(b), heading: isChart && heading !== false ? blockTitle() : null });
     setBusy(null);
     if (!r.ok) { flash({ tone: "err", text: r.error }, 6000); return; }
     if (r.pin.html.length > SNAPSHOT_MAX_STORED_BYTES) {
-      flash({ tone: "err", text: "That section is too large to store in a report (" + Math.round(r.pin.html.length / 1024) + "KB). Export it as a PDF instead." }, 8000);
+      flash({ tone: "err", text: "That " + noun + " is too large to store in a report (" + Math.round(r.pin.html.length / 1024) + "KB). Export it as a PDF instead." }, 8000);
       return;
     }
     // Re-read once more after the async snapshot, for the same reason.
@@ -281,39 +300,41 @@ function SectionExportBar({ title, reportSection, source }) {
     flash({ tone: "ok", text: "Added to " + (fresh.name || "case") + "'s report", caseId: fresh.id }, 9000);
   };
 
-  const btn = (label, kind, onClick, tip, extra) => h("button", Object.assign({
+  const btn = (text, kind, onClick, tip, extra) => h("button", Object.assign({
     key: kind, type: "button", title: tip, disabled: busy != null, onClick,
     style: { padding: "3px 9px", borderRadius: 5, border: "1px solid var(--rule)", background: "transparent",
       color: busy === kind ? "var(--teal)" : "var(--ink-3)", fontFamily: "var(--mono)", fontSize: 10,
       cursor: busy ? "default" : "pointer", whiteSpace: "nowrap" }
-  }, extra || {}), busy === kind ? "…" : label);
+  }, extra || {}), busy === kind ? "…" : text);
 
   const noCase = !cases.length;
+  const shortLabel = label && label.length > 48 ? label.slice(0, 46) + "…" : label;
   return h("div", {
-    ref, "data-no-export": "", className: "section-export-bar" + (msg || busy ? " is-active" : ""),
-    style: { display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 6, flexWrap: "wrap", marginTop: 12 }
+    ref, "data-no-export": "", className: (isChart ? "chart-export-bar" : "section-export-bar") + (msg || busy ? " is-active" : ""),
+    style: { display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 6, flexWrap: "wrap", marginTop: isChart ? 6 : 12 }
   },
     msg && h("span", { role: "status", style: { fontSize: 10, fontFamily: "var(--mono)", color: msg.tone === "ok" ? "var(--teal)" : "var(--red)", marginRight: 4 } },
       msg.text,
       msg.caseId && ctx && ctx.openReport && h("button", { type: "button", onClick: () => { const src = liveSource(); if (src && src.openReport) src.openReport(msg.caseId); },
         style: { marginLeft: 8, background: "none", border: "none", padding: 0, color: "var(--teal)", textDecoration: "underline", fontFamily: "var(--mono)", fontSize: 10, cursor: "pointer" } },
         "Open report →")),
-    h("span", { style: { fontSize: 9, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.05em" } }, "Export"),
-    btn("PNG", "png", () => doExport("png"), "This whole section as a PNG image — title, figures, charts, tables and notes, at full height"),
-    btn("PDF", "pdf", () => doExport("pdf"), "This whole section as a PDF — vector, with selectable text and working links"),
-    chartCount === 1 && btn("SVG", "svg", () => doExport("svg", 0), "Just the chart, as an editable vector SVG"),
-    // Several charts in one section: SVG opens a picker so each can be taken
-    // out on its own, in the order they appear.
-    chartCount > 1 && !pickChart && btn("SVG ▾", "svg", () => setPickChart(true), "Save one of the " + chartCount + " charts in this section as an editable vector SVG"),
-    chartCount > 1 && pickChart && Array.from({ length: chartCount }, (_, i) =>
-      btn("Chart " + (i + 1), "svg" + i, () => { setPickChart(false); doExport("svg", i); }, "Chart " + (i + 1) + " of " + chartCount + ", top to bottom, as SVG")),
+    h("span", { title: label, style: { fontSize: 9, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.05em", maxWidth: 360, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } },
+      (isChart ? "Export chart" : "Export section") + (shortLabel ? " · " : ""),
+      shortLabel && h("span", { style: { textTransform: "none", letterSpacing: 0 } }, shortLabel)),
+    btn("PNG", "png", () => doExport("png"), isChart
+      ? "Just this chart, with its title, as a high-resolution PNG"
+      : "This whole section as a PNG — title, inputs, results, every chart, tables and open notes, at full height"),
+    btn("PDF", "pdf", () => doExport("pdf"), isChart
+      ? "Just this chart, with its title, as a vector PDF"
+      : "This whole section as a vector PDF, with selectable text"),
+    isChart && hasSvg && btn("SVG", "svg", () => doExport("svg"), "Just this chart as an editable vector SVG"),
     h("span", { style: { width: 1, height: 14, background: "var(--rule)", margin: "0 2px" } }),
     btn(reportSection ? (inReport ? "✓ In report" : "+ Report") : "+ Report", "report",
       noCase ? undefined : doReport,
-      noCase ? "Reports belong to a case — create one in Workspace first, then sections can be added to its report"
+      noCase ? "Reports belong to a case — create one in Workspace first, then sections and charts can be added to its report"
         : reportSection
           ? (inReport ? "This section is in " + (target && target.name) + "'s report — click to take it out" : "Include this section in " + (target && target.name) + "'s report (it renders live from the model there)")
-          : "Add a snapshot of exactly this section to " + (target && target.name) + "'s report, to build a PDF of only what you choose",
+          : "Add " + (isChart ? "just this chart" : "this whole section") + " to " + (target && target.name) + "'s report, to build a PDF of only what you choose",
       noCase ? { disabled: true, style: { padding: "3px 9px", borderRadius: 5, border: "1px dashed var(--rule)", background: "transparent", color: "var(--ink-3)", fontFamily: "var(--mono)", fontSize: 10, opacity: 0.6, cursor: "not-allowed" } }
         : (inReport ? { style: { padding: "3px 9px", borderRadius: 5, border: "1px solid var(--teal)", background: "var(--teal-bg)", color: "var(--teal)", fontFamily: "var(--mono)", fontSize: 10, cursor: busy ? "default" : "pointer", whiteSpace: "nowrap" } } : null)),
     cases.length > 1 && h("select", { "aria-label": "Case whose report this goes to", value: targetId || "", onChange: e => setPickedCaseId(e.target.value),
@@ -321,6 +342,8 @@ function SectionExportBar({ title, reportSection, source }) {
       cases.map(c => h("option", { key: c.id, value: c.id }, c.name || "Untitled")))
   );
 }
+function SectionExportBar(props) { return React.createElement(ExportBar, Object.assign({}, props, { scope: "section" })); }
+function ChartExportBar(props) { return React.createElement(ExportBar, Object.assign({}, props, { scope: "chart" })); }
 
 // Wraps any block as its own exportable section — used for the sub-sections
 // packed inside larger cards (the scenario comparison, the bridge, Monte
@@ -898,6 +921,7 @@ function MonteCarloBox({ theCase, discountRatePct, tv }) {
     }, running ? "Running…" : result ? "Re-run" : "Run 3,000 trials"),
     error && h("div", { style: { marginTop: 10, fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-2)" } }, error),
     result && h("div", { style: { marginTop: 14 } },
+      h(ExportableBlock, { title: (theCase.name || "Case") + " — Monte Carlo fair-value distribution" },
       h("div", { style: { display: "flex", gap: 20, flexWrap: "wrap", marginBottom: 14 } },
         [["P10", result.percentiles.p10], ["P25", result.percentiles.p25], ["P50 (median)", result.percentiles.p50], ["P75", result.percentiles.p75], ["P90", result.percentiles.p90]].map(([label, v]) =>
           h("div", { key: label }, h("div", { style: { fontSize: 9, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase" } }, label),
@@ -907,7 +931,7 @@ function MonteCarloBox({ theCase, discountRatePct, tv }) {
         h("div", { key: label, style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 4 } },
           h("div", { style: { width: 28, fontSize: 9, fontFamily: "var(--mono)", color: "var(--ink-3)" } }, label),
           h("div", { style: { flex: 1, height: 6, borderRadius: 3, background: "var(--surface)" } }, h("div", { style: barStyle(v, color) })))
-      ),
+      )),
       h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginTop: 10, lineHeight: 1.6 } },
         "Median can differ from the Base-case point estimate above — that's expected, not a discrepancy: discounting is non-linear (a higher rate hurts value more than an equal-sized lower rate helps it), so averaging across a range captures that in a way three fixed points can't."),
       h("div", { style: { marginTop: 12 } },
@@ -1330,23 +1354,15 @@ function WorkspaceNav({ sections }) {
   );
 }
 
-// Wraps a chart. It used to carry its own PNG/SVG/Panel row, which exported the
-// chart alone — without the title, the figures above it or the caveats under
-// it, which is what a reader needs to make sense of it. Now the enclosing
-// section's bar exports the whole card, so inside a section this renders only
-// its children. A chart that sits in no section at all promotes itself to one,
-// so nothing is ever left without an export path.
-function ExportableBlock({ style, children }) {
+// Wraps a chart. Its row exports the chart alone (titled); the enclosing
+// section's row exports the whole card, chart included — either or both.
+function ExportableBlock({ title, style, children }) {
+  // A chart block: the chart plus its own "Export chart" row, so a chart can
+  // be taken out on its own (with its title) as well as inside its section.
+  // The section's bar still exports everything, chart included.
   const h = React.createElement;
-  const ref = React.useRef(null);
-  const [standalone, setStandalone] = React.useState(false);
-  React.useLayoutEffect(() => {
-    const parent = ref.current && ref.current.parentNode;
-    setStandalone(!(parent && closestExportSection(parent)));
-  }, []);
-  return standalone
-    ? h("div", { ref, className: "export-section", "data-export-section": "", style: style || null }, children, h(SectionExportBar, {}))
-    : h("div", { ref, style: style || null }, children);
+  return h("div", { "data-export-chart": title || "", style: style || null },
+    children, h(ChartExportBar, { title }));
 }
 
 function ReverseSolveBox({ theCase, discountRatePct, tv, options }) {

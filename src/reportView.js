@@ -447,10 +447,8 @@ function ReportView({ theCase, onBack, updateCase }) {
 // app width is wider than a printed page.
 function ReportSnapshot({ pin, dark }) {
   const h = React.createElement;
-  const boxRef = React.useRef(null);
   const [html, setHtml] = React.useState(null);
   const [err, setErr] = React.useState(null);
-  const [avail, setAvail] = React.useState(0);
   React.useEffect(() => {
     let live = true;
     decompressSnapshotText(pin.enc, pin.html)
@@ -458,18 +456,15 @@ function ReportSnapshot({ pin, dark }) {
       .catch(e => { if (live) setErr(e.message || "unreadable"); });
     return () => { live = false; };
   }, [pin.id, pin.html]);
-  React.useLayoutEffect(() => {
-    const measure = () => { if (boxRef.current) setAvail(boxRef.current.clientWidth); };
-    measure();
-    window.addEventListener("resize", measure);
-    return () => window.removeEventListener("resize", measure);
-  }, []);
   if (err) return h("div", { style: { fontSize: 11, fontFamily: "monospace", color: "#b45309" } }, "This section could not be read back (" + err + "). Remove it and add it again.");
-  const w = pin.width || 0;
-  const scale = (w && avail && w > avail) ? avail / w : 1;
-  return h("div", { ref: boxRef, style: { width: "100%", overflow: "hidden" } },
-    html == null ? h("div", { style: { fontSize: 11, fontFamily: "monospace", opacity: 0.6 } }, "Loading…")
-      : h("div", { className: "report-snapshot " + (dark ? "theme-scope-dark" : "theme-scope-light"),
-          style: { width: w ? w + "px" : "100%", zoom: scale, color: "var(--ink-1)", fontFamily: "var(--sans)" },
-          dangerouslySetInnerHTML: { __html: html } }));
+  // The section REFLOWS to the report's column rather than being shrunk from
+  // the width it had in the app. Shrinking used a zoom factor measured on
+  // screen, and a printed page is narrower than the screen, so the PDF cropped
+  // the right-hand side of wide sections (Sample Size lost its last column).
+  // See the .report-snapshot rules in shell.html.
+  return html == null
+    ? h("div", { style: { fontSize: 11, fontFamily: "monospace", opacity: 0.6 } }, "Loading…")
+    : h("div", { className: "report-snapshot " + (dark ? "theme-scope-dark" : "theme-scope-light"),
+        style: { width: "100%", color: "var(--ink-1)", fontFamily: "var(--sans)" },
+        dangerouslySetInnerHTML: { __html: html } });
 }

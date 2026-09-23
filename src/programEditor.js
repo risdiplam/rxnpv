@@ -445,7 +445,7 @@ function ProgramEditor({ program, onChange, onDelete, discountRatePct, terminalV
             h("div", { style: { fontSize: 22, fontFamily: "var(--mono)", fontWeight: 700, color: "var(--ink-1)" } }, fmtMoney(Math.max(...pnl.map(y => y.productContribution)))),
             h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)" } }, "revenue − COGS − sales − marketing"))
         ),
-        h(ExportableBlock, { name: (program.drugName || program.name || "program") + "-revenue", showPanelCapture: true, compact: true },
+        h(ExportableBlock, { title: (program.drugName || program.name || "Program") + " — revenue by year" },
           h(RevenueChart, { series: chartSeries, showLegend: true }))
       ),
 
@@ -555,7 +555,7 @@ function ProgramEditor({ program, onChange, onDelete, discountRatePct, terminalV
         h(Note, { summary: "What \"unrisked\" means, and why it can look worse" },
           "\"Unrisked\" means 100% PoS on both sides — the full peak revenue AND the full R&D cost paid with certainty, not just revenue scaled up. For early-stage assets this can come out more negative than the risk-adjusted number: paying the full R&D cost for certain can outweigh a distant, heavily time-discounted payoff — that's a real feature of rNPV, not an error.",
           valuationMethod === "multiple" && " This waterfall always uses the full DCF/cost-structure math, regardless of the case's Simple Multiple setting — it's a diagnostic, not the number driving your headline valuation while Simple Multiple is active."),
-        h(ExportableBlock, { name: (program.drugName || program.name || "program") + "-risk-waterfall", showPanelCapture: true, compact: true },
+        h(ExportableBlock, { title: (program.drugName || program.name || "Program") + " — risk waterfall" },
           h(RiskWaterfallChart, { unriskedNPV: wf.unriskedNPV, riskedNPV: wf.riskedNPV, posToLaunchPct: wf.posToLaunch * 100 }))
       );
     })(),

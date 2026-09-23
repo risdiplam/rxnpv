@@ -557,7 +557,7 @@ function ValuationPanel({ theCase, onChange }) {
         )),
         h(ExportSection, { title: "Base-case risk-adjusted cash flow by year", reportSection: "cashFlow", style: { marginTop: 16 } },
           h("div", { style: { fontSize: 12, fontFamily: "var(--mono)", color: "var(--ink-2)", marginBottom: 6 } }, "Base-case risk-adjusted cash flow by year"),
-          h(ExportableBlock, { name: (theCase.name || "case") + "-risk-adjusted-cash-flow", showPanelCapture: true },
+          h(ExportableBlock, { title: (theCase.name || "Case") + " — base-case risk-adjusted cash flow" },
             h(RevenueChart, { series: cfSeries, showLegend: false, height: 180 })),
           h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginTop: 4 } }, "Clips negative years to the axis floor — see actual pre-launch values in the P&L panel above.")
         ),
@@ -701,7 +701,8 @@ function ValuationPanel({ theCase, onChange }) {
           return h(ExportSection, { style: { marginTop: 16, borderTop: "1px dashed var(--rule)", paddingTop: 14 } },
             h("div", { "data-section-title": "", style: { fontSize: 13, fontFamily: "var(--display)", fontWeight: 600, color: "var(--ink-1)", marginBottom: 4 } }, "Pipeline risk waterfall (Base case)"),
             h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginBottom: 12 } }, "The whole pipeline's value if every program succeeded for certain, vs. the actual risk-adjusted total — shared G&A included both ways. Each asset's own version is in its own editor above."),
-            h(RiskWaterfallChart, { unriskedNPV, riskedNPV, posToLaunchPct: null, height: 190 })
+            h(ExportableBlock, { title: (theCase.name || "Case") + " — pipeline risk waterfall" },
+              h(RiskWaterfallChart, { unriskedNPV, riskedNPV, posToLaunchPct: null, height: 190 }))
           );
         })(),
 

@@ -169,10 +169,49 @@ function numVal(id) { const el = document.getElementById(id); return el ? parseF
 // These charts used to carry their own PNG/SVG/Panel/Pin row, which exported
 // the chart alone and left a reader with no idea what produced it; that row is
 // gone, and this now only places the chart.
+// Readable names for charts that draw no title of their own (the forest plots),
+// used on the chart's export row, in its exported file and in the report.
+const SIM_CHART_TITLES = {
+  'phase2-3-translator': 'Phase 2 result vs. Phase 3 planning assumption',
+  'p-value-to-ci': 'Confidence interval implied by the p-value',
+  'ci-to-p-value': 'Confidence interval and its p-value',
+  'single-arm-ci': 'Single-arm event rate with confidence interval',
+  '2x2-risk-odds-ratio': 'Risk ratio and odds ratio',
+  '2x2-risk-difference': 'Risk difference',
+  'non-inferiority': 'Result against the non-inferiority margin',
+  'multiplicity-adjustment': 'Adjusted p-values against alpha',
+  'meta-analysis': 'Meta-analysis forest plot',
+  'trial-outcome-survival-curves': 'Simulated survival curves',
+  'peak-sales-driver-sensitivity': 'What drives the peak-sales range'
+};
 function appendChartWithExport(parent, chartHtml, exportName) {
-  const wrap = el('div', {});
-  wrap.appendChild(el('div', { html: chartHtml }));
+  const box = el('div', { html: chartHtml });
+  const svg = box.querySelector('svg');
+  // The chart's own title, drawn inside the SVG, names the chart block; a
+  // chart without one falls back to its export name.
+  const svgTitle = svg && svg.querySelector('text[font-weight="600"][y="18"]');
+  const title = (svgTitle && svgTitle.textContent.trim()) || SIM_CHART_TITLES[exportName] || humanizeExportName(exportName);
+  const wrap = el('div', { class: 'ts-chart', 'data-export-chart': title });
+  // These SVGs carry only a viewBox, so they stretch to fill their container.
+  // When the layout widened to 1240px every chart grew with it — the Fragility
+  // Index icon array, designed at 400px, rendered 1158 x 869 and ran off the
+  // page. Each chart is now capped at 1.25x the width it was drawn for.
+  const vb = svg && svg.viewBox && svg.viewBox.baseVal;
+  if (vb && vb.width) {
+    svg.style.cssText = 'display:block;width:100%;height:auto';
+    wrap.style.maxWidth = Math.round(vb.width * 1.25) + 'px';
+  }
+  wrap.appendChild(box);
+  // Its own export row: this chart alone, as PNG / PDF / SVG, or into a report.
+  const host = el('div', { class: 'sim-chart-export-host' });
+  wrap.appendChild(host);
   parent.appendChild(wrap);
+  if (typeof ReactDOM !== 'undefined' && ReactDOM.createRoot && typeof ChartExportBar === 'function') {
+    const r = ReactDOM.createRoot(host);
+    // The title is inside the SVG already, so the export adds no heading.
+    r.render(React.createElement(ChartExportBar, { title, heading: false, source: 'Simulation' }));
+    simExportRoots.add({ host, root: r });
+  }
   return wrap;
 }
 
@@ -211,9 +250,13 @@ function attachSimExportBars(root) {
     if (panel.hasAttribute('data-export-section')) return;
     panel.setAttribute('data-export-section', '');
     panel.classList.add('export-section');
+    // At the top of the panel, under its heading: a panel's result area can
+    // hold a nested panel (Sample Size's "If the assumptions are wrong") with
+    // its own row at its foot, and two rows stacked at the bottom were
+    // impossible to tell apart.
     const host = el('div', { class: 'sim-export-host' });
-    const results = Array.prototype.find.call(panel.children, c => c.classList && c.classList.contains('results'));
-    if (results) results.after(host); else panel.appendChild(host);
+    const heading = Array.prototype.find.call(panel.children, c => /^H[234]$/.test(c.tagName));
+    if (heading) heading.after(host); else panel.insertBefore(host, panel.firstChild);
     const r = ReactDOM.createRoot(host);
     r.render(React.createElement(SectionExportBar, { source: 'Simulation' }));
     simExportRoots.add({ host, root: r });

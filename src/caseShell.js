@@ -250,7 +250,7 @@ function CaseView({ theCase, onChange, onDelete, onNavigateToTools }) {
         (excludedPrograms.length === 1 ? "“" + excludedPrograms[0] + "” is" : excludedPrograms.length + " programs are")
         + " not included in this rollup or in any valuation below — their revenue build couldn't be computed, usually because a required field is still blank. "
         + "Every total on this page excludes " + (excludedPrograms.length === 1 ? "it" : "them") + "."),
-      h(ExportableBlock, { name: (theCase.name || "case") + "-revenue-rollup", showPanelCapture: true },
+      h(ExportableBlock, { title: (theCase.name || "Case") + " — company revenue rollup" },
         h(RevenueChart, { series: totalSeries.concat(aggChartSeries.length > 1 ? aggChartSeries : []), showLegend: theCase.programs.length > 1, height: 200 }))
     ),
 
@@ -287,7 +287,7 @@ function CaseView({ theCase, onChange, onDelete, onNavigateToTools }) {
           style: { padding: "5px 12px", borderRadius: 7, border: "1px solid var(--rule)", cursor: "pointer", fontFamily: "var(--mono)", fontSize: 11,
             background: rollupView === id ? "var(--teal-bg)" : "transparent", color: rollupView === id ? "var(--teal)" : "var(--ink-2)", fontWeight: rollupView === id ? 700 : 400 } }, lbl))
       ),
-      rollupView === "ebit" && h(ExportableBlock, { name: (theCase.name || "case") + "-pl-waterfall", showPanelCapture: true },
+      rollupView === "ebit" && h(ExportableBlock, { title: (theCase.name || "Case") + " — P&L by year" },
         h(RevenueChart, { series: ebitSeries, showLegend: true, height: 200 })),
       rollupView === "ebit" && (() => {
         const troughYear = companyPnL.reduce((worst, c) => c.ebit < worst.ebit ? c : worst, companyPnL[0]);

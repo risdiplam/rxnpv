@@ -104,7 +104,7 @@ function PortfolioView({ cases }) {
       return h(ExportSection, { title: "Your PoS vs. what the market implies", style: { marginTop: 18, background: "var(--surface)", border: "1px solid var(--rule)", borderRadius: 10, padding: "16px 18px" } },
         h("div", { style: { fontSize: 13, fontFamily: "var(--display)", fontWeight: 600, color: "var(--ink-1)", marginBottom: 4 } }, "Your PoS vs. what the market implies"),
         h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginBottom: 12 } }, "Single-program cases with a price set only. Below the diagonal: you're more bullish than the market. Above: less."),
-        h(ExportableBlock, { name: "portfolio-modeled-vs-implied-pos", showPanelCapture: true },
+        h(ExportableBlock, { title: "Your PoS vs. what the market implies" },
           h(ScatterChart, { points, xLabel: "Your modeled PoS (%)", yLabel: "Market-implied PoS (%)", xFmt: v => v.toFixed(0), yFmt: v => v.toFixed(0) }))
       );
     })()

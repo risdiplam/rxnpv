@@ -295,11 +295,25 @@ function renderIconArray(fraction, opts = {}) {
   const total = cols * rows;
   const highlighted = Math.max(0, Math.min(total, Math.round(fraction * total)));
 
+  // The caption is a sentence ("For every 100 treated with …"), far wider than
+  // one line of a 400-wide chart, and a single centred <text> was clipped at
+  // both ends. Wrapped at word boundaries (~6px per 11px character), with the
+  // chart made taller by a line for each extra line of caption.
+  const maxChars = Math.floor((width - 20) / 6.2);
+  const capLines = [];
+  String(subtitle || '').split(/\s+/).filter(Boolean).forEach(word => {
+    const last = capLines.length ? capLines[capLines.length - 1] : null;
+    if (last != null && (last + ' ' + word).length <= maxChars) capLines[capLines.length - 1] = last + ' ' + word;
+    else capLines.push(word);
+  });
+  const extra = Math.max(0, capLines.length - 1) * 14;
+  const fullHeight = height + extra;
+
   const marginTop = title ? 30 : 10;
-  const marginBottom = subtitle ? 28 : 10;
+  const marginBottom = (subtitle ? 28 : 10) + extra;
   const marginSide = 20;
   const plotW = width - marginSide * 2;
-  const plotH = height - marginTop - marginBottom;
+  const plotH = fullHeight - marginTop - marginBottom;
   const cellW = plotW / cols, cellH = plotH / rows;
   const r = Math.min(cellW, cellH) * 0.36;
 
@@ -313,9 +327,11 @@ function renderIconArray(fraction, opts = {}) {
   }
 
   const titleText = title ? `<text x="${width / 2}" y="18" fill="var(--ink-1)" font-size="13" text-anchor="middle" font-weight="600">${escapeXml(title)}</text>` : '';
-  const subtitleText = subtitle ? `<text x="${width / 2}" y="${height - 8}" fill="var(--ink-2)" font-size="11" text-anchor="middle">${escapeXml(subtitle)}</text>` : '';
+  const capTop = fullHeight - 8 - extra;
+  const subtitleText = capLines.map((line, i) =>
+    `<text x="${width / 2}" y="${capTop + i * 14}" fill="var(--ink-2)" font-size="11" text-anchor="middle">${escapeXml(line)}</text>`).join('');
 
-  return `<svg viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">${titleText}${dots}${subtitleText}</svg>`;
+  return `<svg viewBox="0 0 ${width} ${fullHeight}" xmlns="http://www.w3.org/2000/svg">${titleText}${dots}${subtitleText}</svg>`;
 }
 
 // Forest plot — one flexible primitive covering three uses across the new
