@@ -3763,6 +3763,38 @@ section("FIN-007: implied PoS is expressed against the override baseline");
 }
 report();
 
+section("FIN-008: PRV contribution, worked longhand");
+{
+  // A $150M priority review voucher, granted only on approval, so risked by the
+  // program's P(launch) and discounted from its launch year:
+  //   P(launch) = 10% (a 10% override at a 100% Base multiplier)
+  //   launch year 3, discount rate 12%:  1.12^3 = 1.12 x 1.12 x 1.12 = 1.404928
+  //   $150,000,000 x 0.10 = $15,000,000;  15,000,000 / 1.404928 = $10,676,703.72
+  //   (1.12^3 = 21952/15625 exactly; check: 10,676,703.72 x 1.404928 = 15,000,000.00.
+  //   This comment first said 10,676,774.3 — a slip in the long division, which
+  //   the engine's figure exposed; verified with exact rational arithmetic.)
+  const c = {
+    name: "PRV", currentPrice: "10",
+    capitalStructure: { mode: "simple", dilutedSharesSimple: "10000000", cash: "0", debt: "0" },
+    corporateGA: { preCommercialAnnualM: "0", gaShareOfMatureSgaPct: "0" },
+    programs: [{ id: "p1", name: "Asset", currentPhase: "phase3", therapeuticArea: "Oncology", modality: "smallMolecule",
+      revenueMode: "quick", quickRevenue: { peakRevenue: "400000000", yearsToPeak: "6", profile: "median" },
+      posOverridePct: "10", launchYearOffset: "3", prv: { enabled: true, valueM: "150" } }]
+  };
+  const base = { label: "base", shareMultiplierPct: 100, posMultiplierPct: 100, discountRateAddPct: 0, color: "" };
+  const withPrv = api.computeCaseValuation(c, base, null, 12, { enabled: false });
+  near("PRV added = $150M x 10% / 1.12^3 = $10,676,703.72", withPrv.equity.prvValueAdded, 10676703.72, 0.01);
+  const noPrv = JSON.parse(JSON.stringify(c)); noPrv.programs[0].prv = { enabled: false, valueM: "150" };
+  const without = api.computeCaseValuation(noPrv, base, null, 12, { enabled: false });
+  near("and it is exactly the equity-value difference", withPrv.equity.equityValue - without.equity.equityValue, 10676703.72, 0.01);
+  near("which is $1.0676704 per share on 10M shares", withPrv.equity.perShare - without.equity.perShare, 1.067670372, 1e-8);
+  // Launch year 0 means already launched: no discounting, still risked.
+  const now = JSON.parse(JSON.stringify(c)); now.programs[0].launchYearOffset = "0";
+  near("launch year 0: $150M x 10% undiscounted = $15,000,000",
+    api.computeCaseValuation(now, base, null, 12, { enabled: false }).equity.prvValueAdded, 15000000, 0.1);
+}
+report();
+
 // ════════════════════════════════════════════════════════════════════════════
 console.log("\n" + "═".repeat(64));
 if (fail === 0) {
