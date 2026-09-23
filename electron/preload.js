@@ -3,7 +3,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('electronAPI', {
   isDesktop: true,
   edgarFetch: (url) => ipcRenderer.invoke('edgar:fetch', url),
-  exportPDF: (suggestedName) => ipcRenderer.invoke('export-pdf', suggestedName),
+  exportPDF: (suggestedName, opts) => ipcRenderer.invoke('export-pdf', suggestedName, opts),
   openExternal: (url) => ipcRenderer.invoke('open-external', url),
   // Save an already-encoded asset the renderer produced (SVG text, or a PNG
   // data URL rasterised from an SVG at arbitrary scale).

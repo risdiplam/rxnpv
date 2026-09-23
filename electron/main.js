@@ -38,7 +38,7 @@ function createWindow() {
 // separate PDF library or chart re-implementation needed. The renderer
 // switches to a dedicated print-friendly "Report" layout immediately before
 // calling this, and switches back after.
-ipcMain.handle('export-pdf', async (event, suggestedName) => {
+ipcMain.handle('export-pdf', async (event, suggestedName, opts) => {
   if (!mainWindow) return { ok: false, error: "No window available" };
   const { canceled, filePath } = await dialog.showSaveDialog(mainWindow, {
     title: 'Export Report as PDF',
@@ -47,12 +47,22 @@ ipcMain.handle('export-pdf', async (event, suggestedName) => {
   });
   if (canceled || !filePath) return { ok: false, canceled: true };
   try {
-    const data = await mainWindow.webContents.printToPDF({
-      printBackground: true,
-      landscape: false,
-      pageSize: 'Letter',
-      margins: { marginType: 'default' }
-    });
+    // The page margins are painted with the WINDOW's background colour, not
+    // the page's — the app window is dark, so every report printed with a dark
+    // frame round each page. For the print only, the window takes the
+    // document's own background (a #rrggbb the renderer passes), then goes back.
+    const bg = opts && /^#[0-9a-f]{6}$/i.test(String(opts.background || '')) ? opts.background : null;
+    const prevBg = mainWindow.getBackgroundColor ? mainWindow.getBackgroundColor() : null;
+    if (bg) mainWindow.setBackgroundColor(bg);
+    let data;
+    try {
+      data = await mainWindow.webContents.printToPDF({
+        printBackground: true,
+        landscape: false,
+        pageSize: 'Letter',
+        margins: { marginType: 'default' }
+      });
+    } finally { if (bg && prevBg) mainWindow.setBackgroundColor(prevBg); }
     fs.writeFileSync(filePath, data);
     return { ok: true, filePath };
   } catch (e) {
@@ -238,9 +248,47 @@ async function renderSectionToBuffer(payload) {
   }
 }
 
+// File name from a title: lower-case letters, digits and dashes only, so a
+// bundle item can never carry a path separator or a dot-dot into a filename.
+function safeFileBase(s) {
+  const b = String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 80);
+  return b || 'section';
+}
+
 ipcMain.handle('render-section', async (event, payload) => {
   if (!mainWindow) return { ok: false, error: "No window available" };
   const format = payload && payload.format === 'pdf' ? 'pdf' : 'png';
+  // Batch: the PDF bundle's "separate files" export. One folder is chosen,
+  // once, and each item is rendered exactly as a single section export would
+  // be and written into it, numbered in bundle order. Same channel, same
+  // renderer, same sanitised input as a single export — no new capability.
+  if (payload && Array.isArray(payload.batch)) {
+    const items = payload.batch.slice(0, 60);
+    if (!items.length) return { ok: false, error: "Nothing to export." };
+    try {
+      const pick = await dialog.showOpenDialog(mainWindow, {
+        title: 'Choose a folder for ' + items.length + ' ' + format.toUpperCase() + (items.length === 1 ? ' file' : ' files'),
+        buttonLabel: 'Save here', properties: ['openDirectory', 'createDirectory']
+      });
+      if (pick.canceled || !pick.filePaths || !pick.filePaths[0]) return { ok: false, canceled: true };
+      const dir = path.resolve(pick.filePaths[0]);
+      const files = [], used = new Set();
+      for (let i = 0; i < items.length; i++) {
+        const it = items[i] || {};
+        let name = String(i + 1).padStart(2, '0') + '-' + safeFileBase(it.fileName || it.title) + '.' + format;
+        while (used.has(name)) name = name.replace('.' + format, '-2.' + format);
+        used.add(name);
+        const target = path.join(dir, name);
+        if (path.dirname(target) !== dir) continue; // never outside the chosen folder
+        const buf = await renderSectionToBuffer(Object.assign({}, it, { format }));
+        fs.writeFileSync(target, buf);
+        files.push(target);
+      }
+      return { ok: true, folder: dir, files };
+    } catch (e) {
+      return { ok: false, error: e.message };
+    }
+  }
   try {
     const buf = await renderSectionToBuffer(Object.assign({}, payload, { format }));
     // Used by the automated checks, and by nothing that writes anywhere.

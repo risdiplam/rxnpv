@@ -40,6 +40,12 @@ dialog.showSaveDialog = async (w, o) => {
   const ext = path.extname((o && o.defaultPath) || "") || ".bin";
   return { canceled: false, filePath: path.join(OUT, "files", nextName + ext) };
 };
+// The bundle's "separate PDFs" export asks for a folder, once.
+dialog.showOpenDialog = async () => {
+  const dir = path.join(OUT, "files", "bundle-separate");
+  fs.mkdirSync(dir, { recursive: true });
+  return { canceled: false, filePaths: [dir] };
+};
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const results = [];
 const record = (r) => { results.push(r); if (!r.ok) console.log("FAIL " + r.stop + " · " + r.kind + " · " + r.title + " · " + r.what + (r.detail ? " — " + r.detail : "")); };
@@ -113,7 +119,8 @@ app.whenReady().then(async () => {
   const js = c => win.webContents.executeJavaScript(c, true);
   await js(PAGE_HELPERS);
   const dbg = win.webContents.debugger; dbg.attach("1.3");
-  const click = async (t, ms) => { const r = await js(`__t.click(${JSON.stringify(t)})`); await sleep(ms || 600); return r; };
+  const click = async (t, ms) => { if (args.verbose) console.log("click " + t); const r = await js(`__t.click(${JSON.stringify(t)})`); await sleep(ms || 600); return r; };
+  console.log("app loaded");
   const waitFor = async (code, ms) => { for (let t = 0; t < ms; t += 400) { if (await js(code).catch(() => false)) return true; await sleep(400); } return false; };
   const sheets = [];
 
@@ -273,13 +280,67 @@ app.whenReady().then(async () => {
     const n = await js(`document.querySelectorAll("#report-added .report-snapshot").length`);
     record({ stop: "Report", kind: "report", title: "render", what: "all five render in the report", ok: n === 5, detail: n });
     nextName = "report-together";
-    await js(`window.electronAPI.exportPDF("report-together.pdf")`);
+    // The real button, not a direct call: it is the button that passes the
+    // report's background for the page margins.
+    await js(`[...document.querySelectorAll("button")].find(b => b.textContent.trim() === "Export as PDF").click()`);
     const f = path.join(OUT, "files", "report-together.pdf");
     const ok = await waitFile(f, 20000);
     const pages = ok ? pdfPages(f, path.join(OUT, "files", "report-together-page")) : [];
     record({ stop: "Report", kind: "report", title: "PDF", what: "report PDF exported and rendered", ok: pages.length >= 2, detail: pages.length + " pages" });
     sheets.push({ stop: "Report", rows: pages.map((p, i) => ({ title: "page " + (i + 1), kind: "page", pdf: p })) });
   }
+
+  // ── PDF bundle: collect across views, export merged and separately ──
+  if (!ONLY || ONLY.includes("Bundle")) try {
+    const collect = async (view, sub, kind, nth) => {
+      await click(view, 800); if (sub) { for (const x of sub) await click(x, 700); }
+      if (view === "Simulation") await run();
+      return await js(`(() => { const cls = ${JSON.stringify(kind === "chart" ? ".chart-export-bar" : ".section-export-bar")};
+        const bar = [...document.querySelectorAll(cls)].filter(__t.visible)[${nth || 0}]; if (!bar) return false;
+        const b = [...bar.querySelectorAll("button")].find(x => x.textContent.trim() === "+ Bundle"); if (!b) return false; b.click(); return true; })()`);
+    };
+    const got = [];
+    got.push(await collect("Simulation", ["Trial Statistics", "Sample Size / Power"], "section"));
+    await sleep(900);
+    got.push(await collect("Simulation", ["Trial Statistics", "2×2 Outcome Analysis"], "chart", 0));
+    await sleep(900);
+    got.push(await collect("Simulation", ["Peak Sales"], "chart", 1));
+    await sleep(900);
+    got.push(await collect("Tools", ["Benchmarks", "M&A Premium"], "chart"));
+    await sleep(900);
+    got.push(await collect("Reference Sheet", ["Probability of Success"], "section", 1));
+    await sleep(1200);
+    const n = await js(`JSON.parse(localStorage.getItem("rxnpv_pdf_bundle") || "[]").length`);
+    record({ stop: "Bundle", kind: "bundle", title: "collect", what: "five items collected (2 sections, 3 single charts)", ok: got.every(Boolean) && n === 5, detail: JSON.stringify(got) + " → " + n });
+    const opened = await js(`(() => { const b = [...document.querySelectorAll("button")].find(x => /PDF bundle/.test(x.title || "")); if (b) b.click(); return b ? b.textContent : "none"; })()`); await sleep(1800);
+    console.log("bundle button:", opened, "items:", n, JSON.stringify(got));
+    const shown = await js(`document.querySelectorAll("#bundle-document .report-snapshot").length`);
+    record({ stop: "Bundle", kind: "bundle", title: "view", what: "all five render in the Bundle view", ok: shown === 5, detail: shown });
+    // Merged: one PDF.
+    nextName = "bundle-merged";
+    await js(`[...document.querySelectorAll("button")].find(b => b.textContent.trim() === "Export as one PDF").click()`);
+    const mf = path.join(OUT, "files", "bundle-merged.pdf");
+    const mok = await waitFile(mf, 30000);
+    const mpages = mok ? pdfPages(mf, path.join(OUT, "files", "bundle-merged-page")) : [];
+    record({ stop: "Bundle", kind: "bundle", title: "merged", what: "merged PDF exported", ok: mpages.length >= 2, detail: mpages.length + " pages" });
+    const mink = mpages.map(inkOf);
+    record({ stop: "Bundle", kind: "bundle", title: "merged", what: "no blank pages in the merged PDF", ok: mink.every(x => x > 0.01), detail: mink.map(x => (x * 100).toFixed(1) + "%").join(" ") });
+    // Separate: one PDF per item, into one folder.
+    await js(`[...document.querySelectorAll("button")].find(b => b.textContent.trim() === "Export as separate PDFs").click()`);
+    const dir = path.join(OUT, "files", "bundle-separate");
+    for (let t = 0; t < 60 && !(fs.existsSync(dir) && fs.readdirSync(dir).filter(f => f.endsWith(".pdf")).length >= 5); t++) await sleep(1000);
+    const sep = fs.existsSync(dir) ? fs.readdirSync(dir).filter(f => f.endsWith(".pdf")).sort() : [];
+    record({ stop: "Bundle", kind: "bundle", title: "separate", what: "five separate PDFs, numbered in bundle order", ok: sep.length === 5 && /^01-/.test(sep[0]) && /^05-/.test(sep[4]), detail: sep.join(", ") });
+    const sepPages = [];
+    for (const f of sep) {
+      const pages = pdfPages(path.join(dir, f), path.join(dir, f.replace(/\.pdf$/, "-page")));
+      record({ stop: "Bundle", kind: "bundle", title: f, what: "separate PDF is one full page", ok: pages.length === 1 && inkOf(pages[0]) > 0.01, detail: pages.length + " page(s)" });
+      sepPages.push({ title: f, kind: "page", pdf: pages[0] });
+    }
+    sheets.push({ stop: "Bundle merged", rows: mpages.map((p, i) => ({ title: "page " + (i + 1), kind: "page", pdf: p })) });
+    sheets.push({ stop: "Bundle separate", rows: sepPages });
+    await click("← Back", 600);
+  } catch (e) { record({ stop: "Bundle", kind: "bundle", title: "stage", what: "bundle stage ran", ok: false, detail: e.message }); }
 
   // ── Contact sheets ──
   for (const s of sheets) {

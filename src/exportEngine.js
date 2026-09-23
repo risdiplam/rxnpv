@@ -478,6 +478,57 @@ async function decompressSnapshotText(enc, data) {
 }
 
 // Builds a stored report item from a live section.
+// ── PDF bundle ─────────────────────────────────────────────────────────────
+// A case-free collection of sections and charts, gathered with "+ Bundle" on
+// any export row and exported from the Bundle view either merged into one PDF
+// or as one PDF per item. Same stored shape as a report item (a sanitised,
+// compressed HTML snapshot) so the same renderer shows it. Kept in its own
+// localStorage key; counted as the user's data by the storage banner.
+const BUNDLE_KEY = "rxnpv_pdf_bundle";
+const BUNDLE_MAX_ITEMS = 40;
+const BUNDLE_EVENT = "rxnpv-bundle-changed";
+
+function loadBundle() {
+  try {
+    const raw = localStorage.getItem(BUNDLE_KEY);
+    const v = raw ? JSON.parse(raw) : [];
+    return Array.isArray(v) ? v : [];
+  } catch (e) { return []; }
+}
+
+// Returns true/false; never swallows a failed write (the same rule as every
+// other save in this app — a silently lost bundle is lost work).
+function saveBundle(items) {
+  try {
+    localStorage.setItem(BUNDLE_KEY, JSON.stringify(items || []));
+    if (typeof window !== "undefined" && window.dispatchEvent) window.dispatchEvent(new Event(BUNDLE_EVENT));
+    return true;
+  } catch (e) { return false; }
+}
+
+function addToBundle(item) {
+  const items = loadBundle();
+  if (items.length >= BUNDLE_MAX_ITEMS) return { ok: false, error: "The bundle already holds " + BUNDLE_MAX_ITEMS + " items — export or remove some first." };
+  const next = items.concat([item]);
+  if (!saveBundle(next)) return { ok: false, error: "Couldn't save to the bundle — storage is full. Export or clear the bundle, or clear caches." };
+  return { ok: true, count: next.length };
+}
+
+// Each item rendered on its own through the section renderer, all written to
+// one folder the user picks once (render-section's batch mode).
+async function exportBundleSeparately(items, theme) {
+  if (!isDesktopExport() || !window.electronAPI.renderSection) {
+    return { ok: false, error: "Exporting separate files needs the desktop app." };
+  }
+  const batch = [];
+  for (const it of items) {
+    const html = sanitizeSnapshotHtml(await decompressSnapshotText(it.enc, it.html));
+    batch.push({ html, width: it.width || 900, theme: theme || it.theme || "light",
+      title: it.title || "Section", context: it.source || "", fileName: it.title || "section" });
+  }
+  return await window.electronAPI.renderSection({ format: "pdf", batch });
+}
+
 // A chart exported on its own loses the heading that sits above it on screen
 // (React charts keep their titles outside the chart), so the export carries it.
 // Simulation charts draw their own title inside the SVG and pass no heading.

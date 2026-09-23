@@ -126,14 +126,24 @@
   /* A section added to the report reflows to the report column (see
      ReportSnapshot): nothing in it may be wider than the column, on screen
      or on a printed page. */
-  .report-snapshot { width: 100%; overflow-wrap: anywhere; }
+  /* break-word, not anywhere: "anywhere" also lowers each cell's minimum
+     width, so table columns shrank until "Power" printed as "Powe / r". */
+  .report-snapshot { width: 100%; overflow-wrap: break-word; }
   .report-snapshot *, .report-snapshot *::before, .report-snapshot *::after { max-width: 100%; box-sizing: border-box; }
   .report-snapshot table { width: 100% !important; min-width: 0 !important; }
   .report-snapshot th, .report-snapshot td { white-space: normal !important; }
   .report-snapshot svg { max-width: 100%; }
   @media print {
     .no-print { display: none !important; }
-    body { background: white !important; }
+    /* The printed page takes the report's (or bundle's) own background, set
+       as --print-bg while that view is open — otherwise the app's dark theme
+       printed as a dark frame round every page and a dark block under the
+       last item. */
+    html, body { background: var(--print-bg, white) !important; }
+    /* Tall added sections are allowed to run across pages (keeping a whole
+       one together pushed it to the next page and left page 1 empty), but a
+       chart or a table row is never cut in half. */
+    .report-snapshot [data-export-chart], .report-snapshot svg, .report-snapshot tr { break-inside: avoid; }
     /* Export affordances are interactive chrome — never part of a printed
        page or an exported PDF, where they'd read as stray UI artefacts. */
     .chart-export-row, .section-export-bar, .chart-export-bar { display: none !important; }

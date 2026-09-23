@@ -94,6 +94,7 @@ function ReportView({ theCase, onBack, updateCase }) {
   const rpt = reportDark
     ? { bg: "#181B20", ink1: "#E5E2DA", ink2: "#A19C8E", ink3: "#6E695C", rule: "#2C3038", teal: "#6FAF9A", amber: "#C9A66B", red: "#C17A6B", surface2: "#20242B" }
     : { bg: "#FFFFFF", ink1: "#26241F", ink2: "#5C574A", ink3: "#8F897A", rule: "#DDD7C9", teal: "#4A8B78", amber: "#A6793D", red: "#B0574A", surface2: "#F5F3EC" };
+  usePrintBackground(rpt.bg);
   const revenueSeries = (baseResult && baseResult.calendar) ? [{ name: "Company revenue", color: rpt.teal, points: baseResult.calendar.map(c => ({ v: c.revenue, label: c.calendarYear })) }] : [];
   const fcfSeries = (baseResult && baseResult.calendar) ? [{ name: "Risk-adjusted FCF", color: rpt.amber, points: baseResult.calendar.map(c => ({ v: c.riskAdjFCF, label: c.calendarYear })) }] : [];
 
@@ -101,7 +102,7 @@ function ReportView({ theCase, onBack, updateCase }) {
     if (!window.electronAPI || !window.electronAPI.exportPDF) { setExportMsg("PDF export requires the desktop app."); return; }
     setExporting(true); setExportMsg(null);
     const fileName = (theCase.name || "RxNPV-Report").replace(/[^a-z0-9\- ]/gi, "").trim() + ".pdf";
-    const r = await window.electronAPI.exportPDF(fileName);
+    const r = await window.electronAPI.exportPDF(fileName, { background: rpt.bg });
     setExporting(false);
     if (r.canceled) return;
     setExportMsg(r.ok ? "Saved to " + r.filePath : "Export failed: " + r.error);
@@ -392,8 +393,8 @@ function ReportView({ theCase, onBack, updateCase }) {
           const imgs = pins.filter(p => p.kind !== "html");
           const mism = imgs.filter(p => p.theme && p.theme !== (reportDark ? "dark" : "light"));
           return h("div", { id: "report-added", style: { marginBottom: 16 } },
-            h("div", { style: { fontSize: 13, fontWeight: 700, marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.05em", color: rpt.ink2 } }, "Added Sections"),
-            h("div", { style: { fontSize: 11, color: rpt.ink3, marginBottom: 12 } },
+            h("div", { style: { fontSize: 13, fontWeight: 700, marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.05em", color: rpt.ink2, breakAfter: "avoid", pageBreakAfter: "avoid" } }, "Added Sections"),
+            h("div", { style: { fontSize: 11, color: rpt.ink3, marginBottom: 12, breakAfter: "avoid", pageBreakAfter: "avoid" } },
               pins.length + " section" + (pins.length === 1 ? "" : "s") + " added from across the app.",
               updateCase && h("span", { className: "no-print" }, " Choose which appear, and their order, under Sections ▼.")),
             // An older image pin is pixels of the screen, so one taken in the
@@ -401,8 +402,10 @@ function ReportView({ theCase, onBack, updateCase }) {
             mism.length > 0 && h("div", { className: "no-print", style: { fontSize: 10, color: rpt.amber, marginBottom: 10, lineHeight: 1.5 } },
               "⚠ " + mism.length + " older image pin" + (mism.length === 1 ? " was" : "s were") + " captured in " + (reportDark ? "light" : "dark") +
               " mode and will print that way. Re-adding it with “+ Report” stores it as a section that follows this page’s theme."),
-            pins.map((pin, i) => h("div", { key: pin.id || i, style: { ...cardStyle, pageBreakInside: "avoid" } },
-              h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10, marginBottom: 8 } },
+            // Allowed to break across pages: a tall section kept whole jumped to
+            // the next page and left the one before it nearly empty.
+            pins.map((pin, i) => h("div", { key: pin.id || i, style: { ...cardStyle, breakInside: "auto" } },
+              h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10, marginBottom: 8, breakAfter: "avoid", pageBreakAfter: "avoid" } },
                 h("div", { style: { fontSize: 12, fontWeight: 700, color: rpt.ink1 } }, pin.title || "Section"),
                 h("div", { style: { fontSize: 10, color: rpt.ink3, flexShrink: 0 } },
                   (pin.source ? pin.source + " · " : "") + (pin.capturedAt ? "captured " + new Date(pin.capturedAt).toLocaleDateString() : ""))),
@@ -467,4 +470,110 @@ function ReportSnapshot({ pin, dark }) {
     : h("div", { className: "report-snapshot " + (dark ? "theme-scope-dark" : "theme-scope-light"),
         style: { width: "100%", color: "var(--ink-1)", fontFamily: "var(--sans)" },
         dangerouslySetInnerHTML: { __html: html } });
+}
+
+// ── The PDF bundle ─────────────────────────────────────────────────────────
+// Everything collected with "+ Bundle" from any view — whole sections and
+// single charts, from Tools, Simulation, the Workspace, the Reference Sheet —
+// with no case required. Choose what goes in and in what order, then export it
+// merged into one PDF, or as one PDF per item into a folder chosen once.
+// Merged export prints this page, exactly like the case report; the list and
+// the buttons are no-print.
+function BundleView({ onBack }) {
+  const h = React.createElement;
+  const items = useBundle();
+  const [dark, setDark] = React.useState(false); // light by default, like the report: better on paper
+  const [pageEach, setPageEach] = React.useState(false);
+  const [busy, setBusy] = React.useState(null);
+  const [msg, setMsg] = React.useState(null);
+  const rpt = dark
+    ? { bg: "#181B20", ink1: "#E5E2DA", ink2: "#A19C8E", ink3: "#6E695C", rule: "#2C3038", teal: "#6FAF9A", surface2: "#20242B" }
+    : { bg: "#FFFFFF", ink1: "#26241F", ink2: "#5C574A", ink3: "#8F897A", rule: "#DDD7C9", teal: "#4A8B78", surface2: "#F5F3EC" };
+  usePrintBackground(rpt.bg);
+  const included = items.filter(it => it.included !== false);
+  const save = (next) => { if (!saveBundle(next)) setMsg({ tone: "err", text: "Couldn't save the bundle — storage is full." }); };
+  const move = (i, by) => { const next = items.slice(); const [x] = next.splice(i, 1); next.splice(i + by, 0, x); save(next); };
+  const stamp = new Date().toISOString().slice(0, 10);
+
+  const exportMerged = async () => {
+    if (!window.electronAPI || !window.electronAPI.exportPDF) { setMsg({ tone: "err", text: "PDF export needs the desktop app." }); return; }
+    setBusy("merged"); setMsg(null);
+    const r = await window.electronAPI.exportPDF("RxNPV-bundle-" + stamp + ".pdf", { background: rpt.bg });
+    setBusy(null);
+    if (r && r.canceled) return;
+    setMsg(r && r.ok ? { tone: "ok", text: "Saved " + included.length + " item" + (included.length === 1 ? "" : "s") + " as one PDF: " + r.filePath } : { tone: "err", text: "Export failed: " + ((r && r.error) || "unknown") });
+  };
+  const exportSeparate = async () => {
+    setBusy("separate"); setMsg(null);
+    let r;
+    try { r = await exportBundleSeparately(included, dark ? "dark" : "light"); } catch (e) { r = { ok: false, error: e.message }; }
+    setBusy(null);
+    if (r && r.canceled) return;
+    setMsg(r && r.ok ? { tone: "ok", text: "Saved " + r.files.length + " PDF" + (r.files.length === 1 ? "" : "s") + " to " + r.folder } : { tone: "err", text: "Export failed: " + ((r && r.error) || "unknown") });
+  };
+
+  const tbtn = (label, onClick, opts) => h("button", Object.assign({ type: "button", onClick,
+    style: { padding: "6px 14px", borderRadius: 6, border: "1px solid " + rpt.rule, background: "transparent", color: rpt.ink2, fontFamily: "monospace", fontSize: 12, cursor: "pointer" } }, opts || {}), label);
+  const primary = { padding: "6px 14px", borderRadius: 6, border: "1px solid " + rpt.teal, background: rpt.teal, color: "#fff", fontFamily: "monospace", fontSize: 12, fontWeight: 700, cursor: "pointer" };
+  const none = !included.length;
+
+  return h("div", { style: { minHeight: "100vh", background: rpt.bg, color: rpt.ink1, fontFamily: "'IBM Plex Sans', sans-serif" } },
+    h("div", { className: "no-print", style: { position: "sticky", top: 0, zIndex: 10, background: rpt.surface2, borderBottom: "1px solid " + rpt.rule, padding: "10px 20px", display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" } },
+      tbtn("← Back", onBack),
+      tbtn(dark ? "☀ Light" : "☾ Dark", () => setDark(!dark)),
+      h("button", { type: "button", onClick: exportMerged, disabled: none || busy != null, title: "Every included item, in this order, in a single PDF",
+        style: Object.assign({}, primary, (none || busy) ? { opacity: 0.5, cursor: "default" } : {}) }, busy === "merged" ? "Exporting…" : "Export as one PDF"),
+      h("button", { type: "button", onClick: exportSeparate, disabled: none || busy != null, title: "One PDF per included item, all saved into a folder you choose once",
+        style: Object.assign({}, primary, { background: "transparent", color: rpt.teal }, (none || busy) ? { opacity: 0.5, cursor: "default" } : {}) }, busy === "separate" ? "Exporting…" : "Export as separate PDFs"),
+      h("label", { style: { display: "flex", alignItems: "center", gap: 6, fontSize: 11, fontFamily: "monospace", color: rpt.ink2, cursor: "pointer" } },
+        h("input", { type: "checkbox", checked: pageEach, onChange: () => setPageEach(!pageEach) }), "one PDF: each item on its own page"),
+      msg && h("span", { role: "status", style: { fontSize: 11, fontFamily: "monospace", color: msg.tone === "ok" ? rpt.teal : "#B0574A" } }, msg.text)),
+
+    h("div", { className: "no-print", style: { background: rpt.surface2, borderBottom: "1px solid " + rpt.rule, padding: "14px 20px" } },
+      h("div", { style: { maxWidth: 800, margin: "0 auto" } },
+        h("div", { style: { display: "flex", alignItems: "baseline", gap: 10, marginBottom: 8 } },
+          h("span", { style: { fontSize: 11, fontFamily: "monospace", color: rpt.ink3, textTransform: "uppercase", letterSpacing: "0.05em" } },
+            "In the bundle (" + included.length + " of " + items.length + " included · up to " + BUNDLE_MAX_ITEMS + ")"),
+          h("div", { style: { flex: 1 } }),
+          items.length > 0 && h(ConfirmXButton, { onConfirm: () => save([]), title: "Empty the bundle", label: "Clear all", style: { padding: "2px 10px", fontSize: 10 } })),
+        !items.length && h("div", { style: { fontSize: 12, fontFamily: "monospace", color: rpt.ink3, lineHeight: 1.7 } },
+          "Nothing collected yet. Every section and every chart in the app has a “+ Bundle” button on its export row. Collect a Simulation panel with its inputs, just its chart, a Tools result, a Reference Sheet table — anything — then come back here to export them together as one PDF, or each as its own."),
+        h("div", { style: { display: "flex", flexDirection: "column", gap: 4 } },
+          items.map((it, i) => h("div", { key: it.id || i, style: { display: "flex", alignItems: "center", gap: 8, fontSize: 11, fontFamily: "monospace", color: it.included === false ? rpt.ink3 : rpt.ink2 } },
+            h("input", { type: "checkbox", checked: it.included !== false, "aria-label": "Include " + (it.title || "this item"),
+              onChange: () => save(items.map(x => x === it ? { ...x, included: x.included === false } : x)) }),
+            h("span", { style: { flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textDecoration: it.included === false ? "line-through" : "none" } },
+              it.title, it.source ? h("span", { style: { color: rpt.ink3 } }, " · " + it.source) : null),
+            h("button", { type: "button", "aria-label": "Move up", title: "Move up", disabled: i === 0, onClick: () => move(i, -1),
+              style: { padding: "1px 6px", borderRadius: 4, border: "1px solid " + rpt.rule, background: "transparent", color: i === 0 ? rpt.rule : rpt.ink2, fontFamily: "monospace", fontSize: 10, cursor: i === 0 ? "default" : "pointer" } }, "↑"),
+            h("button", { type: "button", "aria-label": "Move down", title: "Move down", disabled: i === items.length - 1, onClick: () => move(i, 1),
+              style: { padding: "1px 6px", borderRadius: 4, border: "1px solid " + rpt.rule, background: "transparent", color: i === items.length - 1 ? rpt.rule : rpt.ink2, fontFamily: "monospace", fontSize: 10, cursor: i === items.length - 1 ? "default" : "pointer" } }, "↓"),
+            h(ConfirmXButton, { onConfirm: () => save(items.filter(x => x !== it)), title: "Remove from the bundle", style: { padding: "2px 8px", fontSize: 10 } })))))),
+
+    // The document — what "Export as one PDF" prints.
+    h("div", { id: "bundle-document", style: { maxWidth: 800, margin: "0 auto", padding: "32px 40px" } },
+      h("div", { style: { borderBottom: "2px solid " + rpt.ink1, paddingBottom: 12, marginBottom: 20 } },
+        h("div", { style: { fontSize: 24, fontWeight: 700, fontFamily: "Georgia, serif" } }, "RxNPV export"),
+        h("div", { style: { fontSize: 11, fontFamily: "monospace", color: rpt.ink3, marginTop: 4 } },
+          included.length + " item" + (included.length === 1 ? "" : "s") + " — generated " + stamp)),
+      included.map((it, i) => h("div", { key: it.id || i, className: "bundle-item",
+        style: { border: "1px solid " + rpt.rule, borderRadius: 8, padding: "14px 16px", marginBottom: 16,
+          pageBreakBefore: pageEach && i > 0 ? "always" : "auto" } },
+        // Never left at the foot of a page with its content on the next.
+        h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10, marginBottom: 8, breakAfter: "avoid", pageBreakAfter: "avoid" } },
+          h("div", { style: { fontSize: 12, fontWeight: 700, color: rpt.ink1 } }, it.title || "Section"),
+          h("div", { style: { fontSize: 10, color: rpt.ink3, flexShrink: 0 } }, (it.source ? it.source + " · " : "") + (it.capturedAt ? "captured " + new Date(it.capturedAt).toLocaleDateString() : ""))),
+        h(ReportSnapshot, { pin: it, dark }))),
+      h("div", { style: { fontSize: 9.5, color: rpt.ink3, marginTop: 20, lineHeight: 1.6 } },
+        "Generated by RxNPV. Each item is the section or chart as it stood when it was collected; it is not investment advice.")));
+}
+
+// While a printable view (report, bundle) is open, the printed page's
+// background is that view's own — see the print rules in shell.html.
+function usePrintBackground(color) {
+  React.useEffect(() => {
+    const root = document.documentElement;
+    root.style.setProperty("--print-bg", color);
+    return () => root.style.removeProperty("--print-bg");
+  }, [color]);
 }

@@ -108,7 +108,9 @@ function App() {
   // Where "Open report →" goes after adding a section: that case's report,
   // made active so the report is the one it was just added to.
   const openReport = (caseId) => { if (caseId) setActiveCaseId(caseId); setView("report"); window.scrollTo(0, 0); };
-  const reportCtx = { cases, updateCase: (next) => setCases(prev => prev.map(c => c.id === next.id ? next : c)), activeCaseId, openReport };
+  const openBundle = () => { setView("bundle"); window.scrollTo(0, 0); };
+  const bundleItems = useBundle();
+  const reportCtx = { cases, updateCase: (next) => setCases(prev => prev.map(c => c.id === next.id ? next : c)), activeCaseId, openReport, openBundle };
 
   const createCase = () => {
     const c = newCase();
@@ -158,11 +160,19 @@ function App() {
         h("button", { onClick: () => setView("portfolio"), style: navBtnStyle(view === "portfolio") }, "Portfolio")
       ),
       h("div", { style: { flex: 1 } }),
+      // The PDF bundle: whatever was collected with "+ Bundle", from any view.
+      h("button", { onClick: openBundle, "aria-current": view === "bundle" ? "page" : undefined,
+        title: "Your PDF bundle — sections and charts collected with “+ Bundle”, to export together as one PDF or each as its own",
+        style: Object.assign({}, navBtnStyle(view === "bundle"), { marginRight: 8, display: "flex", alignItems: "center", gap: 6 }) },
+        "Bundle", h("span", { style: { padding: "1px 7px", borderRadius: 10, fontSize: 10,
+          background: bundleItems.length ? "var(--teal-bg)" : "transparent", color: bundleItems.length ? "var(--teal)" : "var(--ink-3)",
+          border: "1px solid " + (bundleItems.length ? "var(--teal)" : "var(--rule)") } }, String(bundleItems.length))),
       h("button", { onClick: () => setDark(!dark), title: "Toggle theme",
         style: { padding: "6px 10px", borderRadius: 6, border: "1px solid var(--rule)", background: "transparent", color: "var(--ink-2)", fontFamily: "var(--mono)", fontSize: 12, cursor: "pointer" } }, dark ? "☾" : "☀")
     ),
 
     view === "report" ? h(ErrorBoundary, { key: "report" }, h(ReportView, { theCase: activeCase, onBack: () => setView("workspace"), updateCase })) :
+    view === "bundle" ? h(ErrorBoundary, { key: "bundle" }, h(BundleView, { onBack: () => setView("workspace") })) :
     view === "reference" ? h(ErrorBoundary, { key: "reference" }, h(ReferenceSheet, { activeCase })) :
     view === "tools" ? h(ErrorBoundary, { key: "tools" }, h(ToolsView, { cases, updateCase, activeCase, navRequest: toolsNavRequest })) :
     view === "simulation" ? h(ErrorBoundary, { key: "simulation" }, h(SimulationView, { cases, updateCase })) :

@@ -56,6 +56,9 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
       ok(!/Export (section|chart)/.test(t), where + ": section title contains export-row text (" + t.slice(0, 60) + ")");
     });
     ok(!d.querySelector(".chart-export-row"), where + ": an old chart-only export row is still rendered");
+    [...d.querySelectorAll(".section-export-bar, .chart-export-bar")].forEach(bar => {
+      ok([...bar.querySelectorAll("button")].some(b => b.textContent.trim() === "+ Bundle"), where + ": an export row has no “+ Bundle”");
+    });
     ok(![...d.querySelectorAll("button")].some(b => /Pin to report/.test(b.textContent)), where + ": an old “Pin to report” button is still rendered");
     return secs.length;
   };
@@ -196,6 +199,44 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
   const after = storedCase().pinnedResults.map(p => p.id);
   ok(after[0] === before[1] && after[1] === before[0], "Report: “↓” swaps the order of the added sections");
   ok(d.querySelectorAll("#report-added .report-snapshot").length === 2, "Report: both added sections render");
+
+  // ── PDF bundle: collect a Simulation panel, one of its charts, and a Tools card ──
+  {
+    const bundle = () => JSON.parse(w.localStorage.getItem("rxnpv_pdf_bundle") || "[]");
+    const pressIn = (container, cls, label) => { const bar = [...container.querySelectorAll(cls)][0]; const b = bar && [...bar.querySelectorAll("button")].find(x => x.textContent.trim() === label); if (b) click(b); return !!b; };
+    click(btn("Simulation")); await wait(700); click(btn("Trial Statistics")); await wait(400); click(btn("Fragility Index")); await wait(400);
+    click([...d.querySelectorAll("#ts-root .runbtn")][0]); await wait(600);
+    const panel = d.querySelector("#ts-root .panel");
+    ok(pressIn(panel, ".section-export-bar", "+ Bundle"), "Bundle: the Fragility Index panel offers + Bundle");
+    await wait(700);
+    ok(pressIn(panel, ".chart-export-bar", "+ Bundle"), "Bundle: its chart offers + Bundle on its own");
+    await wait(700);
+    click(btn("Tools")); await wait(400); click(btn("Benchmarks")); await wait(300); click(btn("M&A Premium")); await wait(400);
+    ok(pressIn(d.querySelector("[data-export-context^='Tools'] [data-export-section]"), ".section-export-bar", "+ Bundle"), "Bundle: a Tools card offers + Bundle");
+    await wait(700);
+    const b = bundle();
+    ok(b.length === 3, "Bundle: three items collected (" + b.length + ")");
+    ok(b[0] && b[0].title === "Fragility Index" && b[0].kind === "html", "Bundle: the panel is stored as an HTML snapshot titled Fragility Index (" + (b[0] && b[0].title) + ")");
+    ok(b[1] && /out of 50/.test(b[1].title), "Bundle: the chart is stored on its own, titled by its chart title (" + (b[1] && b[1].title) + ")");
+    ok(/Bundle\s*3/.test((btn("Bundle3") || [...d.querySelectorAll("button")].find(x => /^Bundle\s*\d+$/.test(x.textContent.trim())) || {}).textContent || ""), "Bundle: the top bar shows 3");
+    // Needs no case: the bundle works regardless of which case is active.
+    click([...d.querySelectorAll("button")].find(x => /^Bundle\s*\d+$/.test(x.textContent.trim()))); await wait(800);
+    const doc = d.getElementById("bundle-document");
+    ok(doc && doc.querySelectorAll(".report-snapshot").length === 3, "Bundle view: all three render as real content");
+    ok(doc && /patients in Treatment would need to flip/.test(doc.textContent), "Bundle view: the panel carries its result, not just its inputs");
+    ok(doc && !doc.querySelector(".section-export-bar, .chart-export-bar, script, [onclick]"), "Bundle view: no export controls or anything executable inside");
+    const down = [...d.querySelectorAll('button[aria-label="Move down"]')][0];
+    click(down); await wait(400);
+    ok(bundle()[0].title !== "Fragility Index" && bundle()[1].title === "Fragility Index", "Bundle view: ↓ reorders and saves");
+    const box = d.querySelector('input[aria-label^="Include"]');
+    click(box); await wait(400);
+    ok(bundle()[0].included === false && d.getElementById("bundle-document").querySelectorAll(".report-snapshot").length === 2, "Bundle view: unticking leaves an item out of the document");
+    ok(/2 of 3 included/.test(d.body.textContent), "Bundle view: the count says 2 of 3 included");
+    ok(!!btn("Export as one PDF") && !!btn("Export as separate PDFs"), "Bundle view: both export choices are offered");
+    const clear = btn("Clear all"); click(clear); await wait(200); click(btn("Sure?") || clear); await wait(400);
+    ok(bundle().length === 0, "Bundle view: Clear all empties it (after a confirming second click)");
+    click(btn("← Back")); await wait(400);
+  }
 
   console.log("Sections audited — Workspace " + wsCount + ", Tools " + toolSections + ", Simulation " + simSections + ", Reference Sheet " + refSections);
   if (errors.length) { console.log(errors.slice(0, 40).join("\n")); console.log("\n" + errors.length + " FAILURE(S) across " + checks + " checks"); process.exit(1); }

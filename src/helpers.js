@@ -193,6 +193,20 @@ function reportSectionIncluded(theCase, id) {
   return !!(def && def.defaultOn);
 }
 
+// The PDF bundle's current items, kept live: every bar and the top-bar count
+// re-read it when any of them changes it (Simulation's bars are separate React
+// roots, so a shared event rather than context).
+function useBundle() {
+  const [items, setItems] = React.useState(() => loadBundle());
+  React.useEffect(() => {
+    const on = () => setItems(loadBundle());
+    window.addEventListener(BUNDLE_EVENT, on);
+    window.addEventListener("storage", on);
+    return () => { window.removeEventListener(BUNDLE_EVENT, on); window.removeEventListener("storage", on); };
+  }, []);
+  return items;
+}
+
 // Nearest enclosing chart block — [data-export-chart] — for a chart-scoped bar.
 function closestChartBlock(el) {
   let n = el;
@@ -267,6 +281,25 @@ function ExportBar({ scope, title, heading, reportSection, source }) {
 
   const inReport = !!(reportSection && target && reportSectionIncluded(target, reportSection));
 
+  // "+ Bundle": the same snapshot "+ Report" stores, into the case-free PDF
+  // bundle instead, to be exported with anything else collected — merged into
+  // one PDF or as separate files — from the Bundle view.
+  const doBundle = async () => {
+    const b = block();
+    if (!b) { flash({ tone: "err", text: "Couldn't find the " + noun + " to add." }, 4000); return; }
+    setBusy("bundle");
+    const r = await buildSectionSnapshot(b, { title: blockTitle(), source: source || exportContextOf(b) });
+    setBusy(null);
+    if (!r.ok) { flash({ tone: "err", text: r.error }, 6000); return; }
+    if (r.pin.html.length > SNAPSHOT_MAX_STORED_BYTES) {
+      flash({ tone: "err", text: "That " + noun + " is too large to keep in the bundle (" + Math.round(r.pin.html.length / 1024) + "KB). Export it as a PDF directly instead." }, 8000);
+      return;
+    }
+    const added = addToBundle(r.pin);
+    if (!added.ok) { flash({ tone: "err", text: added.error }, 8000); return; }
+    flash({ tone: "ok", text: "In the PDF bundle (" + added.count + (added.count === 1 ? " item)" : " items)"), bundle: true }, 9000);
+  };
+
   const doReport = async () => {
     const src = liveSource();
     const live = src && (src.cases || []).find(c => c.id === targetId);
@@ -317,7 +350,10 @@ function ExportBar({ scope, title, heading, reportSection, source }) {
       msg.text,
       msg.caseId && ctx && ctx.openReport && h("button", { type: "button", onClick: () => { const src = liveSource(); if (src && src.openReport) src.openReport(msg.caseId); },
         style: { marginLeft: 8, background: "none", border: "none", padding: 0, color: "var(--teal)", textDecoration: "underline", fontFamily: "var(--mono)", fontSize: 10, cursor: "pointer" } },
-        "Open report →")),
+        "Open report →"),
+      msg.bundle && h("button", { type: "button", onClick: () => { const src = liveSource(); if (src && src.openBundle) src.openBundle(); },
+        style: { marginLeft: 8, background: "none", border: "none", padding: 0, color: "var(--teal)", textDecoration: "underline", fontFamily: "var(--mono)", fontSize: 10, cursor: "pointer" } },
+        "Open bundle →")),
     h("span", { title: label, style: { fontSize: 9, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.05em", maxWidth: 360, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } },
       (isChart ? "Export chart" : "Export section") + (shortLabel ? " · " : ""),
       shortLabel && h("span", { style: { textTransform: "none", letterSpacing: 0 } }, shortLabel)),
@@ -337,6 +373,7 @@ function ExportBar({ scope, title, heading, reportSection, source }) {
           : "Add " + (isChart ? "just this chart" : "this whole section") + " to " + (target && target.name) + "'s report, to build a PDF of only what you choose",
       noCase ? { disabled: true, style: { padding: "3px 9px", borderRadius: 5, border: "1px dashed var(--rule)", background: "transparent", color: "var(--ink-3)", fontFamily: "var(--mono)", fontSize: 10, opacity: 0.6, cursor: "not-allowed" } }
         : (inReport ? { style: { padding: "3px 9px", borderRadius: 5, border: "1px solid var(--teal)", background: "var(--teal-bg)", color: "var(--teal)", fontFamily: "var(--mono)", fontSize: 10, cursor: busy ? "default" : "pointer", whiteSpace: "nowrap" } } : null)),
+    btn("+ Bundle", "bundle", doBundle, "Collect " + (isChart ? "just this chart" : "this whole section") + " into your PDF bundle — then export everything you collected as one PDF, or each as its own PDF, from Bundle in the top bar. No case needed."),
     cases.length > 1 && h("select", { "aria-label": "Case whose report this goes to", value: targetId || "", onChange: e => setPickedCaseId(e.target.value),
       style: { padding: "2px 6px", borderRadius: 5, border: "1px solid var(--rule)", background: "var(--surface)", color: "var(--ink-3)", fontFamily: "var(--mono)", fontSize: 9, maxWidth: 150 } },
       cases.map(c => h("option", { key: c.id, value: c.id }, c.name || "Untitled")))

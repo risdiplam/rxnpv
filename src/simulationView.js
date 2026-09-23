@@ -30,7 +30,8 @@ function SimulationView({ cases, updateCase }) {
   // Simulation panels can say where an added section went and open it.
   window.rxnpvSimBridge = { cases, updateCase,
     activeCaseId: ctx ? ctx.activeCaseId : null,
-    openReport: ctx ? ctx.openReport : null };
+    openReport: ctx ? ctx.openReport : null,
+    openBundle: ctx ? ctx.openBundle : null };
 
   React.useEffect(() => {
     if (bootedRef.current) return; // guard against any double-invoke (e.g. StrictMode-style double effects)
