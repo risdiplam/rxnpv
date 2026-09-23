@@ -502,16 +502,23 @@ function ValuationPanel({ theCase, onChange }) {
             ),
             h("div", { style: { marginTop: 10, paddingTop: 10, borderTop: "1px dashed var(--rule)" } },
               h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginBottom: 8 } }, "Optional: give each program an independent peak revenue for " + label + ", instead of scaling Base by the multiplier above"),
-              theCase.programs.filter(p => (p.revenueMode || "quick") !== "full").map(p => h(BenchField, {
+              // Stored in raw dollars, exactly like quickRevenue.peakRevenue,
+              // because that is what computeProgramValuation and the Simple
+              // Multiple path read. MillionsField shows and accepts $M and
+              // converts at the edge. This used to be a BenchField that
+              // multiplied by 1e6 on write but displayed the stored dollars
+              // next to "$M" — so the field read 1000000000 $M, and editing it
+              // again multiplied the assumption by another million (FIN-001).
+              theCase.programs.filter(p => (p.revenueMode || "quick") !== "full").map(p => h(MillionsField, {
                 key: p.id, label: (p.drugName || p.name) + " — peak revenue override",
                 value: ((p.quickRevenue || {}).scenarioOverrides || {})[key] ? p.quickRevenue.scenarioOverrides[key].peakRevenue : "",
-                onChange: v => {
+                onChange: raw => {
                   const nextPrograms = theCase.programs.map(pr => pr.id === p.id
-                    ? { ...pr, quickRevenue: { ...pr.quickRevenue, scenarioOverrides: { ...(pr.quickRevenue.scenarioOverrides || { bear: {}, bull: {} }), [key]: { peakRevenue: v ? String(Math.round(Number(v) * 1e6)) : "" } } } }
+                    ? { ...pr, quickRevenue: { ...pr.quickRevenue, scenarioOverrides: { ...(pr.quickRevenue.scenarioOverrides || { bear: {}, bull: {} }), [key]: { peakRevenue: raw } } } }
                     : pr);
                   update({ programs: nextPrograms });
                 },
-                suffix: "$M", wide: false
+                wide: false
               }))
             )
           ))
