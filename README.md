@@ -139,6 +139,7 @@ A cross-case summary: fair value against price, runway, modelled against implied
   - **Export section → PNG / PDF** saves the *whole* section at full height, even when it is taller than the window: title, inputs as set, results, every chart, tables and any open notes, plus a footer naming where it came from. The PDF is vector with selectable text.
   - **Export chart → PNG / PDF / SVG** saves just that chart, with its title. SVG is editable in design tools.
   - Either row's **+ Report** adds that section, or just that chart, to a case's report.
+  - Either row's **+ Bundle** collects it into your **PDF bundle** (no case needed). **Bundle (N)** in the top bar opens it: tick what to include, reorder, remove, preview, then **Export as one PDF** (optionally one item per page) or **Export as separate PDFs** (a folder chosen once; files numbered in bundle order).
 - **+ Report** adds a section to a case's PDF report.
   - For sections the report already builds live from the model (revenue chart, cash flow, bridge, SOTP, scenarios), it toggles them on or off instead of copying them.
   - Everything else is stored as a sanitised HTML snapshot.
