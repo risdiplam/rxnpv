@@ -252,6 +252,33 @@ function computeCaseValuation(theCase, scenario, scenarioKey, discountRateBasePc
   return { programVals, calendar, discountRateUsed: discountRate, npvResult, capResult, equity };
 }
 
+// ── The EV -> equity bridge as line items that sum to the equity value ──
+// Each item is what actually moved equity away from enterprise value in this
+// result, read from the same capResult/equity the per-share figure came from,
+// so the displayed bridge always foots. Shared by the Workspace bridge and the
+// report's. Both used to build their own list from cash and debt only, which
+// left out two things the engine does count (FIN-011): a convertible note that
+// does NOT convert stays a debt claim (capitalStructure's detailed mode
+// subtracts its face), and a modelled future raise adds its proceeds to net
+// cash. The per-share number was right; the chips did not add up to it.
+// sign: +1 adds to equity, -1 subtracts, 0 is the starting value.
+function computeEquityBridgeSteps(theCase, result) {
+  const cap = theCase.capitalStructure || { mode: "simple" };
+  const capR = result.capResult || {};
+  const steps = [
+    { key: "ev", label: "Enterprise Value", value: result.npvResult.npv, sign: 0 },
+    { key: "cash", label: "Cash", value: numOr(cap.cash, 0), sign: 1 },
+    { key: "debt", label: "Debt", value: numOr(cap.debt, 0), sign: -1 }
+  ];
+  const convFace = cap.mode === "simple" ? 0 : numOr(cap.convFace, 0);
+  if (convFace > 0 && !capR.convertsInTheMoney) steps.push({ key: "convertible", label: "Convertible notes (not converting)", value: convFace, sign: -1 });
+  if (capR._futureRaiseAmount) steps.push({ key: "raise", label: "Modelled future raise", value: capR._futureRaiseAmount, sign: 1 });
+  const eq = result.equity || {};
+  if (eq.prvValueAdded) steps.push({ key: "prv", label: "PRV (risk-adj.)", value: eq.prvValueAdded, sign: 1 });
+  if (eq.partnershipValueAdded) steps.push({ key: "partnership", label: "Partnership (upfront + milestones)", value: eq.partnershipValueAdded, sign: 1 });
+  return steps;
+}
+
 // ── Partnership economics — upfront and milestones, as a cash figure to add
 // on top of a computed equity value. Upfront is added directly (near-certain /
 // already-contracted, so not PoS-risked and not discounted — same treatment as

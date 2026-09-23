@@ -619,16 +619,10 @@ function ValuationPanel({ theCase, onChange }) {
         // to handle that safely.
         (() => {
           const baseR = scenarioResults.find(s => s.key === "base").result;
-          const cash = Number(cap.cash) || 0, debt = Number(cap.debt) || 0;
-          const prvAdded = baseR.equity.prvValueAdded || 0;
-          const partnershipAdded = baseR.equity.partnershipValueAdded || 0;
-          const steps = [
-            { label: "Enterprise Value", value: baseR.npvResult.npv, op: null },
-            { label: "Cash", value: cash, op: "+" },
-            { label: "Debt", value: debt, op: "-" },
-          ];
-          if (prvAdded) steps.push({ label: "PRV (risk-adj.)", value: prvAdded, op: "+" });
-          if (partnershipAdded) steps.push({ label: "Partnership (upfront + milestones)", value: partnershipAdded, op: "+" });
+          // Line items come from the result itself, so they always sum to the
+          // equity value shown (see computeEquityBridgeSteps).
+          const steps = computeEquityBridgeSteps(theCase, baseR)
+            .map(st => ({ label: st.label, value: st.value, op: st.sign === 0 ? null : st.sign > 0 ? "+" : "-" }));
           steps.push({ label: "Equity Value", value: baseR.equity.equityValue, op: "=" });
           return h(ExportSection, { id: "ws-bridge", title: "Enterprise Value → Per-Share bridge (Base case)", reportSection: "bridge", style: { marginTop: 16, borderTop: "1px dashed var(--rule)", paddingTop: 14 } },
             h("div", { style: { fontSize: 13, fontFamily: "var(--display)", fontWeight: 600, color: "var(--ink-1)", marginBottom: 10 } }, "Enterprise Value → Per-Share bridge (Base case)"),

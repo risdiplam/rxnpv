@@ -197,6 +197,30 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
     click(btn("Workspace")); await wait(400);
   }
 
+  // ── FIN-011 — the bridge on screen (and in the report) shows the convertible ──
+  // Detailed capital: $100M cash, $20M debt, $50M convertible at a $100
+  // conversion price against a $10 share price, so it does not convert and is
+  // a debt claim the per-share value already subtracts. The bridge must show
+  // it, or its chips do not add up to the Equity Value chip.
+  {
+    click(btn("Workspace")); await wait(400);
+    const priceLabel = [...d.querySelectorAll("span")].find(n => n.textContent.trim() === "Current price");
+    const price = priceLabel && priceLabel.parentElement.querySelector("input");
+    setVal(price, "10"); await wait(150);
+    click(btn("Detailed")); await wait(300);
+    setVal(inputsByLabel("Basic shares outstanding")[0], "10000000"); await wait(100);
+    setVal(inputsByLabel("Cash & equivalents")[0], "100"); await wait(100);
+    setVal(inputsByLabel("Debt")[0], "20"); await wait(100);
+    setVal(inputsByLabel("Convertible face value")[0], "50"); await wait(100);
+    setVal(inputsByLabel("Conversion price")[0], "100"); await wait(400);
+    const bridge = d.getElementById("ws-bridge");
+    ok(bridge && /Convertible notes \(not converting\)/.test(bridge.textContent), "FIN-011: the Workspace bridge shows the non-converting convertible");
+    [...d.querySelectorAll("button")].find(b => /Generate Report/.test(b.textContent)).click(); await wait(700);
+    ok(/- Convertible notes \(not converting\)/.test(d.body.textContent), "FIN-011: so does the report's bridge");
+    click(btn("← Back to Workspace")); await wait(400);
+    click(btn("Simple")); await wait(300);
+  }
+
   if (errors.length) { console.log(errors.slice(0, 40).join("\n")); console.log("\n" + errors.length + " FAILURE(S) across " + checks + " checks"); process.exit(1); }
   console.log("ALL AUDIT REGRESSION CHECKS PASSED — " + checks + " checks");
   process.exit(0);

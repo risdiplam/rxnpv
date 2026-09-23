@@ -66,7 +66,7 @@ const EXPORTS = [
   "SCENARIO_PRESETS", "getEffectiveScenarioPreset", "applyBasePosAdjustment",
   "computeProgramValuation", "computeCaseValuation", "computeProgramRiskWaterfall",
   "computeEffectivePoS", "computeRnDToLaunch", "resolveLaunchYearOffset",
-  "computeFullCaseMonteCarlo", "solveImpliedPoSMultiplier",
+  "computeFullCaseMonteCarlo", "solveImpliedPoSMultiplier", "computeEquityBridgeSteps",
   "computePortfolioSummary", "shrinkBinaryResponseRate", "shrinkHazardRatio",
   "BINARY_SHRINKAGE_FACTOR", "HR_SHRINKAGE_FACTOR",
   "MODALITY_OPTIONS", "getCogsBenchmark", "getErosionDefaults", "resolveErosionParams",
@@ -3792,6 +3792,50 @@ section("FIN-008: PRV contribution, worked longhand");
   const now = JSON.parse(JSON.stringify(c)); now.programs[0].launchYearOffset = "0";
   near("launch year 0: $150M x 10% undiscounted = $15,000,000",
     api.computeCaseValuation(now, base, null, 12, { enabled: false }).equity.prvValueAdded, 15000000, 0.1);
+}
+report();
+
+section("FIN-011: the EV -> equity bridge foots");
+{
+  // Detailed capital structure at a $10 price:
+  //   cash $100M, ordinary debt $20M, a $50M convertible with a $100 conversion
+  //   price (so it does NOT convert and stays a debt claim), and a modelled
+  //   $30M future raise.
+  //   net cash = 100 - 20 - 50 + 30 = +$60M, so equity = EV + $60M.
+  // The bridge's signed items must sum to exactly that. The old chip list
+  // (EV + cash - debt) summed to EV + $80M: $20M off (= -50 + 30).
+  const mk = (convPrice) => ({
+    name: "B", currentPrice: "10",
+    capitalStructure: { mode: "detailed", cash: "100000000", debt: "20000000", basicShares: "10000000",
+      opts: "", optK: "", war: "", warK: "", convFace: "50000000", convPrice },
+    futureRaise: { enabled: true, amountM: "30000000", priceOverride: "" },
+    corporateGA: { preCommercialAnnualM: "0", gaShareOfMatureSgaPct: "0" },
+    programs: [{ id: "p1", name: "Asset", currentPhase: "phase2", therapeuticArea: "Oncology", modality: "smallMolecule",
+      revenueMode: "quick", quickRevenue: { peakRevenue: "600000000", yearsToPeak: "6", profile: "median" } }]
+  });
+  const base = { label: "base", shareMultiplierPct: 100, posMultiplierPct: 100, discountRateAddPct: 0, color: "" };
+  const sum = (steps) => steps.reduce((t, st) => t + (st.sign === 0 ? st.value : st.sign * st.value), 0);
+
+  const r = api.computeCaseValuation(mk("100"), base, null, 12, { enabled: false });
+  const steps = api.computeEquityBridgeSteps(mk("100"), r);
+  near("non-converting convertible: the bridge sums to the equity value", sum(steps), r.equity.equityValue, 1e-3);
+  near("equity = EV + $60M net cash (100 - 20 - 50 + 30)", r.equity.equityValue - r.npvResult.npv, 60e6, 1e-3);
+  const conv = steps.find(st => st.key === "convertible");
+  ok("the convertible appears as its own subtracted line", conv && conv.sign === -1 && conv.value === 50e6);
+  const raise = steps.find(st => st.key === "raise");
+  ok("the modelled raise appears as its own added line", raise && raise.sign === 1 && raise.value === 30e6);
+  near("the old cash-and-debt-only list was off by exactly -$20M",
+    r.equity.equityValue - (r.npvResult.npv + 100e6 - 20e6), -20e6, 1e-3);
+
+  // $5 conversion price at a $10 share price: it converts into 50M / 5 = 10M
+  // shares and leaves net cash, so no convertible line; net cash = 100 - 20 + 30.
+  const r2 = api.computeCaseValuation(mk("5"), base, null, 12, { enabled: false });
+  const steps2 = api.computeEquityBridgeSteps(mk("5"), r2);
+  ok("a converting note is not shown as debt", !steps2.some(st => st.key === "convertible"));
+  near("converting: the bridge still sums to the equity value", sum(steps2), r2.equity.equityValue, 1e-3);
+  near("converting: equity = EV + $110M", r2.equity.equityValue - r2.npvResult.npv, 110e6, 1e-3);
+  // 10M basic + 10M from conversion + 30M / $10 = 3M from the raise = 23M.
+  near("converting: diluted shares = 10M + 10M + 3M", r2.equity.dilutedShares, 23e6, 1e-6);
 }
 report();
 

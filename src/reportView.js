@@ -293,20 +293,15 @@ function ReportView({ theCase, onBack, updateCase }) {
         // condition is whether it's been included.
         inc("bridge") && (() => {
           const baseR = scenarioResults.find(s => s.key === "base").result;
-          const prvAdded = baseR.equity.prvValueAdded || 0;
-          const partnershipAdded = baseR.equity.partnershipValueAdded || 0;
-          const cap = theCase.capitalStructure || { mode: "simple" };
-          const cash = Number(cap.cash) || 0, debt = Number(cap.debt) || 0;
-          const rows = [
-            ["Enterprise Value", fmtMoney(baseR.npvResult.npv)],
-            prvAdded > 0 ? ["+ PRV (risk-adjusted)", fmtMoney(prvAdded)] : null,
-            partnershipAdded > 0 ? ["+ Partnership (upfront + milestones)", fmtMoney(partnershipAdded)] : null,
-            ["+ Cash", fmtMoney(cash)],
-            ["- Debt", fmtMoney(debt)],
+          // Same line items as the Workspace bridge, from the result itself,
+          // so the rows always sum to the equity value (FIN-011).
+          const rows = computeEquityBridgeSteps(theCase, baseR)
+            .map(st => [(st.sign === 0 ? "" : st.sign > 0 ? "+ " : "- ") + st.label, fmtMoney(st.value)])
+            .concat([
             ["= Equity Value", fmtMoney(baseR.equity.equityValue)],
             ["÷ Diluted shares", fmtNum(baseR.equity.dilutedShares)],
             ["= Per Share", fmtShare(baseR.equity.perShare)]
-          ].filter(Boolean);
+          ]);
           return h("div", { style: cardStyle },
             h("div", { style: { fontSize: 13, fontWeight: 700, marginBottom: 10, textTransform: "uppercase", letterSpacing: "0.05em", color: rpt.ink2 } }, "Enterprise Value → Per-Share Bridge (Base Case)"),
             h("table", { style: { width: "100%", borderCollapse: "collapse", fontSize: 12 } },
