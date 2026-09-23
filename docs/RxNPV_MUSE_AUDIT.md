@@ -833,30 +833,42 @@ Do not delete Muse findings above. Update this table as you land commits.
 
 | ID | Grok verdict | Claude | Commit | Notes |
 |---|---|---|---|---|
-| FIN-001 | CONFIRMED — implement first | | | Check consumer of `scenarioOverrides.peakRevenue` so units are not inverted twice |
-| FIN-002 | CONFIRMED | | | Thread effective PoS; keep Simple Multiple on this function |
-| FIN-003 | CONFIRMED | | | Prefer 0–100 UX |
-| FIN-004 | CONFIRMED | | | Data already on the object |
-| FIN-005 | CONFIRMED | | | Clear on search + seq on load |
-| FIN-006 | CONFIRMED | | | Copy FdaLookupTool seq |
-| FIN-007 | CONFIRMED | | | Override baseline |
-| FIN-008 | Coverage gap | | | Golden longhand PRV |
-| FIN-009 | Coverage gap | | | After FIN-010 |
-| FIN-010 | CONFIRMED | | | Degenerate bound + clamp mode |
-| FIN-011 | NEEDS RUNTIME | | | Foot the bridge or fix capital |
-| FIN-012 | MIS-SCOPED | | | Split Workspace >100% vs Peak Sales 0–1 |
-| FIN-013 | CONFIRMED dead | | | Delete `fetchTrialByNctId` |
-| FIN-014 | CONFIRMED | | | `k_a` / `k_e` via `sci()` |
-| Drift: Electron item 6 | CONFIRMED | | | Mark done 2026-09-22 / 44.4.4 |
-| Drift: 14 fields | CONFIRMED 13 | | | Four doc sites |
-| Drift: Human Test Checklist | CONFIRMED stale | | | Archive or pointer-only |
-| B-001 … B-013 | Packaged / live | | | Not closable in jsdom |
+| FIN-001 | CONFIRMED — implement first | **FIXED** | `97a6934` | Consumer checked: `computeProgramValuation` and Simple Multiple read the override in raw dollars, exactly like `quickRevenue.peakRevenue`, so storage/use were always consistent and a value typed once was valued right. The defect was display: stored dollars shown beside "$M", so editing compounded (a trailing 0 stored $1e16). Now a `MillionsField`; no data migration needed. Test fails on `f49689f`. |
+| FIN-002 | CONFIRMED | **FIXED** | `d88ab6a` | Benchmark × override × scenario composition extracted to `computeEffectivePoS()`, used by DCF program valuation (hence PRV), Simple Multiple and milestones; both call sites pass the scenario. Upfront stays certain; Base with no override unchanged. Longhand: 50% vs 10% override = exactly 5×, Bear 70% = exactly 0.7×, PRV/milestone = 1.12^(T−L), stage gate 5^(j/n). 7 checks fail on `f49689f`. |
+| FIN-003 | CONFIRMED | **FIXED** | `2a0eafb` | 0–100 UX as preferred: labels "(%)", defaults 60/50/15–35, `percentSpecToFraction` at the edge (Normal SD too); engine keeps its 0–1 contract. Out-of-range rates refused with a visible message (`percentSpecError`), not clamped. On `f49689f` 60/50/25 gave $100B (all clamped to 100%); now $7.5B. |
+| FIN-004 | CONFIRMED | **FIXED** | `97997c3` | `(affected/atRisk)` in each event cell, same idiom as the summary table. Rendered test: "20.0%" with "40/200". |
+| FIN-005 | CONFIRMED | **FIXED** | `8f67b70` | `search()` clears insider result/error/loading and advances `insiderSeq`; `loadInsiderActivity` drops a superseded result. Test with stubbed SEC calls reproduces A's insiders under B on `f49689f`. |
+| FIN-006 | CONFIRMED | **FIXED** | `dec29ef` | Guard copied from `FdaLookupTool` — note its ref is named **`reqSeq`**, not `resSeq` as cited (pattern as described). Overlap is reachable because Enter bypasses the disabled button; test uses that path. |
+| FIN-007 | CONFIRMED | **FIXED** | `5734324` | Absolute implied PoS now uses `computeEffectivePoS` at a 100% multiplier. Round-trip test: re-valuing at the implied PoS reproduces the market price. |
+| FIN-008 | Coverage gap | **CONFIRMED — test added** | `d0f0bc8` | $150M × 10% / 1.12³ = **$10,676,703.72** (1.12³ = 21952/15625). My first longhand figure (10,676,774.3) was a division slip that the engine's number exposed; exact rational arithmetic confirmed the engine. No code change. |
+| FIN-009 | Coverage gap | **CONFIRMED — test added** | `5738c1c` | Degenerate at Base reproduces the deterministic Base per-share at every percentile and the mean. Held on `f49689f` too (no bug alleged). No seeded-reproducibility test: the sampler has no seed and adding one is an engine change, not coverage. |
+| FIN-010 | CONFIRMED | **FIXED — broader than stated** | `5738c1c` | Equal bounds now return the bound; mode is the case's effective **Base** preset, clamped into [low, high]. Wider than filed: the case-level Base-PoS adjustment scales Bear/Bull but left the mode at 100, so a 50% adjustment (Bear 35 / Bull 65) drew values up to ~79, past Bull — reachable from a documented control. Tests fail on `f49689f`. |
+| FIN-011 | NEEDS RUNTIME | **CONFIRMED (display) — FIXED** | `be1acf0` | Per-share was right; the chips omitted the non-converting convertible **and** a modelled future raise (a second gap, not in the audit). Both the Workspace bridge and the report's bridge now come from one `computeEquityBridgeSteps()` built from the valuation result, so they always foot. Capital engine untouched. |
+| FIN-012 | MIS-SCOPED | **SCOPED + FIXED** | `2a0eafb`, `f8a390f` | (a) Peak Sales MC share: folded into FIN-003 (>100% refused on the form). (b) Workspace Full-mode `peakShareOverridePct`: capped to [0,100] in `computeProgramRevenue`, with a high-severity red flag naming the cap (replacing, not duplicating, the above-benchmark flag). No second clamp on the Peak Sales form. |
+| FIN-013 | CONFIRMED dead | **FIXED (deleted)** | `7bc764d` | Unused and unexported elsewhere; deleted, not wired up. |
+| FIN-014 | CONFIRMED | **PARTLY REJECTED; remainder FIXED** | `7bc764d` | Field labels were already correct: `sci()`'s token table maps "Ka"/"Ke" to k<sub>a</sub>/k<sub>e</sub> (with the lower-case correction). Renaming them to `k_a` as proposed would have **broken** that, since `k_a` is not a token. The real gap was the validation message, inserted as plain text ("Ke"); it now goes through `sci()`. Test: label passes on `f49689f`, message fails there. |
+| Drift: Electron item 6 | CONFIRMED | **FIXED** | `528b2cb` | Marked done (2026-09-22, 44.4.4). |
+| Drift: 14 fields | CONFIRMED 13 | **FIXED** | `528b2cb` | 9 + 4 = 13 verified from source. Four sites corrected (build log annotated, not rewritten). New test counts fields from source and fails if README/CLAUDE.md/Feature Map disagree. |
+| Drift: Human Test Checklist | CONFIRMED stale | **FIXED** | `528b2cb` | Body replaced with a pointer to README test steps and §11 here. |
+| Drift: Findings TODO "Still open: Nothing" | Conditional | **FIXED** | this commit | "Still open" now lists the packaged-app worklist and NEW-001/NEW-002 below; the FIN items are recorded under Fixed. |
+| B-001 … B-013 | Packaged / live | **OPEN — not closable in jsdom** | — | Left for Caleb + Claude on the Mac. Nothing here claims them. |
+
+### Found during this pass (not in the Muse audit)
+
+| ID | Severity | Status | Notes |
+|---|---|---|---|
+| NEW-001 | P1 (money, documented path) | **OPEN — for Caleb's decision** | **Simple Multiple adds no PRV at all.** `computeCaseValuation` adds a risk-adjusted, discounted PRV; `computeSimpleMultipleValuation` has no PRV step, so a PRV-enabled case loses that value when switched to Napkin / Simple Multiple. Same class as the fixed "Simple Multiple dropped partnership value" bug. Not fixed because it is outside this packet; the fix is small (reuse the PRV block with the Simple Multiple program valuations) and would take a longhand test like FIN-008's. |
+| NEW-002 | P3 (edge) | **OPEN — observation** | Scenario share multipliers scale patients linearly (`scaleRevenueResult`), so a Full-mode share near the cap can exceed 100% of eligible patients under Bull (90% × 130% = 117%). FIN-012 caps the *override*, not the scenario-scaled result. Rare in practice; noted rather than fixed. |
+| NEW-003 | — | **FIXED with FIN-011** | Modelled future raise missing from both bridges (see FIN-011). |
+| NEW-004 | — | **FIXED with FIN-010** | Base-PoS adjustment pushing the MC mode outside its own range (see FIN-010). |
+
+**Test contract after this pass:** 13 suites (new `audit_regressions_test.js`, 36 checks), `math_verification.js` 1,090 checks. `npm test` and `npm run test:dev`: 13/13. Every new P1 test was run against a build of `f49689f` and confirmed to fail there.
 
 ### Release go / no-go
 
-- Static + P1 code: **NO-GO** until FIN-001–006 are fixed and tested.
-- Product IPO-tomorrow bar: **NO-GO** until that plus B-001, B-002, B-007, B-008 on a Mac.
-- Vanilla DCF path: suite-green on `f49689f`; do not confuse that with release-ready.
+- Static + P1 code: **all six P1s FIXED and tested** (`97a6934` … `dec29ef`). One newly found P1-class item, **NEW-001, is open** pending Caleb's call.
+- Product release bar: **still NO-GO.** B-001 (offline packaged launch), B-002 (PNG/PDF export), B-007 (report pin/reorder/retheme) and B-008 (resize/quit/reopen) have not been re-run on a Mac against this tree. Parts of B-002 and B-007 were exercised in the packaged app during the export work just before this audit (tracker, Phases 28–29), but none of the four has been re-run since these fixes, and jsdom cannot close them.
+- Vanilla DCF path: still green; do not confuse that with release-ready.
 
 ---
 
