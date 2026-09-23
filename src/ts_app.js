@@ -1563,7 +1563,9 @@ function renderPeakSalesTab(content) {
     const aEl = document.getElementById(prefix + 'A'), bEl = document.getElementById(prefix + 'B'), cEl = document.getElementById(prefix + 'C');
     const a = parseFloat(aEl.value);
     if (!isFinite(a)) return;
-    const setIfBlank = (el, v) => { if (el.value.trim() === '') el.value = v; };
+    // The three rate fields are percents, so a seeded high end is capped at 100.
+    const isRate = prefix === 'dx' || prefix === 'tx' || prefix === 'share';
+    const setIfBlank = (el, v) => { if (el.value.trim() === '') el.value = isRate ? String(Math.min(100, Number(v))) : v; };
     if (type === 'uniform') setIfBlank(bEl, (a * 1.5).toPrecision(4));
     else if (type === 'normal') setIfBlank(bEl, (a * 0.2).toPrecision(4));
     else if (type === 'triangular') { setIfBlank(bEl, (a * 1.2).toPrecision(4)); setIfBlank(cEl, (a * 1.5).toPrecision(4)); }
@@ -1583,9 +1585,10 @@ function renderPeakSalesTab(content) {
     el('p', { class: 'subtle' }, 'Each input below can be a fixed value or a distribution. A: point value / low / mean. B: high / SD / mode. C: high (triangular only).'),
     note('Which distribution type should I pick?', '"Fixed" is for anything you actually know or want to hold constant — a stated price, a fixed population count. "Uniform" (low/high) says any value in that range is equally plausible — a reasonable default when you have a range but no real opinion on where within it the true value sits, like peak market share here. "Normal" (mean/SD) is for a value you have a real point estimate for plus a sense of how uncertain it is — most values cluster near the mean, symmetric in both directions. "Triangular" (low/mode/high) is for when you have a most-likely case plus a plausible low and high, but the low and high aren’t equally far from the most-likely value — common when a range is asymmetric (e.g. "probably $2B, could be as low as $1B, but a real blowout could hit $5B").'),
     field('Addressable population', distFields('pop', { type: 'point', a: 1000000, b: '', c: '' })),
-    field('Diagnosis rate', distFields('dx', { type: 'point', a: 0.6, b: '', c: '' })),
-    field('Treatment rate', distFields('tx', { type: 'point', a: 0.5, b: '', c: '' })),
-    field('Peak market share', distFields('share', { type: 'uniform', a: 0.15, b: 0.35, c: '' })),
+    // Rates are whole percents, like everywhere else in the app (FIN-003).
+    field('Diagnosis rate (%)', distFields('dx', { type: 'point', a: 60, b: '', c: '' })),
+    field('Treatment rate (%)', distFields('tx', { type: 'point', a: 50, b: '', c: '' })),
+    field('Peak market share (%)', distFields('share', { type: 'uniform', a: 15, b: 35, c: '' })),
     field('Annual price (USD)', distFields('price', { type: 'point', a: 100000, b: '', c: '' })),
     field('Iterations', numberInput('peakIterations', 10000, { step: '1000' })),
     el('button', { class: 'runbtn', onclick: runPeakSales }, 'Run simulation'),
@@ -1609,11 +1612,18 @@ function runPeakSales() {
   // Same rationale as runTrialOutcome: sampleInput() throws on an unknown
   // distribution type, which is correct, but an unmounted tab yields "".
   if (!val('popType')) return;
+  const resultsDiv0 = document.getElementById('peakSalesResults');
+  const rates = [['dx', 'Diagnosis rate'], ['tx', 'Treatment rate'], ['share', 'Peak market share']];
+  const rateError = rates.map(([p, label]) => percentSpecError(readDistInput(p), label)).find(Boolean);
+  if (rateError) {
+    if (resultsDiv0) { resultsDiv0.innerHTML = ''; resultsDiv0.appendChild(el('div', { class: 'error' }, rateError + ' Rates here are whole percents — 60 means 60%.')); }
+    return;
+  }
   const inputs = {
     addressablePopulation: readDistInput('pop'),
-    diagnosisRate: readDistInput('dx'),
-    treatmentRate: readDistInput('tx'),
-    peakShare: readDistInput('share'),
+    diagnosisRate: percentSpecToFraction(readDistInput('dx')),
+    treatmentRate: percentSpecToFraction(readDistInput('tx')),
+    peakShare: percentSpecToFraction(readDistInput('share')),
     annualPriceUSD: readDistInput('price')
   };
   // Math.max(1000, NaN) is NaN, not 1000 — a NaN operand poisons Math.max in

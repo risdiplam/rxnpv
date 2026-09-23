@@ -72,7 +72,7 @@ const EXPORTS = [
   "MODALITY_OPTIONS", "getCogsBenchmark", "getErosionDefaults", "resolveErosionParams",
   "COGS_BENCHMARKS", "EXCLUSIVITY_BENCHMARKS",
   "samplePrior", "priorQuantile", "simulateTimeToEventReplicate", "runAssuranceSimulation",
-  "runPeakSalesSimulation", "driverSensitivity",
+  "runPeakSalesSimulation", "driverSensitivity", "percentSpecToFraction", "percentSpecError",
   "niceTicks", "formatTick", "renderLineChart", "renderHistogram", "renderForestPlot",
   "treasuryMethodShares", "ifConvertedShares", "computeEquityValue", "applyFutureRaise",
   "classifyCatalystFunding", "monthsUntil", "parseCatalystDate", "RUNWAY_CUSHION_MONTHS_DEFAULT",
@@ -3650,6 +3650,37 @@ section("FIN-002: partnership milestones use the program's effective PoS");
   const plain = api.computePartnershipContribution(mkCase(prog("", launchM)), 0.12, base);
   near("with no override at Base, the milestone uses the benchmark P(launch)",
     plain, 100e6 * api.computePoSWeighting(prog("", launchM)).posToLaunch / Math.pow(1.12, T), 1e-3);
+}
+report();
+
+section("FIN-003: Peak Sales rates are entered as whole percents");
+{
+  // The form takes 60 for 60%; the engine works in fractions. Every parameter
+  // of a rate's spec divides by 100 — a Normal's SD too, being in the mean's units.
+  near("point 60 -> 0.60", api.percentSpecToFraction({ type: "point", value: 60 }).value, 0.60, 1e-12);
+  const u = api.percentSpecToFraction({ type: "uniform", low: 15, high: 35 });
+  near("uniform 15-35 -> low 0.15", u.low, 0.15, 1e-12);
+  near("uniform 15-35 -> high 0.35", u.high, 0.35, 1e-12);
+  const nrm = api.percentSpecToFraction({ type: "normal", mean: 40, sd: 5 });
+  near("normal SD scales with its mean (5 -> 0.05)", nrm.sd, 0.05, 1e-12);
+  ok("the spec type is kept", nrm.type === "normal");
+  // A rate outside 0-100 is refused, not clamped.
+  ok("60% is accepted", api.percentSpecError({ type: "point", value: 60 }, "Share") === null);
+  ok("150% share is refused with a message", /between 0 and 100/.test(api.percentSpecError({ type: "point", value: 150 }, "Share") || ""));
+  ok("a negative rate is refused", !!api.percentSpecError({ type: "uniform", low: -5, high: 20 }, "Share"));
+  ok("a blank (NaN) rate is refused", !!api.percentSpecError({ type: "point", value: NaN }, "Share"));
+  ok("a triangular high above 100 is refused", !!api.percentSpecError({ type: "triangular", low: 50, mode: 80, high: 120 }, "Share"));
+  ok("a negative Normal SD is refused", !!api.percentSpecError({ type: "normal", mean: 50, sd: -1 }, "Share"));
+  // End to end with fixed inputs: 1,000,000 people x 60% diagnosed x 50%
+  // treated x 25% share x $100,000 = 1e6 x 0.6 x 0.5 x 0.25 x 1e5 = $7.5e9.
+  const r = api.runPeakSalesSimulation({
+    addressablePopulation: { type: "point", value: 1e6 },
+    diagnosisRate: api.percentSpecToFraction({ type: "point", value: 60 }),
+    treatmentRate: api.percentSpecToFraction({ type: "point", value: 50 }),
+    peakShare: api.percentSpecToFraction({ type: "point", value: 25 }),
+    annualPriceUSD: { type: "point", value: 1e5 }
+  }, 1000);
+  near("60/50/25 percent inputs give $7.5B peak sales, not a clamped 100%", r.summary.p50, 7.5e9, 1e-3);
 }
 report();
 

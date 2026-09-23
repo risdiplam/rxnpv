@@ -63,6 +63,35 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
     ok(bear() === "", "FIN-001: clearing the field clears the override");
   }
 
+  // ── FIN-003 — Peak Sales rates: labelled %, 60 reaches the engine as 0.60 ──
+  {
+    click(btn("Simulation")); await wait(700);
+    click(btn("Peak Sales")); await wait(500);
+    const labelOf = id => { const f = d.getElementById(id); const box = f && f.closest(".field"); return box ? box.textContent : ""; };
+    ok(/Diagnosis rate \(%\)/.test(d.getElementById("ts-root").textContent), "FIN-003: the diagnosis rate label carries a unit");
+    ok(/Peak market share \(%\)/.test(d.getElementById("ts-root").textContent), "FIN-003: the peak share label carries a unit");
+    ok(d.getElementById("dxA").value === "60", "FIN-003: the diagnosis default reads 60 (percent), not 0.6 (got " + d.getElementById("dxA").value + ")");
+    // Spy on what the form hands the engine.
+    let seen = null;
+    const real = w.runPeakSalesSimulation;
+    w.runPeakSalesSimulation = (inputs, n) => { seen = inputs; return real(inputs, n); };
+    const setNum = (id, v) => { d.getElementById(id).value = v; };
+    const sel = d.getElementById("shareType"); sel.value = "point"; sel.dispatchEvent(new w.Event("change", { bubbles: true }));
+    setNum("dxA", "60"); setNum("txA", "50"); setNum("shareA", "25");
+    click(btn("Run simulation")); await wait(600);
+    ok(seen && Math.abs(seen.diagnosisRate.value - 0.60) < 1e-12, "FIN-003: typing 60 hands the engine 0.60 (got " + (seen && seen.diagnosisRate.value) + ")");
+    ok(seen && Math.abs(seen.peakShare.value - 0.25) < 1e-12, "FIN-003: typing 25 share hands the engine 0.25");
+    // A share above 100% is refused on screen, and the engine is not run.
+    seen = null;
+    setNum("shareA", "150");
+    click(btn("Run simulation")); await wait(400);
+    const res = d.getElementById("peakSalesResults").textContent;
+    ok(seen === null, "FIN-003/FIN-012: a 150% share does not run the simulation");
+    ok(/between 0 and 100%/.test(res), "FIN-003/FIN-012: it shows why (" + res.slice(0, 80) + ")");
+    w.runPeakSalesSimulation = real;
+    click(btn("Workspace")); await wait(400);
+  }
+
   if (errors.length) { console.log(errors.slice(0, 40).join("\n")); console.log("\n" + errors.length + " FAILURE(S) across " + checks + " checks"); process.exit(1); }
   console.log("ALL AUDIT REGRESSION CHECKS PASSED — " + checks + " checks");
   process.exit(0);

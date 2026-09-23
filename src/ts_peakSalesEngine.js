@@ -73,6 +73,34 @@ function driverSensitivity(simResult) {
   }).sort((a, b) => Math.abs(b.correlation) - Math.abs(a.correlation));
 }
 
+// ── Percent inputs ───────────────────────────────────────────────────────
+// The rest of the app takes rates as whole percents (60 = 60%). This engine
+// works in fractions, so the form converts at the edge: every parameter of a
+// rate's sampling spec is divided by 100. That includes a Normal's SD, which is
+// in the same units as its mean. The form used to take fractions directly with
+// no unit label, and tsClamp01 silently turned a typed 60 into 100% (FIN-003).
+const PEAK_SALES_RATE_PARAMS = ["value", "low", "high", "mean", "sd", "mode"];
+function percentSpecToFraction(spec) {
+  const out = { ...spec };
+  PEAK_SALES_RATE_PARAMS.forEach(k => { if (typeof out[k] === "number") out[k] = out[k] / 100; });
+  return out;
+}
+
+// A rate outside 0–100% is a typing mistake, never an assumption — a share
+// above 100% cannot exist. Refused with a message rather than clamped, which
+// would hide it. (An SD is a spread, not a rate, so only its sign is checked;
+// a Normal's sampled tail past 0% or 100% is still clamped per draw, which is
+// how a bounded quantity with a Normal belief has to be sampled.)
+function percentSpecError(spec, label) {
+  const bad = (v) => !isFinite(v) || v < 0 || v > 100;
+  const t = spec.type;
+  if (t === "point" && bad(spec.value)) return label + " must be between 0 and 100%.";
+  if (t === "uniform" && (bad(spec.low) || bad(spec.high))) return label + ": low and high must both be between 0 and 100%.";
+  if (t === "normal" && (bad(spec.mean) || !isFinite(spec.sd) || spec.sd < 0)) return label + ": the mean must be between 0 and 100% and the SD 0 or more.";
+  if (t === "triangular" && (bad(spec.low) || bad(spec.mode) || bad(spec.high))) return label + ": low, most likely and high must all be between 0 and 100%.";
+  return null;
+}
+
 // ── Helpers ──────────────────────────────────────────────────────────────
 function tsClamp01(x) { return Math.min(1, Math.max(0, x)); }
 
@@ -97,5 +125,5 @@ function pearsonCorrelation(x, y) {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { sampleInput, sampleTriangular, runPeakSalesSimulation, driverSensitivity, percentile, pearsonCorrelation };
+  module.exports = { percentSpecToFraction, percentSpecError, sampleInput, sampleTriangular, runPeakSalesSimulation, driverSensitivity, percentile, pearsonCorrelation };
 }
