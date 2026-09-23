@@ -49,6 +49,19 @@ function getEffectiveScenarioPreset(theCase, key) {
   return applyBasePosAdjustment(resolved, theCase.basePosAdjustmentPct);
 }
 
+// A scenario share multiplier scales patients linearly, so a Full-mode share
+// near the top multiplied by Bull's 130% could claim more than every eligible
+// patient (90% x 1.3 = 117%). FIN-012 caps a typed override at 100%; this caps
+// the scenario-scaled share the same way, by limiting the multiplier to
+// 100 / share. Quick mode has no share (peakShare is null) — there a multiplier
+// scales a revenue figure, which has no such ceiling, so it passes unchanged
+// (NEW-002, September 2026 audit pass).
+function cappedShareMultiplier(revenueResult, multiplier) {
+  const share = revenueResult && typeof revenueResult.peakShare === "number" ? revenueResult.peakShare : null;
+  if (share == null || share <= 0) return multiplier;
+  return Math.min(multiplier, 100 / share);
+}
+
 // Exact rescale — patient counts (and thus revenue, since price is unchanged) scale
 // linearly with market share by construction, so this is not an approximation.
 function scaleRevenueResult(revenueResult, multiplier) {
@@ -142,7 +155,7 @@ function computeProgramValuation(program, scenario, scenarioKey) {
     scaledRevenue = getProgramRevenueResult(overriddenProgram, 25); // override IS the absolute value — no % scaling on top
   } else {
     const baseRevenue = getProgramRevenueResult(program, 25);
-    scaledRevenue = scaleRevenueResult(baseRevenue, scenario.shareMultiplierPct / 100);
+    scaledRevenue = scaleRevenueResult(baseRevenue, cappedShareMultiplier(baseRevenue, scenario.shareMultiplierPct / 100));
   }
 
   const cs = program.costStructure || { cogsPct: "", reps: {}, marketingPctOfPeak: "" };
@@ -451,7 +464,8 @@ function computeSimpleMultipleValuation(theCase, scenario, scenarioKey, multiple
       const overriddenProgram = { ...p, quickRevenue: { ...p.quickRevenue, peakRevenue: qOverride.peakRevenue } };
       peakRevenue = getProgramRevenueResult(overriddenProgram, 25).peakTotalRevenue;
     } else {
-      peakRevenue = getProgramRevenueResult(p, 25).peakTotalRevenue * (scenario.shareMultiplierPct / 100);
+      const baseRev = getProgramRevenueResult(p, 25);
+      peakRevenue = baseRev.peakTotalRevenue * cappedShareMultiplier(baseRev, scenario.shareMultiplierPct / 100);
     }
 
     const yearsToPeakFromLaunch = (p.revenueMode || "quick") === "full"

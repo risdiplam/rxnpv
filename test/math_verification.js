@@ -3897,6 +3897,41 @@ section("NEW-001: Simple Multiple includes the PRV");
 }
 report();
 
+section("NEW-002: a scenario share multiplier cannot push share past 100%");
+{
+  // Scenario share multipliers scale patients linearly. With a 90% share,
+  // Bull's 130% would mean 117% of eligible patients; capped, the most it can
+  // be is 100%, so Bull/Base revenue = 100/90 = 1.1111..., not 1.3.
+  // With a 50% share, 50% x 1.3 = 65% is possible, so the ratio stays 1.3.
+  // Quick mode has no share and scales revenue by the full 1.3.
+  const full = (share) => ({ id: "p1", name: "Asset", currentPhase: "phase2", therapeuticArea: "Oncology", modality: "smallMolecule",
+    revenueMode: "full", revenueBuild: {
+      population: { mode: "prevalence", prevalence: "100000", diagnosisRatePct: "100", treatmentRatePct: "100", eligiblePct: "100" },
+      adherencePct: "80", marketShare: { numDrugs: 2, orderOfEntry: 1, peakShareOverridePct: share },
+      launchCurve: { yearsToPeak: 6, profile: "median" },
+      pricing: { usAnnualPrice: "10000", usAnnualGrowthPct: "0", includeExUS: false },
+      exclusivity: { yearsToLOE: "13", modality: "smallMolecule", volumeRetainedPct: "", priceDeclinePct: "" } } });
+  const quick = { id: "p1", name: "Asset", currentPhase: "phase2", therapeuticArea: "Oncology", modality: "smallMolecule",
+    revenueMode: "quick", quickRevenue: { peakRevenue: "500000000", yearsToPeak: "6", profile: "median" } };
+  const base = { label: "base", shareMultiplierPct: 100, posMultiplierPct: 100, discountRateAddPct: 0, color: "" };
+  const bull = { label: "bull", shareMultiplierPct: 130, posMultiplierPct: 100, discountRateAddPct: 0, color: "" };
+  const ratio = (prog) => api.computeProgramValuation(prog, bull, null).peakRevenue / api.computeProgramValuation(prog, base, null).peakRevenue;
+  near("DCF: a 90% share under Bull scales by 100/90, not 1.3", ratio(full("90")), 100 / 90, 1e-3);
+  near("DCF: a 50% share under Bull still scales by 1.3", ratio(full("50")), 1.3, 1e-3);
+  near("DCF: Quick mode scales by the full 1.3", ratio(quick), 1.3, 1e-9);
+  const mk = (prog) => ({ name: "S", currentPrice: "10", capitalStructure: { mode: "simple", dilutedSharesSimple: "10000000" },
+    corporateGA: { preCommercialAnnualM: "0", gaShareOfMatureSgaPct: "0" }, programs: [prog] });
+  const smRatio = (prog) => api.computeSimpleMultipleValuation(mk(prog), bull, null, 3, 12).programVals[0].peakRevenue
+    / api.computeSimpleMultipleValuation(mk(prog), base, null, 3, 12).programVals[0].peakRevenue;
+  near("Simple Multiple: a 90% share under Bull scales by 100/90", smRatio(full("90")), 100 / 90, 1e-3);
+  near("Simple Multiple: a 50% share under Bull scales by 1.3", smRatio(full("50")), 1.3, 1e-3);
+  // Bear (a multiplier below 1) is never capped.
+  const bear = { label: "bear", shareMultiplierPct: 70, posMultiplierPct: 100, discountRateAddPct: 0, color: "" };
+  near("Bear scales a 90% share by the full 0.7",
+    api.computeProgramValuation(full("90"), bear, null).peakRevenue / api.computeProgramValuation(full("90"), base, null).peakRevenue, 0.7, 1e-3);
+}
+report();
+
 // ════════════════════════════════════════════════════════════════════════════
 console.log("\n" + "═".repeat(64));
 if (fail === 0) {
