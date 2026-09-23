@@ -174,6 +174,29 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
     click(btn("Workspace")); await wait(400);
   }
 
+  // ── FIN-006 — Exclusivity / LOE: a slow earlier lookup cannot overwrite a newer one ──
+  // The Look up button is disabled while loading, but Enter in the field runs
+  // a new lookup regardless — the realistic way two requests overlap. Eliquis
+  // is looked up first and its response is made to land LAST.
+  {
+    const saved = w.fetchExclusivity;
+    const pending = {};
+    w.fetchExclusivity = (name) => new Promise(res => { pending[name] = () => res({ ok: false, error: "Orange Book result for " + name }); });
+    click(btn("Tools")); await wait(400); click(btn("Commercial")); await wait(300); click(btn("Exclusivity / LOE")); await wait(400);
+    const input = d.querySelector('input[placeholder^="Brand name"]');
+    const enter = () => input.dispatchEvent(new w.KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    setVal(input, "Eliquis"); await wait(100); enter(); await wait(100);
+    setVal(input, "Jardiance"); await wait(100); enter(); await wait(100);
+    ok(!!pending.Eliquis && !!pending.Jardiance, "FIN-006: two overlapping lookups were started");
+    pending.Jardiance(); await wait(200);
+    pending.Eliquis(); await wait(300);
+    const text = d.body.textContent;
+    ok(/Orange Book result for Jardiance/.test(text), "FIN-006: the newer lookup (Jardiance) is what remains on screen");
+    ok(!/Orange Book result for Eliquis/.test(text), "FIN-006: the older response, landing last, is dropped");
+    w.fetchExclusivity = saved;
+    click(btn("Workspace")); await wait(400);
+  }
+
   if (errors.length) { console.log(errors.slice(0, 40).join("\n")); console.log("\n" + errors.length + " FAILURE(S) across " + checks + " checks"); process.exit(1); }
   console.log("ALL AUDIT REGRESSION CHECKS PASSED — " + checks + " checks");
   process.exit(0);

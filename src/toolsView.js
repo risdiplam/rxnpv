@@ -978,12 +978,21 @@ function ExclusivityTool({ cases, updateCase }) {
   const [res, setRes] = React.useState(null);
   const [loading, setLoading] = React.useState(false);
   const exRef = React.useRef(null);
+  // Same guard as FdaLookupTool's reqSeq. Without it, looking up one brand and
+  // then another let whichever response landed last win, so one drug's patent
+  // table could paint under another's name — and its dates feed the LOE year
+  // (FIN-006).
+  const reqSeq = React.useRef(0);
 
   const run = async () => {
     if (!name.trim()) return;
+    const myReq = ++reqSeq.current;
     setLoading(true); setRes(null);
-    try { setRes(await fetchExclusivity(name)); }
-    catch (e) { setRes({ ok: false, error: e.message }); }
+    let r;
+    try { r = await fetchExclusivity(name); }
+    catch (e) { r = { ok: false, error: e.message }; }
+    if (myReq !== reqSeq.current) return; // a newer lookup has already started
+    setRes(r);
     setLoading(false);
   };
   const fmtDate = d => d ? d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") : "—";
