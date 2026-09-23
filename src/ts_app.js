@@ -1850,8 +1850,11 @@ function runPkpd() {
   });
   if (bad && resultsEl) {
     resultsEl.innerHTML = '';
+    // Through sci() like the field labels, so "Ke" reads as k-sub-e here too
+    // rather than as a capital-K equilibrium constant (FIN-014). The labels
+    // stay "Ka"/"Ke": those are sci()'s tokens, and "k_a" is not.
     resultsEl.appendChild(el('p', { class: 'error' },
-      `Check the inputs — ${bad.label} must be a ${bad.positive ? 'number greater than zero' : 'number of zero or more'}.`));
+      sci(`Check the inputs — ${bad.label} must be a ${bad.positive ? 'number greater than zero' : 'number of zero or more'}.`)));
     return;
   }
 

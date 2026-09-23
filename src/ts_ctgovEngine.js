@@ -115,14 +115,6 @@ function summarizeStudiesResponse(data, queryMeta) {
   };
 }
 
-// ── Single-trial lookup, for pulling a specific comparator's design details ─
-async function fetchTrialByNctId(nctId) {
-  if (!FETCH_FN) throw new Error('No fetch available in this environment');
-  const res = await fetch(`${TS_CTGOV_BASE}/${encodeURIComponent(nctId)}?format=json`);
-  if (!res.ok) throw new Error(`ClinicalTrials.gov API error: ${res.status} ${res.statusText}`);
-  return res.json();
-}
-
 // ── Helpers ──────────────────────────────────────────────────────────────
 function monthsBetween(startStr, endStr) {
   const start = parsePartialDate(startStr);
@@ -146,7 +138,7 @@ function median(arr) {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { fetchHistoricalComps, fetchTrialByNctId, parseHistoricalStudy, summarizeStudiesResponse, monthsBetween, median, TS_CTGOV_BASE, extractAnalogEffects, fetchAnalogEffects, tsClassifyEffectParam, positionInAnalogs };
+  module.exports = { fetchHistoricalComps, parseHistoricalStudy, summarizeStudiesResponse, monthsBetween, median, TS_CTGOV_BASE, extractAnalogEffects, fetchAnalogEffects, tsClassifyEffectParam, positionInAnalogs };
 }
 
 // ════════════════════════════════════════════════════════════════════════════

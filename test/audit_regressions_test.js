@@ -221,6 +221,24 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
     click(btn("Simple")); await wait(300);
   }
 
+  // ── FIN-014 — PK/PD rate constants render as k-sub-a / k-sub-e everywhere ──
+  // The field labels already did (sci() maps the tokens "Ka"/"Ke" to lower-case
+  // k with a subscript), so that half of FIN-014 was a false positive, locked
+  // in here. The validation message did not go through sci().
+  {
+    click(btn("Simulation")); await wait(700);
+    click(btn("PK/PD")); await wait(500);
+    const kaLabel = d.getElementById("ka").closest("label").querySelector("span");
+    ok(kaLabel && /^ka/.test(kaLabel.textContent) && kaLabel.querySelector("sub") && kaLabel.querySelector("sub").textContent === "a",
+      "FIN-014: the absorption field reads k with subscript a (" + (kaLabel && kaLabel.innerHTML.slice(0, 40)) + ")");
+    d.getElementById("ke").value = "";
+    click([...d.querySelectorAll("#ts-root .runbtn")][0]); await wait(400);
+    const err = d.querySelector("#pkpdResults .error");
+    ok(err && /ke \(elimination rate\)/.test(err.textContent) && [...err.querySelectorAll("sub")].some(n => n.textContent === "e"),
+      "FIN-014: the validation message reads k with subscript e, not a capital Ke (" + (err && err.innerHTML.slice(0, 80)) + ")");
+    click(btn("Workspace")); await wait(400);
+  }
+
   if (errors.length) { console.log(errors.slice(0, 40).join("\n")); console.log("\n" + errors.length + " FAILURE(S) across " + checks + " checks"); process.exit(1); }
   console.log("ALL AUDIT REGRESSION CHECKS PASSED — " + checks + " checks");
   process.exit(0);
