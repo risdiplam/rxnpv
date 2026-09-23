@@ -65,6 +65,8 @@ const EXPORTS = [
   "POS_MODIFIERS", "POS_REGULATORY", "POS_REGULATORY_MODIFIERS",
   "SCENARIO_PRESETS", "getEffectiveScenarioPreset", "applyBasePosAdjustment",
   "computeProgramValuation", "computeCaseValuation", "computeProgramRiskWaterfall",
+  "computeEffectivePoS", "computeRnDToLaunch", "resolveLaunchYearOffset",
+  "computeFullCaseMonteCarlo", "solveImpliedPoSMultiplier",
   "computePortfolioSummary", "shrinkBinaryResponseRate", "shrinkHazardRatio",
   "BINARY_SHRINKAGE_FACTOR", "HR_SHRINKAGE_FACTOR",
   "MODALITY_OPTIONS", "getCogsBenchmark", "getErosionDefaults", "resolveErosionParams",
@@ -3583,6 +3585,71 @@ section("Actual versus modelled revenue — a partial year is not a full one");
     api.actualVsModelSeries([], [{ year: 2025, quarters: 4, revenueUsd: 1 }], 2025).modelled.length === 0);
   ok("a missing Year 0 anchor yields empty series", api.actualVsModelSeries(cal, [], "").modelled.length === 0);
   near("the calendar mapping is a plain offset", api.modelYearForCalendar(2028, 2025), 3, 0);
+}
+report();
+
+section("FIN-002: partnership milestones use the program's effective PoS");
+{
+  // A milestone paid at approval is worth  face × P(launch) ÷ (1+r)^T,  where
+  // T is the R&D timeline to launch. So with everything else fixed:
+  //   · a 50% PoS override vs a 10% one gives exactly 0.50/0.10 = 5× the value;
+  //   · a Bear PoS multiplier of 70% on a 50% override gives 0.35/0.50 = 0.7×;
+  //   · $100M × 0.35 ÷ 1.12^T in absolute terms.
+  // On f49689f milestones re-read the raw benchmark, so every ratio was 1.
+  const prog = (overridePct, milestones, extra) => Object.assign({
+    id: "p1", name: "Asset", currentPhase: "phase2", therapeuticArea: "Oncology", modality: "smallMolecule",
+    revenueMode: "quick", quickRevenue: { peakRevenue: "500000000", yearsToPeak: "6", profile: "median" },
+    posOverridePct: overridePct,
+    partnership: { enabled: true, upfrontM: "0", milestones }
+  }, extra || {});
+  const mkCase = (p) => ({
+    name: "T", currentPrice: "10",
+    capitalStructure: { mode: "simple", dilutedSharesSimple: "10000000", cash: "0", debt: "0" },
+    corporateGA: { preCommercialAnnualM: "0", gaShareOfMatureSgaPct: "0" }, programs: [p]
+  });
+  const base = { label: "base", shareMultiplierPct: 100, posMultiplierPct: 100, discountRateAddPct: 0, color: "" };
+  const bear = { label: "bear", shareMultiplierPct: 100, posMultiplierPct: 70, discountRateAddPct: 0, color: "" };
+  const launchM = [{ label: "Approval", gate: "launch", valueM: "100" }];
+  const T = api.computeRnDToLaunch(prog("50", launchM)).totalYears;
+
+  const m50 = api.computePartnershipContribution(mkCase(prog("50", launchM)), 0.12, base);
+  const m10 = api.computePartnershipContribution(mkCase(prog("10", launchM)), 0.12, base);
+  near("a 50% override is worth exactly 5x a 10% override", m50 / m10, 5, 1e-9);
+  near("absolute: $100M x 0.50 / 1.12^T", m50, 100e6 * 0.50 / Math.pow(1.12, T), 1e-3);
+
+  const mBear = api.computePartnershipContribution(mkCase(prog("50", launchM)), 0.12, bear);
+  near("a Bear 70% PoS multiplier scales the milestone by exactly 0.7", mBear / m50, 0.7, 1e-9);
+  near("absolute Bear: $100M x 0.35 / 1.12^T", mBear, 100e6 * 0.35 / Math.pow(1.12, T), 1e-3);
+
+  // PRV and a launch milestone of equal face on one program: both are
+  // face × the SAME effective P(launch), discounted from launch — the PRV from
+  // the program's launch year L, the milestone from T. So
+  //   PRV / milestone = 1.12^(T − L)   exactly, and PRV = $150M × 0.35 / 1.12^L.
+  const both = prog("50", [{ label: "Approval", gate: "launch", valueM: "150" }], { launchYearOffset: "5", prv: { enabled: true, valueM: "150" } });
+  const cv = api.computeCaseValuation(mkCase(both), bear, null, 12, { enabled: false });
+  near("PRV = $150M x 0.35 / 1.12^5", cv.equity.prvValueAdded, 150e6 * 0.35 / Math.pow(1.12, 5), 1e-3);
+  near("PRV and milestone share one effective PoS: ratio is 1.12^(T-5)",
+    cv.equity.prvValueAdded / cv.equity.partnershipValueAdded, Math.pow(1.12, T - 5), 1e-9);
+
+  // Simple Multiple calls the same function and must pass its scenario too.
+  const sm = api.computeSimpleMultipleValuation(mkCase(prog("50", launchM)), bear, null, 3, 12);
+  near("Simple Multiple: milestone = $100M x 0.35 / 1.12^T", sm.equity.partnershipValueAdded, 100e6 * 0.35 / Math.pow(1.12, T), 1e-3);
+
+  // A stage gate reads the rebuilt stage path. The override factor f is spread
+  // evenly across the n stage transitions (k = f^(1/n)), so the probability of
+  // REACHING stage j scales by k^j, and 50% vs 10% differs by 5^(j/n).
+  const stages = api.computePoSWeighting(prog("50", launchM)).stages;
+  const j = stages.findIndex(st => st.key === "regulatory");
+  const regM = [{ label: "Filing", gate: "regulatory", valueM: "100" }];
+  const r50 = api.computePartnershipContribution(mkCase(prog("50", regM)), 0.12, base);
+  const r10 = api.computePartnershipContribution(mkCase(prog("10", regM)), 0.12, base);
+  ok("the fixture has a regulatory stage after the current one", j > 0);
+  near("a stage-gate milestone scales by 5^(j/n) between 50% and 10% overrides", r50 / r10, Math.pow(5, j / stages.length), 1e-9);
+
+  // No override, Base scenario: unchanged from before (benchmark odds).
+  const plain = api.computePartnershipContribution(mkCase(prog("", launchM)), 0.12, base);
+  near("with no override at Base, the milestone uses the benchmark P(launch)",
+    plain, 100e6 * api.computePoSWeighting(prog("", launchM)).posToLaunch / Math.pow(1.12, T), 1e-3);
 }
 report();
 

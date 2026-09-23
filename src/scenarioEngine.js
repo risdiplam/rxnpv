@@ -69,6 +69,62 @@ function scaleRevenueResult(revenueResult, multiplier) {
 
 function clamp01(v) { return Math.max(0, Math.min(1, v)); }
 
+// ── Effective probability of success for one program under one scenario ──
+// The benchmark PoS, the per-program override and the scenario multiplier,
+// composed exactly once. Everything that risk-adjusts by a program's odds reads
+// this: the DCF program valuation, Simple Multiple, the PRV (through
+// programVals) and partnership milestones. Milestones used to call
+// computePoSWeighting() fresh and got the raw benchmark, so a Bear PoS haircut
+// or a 50%-vs-10% override moved every part of the case except the milestone
+// value (FIN-002). Returns the launch probability and the rebuilt stage path.
+function computeEffectivePoS(program, scenario) {
+  const posBase = computePoSWeighting(program);
+  // Optional per-program override: lets you say "I think THIS drug's overall
+  // odds are X%, not the area/phase benchmark's Y%" — the one major benchmark
+  // in the app that wasn't yet editable at the drug level. Composes with the
+  // scenario multiplier rather than replacing it: Bear/Bull still scale
+  // relative to whatever the effective Base assumption is (override or not),
+  // preserving the existing 70%/100%/130% relationship on top of your own view.
+  const posOverridePct = program.posOverridePct;
+  const overrideMultiplier = (posOverridePct !== "" && posOverridePct != null && posBase.posToLaunch > 0)
+    ? (Number(posOverridePct) / 100) / posBase.posToLaunch
+    : 1;
+  const effectiveMultiplierPct = overrideMultiplier * scenario.posMultiplierPct;
+  const posToLaunch = clamp01(posBase.posToLaunch * (effectiveMultiplierPct / 100));
+  // Rescale the STAGE TRANSITION probabilities, then rebuild the cumulative
+  // reach probabilities from them — rather than scaling the reach
+  // probabilities directly.
+  //
+  // Scaling reach probabilities was wrong in a way that only showed up once
+  // modality widened the gap between the benchmark PoS and a typed override:
+  // posToReachStage[0] is 1.0 by definition (you have already reached the
+  // stage you are currently in), and multiplying it by an override factor of
+  // 0.49 claimed a 49% chance of reaching a phase the drug is already sitting
+  // in. That understated the probability of paying near-term R&D cost, so two
+  // programs with an IDENTICAL typed cumulative PoS could differ ~8% in value
+  // purely by modality — the override was not fully in control of the number.
+  //
+  // Distributing the adjustment evenly across transitions in log space keeps
+  // the product exactly on target (k^n x rawCum = target) while leaving the
+  // first stage at 1.0. Each stage is still capped, so an extreme target can
+  // fall short of its own request rather than fabricating a certainty.
+  const posStages = (() => {
+    const stages = posBase.stages;
+    if (!stages.length) return [];
+    const factor = effectiveMultiplierPct / 100;
+    if (Math.abs(factor - 1) < 1e-12) return stages.map(s => ({ ...s }));
+    const k = Math.pow(Math.max(factor, 0), 1 / stages.length);
+    let cum = 1;
+    return stages.map(s => {
+      const reach = cum;
+      const scaledPos = clamp01(Math.min(0.99, s.pos * k));
+      cum *= scaledPos;
+      return { ...s, pos: scaledPos, posToReachStage: clamp01(reach) };
+    });
+  })();
+  return { posBase, posToLaunch, posStages };
+}
+
 // ── Full per-program valuation under a given scenario ──
 // scenarioKey ('bear'|'base'|'bull'|null): when set and the program is in Quick
 // mode, checks for an absolute peak-revenue override for that scenario — if
@@ -123,51 +179,7 @@ function computeProgramValuation(program, scenario, scenarioKey) {
     rndForRisk = { ...rndForRisk, items: rndForRisk.items.map(i => ({ ...i, costM: i.costM * keepPct })) };
   }
 
-  const posBase = computePoSWeighting(program);
-  // Optional per-program override: lets you say "I think THIS drug's overall
-  // odds are X%, not the area/phase benchmark's Y%" — the one major benchmark
-  // in the app that wasn't yet editable at the drug level. Composes with the
-  // scenario multiplier rather than replacing it: Bear/Bull still scale
-  // relative to whatever the effective Base assumption is (override or not),
-  // preserving the existing 70%/100%/130% relationship on top of your own view.
-  const posOverridePct = program.posOverridePct;
-  const overrideMultiplier = (posOverridePct !== "" && posOverridePct != null && posBase.posToLaunch > 0)
-    ? (Number(posOverridePct) / 100) / posBase.posToLaunch
-    : 1;
-  const effectiveMultiplierPct = overrideMultiplier * scenario.posMultiplierPct;
-  const posToLaunch = clamp01(posBase.posToLaunch * (effectiveMultiplierPct / 100));
-  const posScaleFactor = posBase.posToLaunch > 0 ? posToLaunch / posBase.posToLaunch : 0;
-  // Rescale the STAGE TRANSITION probabilities, then rebuild the cumulative
-  // reach probabilities from them — rather than scaling the reach
-  // probabilities directly.
-  //
-  // Scaling reach probabilities was wrong in a way that only showed up once
-  // modality widened the gap between the benchmark PoS and a typed override:
-  // posToReachStage[0] is 1.0 by definition (you have already reached the
-  // stage you are currently in), and multiplying it by an override factor of
-  // 0.49 claimed a 49% chance of reaching a phase the drug is already sitting
-  // in. That understated the probability of paying near-term R&D cost, so two
-  // programs with an IDENTICAL typed cumulative PoS could differ ~8% in value
-  // purely by modality — the override was not fully in control of the number.
-  //
-  // Distributing the adjustment evenly across transitions in log space keeps
-  // the product exactly on target (k^n x rawCum = target) while leaving the
-  // first stage at 1.0. Each stage is still capped, so an extreme target can
-  // fall short of its own request rather than fabricating a certainty.
-  const posStages = (() => {
-    const stages = posBase.stages;
-    if (!stages.length) return [];
-    const factor = effectiveMultiplierPct / 100;
-    if (Math.abs(factor - 1) < 1e-12) return stages.map(s => ({ ...s }));
-    const k = Math.pow(Math.max(factor, 0), 1 / stages.length);
-    let cum = 1;
-    return stages.map(s => {
-      const reach = cum;
-      const scaledPos = clamp01(Math.min(0.99, s.pos * k));
-      cum *= scaledPos;
-      return { ...s, pos: scaledPos, posToReachStage: clamp01(reach) };
-    });
-  })();
+  const { posToLaunch, posStages } = computeEffectivePoS(program, scenario);
   const riskAdj = riskAdjustRnDCost(rndForRisk, { stages: posStages, posToLaunch });
 
   const launchYearOffset = resolveLaunchYearOffset(program);
@@ -231,7 +243,7 @@ function computeCaseValuation(theCase, scenario, scenarioKey, discountRateBasePc
     equity = { ...equity, equityValue: newEquityValue, perShare: equity.dilutedShares > 0 ? newEquityValue / equity.dilutedShares : null, prvValueAdded: prvContribution };
   }
 
-  const partnershipContribution = computePartnershipContribution(theCase, r);
+  const partnershipContribution = computePartnershipContribution(theCase, r, scenario);
   if (partnershipContribution > 0) {
     const newEquityValue = equity.equityValue + partnershipContribution;
     equity = { ...equity, equityValue: newEquityValue, perShare: equity.dilutedShares > 0 ? newEquityValue / equity.dilutedShares : null, partnershipValueAdded: partnershipContribution };
@@ -259,14 +271,17 @@ function computeCaseValuation(theCase, scenario, scenarioKey, discountRateBasePc
 // for identical deal terms, silently, because both call sites read the result
 // defensively as `partnershipValueAdded || 0`. `r` is the discount rate as a
 // fraction, not a percentage.
-function computePartnershipContribution(theCase, r) {
+function computePartnershipContribution(theCase, r, scenario) {
   let upfrontContribution = 0, milestoneContribution = 0;
   (theCase.programs || []).forEach(prog => {
     const partnership = prog.partnership;
     if (!partnership || !partnership.enabled) return;
     upfrontContribution += (numOr(partnership.upfrontM, 0)) * 1e6;
     if (!partnership.milestones || !partnership.milestones.length) return;
-    const posW = computePoSWeighting(prog);
+    // The same effective odds the program itself is valued at — override-aware
+    // and scenario-scaled — so a milestone moves with Bear/Bull and with a
+    // typed PoS exactly as the asset does. A missing scenario means Base (100%).
+    const eff = computeEffectivePoS(prog, scenario || { posMultiplierPct: 100 });
     const rndFull = computeRnDToLaunch(prog);
     let cumYears = 0;
     const yearsToReachStage = {};
@@ -276,10 +291,10 @@ function computePartnershipContribution(theCase, r) {
       if (valueM <= 0) return;
       let posToGate, yearsToGate;
       if (m.gate === "launch") {
-        posToGate = posW.posToLaunch;
+        posToGate = eff.posToLaunch;
         yearsToGate = rndFull.totalYears;
       } else {
-        const stage = posW.stages.find(s => s.key === m.gate);
+        const stage = eff.posStages.find(s => s.key === m.gate);
         posToGate = stage ? stage.posToReachStage : 1; // gate already behind current phase -> certain
         yearsToGate = yearsToReachStage[m.gate] != null ? yearsToReachStage[m.gate] : 0;
       }
@@ -406,10 +421,7 @@ function computeSimpleMultipleValuation(theCase, scenario, scenarioKey, multiple
     const launchYearOffset = resolveLaunchYearOffset(p);
     const yearsToPeakFromToday = launchYearOffset + yearsToPeakFromLaunch;
 
-    const posBase = computePoSWeighting(p);
-    const overrideMultiplier = (p.posOverridePct !== "" && p.posOverridePct != null && posBase.posToLaunch > 0)
-      ? (Number(p.posOverridePct) / 100) / posBase.posToLaunch : 1;
-    const posToLaunch = clamp01(posBase.posToLaunch * (overrideMultiplier * scenario.posMultiplierPct / 100));
+    const posToLaunch = computeEffectivePoS(p, scenario).posToLaunch;
 
     const peakEV = peakRevenue * multiple;
     const riskedEV = peakEV * posToLaunch;
@@ -430,7 +442,7 @@ function computeSimpleMultipleValuation(theCase, scenario, scenarioKey, multiple
   // values the underlying asset, and used to be dropped entirely here — see
   // computePartnershipContribution. Royalty is already inside peakRevenue via
   // getProgramRevenueResult, so it is not added again.
-  const partnershipContribution = computePartnershipContribution(theCase, r);
+  const partnershipContribution = computePartnershipContribution(theCase, r, scenario);
   if (partnershipContribution > 0) {
     const newEquityValue = equity.equityValue + partnershipContribution;
     equity = { ...equity, equityValue: newEquityValue, perShare: equity.dilutedShares > 0 ? newEquityValue / equity.dilutedShares : null, partnershipValueAdded: partnershipContribution };
