@@ -283,8 +283,12 @@ function computeNNT(eventsA, nA, eventsB, nB, confidenceLevel = 0.95) {
   const eventsHigherInArmA = rd.rd > 0;
   return {
     nnt, eventsHigherInArmA, crossesNull,
-    lower: crossesNull ? null : Math.abs(1 / rd.upper),
-    upper: crossesNull ? null : Math.abs(1 / rd.lower),
+    // Inverting flips the order, and which RD bound maps to which NNT bound
+    // depends on the sign of the difference — so take min/max rather than a
+    // fixed pairing. The fixed pairing was right for a positive RD and
+    // printed "13.2 to 3.1" for a negative one.
+    lower: crossesNull ? null : Math.min(Math.abs(1 / rd.lower), Math.abs(1 / rd.upper)),
+    upper: crossesNull ? null : Math.max(Math.abs(1 / rd.lower), Math.abs(1 / rd.upper)),
     riskDifference: rd
   };
 }

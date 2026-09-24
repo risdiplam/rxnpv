@@ -207,7 +207,7 @@ function ReportView({ theCase, onBack, updateCase }) {
       h("div", { style: { borderBottom: "2px solid " + rpt.ink1, paddingBottom: 14, marginBottom: 20 } },
         h("div", { style: { fontSize: 26, fontWeight: 700, fontFamily: "Georgia, serif" } }, theCase.name || "Untitled Case", theCase.ticker ? h("span", { style: { color: rpt.ink3, fontWeight: 400, marginLeft: 10 } }, theCase.ticker) : null),
         h("div", { style: { fontSize: 11, fontFamily: "monospace", color: rpt.ink3, marginTop: 4 } },
-          "RxNPV valuation report — generated " + new Date().toISOString().slice(0,10) + " — " + (valMethod === "multiple" ? "Simple Multiple method" : "DCF method"))
+          "RxNPV valuation report — generated " + localDateStamp() + " — " + (valMethod === "multiple" ? "Simple Multiple method" : "DCF method"))
       ),
 
       error ? h("div", { style: { color: rpt.red } }, "Could not compute valuation: " + error) : h("div", null,
@@ -493,7 +493,7 @@ function BundleView({ onBack }) {
   const included = items.filter(it => it.included !== false);
   const save = (next) => { if (!saveBundle(next)) setMsg({ tone: "err", text: "Couldn't save the bundle — storage is full." }); };
   const move = (i, by) => { const next = items.slice(); const [x] = next.splice(i, 1); next.splice(i + by, 0, x); save(next); };
-  const stamp = new Date().toISOString().slice(0, 10);
+  const stamp = localDateStamp();
 
   const exportMerged = async () => {
     if (!window.electronAPI || !window.electronAPI.exportPDF) { setMsg({ tone: "err", text: "PDF export needs the desktop app." }); return; }

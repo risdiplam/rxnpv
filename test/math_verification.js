@@ -80,7 +80,7 @@ const EXPORTS = [
   "computeBinaryEventImpliedPoS", "selectPeakSalesCompWindow",
   "applyTaxToCalendar", "computeMoleculeTypePoSRatios", "POS_BY_MOLECULE",
   "computeProgramValuation",
-  "revenueChartYScale", "niceAxisTicks", "selectPeakSalesCompWindow",
+  "revenueChartYScale", "niceAxisTicks", "localDateStamp", "selectPeakSalesCompWindow",
   "measureStorage", "STORAGE_ASSUMED_QUOTA_BYTES", "STORAGE_WARN_FRACTION", "STORAGE_CRITICAL_FRACTION",
   "computeTreatedPopulation", "launchCurveForYears", "erosionMultiplier", "computeProgramRevenue",
   "resolveNetPrice", "aspPctOfBasis", "PRICE_BASIS_OPTIONS", "getRevenueBuild", "PRICING_CONVERSION_MATRIX", "priceBasisArticle",
@@ -784,8 +784,16 @@ section("2x2 outcome measures (RR/OR/RD/NNT)");
   near("NNT = 1/|RD| = 1/0.20 = 5", nnt.nnt, 5, 1e-9);
   ok("eventsHigherInArmA correctly false (arm A's rate is LOWER, 20% vs 40%)", nnt.eventsHigherInArmA === false);
   ok("RD CI doesn't cross zero for this table -> NNT CI is a real interval", !nnt.crossesNull);
-  near("NNT CI bounds are the RD CI bounds inverted", nnt.lower, Math.abs(1/rd.upper), 1e-9);
-  near("NNT CI bounds are the RD CI bounds inverted (other side)", nnt.upper, Math.abs(1/rd.lower), 1e-9);
+  // Longhand: SE = sqrt(0.2*0.8/100 + 0.4*0.6/100) = sqrt(0.004) = 0.0632456;
+  // half-width 1.959964 * 0.0632456 = 0.1239590 -> RD CI (-0.3239590, -0.0760410).
+  // NNT CI = (1/0.3239590, 1/0.0760410) = (3.08681, 13.15080), low to high.
+  // (These two checks used to assert lower = |1/rd.upper| — the formula the
+  // code used — which for a negative RD is the LARGER number, so the suite
+  // passed while the UI printed "13.2 to 3.1".)
+  near("NNT CI lower = 1/0.3239590 = 3.08681", nnt.lower, 3.08681, 1e-4);
+  near("NNT CI upper = 1/0.0760410 = 13.15080", nnt.upper, 13.15080, 1e-4);
+  const nntPos = api.computeNNT(40, 100, 20, 100);
+  ok("the same table with arms swapped (positive RD) gives the same NNT interval", Math.abs(nntPos.lower - 3.08681) < 1e-4 && Math.abs(nntPos.upper - 13.15080) < 1e-4);
 
   // A table with no real difference must produce a risk difference CI that
   // crosses zero, and NNT must correctly report crossesNull rather than a
@@ -1574,6 +1582,12 @@ section("RevenueChart Y-axis scaling (negative-value support)");
   [mixed, allNeg].forEach((s, i) => {
     ok(`scale ${i}: zero falls within [minV, maxV]`, 0 >= s.minV && 0 <= s.maxV);
   });
+}
+section("Local date stamp");
+{
+  // Constructed in local time, so this holds in any time zone the suite runs in.
+  ok("11:30pm on 23 Sep stamps as 2026-09-23 (not the UTC next day)", api.localDateStamp(new Date(2026, 8, 23, 23, 30)) === "2026-09-23");
+  ok("single-digit month and day are zero-padded", api.localDateStamp(new Date(2026, 0, 5, 0, 1)) === "2026-01-05");
 }
 section("Chart gridlines: niceAxisTicks");
 {

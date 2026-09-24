@@ -97,7 +97,7 @@ Suggested real-world inputs, most of them the cases used against the live servic
 | **Evidence Log, Calibration Log** | Sources behind judgement calls; your PoS call against the market's, Brier-scored after the outcome. | Add an entry to each, then delete one. Deletion needs two clicks. |
 | **Sum-of-the-parts, risk waterfalls** | Per-program value contribution (needs 2+ programs); unrisked → risked NPV. | Add a second program. The SOTP and pipeline waterfall appear. |
 
-**Automated:** `final_regression_pass.js` covers the core valuation paths. `math_verification.js` (1,123 checks) covers every formula against hand-derived values.
+**Automated:** `final_regression_pass.js` covers the core valuation paths. `math_verification.js` (1,130 checks) covers every formula against hand-derived values.
 
 ### Tools: six workbenches, 18 tools, grouped by the question being asked
 
@@ -180,7 +180,7 @@ A cross-case summary: fair value against price, runway, modelled against implied
 
 | Suite | Covers |
 |---|---|
-| `math_verification.js` | 1,123 checks of engine math against values derived by hand, from closed forms or from published constants. Never against the app's own output. Needs no DOM. |
+| `math_verification.js` | 1,130 checks of engine math against values derived by hand, from closed forms or from published constants. Never against the app's own output. Needs no DOM. |
 | `export_test.js` | Section serialiser: form state carried over, export controls removed, truncated text restored, sanitiser strips scripts, handlers, remote resources and `javascript:` URLs. |
 | `audit_regressions_test.js` | The UI-level fixes from the September 2026 Muse audit ([`docs/RxNPV_MUSE_AUDIT.md`](docs/RxNPV_MUSE_AUDIT.md)): override display round-trip, percent inputs, AE denominators, stale Form 4 / Exclusivity responses, the bridge convertible line, PK/PD notation, and the documented Trial Watch field count held to the code. Each check was confirmed to fail on the audited tree. |
 | `export_coverage_test.js` | Every section in every view has its own export bar; + Report (snapshot and live toggle); report rendering, include/exclude, reorder. |

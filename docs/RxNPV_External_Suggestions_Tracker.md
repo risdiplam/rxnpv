@@ -737,4 +737,12 @@ New `test/packaged/export_sweep.js` clicks every export button in every view of 
 - A caption under the cash-flow chart said negative years were clipped to the axis floor — untrue since the chart gained negative support. Rewritten.
 - "−0.00" correlations on the Peak Sales driver chart; truncated names in both peak-sales comp charts; the Discount rate box stretched to 1,100px for two digits and, left blank, used 15% with nothing in the box to say so (now a placeholder says it); Binary Event's example numbers looked like typed values (now "e.g."); the Peak Sales distribution boxes had no labels (now Value / Low / High / Mean / SD / Most likely per distribution, unused boxes disabled); PK/PD's 17 full-width single-field rows regrouped into the grid every other form uses; the price-target grid's shading now explains itself (it is upside vs today's price, so a grid of positive values below the price is all red).
 
-**Verified:** `npm test` and `npm run test:dev` green (13 suites; math_verification 1,123 checks); ui_audit zero findings; export sweep rerun across every view with contact sheets reviewed; screenshots of each fixed screen inspected in both themes.
+**Verified:** `npm test` and `npm run test:dev` green (13 suites; math_verification 1,130 checks); ui_audit zero findings; export sweep rerun across every view with contact sheets reviewed; screenshots of each fixed screen inspected in both themes.
+
+**Follow-up sweep (same day).** Full suites, packaged checks (offline 26/26, reopen 4/4, live APIs 21/21) and the CT.gov canary all clean; then the screens not reviewed in the first pass. Found and fixed:
+- **NNT confidence interval printed high-to-low** ("13.2 to 3.1") whenever the risk difference was negative — `computeNNT` paired `lower` with `1/rd.upper`, which is only the smaller number for a positive RD. The two math checks on it had asserted that same formula rather than a hand-worked number, so they passed; they now check 3.08681 / 13.15080 worked longhand, plus the swapped-arms table.
+- **Dates stamped in UTC.** Report, bundle and auto-logged Evidence Log entries used `toISOString()`, so after ~8pm US time they carried tomorrow's date. New `localDateStamp()`.
+- The Cash Runway chart caption claimed negative cash was "clamped to zero for display"; it is not, and the negative stretch is meaningful (cumulative cash the plan needs raised). Rewritten.
+- Export titles from disclosure headings carried the arrow ("▸ SECONDARY ENDPOINTS").
+
+Math checks 1,130; export_test 31.

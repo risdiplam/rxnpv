@@ -101,6 +101,9 @@ const dom = new JSDOM(html, { runScripts: "dangerously", pretendToBeVisual: true
   // with the uppercase text a real renderer returns.
   Object.defineProperty(rowFirst, "innerText", { value: "EXPORT SECTION · Export section · x\nPNG\nPDF\nPooled estimate" });
   ok("an uppercase-rendered export row is never read back as the title", w.sectionTitleOf(rowFirst) === "Pooled estimate");
+  const disclosure = d.createElement("div");
+  Object.defineProperty(disclosure, "innerText", { value: "▸ SECONDARY ENDPOINTS (5)\nbody" });
+  ok("a disclosure arrow is not part of the title", w.sectionTitleOf(disclosure) === "SECONDARY ENDPOINTS (5)");
   const inner = d.createElement("span"); card.appendChild(inner);
   ok("a control finds the section it sits inside", w.closestExportSection(inner) === card);
 

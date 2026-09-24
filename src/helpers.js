@@ -12,6 +12,13 @@ function fmtMoney(v, decimals) {
   if (a >= 1e3) return (v < 0 ? "-" : "") + "$" + (a / 1e3).toFixed(0) + "K";
   return (v < 0 ? "-" : "") + "$" + a.toFixed(0);
 }
+// Today's date as YYYY-MM-DD in the user's own time zone. toISOString() is
+// UTC, so after ~8pm in the US every report, bundle and auto-logged evidence
+// entry was stamped with tomorrow's date.
+function localDateStamp(d) {
+  d = d || new Date();
+  return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+}
 function fmtNum(v) { if (v == null || isNaN(v)) return "—"; return Math.round(v).toLocaleString(); }
 
 // Per-share dollar values (fair value, current price) — unlike fmtMoney,
@@ -908,7 +915,7 @@ function EvidenceEntryForm({ onSave, onCancel, initialValues, saveLabel }) {
 // a later date still logs fresh.
 function appendEdgarEvidenceToPrograms(programs, edgarResult, contextLabel) {
   if (!edgarResult || !edgarResult.ok || !programs || !programs.length) return programs;
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localDateStamp();
   const source = edgarResult.sourceFilingUrl || (edgarResult.name ? edgarResult.name + " SEC filing" : "SEC EDGAR");
   const label = "Capital structure (EDGAR)";
   const thesis = "Auto-logged: pulled via " + contextLabel + (edgarResult.sourceFilingLabel ? " from " + edgarResult.sourceFilingLabel : "") + ".";

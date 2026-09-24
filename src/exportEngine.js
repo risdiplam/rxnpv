@@ -411,7 +411,9 @@ function sectionTitleOf(root) {
   const copy = root.cloneNode ? root.cloneNode(true) : root;
   if (copy.querySelectorAll) copy.querySelectorAll("[data-no-export], .badge").forEach(n => n.remove());
   const heading = copy.querySelector && copy.querySelector("h1,h2,h3,h4,[data-section-title]");
-  if (heading && heading.textContent.trim()) return heading.textContent.trim().slice(0, 90);
+  // A disclosure heading ("▸ Secondary endpoints") keeps its arrow in the
+  // text; the arrow is a control, not part of the name.
+  if (heading && heading.textContent.trim()) return heading.textContent.trim().replace(/^[▸▾►▼▶]\s*/, "").slice(0, 90);
   // A panel whose heading sits just before it (Simulation's Meta-Analysis),
   // possibly with a description paragraph in between.
   let prev = root.previousElementSibling;
@@ -430,7 +432,7 @@ function sectionTitleOf(root) {
   const controlLine = /^(export (section|chart)\b|png|pdf|svg|\+ report|\+ bundle|✓ in report|✓ in bundle)$|^export (section|chart)\b/i;
   const live = (root.innerText || "").split("\n").map(t => t.trim()).find(t => t && !controlLine.test(t));
   const first = live || (copy.textContent || "").trim().split("\n")[0];
-  return (first || "Section").slice(0, 90);
+  return ((first || "").replace(/^[▸▾►▼▶]\s*/, "") || "Section").slice(0, 90);
 }
 
 // Nearest enclosing section of an element — how an export button finds the

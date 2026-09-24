@@ -804,7 +804,7 @@ function RunwayTool({ cases, updateCase, activeCase }) {
               series: [{ name: "Projected cash balance", color: "var(--teal)", points: fr.path.map(p => ({ v: p.balanceEnd, label: p.year })) }],
               height: 160, showLegend: false
             })),
-          h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginTop: 4 } }, "Clamped to zero for display — the model doesn't project negative cash, it projects when a raise becomes necessary.")
+          h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginTop: 4 } }, "Below the zero line is the cumulative cash the plan would need raised — the model never raises money on its own, so where the line crosses zero is when a raise becomes necessary.")
         )
       ]);
     })(),
