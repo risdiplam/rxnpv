@@ -746,3 +746,5 @@ New `test/packaged/export_sweep.js` clicks every export button in every view of 
 - Export titles from disclosure headings carried the arrow ("▸ SECONDARY ENDPOINTS").
 
 Math checks 1,130; export_test 31.
+
+**Second follow-up.** The Reference Sheet was still on its old 880px column — the one view left off the shared `--app-max-width`, though this file and CLAUDE.md said all five matched. Moved onto it; data tables keep an 880px cap, and 25 body-text blocks that had relied on the narrow column now carry the 660px reading measure. Reference tables now show one precision per column (65.0 beside 62.2, not 65). The M&A filter's placeholder no longer truncates. The export-row hover (teal text) measured 4.3:1 on light tinted cards and now darkens the text instead. `computeRunwayVsCatalysts` — whose parts were tested but not the function that composes them (skipping read-out catalysts, counting undated ones) — gained 7 hand-worked checks. ui_audit clean; math checks 1,137.

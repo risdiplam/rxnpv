@@ -106,7 +106,9 @@
      rather than by transparency: at the old 50% opacity their text fell to
      ~2.5:1 and failed contrast, and the rows were easy to miss entirely. */
   .section-export-bar, .chart-export-bar { opacity: 1; }
-  .section-export-bar button:hover:not(:disabled), .chart-export-bar button:hover:not(:disabled) { border-color: var(--teal) !important; color: var(--teal) !important; }
+  /* Hover darkens the text and tints the border. Teal text measured 4.3:1 on
+     the light theme's tinted cards, just under AA. */
+  .section-export-bar button:hover:not(:disabled), .chart-export-bar button:hover:not(:disabled) { border-color: var(--teal) !important; color: var(--ink-1) !important; }
   .export-section:hover > .section-export-bar,
   .export-section:hover > * > .section-export-bar,
   [data-export-chart]:hover > .chart-export-bar, [data-export-chart]:hover > * > .chart-export-bar,

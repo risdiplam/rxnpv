@@ -75,7 +75,7 @@ const EXPORTS = [
   "runPeakSalesSimulation", "driverSensitivity", "percentSpecToFraction", "percentSpecError", "renderIconArray",
   "niceTicks", "formatTick", "renderLineChart", "renderHistogram", "renderForestPlot",
   "treasuryMethodShares", "ifConvertedShares", "computeEquityValue", "applyFutureRaise",
-  "classifyCatalystFunding", "monthsUntil", "parseCatalystDate", "RUNWAY_CUSHION_MONTHS_DEFAULT",
+  "classifyCatalystFunding", "computeRunwayVsCatalysts", "monthsUntil", "parseCatalystDate", "RUNWAY_CUSHION_MONTHS_DEFAULT",
   "summarizeOrangeBookPatents", "isPediatricExtension", "parseFdaYyyymmdd",
   "computeBinaryEventImpliedPoS", "selectPeakSalesCompWindow",
   "applyTaxToCalendar", "computeMoleculeTypePoSRatios", "POS_BY_MOLECULE",
@@ -1582,6 +1582,30 @@ section("RevenueChart Y-axis scaling (negative-value support)");
   [mixed, allNeg].forEach((s, i) => {
     ok(`scale ${i}: zero falls within [minV, maxV]`, 0 >= s.minV && 0 <= s.maxV);
   });
+}
+section("Runway vs. catalyst: the composing function");
+{
+  // The pieces are checked elsewhere; this checks what the case-level function
+  // feeds them. now = 23 Sep 2026 (local). Log: a pending 2027-Q1 readout, a
+  // resolved one (must be skipped), and a pending one with no date (counted,
+  // never guessed). 2027-Q1 -> 31 Mar 2027; 23 Sep -> 31 Mar = 7 + 31 + 30 +
+  // 31 + 31 + 28 + 31 = 189 days; 189 / 30.4375 = 6.20945 months. With a
+  // 12-month runway the cushion is 12 - 6.20945 = 5.79055, under the 6-month
+  // default -> "tight".
+  const theCase = { programs: [{ drugName: "X", calibrationLog: [
+    { catalystLabel: "Ph3 readout", catalystDate: "2027-Q1", outcome: "pending" },
+    { catalystLabel: "Ph2 readout", catalystDate: "2026-03", outcome: "yes" },
+    { catalystLabel: "Someday", catalystDate: "", outcome: "pending" }
+  ] }] };
+  const r = api.computeRunwayVsCatalysts(theCase, { now: new Date(2026, 8, 23), runwayMonthsOverride: 12 });
+  ok("ok result", r.ok === true);
+  near("only the pending dated catalyst is compared", r.rows.length, 1, 0);
+  near("its months away = 189 / 30.4375 = 6.20945", r.rows[0].monthsAway, 6.20945, 1e-4);
+  near("cushion at the readout = 12 - 6.20945 = 5.79055", r.rows[0].cushionAtCatalyst, 5.79055, 1e-4);
+  ok("5.79 months of cash left is under the 6-month cushion -> tight", r.rows[0].status === "tight" && r.firstProblem && r.firstProblem.label === "Ph3 readout");
+  near("the undated pending entry is counted, not dropped silently", r.undatedCount, 1, 0);
+  const r2 = api.computeRunwayVsCatalysts(theCase, { now: new Date(2026, 8, 23), runwayMonthsOverride: 5 });
+  ok("a 5-month runway runs out before a 6.2-month readout -> gap", r2.rows[0].status === "gap" && r2.gapCount === 1);
 }
 section("Local date stamp");
 {

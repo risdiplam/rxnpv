@@ -12,10 +12,19 @@ function ReferenceSheet({ activeCase }) {
   const card = (children, key) => h.apply(null, ["div", { key, className: "export-section", "data-export-section": "", style: { background: "var(--surface)", border: "1px solid var(--rule)", borderRadius: 10, padding: "18px 20px", marginBottom: 16 } }].concat(Array.isArray(children) ? children : [children]).concat([h(SectionExportBar, { key: "__export" })]));
   const label = (t) => h("div", { "data-section-title": "", style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 10 } }, t);
   const src = (t) => h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginTop: 10, fontStyle: "italic", lineHeight: 1.5 } }, t);
-  const table = (headers, rows) => h("div", { style: { overflowX: "auto" } },
+  // Numbers in a column share one precision: the source tables drop trailing
+  // zeros (65 beside 62.2, 76 beside 50.6), which reads as a different kind
+  // of number rather than the same measure. Capped at 880px so a label and
+  // its three figures don't sit 1,200px apart on the wider page.
+  const alignColumns = rows => {
+    const dp = [];
+    rows.forEach(r => r.forEach((c, j) => { if (typeof c === "number" && isFinite(c)) { const d = (String(c).split(".")[1] || "").length; dp[j] = Math.max(dp[j] || 0, Math.min(d, 2)); } }));
+    return rows.map(r => r.map((c, j) => (typeof c === "number" && isFinite(c) && dp[j]) ? c.toFixed(dp[j]) : c));
+  };
+  const table = (headers, rows) => h("div", { style: { overflowX: "auto", maxWidth: 880 } },
     h("table", { style: { width: "100%", borderCollapse: "collapse", fontSize: 12, fontFamily: "var(--mono)" } },
       h("thead", null, h("tr", null, headers.map((hd, i) => h("th", { key: i, style: { textAlign: i === 0 ? "left" : "right", padding: "6px 10px", borderBottom: "1px solid var(--rule)", color: "var(--ink-3)", fontSize: 10, textTransform: "uppercase" } }, hd)))),
-      h("tbody", null, rows.map((r, i) => h("tr", { key: i, style: { borderBottom: "1px solid var(--rule)" } },
+      h("tbody", null, alignColumns(rows).map((r, i) => h("tr", { key: i, style: { borderBottom: "1px solid var(--rule)" } },
         r.map((c, j) => h("td", { key: j, style: { padding: "7px 10px", textAlign: j === 0 ? "left" : "right", color: j === 0 ? "var(--ink-1)" : "var(--ink-2)" } }, c)))))
     ));
 
@@ -196,7 +205,7 @@ function ReferenceSheet({ activeCase }) {
     ]),
     card([
       label("Adherence / persistence benchmarks"),
-      h("div", { style: { fontSize: 12, fontFamily: "var(--sans)", color: "var(--ink-1)", lineHeight: 1.8 } },
+      h("div", { style: { maxWidth: PROSE, fontSize: 12, fontFamily: "var(--sans)", color: "var(--ink-1)", lineHeight: 1.8 } },
         h("div", null, "Acute therapies: ", h("b", null, ADHERENCE_BENCHMARKS.acuteAvg + "% avg"), " (range ", ADHERENCE_BENCHMARKS.acuteRange.join("-"), "%)"),
         h("div", null, "Chronic ambulatory base case: ", h("b", null, ADHERENCE_BENCHMARKS.chronicAmbulatoryBase + "%")),
         h("div", null, "Asymptomatic conditions (hyperlipidemia, HTN, GERD): ", h("b", null, ADHERENCE_BENCHMARKS.byFactor.asymptomatic.join("-") + "%")),
@@ -206,7 +215,7 @@ function ReferenceSheet({ activeCase }) {
     ]),
     card([
       label("Pricing definitions"),
-      h("div", { style: { fontSize: 12, fontFamily: "var(--sans)", color: "var(--ink-1)", lineHeight: 1.9 } },
+      h("div", { style: { maxWidth: PROSE, fontSize: 12, fontFamily: "var(--sans)", color: "var(--ink-1)", lineHeight: 1.9 } },
         h("div", null, h("b", null, "ASP"), " — ", PRICING_DEFS.ASP),
         h("div", null, h("b", null, "WAC"), " — ", PRICING_DEFS.WAC),
         h("div", null, h("b", null, "AWP"), " — ", PRICING_DEFS.AWP),
@@ -222,7 +231,7 @@ function ReferenceSheet({ activeCase }) {
         ["WAC", PRICING_CONVERSION_MATRIX.refAWP100.WAC, PRICING_CONVERSION_MATRIX.refRetail100.WAC, PRICING_CONVERSION_MATRIX.refWAC100.WAC, PRICING_CONVERSION_MATRIX.refASP100.WAC],
         ["ASP", PRICING_CONVERSION_MATRIX.refAWP100.ASP, PRICING_CONVERSION_MATRIX.refRetail100.ASP, PRICING_CONVERSION_MATRIX.refWAC100.ASP, PRICING_CONVERSION_MATRIX.refASP100.ASP]
       ]),
-      h("div", { style: { fontSize: 11.5, fontFamily: "var(--sans)", color: "var(--ink-2)", lineHeight: 1.7, marginTop: 10 } },
+      h("div", { style: { maxWidth: PROSE, fontSize: 11.5, fontFamily: "var(--sans)", color: "var(--ink-2)", lineHeight: 1.7, marginTop: 10 } },
         "This table is what the Workspace's price-basis control uses. Enter whatever price you have, say which basis it is on, and the revenue build converts it to ASP before multiplying by patients — so a list price no longer silently inflates peak revenue by roughly a quarter. ",
         h("b", null, "Treat these as a floor on the deduction, not a forecast of it."),
         " They are averages across every drug in the source. US gross-to-net has widened a great deal since, and for a modern specialty or rare-disease brand, deductions of 40-50% off list are ordinary. If you have a real figure for a close comparable, enter it as the net price realisation and it overrides the table.")
@@ -232,7 +241,7 @@ function ReferenceSheet({ activeCase }) {
     ]),
     card([
       label("Exclusivity / loss of exclusivity"),
-      h("div", { style: { fontSize: 12, fontFamily: "var(--sans)", color: "var(--ink-1)", lineHeight: 1.9 } },
+      h("div", { style: { maxWidth: PROSE, fontSize: 12, fontFamily: "var(--sans)", color: "var(--ink-1)", lineHeight: 1.9 } },
         h("div", null, "US patent term: ", h("b", null, EXCLUSIVITY_BENCHMARKS.patentTermYears + "yr from filing"), " (not from launch — clinical + regulatory time eats into this)"),
         h("div", null, "Hatch-Waxman extension: +", h("b", null, EXCLUSIVITY_BENCHMARKS.hatchWaxmanExtensionYears + "yr")),
         h("div", null, "Orphan drug exclusivity: ", h("b", null, EXCLUSIVITY_BENCHMARKS.orphanExclusivityYears + "yr"), " (vs 5yr standard)"),
@@ -266,7 +275,7 @@ function ReferenceSheet({ activeCase }) {
       h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginTop: 6, lineHeight: 1.6, maxWidth: PROSE } }, "Gene therapy: " + COGS_BENCHMARKS.geneTherapyNote)
     ]),
     card([ label("SG&A benchmarks"),
-      h("div", { style: { fontSize: 12, fontFamily: "var(--sans)", color: "var(--ink-1)", lineHeight: 1.9 } },
+      h("div", { style: { maxWidth: PROSE, fontSize: 12, fontFamily: "var(--sans)", color: "var(--ink-1)", lineHeight: 1.9 } },
         h("div", null, "Mature SG&A/revenue (>$" + SGA_BENCHMARKS.maturityRevenueThresholdM + "M): ", h("b", null, SGA_BENCHMARKS.matureSgaPctOfRevenue + "%"), " (range ", SGA_BENCHMARKS.matureSgaRange.join("-"), "%)"),
         h("div", null, "Large-cap pharma: ", h("b", null, SGA_BENCHMARKS.largeCapSgaPctOfRevenue + "%"), " (range ", SGA_BENCHMARKS.largeCapSgaRange.join("-"), "%)"),
         h("div", { style: { marginTop: 8 } }, "Pre-commercial G&A: ", h("b", null, "$" + SGA_BENCHMARKS.preCommercialGA.medianM + "M median"), " (IQR $", SGA_BENCHMARKS.preCommercialGA.iqrM.join("-"), "M)"),
@@ -283,18 +292,18 @@ function ReferenceSheet({ activeCase }) {
       ])
     ]),
     card([ label("Typical launch sales-force size"),
-      h("div", { style: { fontSize: 12, fontFamily: "var(--sans)", color: "var(--ink-1)", lineHeight: 1.9 } },
+      h("div", { style: { maxWidth: PROSE, fontSize: 12, fontFamily: "var(--sans)", color: "var(--ink-1)", lineHeight: 1.9 } },
         h("div", null, "Hospital-based or specialty product: ", h("b", null, "~" + SALES_FORCE_SIZE_BENCHMARKS.hospitalOrSpecialty + " reps")),
         h("div", null, "Primary care product, no partner: ", h("b", null, "~" + SALES_FORCE_SIZE_BENCHMARKS.primaryCareNoPartner + " reps")),
         h("div", { style: { marginTop: 6 } }, "Observed across 13 launches: median ", SALES_FORCE_SIZE_BENCHMARKS.observedMedian, ", average ", SALES_FORCE_SIZE_BENCHMARKS.observedAverage)
       ),
-      h("div", { style: { fontSize: 11, fontFamily: "var(--sans)", color: "var(--ink-2)", marginTop: 10, lineHeight: 1.7, padding: "8px 12px", background: "var(--surface-2)", borderRadius: 6 } },
+      h("div", { style: { maxWidth: PROSE, fontSize: 11, fontFamily: "var(--sans)", color: "var(--ink-2)", marginTop: 10, lineHeight: 1.7, padding: "8px 12px", background: "var(--surface-2)", borderRadius: 6 } },
         h("b", null, "How the model applies this: "),
         "30% of the team staffs the year before launch, ramping to 100% at launch. Compensation grows ", SALES_FORCE_COMP_GROWTH_PCT + "%/yr (same CAGR as drug pricing). At loss of exclusivity, sales force cost is fully eliminated the following year — not phased down."
       )
     ]),
     card([ label("Marketing spend"),
-      h("div", { style: { fontSize: 12, fontFamily: "var(--sans)", color: "var(--ink-1)" } },
+      h("div", { style: { maxWidth: PROSE, fontSize: 12, fontFamily: "var(--sans)", color: "var(--ink-1)" } },
         "Base case: ", h("b", null, MARKETING_BENCHMARKS.baseCasePctOfPeakRevenue + "% of peak revenue"), ". Competitive scenarios: ", h("b", null, MARKETING_BENCHMARKS.competitiveScenarioRange.join("-") + "%"), "."),
       h("ul", { style: { fontSize: 11, fontFamily: "var(--sans)", color: "var(--ink-2)", marginTop: 8, paddingLeft: 18, lineHeight: 1.7 } },
         MARKETING_BENCHMARKS.competitiveDrivers.map((d,i) => h("li", { key: i }, d)))
@@ -309,12 +318,12 @@ function ReferenceSheet({ activeCase }) {
     card([ label("Trial duration by phase & therapeutic area (initiation → results, yrs)"),
       table(["Area", "Phase 2", "Phase 3"], Object.entries(TRIAL_DURATION_BY_AREA.byArea).map(([a,v]) => [a, v.phase2, v.phase3])),
       h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-2)", marginTop: 8, maxWidth: PROSE } }, "Phase 1 base: " + TRIAL_DURATION_BY_AREA.phase1BaseYears + "yr. Nonclinical add-on: +" + TRIAL_DURATION_BY_AREA.nonclinicalAddYears.phase2 + "yr (Ph2), +" + TRIAL_DURATION_BY_AREA.nonclinicalAddYears.phase3 + "yr (Ph3). All-area total dev benchmark: " + TRIAL_DURATION_BY_AREA.totalDevBenchmarkYears + "yr."),
-      h("div", { style: { fontSize: 11, fontFamily: "var(--sans)", color: "var(--ink-1)", marginTop: 10, padding: "8px 12px", background: "var(--amber-bg)", borderRadius: 6 } },
+      h("div", { style: { maxWidth: PROSE, fontSize: 11, fontFamily: "var(--sans)", color: "var(--ink-1)", marginTop: 10, padding: "8px 12px", background: "var(--amber-bg)", borderRadius: 6 } },
         h("b", null, "Breakthrough Therapy Designation: "), TRIAL_DURATION_BY_AREA.breakthroughDesignation.withBTD + "yr median vs " + TRIAL_DURATION_BY_AREA.breakthroughDesignation.withoutBTD + "yr without — the only expedited pathway found to shorten duration (priority review, accelerated approval, fast track showed no significant difference). ",
         h("span", { style: { color: "var(--ink-3)", fontStyle: "italic" } }, "(" + TRIAL_DURATION_BY_AREA.breakthroughDesignation.source + ")"))
     ]),
     card([ label("Regulatory"),
-      h("div", { style: { fontSize: 12, fontFamily: "var(--sans)", color: "var(--ink-1)", lineHeight: 1.9 } },
+      h("div", { style: { maxWidth: PROSE, fontSize: 12, fontFamily: "var(--sans)", color: "var(--ink-1)", lineHeight: 1.9 } },
         h("div", null, "Review duration: ", h("b", null, REGULATORY_BENCHMARKS.reviewDurationYears.join("-") + "yr"), " (shorter end for priority/fast-track)"),
         h("div", null, "US filing fee: ", h("b", null, "$" + REGULATORY_BENCHMARKS.usFilingFeeM + "M")),
         h("div", null, "EU / Japan filing fee: ", h("b", null, "~$" + REGULATORY_BENCHMARKS.euJapanFilingFeeK + "K each"))
@@ -331,7 +340,7 @@ function ReferenceSheet({ activeCase }) {
         [name, v.rate + "%" + (v.range ? " (" + v.range[0] + "-" + v.range[1] + "%)" : ""), v.endpoint])),
     h("div", { style: { marginTop: 12, display: "flex", flexDirection: "column", gap: 10 } },
       Object.entries(PLACEBO_RESPONSE_BENCHMARKS.areas).map(([name, v]) =>
-        h("div", { key: name, style: { fontSize: 11, fontFamily: "var(--sans)", color: "var(--ink-2)", lineHeight: 1.5 } },
+        h("div", { key: name, style: { maxWidth: PROSE, fontSize: 11, fontFamily: "var(--sans)", color: "var(--ink-2)", lineHeight: 1.5 } },
           h("b", { style: { color: "var(--ink-1)" } }, name + ": "), v.note, " ",
           h("span", { style: { fontFamily: "var(--mono)", color: "var(--ink-3)" } }, "(" + v.source + ")")
         )
@@ -369,7 +378,7 @@ function ReferenceSheet({ activeCase }) {
       ])
     ]),
     card([ label("Nonscientific-failure-adjusted alternative"),
-      h("div", { style: { fontSize: 12, fontFamily: "var(--sans)", color: "var(--ink-1)", lineHeight: 1.8 } },
+      h("div", { style: { maxWidth: PROSE, fontSize: 12, fontFamily: "var(--sans)", color: "var(--ink-1)", lineHeight: 1.8 } },
         "~" + POS_NONSCIENTIFIC_ADJUSTED.nonscientificTerminationRate.phase1 + "% of Phase 1 and ~" + POS_NONSCIENTIFIC_ADJUSTED.nonscientificTerminationRate.phase2 +
         "% of Phase 2 terminations are for non-scientific reasons (portfolio rationalization, budget) — not drug failure. Adjusting for this: Phase 1 ",
         h("b", null, POS_NONSCIENTIFIC_ADJUSTED.phase1 + "%"), ", Phase 2 ", h("b", null, POS_NONSCIENTIFIC_ADJUSTED.phase2 + "%"), " (Phase 3 unchanged — source gives no adjusted figure)."),
@@ -401,14 +410,14 @@ function ReferenceSheet({ activeCase }) {
       h("div", { style: { fontSize: 11, color: "var(--ink-3)", fontFamily: "var(--mono)", maxWidth: PROSE } }, "Range across 6 sources: " + POS_REGULATORY.range.join("-") + "%. " + POS_REGULATORY.definition + ".")
     ]),
     card([ label("Regulatory-stage-specific modifiers (distinct from clinical-phase modifiers above)"),
-      h("div", { style: { fontSize: 12, fontFamily: "var(--sans)", color: "var(--ink-1)", lineHeight: 1.9 } },
+      h("div", { style: { maxWidth: PROSE, fontSize: 12, fontFamily: "var(--sans)", color: "var(--ink-1)", lineHeight: 1.9 } },
         h("div", { style: { fontWeight: 700, marginTop: 4 } }, "Thomas (2016):"),
         h("div", null, "Selection biomarkers: ", h("b", { style: { color: "var(--green)" } }, "+" + POS_REGULATORY_MODIFIERS.thomas2016.selectionBiomarkers + "%"), " · No biomarkers: ", h("b", { style: { color: "var(--amber)" } }, POS_REGULATORY_MODIFIERS.thomas2016.noBiomarkers + "%")),
         h("div", null, "Chronic high-prevalence: ", h("b", { style: { color: "var(--green)" } }, "+" + POS_REGULATORY_MODIFIERS.thomas2016.chronicHighPrevalence + "%"), " · Rare disease: ", h("b", { style: { color: "var(--green)" } }, "+" + POS_REGULATORY_MODIFIERS.thomas2016.rareDisease + "%")),
         h("div", { style: { fontWeight: 700, marginTop: 8 } }, "Hay (2014):"),
         h("div", null, "Special Protocol Assessment: ", h("b", { style: { color: "var(--amber)" } }, POS_REGULATORY_MODIFIERS.hay2014.specialProtocolAssessment + "%"), " · Orphan designation: ", h("b", { style: { color: "var(--amber)" } }, POS_REGULATORY_MODIFIERS.hay2014.orphanDesignation + "%"))
       ),
-      h("div", { style: { fontSize: 11, fontFamily: "var(--sans)", color: "var(--ink-2)", marginTop: 8, fontStyle: "italic" } }, POS_REGULATORY_MODIFIERS.hay2014.note)
+      h("div", { style: { maxWidth: PROSE, fontSize: 11, fontFamily: "var(--sans)", color: "var(--ink-2)", marginTop: 8, fontStyle: "italic" } }, POS_REGULATORY_MODIFIERS.hay2014.note)
     ]),
     h("div", { style: { fontSize: 11, fontFamily: "var(--sans)", color: "var(--ink-3)", padding: "10px 4px", maxWidth: PROSE } }, "The PoS modifiers above (biomarker use, disease type) are wired into the actual PoS calculation via each program's Biomarker Use / Disease Type fields. The molecule-type table is wired in too, applied automatically from each program's Modality — composed as a ratio against its own all-molecules baseline, the same method used for the modifiers. Cell and gene therapy deliberately receive no molecule-type adjustment: these sources run 2010-2016 and their \"biologic\" cohort is antibodies and proteins, so applying it to a gene therapy would be inventing a datapoint. The base-case and regulatory tables remain reference-only and are not auto-selected by the engine."),
     placeboResponseCard()
@@ -422,32 +431,32 @@ function ReferenceSheet({ activeCase }) {
         h("div", null, h("div", { style: { fontSize: 24, fontFamily: "var(--mono)", fontWeight: 700, color: "var(--teal)" } }, "~" + DISCOUNT_RATE_GUIDANCE.largePharmaOrAcquirerLens + "%"),
           h("div", { style: { fontSize: 11, color: "var(--ink-3)", fontFamily: "var(--mono)", maxWidth: 220 } }, "Large-pharma / acquirer lens — evaluating an asset from a large, diversified buyer's cost of capital, not this tool's default"))
       ),
-      h("div", { style: { padding: "10px 14px", borderRadius: 8, background: "var(--red-bg)", border: "1px solid var(--red)", fontSize: 12, fontFamily: "var(--sans)", color: "var(--ink-1)", lineHeight: 1.6, marginBottom: 14 } },
+      h("div", { style: { maxWidth: PROSE, padding: "10px 14px", borderRadius: 8, background: "var(--red-bg)", border: "1px solid var(--red)", fontSize: 12, fontFamily: "var(--sans)", color: "var(--ink-1)", lineHeight: 1.6, marginBottom: 14 } },
         h("b", { style: { color: "var(--red)" } }, "Don't double-count risk: "), DISCOUNT_RATE_GUIDANCE.warning),
       h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-2)" } }, label("Survey ranges")),
       Object.entries(DISCOUNT_RATE_GUIDANCE.surveyRanges).map(([k,v],i) => h("div", { key: i, style: { display: "flex", justifyContent: "space-between", fontSize: 11, fontFamily: "var(--mono)", padding: "5px 0", borderBottom: "1px solid var(--rule)" } },
         h("span", { style: { color: "var(--ink-2)" } }, k), h("span", { style: { color: "var(--ink-1)", fontWeight: 700 } }, Array.isArray(v) ? v.join("-")+"%" : v+"%")))
     ]),
     card([ label("Internal rate of return (IRR) — an alternate hurdle-rate floor"),
-      h("div", { style: { fontSize: 12, fontFamily: "var(--sans)", color: "var(--ink-1)", lineHeight: 1.9 } },
+      h("div", { style: { maxWidth: PROSE, fontSize: 12, fontFamily: "var(--sans)", color: "var(--ink-1)", lineHeight: 1.9 } },
         h("div", null, "Theoretical IRR (2010 model): small molecule ", h("b", null, DISCOUNT_RATE_GUIDANCE.irr.theoreticalSmallMolecule + "%"), ", biologic ", h("b", null, DISCOUNT_RATE_GUIDANCE.irr.theoreticalBiologic + "%")),
         h("div", null, "Historical trend (12 pharma cos): ", h("b", null, DISCOUNT_RATE_GUIDANCE.irr.historicalTrend.y2010 + "%"), " (2010) → ", h("b", null, DISCOUNT_RATE_GUIDANCE.irr.historicalTrend.y2015 + "%"), " (2015)"),
         h("div", null, "2013-2015 range across companies: ", h("b", null, DISCOUNT_RATE_GUIDANCE.irr.y2013to2015Range.join("% to ") + "%"))
       ),
-      h("div", { style: { fontSize: 11, fontFamily: "var(--sans)", color: "var(--ink-2)", marginTop: 8, fontStyle: "italic" } }, DISCOUNT_RATE_GUIDANCE.irr.note)
+      h("div", { style: { maxWidth: PROSE, fontSize: 11, fontFamily: "var(--sans)", color: "var(--ink-2)", marginTop: 8, fontStyle: "italic" } }, DISCOUNT_RATE_GUIDANCE.irr.note)
     ])
   );
 
   const valuationTab = () => h("div", null,
     card([ label("Quick mode vs. Full mode"),
-      h("div", { style: { fontSize: 12, fontFamily: "var(--sans)", color: "var(--ink-1)", lineHeight: 1.9 } },
+      h("div", { style: { maxWidth: PROSE, fontSize: 12, fontFamily: "var(--sans)", color: "var(--ink-1)", lineHeight: 1.9 } },
         h("div", null, h("b", null, "Quick"), " — enter a single peak revenue estimate directly. Fastest way to a number; good for a first pass or when you just want a sanity check against a comparable drug's peak sales."),
         h("div", { style: { marginTop: 6 } }, h("b", null, "Full"), " — builds revenue up from population → diagnosis/treatment rate → adherence → market share → launch curve → pricing. Slower to fill in, but every assumption is visible and independently sourced."),
         h("div", { style: { marginTop: 6, maxWidth: PROSE } }, "Both modes run through the exact same downstream pipeline below — R&D costing, PoS risk-adjustment, discounting, and dilution don't change based on which one you pick. Loss-of-exclusivity timing and erosion apply identically either way. Switch anytime per program; your inputs for the mode you're not using are preserved.")
       )
     ]),
     card([ label("How the pieces combine — the full pipeline"),
-      h("div", { style: { fontSize: 12, fontFamily: "var(--sans)", color: "var(--ink-1)", lineHeight: 1.9 } },
+      h("div", { style: { maxWidth: PROSE, fontSize: 12, fontFamily: "var(--sans)", color: "var(--ink-1)", lineHeight: 1.9 } },
         h("ol", { style: { paddingLeft: 18, margin: 0 } },
           h("li", null, "Revenue build — either Quick (direct peak estimate) or Full (population → price → share → launch curve → LOE erosion) — produces a year-by-year revenue curve per program."),
           h("li", null, "Cost structure (COGS, sales force, marketing) turns that into product contribution; corporate G&A is netted at the company level."),
@@ -457,7 +466,7 @@ function ReferenceSheet({ activeCase }) {
           h("li", null, "Capital structure (cash, debt, dilutive securities) bridges Enterprise Value to Equity Value, then divides by diluted shares for a per-share figure.")
         )
       ),
-      h("div", { style: { fontSize: 11, fontFamily: "var(--sans)", color: "var(--ink-2)", marginTop: 10, paddingTop: 10, borderTop: "1px dashed var(--rule)", lineHeight: 1.7 } },
+      h("div", { style: { maxWidth: PROSE, fontSize: 11, fontFamily: "var(--sans)", color: "var(--ink-2)", marginTop: 10, paddingTop: 10, borderTop: "1px dashed var(--rule)", lineHeight: 1.7 } },
         h("b", null, "On terminology: "), "this is rNPV (risk-adjusted / probability-adjusted NPV) — the standard methodology for valuing pre-revenue biotech assets, since step 4 above weights every cash flow by the probability it actually happens before step 5 discounts it. Neither source document uses the literal term \"rNPV\" — they describe the mechanics (\"risk-adjusting the cash flows,\" separately, from choosing a discount rate) without the shorthand. The methodology has been rNPV throughout; the app's labels now say so explicitly rather than just \"NPV.\"")
     ]),
     card([ label("Simplifications, stated plainly") ,
@@ -541,15 +550,15 @@ function ReferenceSheet({ activeCase }) {
       label("Valuation heuristics"),
       h("ul", { style: { fontSize: 12, fontFamily: "var(--sans)", color: "var(--ink-1)", lineHeight: 1.9, paddingLeft: 18, margin: 0 } },
         MA_COMPS.heuristics.map((t, i) => h("li", { key: i }, t))),
-      h("div", { style: { fontSize: 11, fontFamily: "var(--sans)", color: "var(--ink-2)", marginTop: 10, paddingTop: 10, borderTop: "1px dashed var(--rule)" } },
+      h("div", { style: { maxWidth: PROSE, fontSize: 11, fontFamily: "var(--sans)", color: "var(--ink-2)", marginTop: 10, paddingTop: 10, borderTop: "1px dashed var(--rule)" } },
         "Looking for the M&A Target Premium calculator? It's moved to the ", h("b", null, "Tools"), " tab, where it can pull a starting value from any open case.")
     ]),
     card([
       h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10, flexWrap: "wrap", gap: 8 } },
         label("Deals (" + filtered.length + " of " + allDeals.length + ")"),
         h("div", { style: { display: "flex", gap: 8, alignItems: "center" } },
-          h("input", { type: "text", "aria-label": "Filter M&A deals", value: maFilter, placeholder: "Filter by company, area, or stage…", onChange: e => setMaFilter(e.target.value),
-            style: { padding: "7px 10px", borderRadius: 6, border: "1.5px solid var(--rule)", background: "var(--surface)", color: "var(--ink-1)", fontFamily: "var(--mono)", fontSize: 12, width: 240 } }),
+          h("input", { type: "text", "aria-label": "Filter M&A deals", value: maFilter, placeholder: "Filter company, area, stage…", onChange: e => setMaFilter(e.target.value),
+            style: { padding: "7px 10px", borderRadius: 6, border: "1.5px solid var(--rule)", background: "var(--surface)", color: "var(--ink-1)", fontFamily: "var(--mono)", fontSize: 12, width: 280, maxWidth: "100%" } }),
           h("button", { onClick: () => downloadCSV("RxNPV-MA-Comps.csv",
               ["Acquirer", "Target", "Year", "Deal Value ($B)", "Premium (%)", "Area", "Stage", "Asset", "Note"],
               filtered.map(d => [d.acquirer, d.target, d.year, d.valueB, d.premiumPct, d.area, d.stage, d.asset || "", d.note || ""])),
@@ -619,7 +628,7 @@ function ReferenceSheet({ activeCase }) {
   const glossaryTab = () => h("div", null,
     card([
       label("Reading a trial, in the terms trials are actually written in"),
-      h("div", { style: { fontSize: 12.5, fontFamily: "var(--sans)", color: "var(--ink-2)", lineHeight: 1.7 } },
+      h("div", { style: { maxWidth: PROSE, fontSize: 12.5, fontFamily: "var(--sans)", color: "var(--ink-2)", lineHeight: 1.7 } },
         "Everything below is vocabulary, not a benchmark — no number here feeds the model. It exists because the Trial Decoder in Tools is only useful if the words on a trial record mean something to you, and a press release will rarely define them. The “why it matters” column is the part worth reading: most of these terms are perfectly well explained elsewhere, but what makes one endpoint stronger evidence than another rarely is.")
     ]),
     ENDPOINT_GLOSSARY.map(group => card([
@@ -628,13 +637,13 @@ function ReferenceSheet({ activeCase }) {
         group.items.map(it => h("div", { key: it.term, style: { borderLeft: "2px solid var(--rule)", paddingLeft: 12 } },
           h("div", { style: { fontFamily: "var(--mono)", fontSize: 12, fontWeight: 700, color: "var(--ink-1)" } },
             it.term, h("span", { style: { color: "var(--ink-3)", fontWeight: 400 } }, " — " + it.full)),
-          h("div", { style: { fontFamily: "var(--sans)", fontSize: 12, color: "var(--ink-2)", marginTop: 3, lineHeight: 1.6 } }, it.plain),
-          h("div", { style: { fontFamily: "var(--sans)", fontSize: 11.5, color: "var(--ink-3)", marginTop: 4, lineHeight: 1.6 } }, it.why)
+          h("div", { style: { maxWidth: PROSE, fontFamily: "var(--sans)", fontSize: 12, color: "var(--ink-2)", marginTop: 3, lineHeight: 1.6 } }, it.plain),
+          h("div", { style: { maxWidth: PROSE, fontFamily: "var(--sans)", fontSize: 11.5, color: "var(--ink-3)", marginTop: 4, lineHeight: 1.6 } }, it.why)
         )))
     ], group.group)),
     card([
       label("What each phase can and cannot establish"),
-      h("div", { style: { fontSize: 11.5, fontFamily: "var(--sans)", color: "var(--ink-3)", marginBottom: 12, lineHeight: 1.6 } },
+      h("div", { style: { maxWidth: PROSE, fontSize: 11.5, fontFamily: "var(--sans)", color: "var(--ink-3)", marginBottom: 12, lineHeight: 1.6 } },
         "Framed as what the architecture supports, not how likely it is to succeed. The single most expensive mistake in reading early data is treating a Phase 2 effect size as an estimate of the Phase 3 result — see the Phase 2→3 Translator in Simulation for what the published shrinkage actually looks like."),
       h("div", { style: { display: "flex", flexDirection: "column", gap: 16 } },
         PHASE_CAPABILITIES.map(p => h("div", { key: p.phase },
@@ -653,7 +662,7 @@ function ReferenceSheet({ activeCase }) {
 
   const tabs = [["guide","How This Works"],["revenue","Revenue Build"],["cost","Cost Structure"],["rd","R&D & Timeline"],["pos","Probability of Success"],["discount","Discount Rate"],["valuation","Valuation & Dilution"],["ma","M&A Comps"],["glossary","Trial Glossary"]];
 
-  return h("div", { "data-export-context": "Reference Sheet", style: { maxWidth: 880, margin: "0 auto", padding: "24px 20px 60px" } },
+  return h("div", { "data-export-context": "Reference Sheet", style: { maxWidth: "var(--app-max-width)", margin: "0 auto", padding: "24px 28px 60px" } },
     h("div", { style: { fontFamily: "var(--display)", fontSize: 24, fontWeight: 700, color: "var(--ink-1)", marginBottom: 4 } }, "Reference Sheet"),
     h("div", { style: { fontFamily: "var(--mono)", fontSize: 12, color: "var(--ink-3)", marginBottom: 20 } }, "Every benchmark the engine uses (and a few it will use next), sourced. This is what stands in for napkin math."),
     h("div", { style: { display: "flex", gap: 6, marginBottom: 20, flexWrap: "wrap" } },

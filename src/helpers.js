@@ -345,7 +345,7 @@ function ExportBar({ scope, title, heading, reportSection, source }) {
   const btn = (text, kind, onClick, tip, extra) => h("button", Object.assign({
     key: kind, type: "button", title: tip, disabled: busy != null, onClick,
     style: { padding: "4px 10px", minHeight: 26, borderRadius: 5, border: "1px solid var(--rule)", background: "transparent",
-      color: busy === kind ? "var(--teal)" : "var(--ink-2)", fontFamily: "var(--mono)", fontSize: 10,
+      color: busy === kind ? "var(--ink-1)" : "var(--ink-2)", fontFamily: "var(--mono)", fontSize: 10,
       cursor: busy ? "default" : "pointer", whiteSpace: "nowrap" }
   }, extra || {}), busy === kind ? "…" : text);
 

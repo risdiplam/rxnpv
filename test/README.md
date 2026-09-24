@@ -34,7 +34,7 @@ You must run `node build.js` from the project root first — `setup.js` reads `e
 
 This project's original, deepest test coverage — a 38-check suite covering hand-verified DCF math to the cent — did not survive an earlier sandbox reset during development. `final_regression_pass.js` is a leaner behavioural replacement covering the core valuation paths plus every top-level view, but it asserts "nothing crashed and the right text appeared," not "the arithmetic is right."
 
-**`math_verification.js` (1,130 checks) now covers that gap** and goes wider than the original did — every numerical primitive in the app checked against an independently-derived value.
+**`math_verification.js` (1,137 checks) now covers that gap** and goes wider than the original did — every numerical primitive in the app checked against an independently-derived value.
 
 ### What it does and does not check — read this before adding to it
 
