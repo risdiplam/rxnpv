@@ -265,10 +265,10 @@ function CaseView({ theCase, onChange, onDelete, onNavigateToTools }) {
         h("div", { style: { flex: "1 1 200px" } },
           h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-2)", marginBottom: 5 } }, "Pre-commercial corporate G&A"),
           h("div", { style: { display: "flex", alignItems: "center", gap: 6 } },
-            h("input", { type: "number", value: corpGA.preCommercialAnnualM, placeholder: String(SGA_BENCHMARKS.preCommercialGA.medianM), onChange: e => updateCorpGA({ preCommercialAnnualM: e.target.value }),
+            h("input", { type: "number", "aria-label": "Pre-commercial corporate G&A ($M per year)", value: corpGA.preCommercialAnnualM, placeholder: String(SGA_BENCHMARKS.preCommercialGA.medianM), onChange: e => updateCorpGA({ preCommercialAnnualM: e.target.value }),
               style: { flex: 1, padding: "6px 9px", borderRadius: 6, border: "1.5px solid var(--rule)", background: "var(--surface)", color: "var(--ink-1)", fontFamily: "var(--mono)", fontSize: 12 } }),
             h("span", { style: { fontSize: 11, color: "var(--ink-3)" } }, "$M/yr")),
-          h("div", { style: { fontSize: 9, fontFamily: "var(--mono)", color: "var(--ink-3)", marginTop: 3 } }, "Benchmark: $" + SGA_BENCHMARKS.preCommercialGA.medianM + "M median")
+          h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginTop: 3 } }, "Benchmark: $" + SGA_BENCHMARKS.preCommercialGA.medianM + "M median")
         ),
         h("div", { style: { flex: "1 1 200px" } },
           h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-2)", marginBottom: 5 } }, "G&A share of mature SG&A"),
@@ -276,7 +276,7 @@ function CaseView({ theCase, onChange, onDelete, onNavigateToTools }) {
             h("input", { type: "number", value: corpGA.gaShareOfMatureSgaPct, onChange: e => updateCorpGA({ gaShareOfMatureSgaPct: e.target.value }), "aria-label": "G&A share of mature SG&A (%)",
               style: { flex: 1, padding: "6px 9px", borderRadius: 6, border: "1.5px solid var(--rule)", background: "var(--surface)", color: "var(--ink-1)", fontFamily: "var(--mono)", fontSize: 12 } }),
             h("span", { style: { fontSize: 11, color: "var(--ink-3)" } }, "%")),
-          h("div", { style: { fontSize: 9, fontFamily: "var(--mono)", color: "var(--ink-3)", marginTop: 3 } }, "Judgment call, not a sourced figure — see help below")
+          h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginTop: 3 } }, "Judgment call, not a sourced figure — see help below")
         ),
         h("div", { style: { flex: "1 1 100%" } },
           h(Note, { summary: "Why this split exists" },
@@ -328,7 +328,7 @@ function CaseView({ theCase, onChange, onDelete, onNavigateToTools }) {
             textAlign: "left", lineHeight: 1.35 }
         },
           h("div", null, p.drugName || p.name),
-          multi && h("div", { style: { fontSize: 9, color: isActive ? "var(--teal)" : "var(--ink-3)", fontWeight: 400 } },
+          multi && h("div", { style: { fontSize: 10, color: isActive ? "var(--teal)" : "var(--ink-3)", fontWeight: 400 } },
             [phaseLabel, peak ? fmtMoney(peak) + " peak" : null].filter(Boolean).join(" · "))
         );
       }),

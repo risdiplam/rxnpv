@@ -80,7 +80,7 @@ const EXPORTS = [
   "computeBinaryEventImpliedPoS", "selectPeakSalesCompWindow",
   "applyTaxToCalendar", "computeMoleculeTypePoSRatios", "POS_BY_MOLECULE",
   "computeProgramValuation",
-  "revenueChartYScale", "selectPeakSalesCompWindow",
+  "revenueChartYScale", "niceAxisTicks", "selectPeakSalesCompWindow",
   "measureStorage", "STORAGE_ASSUMED_QUOTA_BYTES", "STORAGE_WARN_FRACTION", "STORAGE_CRITICAL_FRACTION",
   "computeTreatedPopulation", "launchCurveForYears", "erosionMultiplier", "computeProgramRevenue",
   "resolveNetPrice", "aspPctOfBasis", "PRICE_BASIS_OPTIONS", "getRevenueBuild", "PRICING_CONVERSION_MATRIX", "priceBasisArticle",
@@ -1575,6 +1575,42 @@ section("RevenueChart Y-axis scaling (negative-value support)");
     ok(`scale ${i}: zero falls within [minV, maxV]`, 0 >= s.minV && 0 <= s.maxV);
   });
 }
+section("Chart gridlines: niceAxisTicks");
+{
+  // The screenshot that prompted this: risk-adjusted FCF from -$17M to $53M
+  // was gridded at -17, 1, 18, 35, 53 — the zero line labelled "$1M".
+  // Longhand: span 70M / 4 = 17.5M; magnitude 10M, normalised 1.75 -> step 2
+  // x 10M = 20M; floor(-17/20) = -1 -> lo = -20M; ceil(53/20) = 3 -> hi = 60M.
+  const t = api.niceAxisTicks(-17e6, 53e6);
+  near("-17M..53M: step is 20M", t.step, 20e6, 1e-3);
+  near("-17M..53M: axis floor -20M", t.lo, -20e6, 1e-3);
+  near("-17M..53M: axis top 60M", t.hi, 60e6, 1e-3);
+  ok("-17M..53M: ticks are -20, 0, 20, 40, 60 (M)", JSON.stringify(t.ticks) === JSON.stringify([-20e6, 0, 20e6, 40e6, 60e6]));
+  // 0..1630: 1630/4 = 407.5; magnitude 100, normalised 4.075 -> 5 -> step 500;
+  // top ceil(1630/500) = 4 -> 2000.
+  const r = api.niceAxisTicks(0, 1630);
+  ok("0..1630: ticks 0, 500, 1000, 1500, 2000", JSON.stringify(r.ticks) === JSON.stringify([0, 500, 1000, 1500, 2000]));
+  // 0..9: 9/4 = 2.25; magnitude 1, normalised 2.25 -> 2.5 -> step 2.5; top 10.
+  const q = api.niceAxisTicks(0, 9);
+  ok("0..9: 2.5 steps up to 10", JSON.stringify(q.ticks) === JSON.stringify([0, 2.5, 5, 7.5, 10]));
+  // All-negative, axis to zero: -50..0 -> 12.5 -> magnitude 10, 1.25 -> 2 -> 20;
+  // floor(-50/20) = -3 -> -60.
+  const n = api.niceAxisTicks(-50, 0);
+  ok("-50..0: ticks -60, -40, -20, 0 (zero is the top gridline)", JSON.stringify(n.ticks) === JSON.stringify([-60, -40, -20, 0]));
+  // A span that is already an exact multiple is not widened by float drift.
+  const e = api.niceAxisTicks(0, 100);
+  ok("0..100: exact multiple not widened (ticks 0..100 by 25)", JSON.stringify(e.ticks) === JSON.stringify([0, 25, 50, 75, 100]));
+  ok("degenerate 0..0 still yields a finite, increasing axis", api.niceAxisTicks(0, 0).hi > 0);
+  // Invariants across a sweep of awkward ranges.
+  let allGood = true;
+  [[-8.7, 1630], [-3.3e6, 0.4e6], [0.2, 0.9], [-1234567, 7654321], [12, 13]].forEach(([a, b]) => {
+    const k = api.niceAxisTicks(a, b);
+    if (!(k.lo <= a && k.hi >= b)) allGood = false;
+    if (k.lo < 0 && k.hi > 0 && !k.ticks.includes(0)) allGood = false;
+    if (k.ticks.length < 2 || k.ticks.length > 11) allGood = false;
+  });
+  ok("sweep: axis covers the data, includes 0 when it straddles it, 2-11 ticks", allGood);
+}
 report();
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -2121,6 +2157,17 @@ section("Charts stay valid at data extremes");
   }
 
   ok("an empty histogram is an empty svg, not a crash", api.renderHistogram([], {}) === "<svg></svg>");
+  {
+    // The Trial Outcome histogram from the UI audit: effects spanning -0.13 to
+    // 0.45 were labelled only at min / mid / max. niceTicks(-0.13, 0.45, 6):
+    // raw step 0.58/6 = 0.0967, magnitude 0.01, normalised 9.67 -> 10 -> 0.1,
+    // so the labels are -0.1, 0, 0.1, 0.2, 0.3, 0.4.
+    const vals = []; for (let i = 0; i <= 58; i++) vals.push(-0.13 + i * 0.01);
+    const svg = api.renderHistogram(vals, {});
+    const labels = [...svg.matchAll(/<text[^>]*>([^<]*)<\/text>/g)].map(m => m[1]).filter(t => /^-?[\d.]+$/.test(t));
+    ["-0.1", "0", "0.1", "0.2", "0.3", "0.4"].forEach(t => ok("histogram x-axis labels the round value " + t, labels.includes(t)));
+    ok("and no longer labels the raw extremes -0.13 / 0.45", !labels.includes("-0.13") && !labels.includes("0.45"));
+  }
   ok("an empty line chart is an empty svg", api.renderLineChart([{ name: "e", color: "c", points: [] }], {}) === "<svg></svg>");
 
   // Forest plot: no rows and nothing to anchor a domain produced Infinity
@@ -3946,6 +3993,16 @@ section("Icon-array captions wrap instead of being clipped");
   const vb = +(svg.match(/viewBox="0 0 \d+ (\d+)"/) || [])[1];
   ok("the chart grows to make room (taller than the 300 default)", vb > 300);
   ok("a short caption stays on one line", (api.renderIconArray(0.5, { subtitle: "Half" }).match(/font-size="11"/g) || []).length === 1);
+  // Fragility Index "6 out of 50" used to draw a 100-dot grid with 12 lit —
+  // the right share, the wrong count, under a title stating the count.
+  {
+    const fi = api.renderIconArray(6 / 50, { units: 50, highlightCount: 6, highlightColor: "HL", baseColor: "BASE", title: "6 out of 50" });
+    near("count mode draws exactly 50 dots", (fi.match(/<circle/g) || []).length, 50, 0);
+    near("and lights exactly 6 of them", (fi.match(/fill="HL"/g) || []).length, 6, 0);
+    const pct = api.renderIconArray(6 / 50, { highlightColor: "HL" });
+    near("the default per-100 grid is unchanged: 100 dots", (pct.match(/<circle/g) || []).length, 100, 0);
+    near("with 12 lit (6/50 = 12 per 100)", (pct.match(/fill="HL"/g) || []).length, 12, 0);
+  }
 }
 report();
 

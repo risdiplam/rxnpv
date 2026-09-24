@@ -142,21 +142,21 @@ function ValuationPanel({ theCase, onChange }) {
         h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase", marginBottom: 10 } }, "Price vs. model"),
         h("div", { style: { display: "flex", gap: 20, flexWrap: "wrap", alignItems: "baseline" } },
           h("div", null,
-            h("div", { style: { fontSize: 9, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase" } }, "Current price"),
+            h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase" } }, "Current price"),
             h("div", { style: { fontSize: 22, fontFamily: "var(--mono)", fontWeight: 800, color: "var(--ink-1)" } }, price != null ? fmtShare(price) : "—")),
           scenarioResults.map(s => h("div", { key: s.key },
-            h("div", { style: { fontSize: 9, fontFamily: "var(--mono)", color: s.preset.color, textTransform: "uppercase" } }, s.preset.label + " fair value"),
+            h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: s.preset.color, textTransform: "uppercase" } }, s.preset.label + " fair value"),
             h("div", { style: { fontSize: 22, fontFamily: "var(--mono)", fontWeight: 800, color: s.preset.color } },
               fmtShare(s.result.equity.perShare)))),
           upsidePct != null && h("div", null,
-            h("div", { style: { fontSize: 9, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase" } }, "Base upside/downside"),
+            h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase" } }, "Base upside/downside"),
             h("div", { style: { fontSize: 22, fontFamily: "var(--mono)", fontWeight: 800, color: upsidePct >= 0 ? "var(--teal)" : "var(--red)" } },
               (upsidePct >= 0 ? "+" : "") + upsidePct.toFixed(0) + "%")),
           showImplied && theCase.programs.length === 1 && impliedSolved.baseAbsolutePct != null && h("div", null,
-            h("div", { style: { fontSize: 9, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase" } }, "Your PoS"),
+            h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase" } }, "Your PoS"),
             h("div", { style: { fontSize: 22, fontFamily: "var(--mono)", fontWeight: 800, color: "var(--ink-1)" } }, impliedSolved.baseAbsolutePct.toFixed(0) + "%")),
           showImplied && theCase.programs.length === 1 && impliedSolved.impliedAbsolutePct != null && h("div", null,
-            h("div", { style: { fontSize: 9, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase" } }, "Price implies"),
+            h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase" } }, "Price implies"),
             h("div", { style: { fontSize: 22, fontFamily: "var(--mono)", fontWeight: 800, color: impliedSolved.impliedAbsolutePct >= impliedSolved.baseAbsolutePct ? "var(--teal)" : "var(--red)" } },
               impliedSolved.impliedAbsolutePct.toFixed(0) + "%"))
         ),
@@ -202,7 +202,7 @@ function ValuationPanel({ theCase, onChange }) {
           border: "1px solid " + (active === id ? "var(--teal)" : "var(--rule)"),
           background: active === id ? "var(--teal-bg)" : "transparent" } },
         h("div", { style: { fontFamily: "var(--mono)", fontSize: 12, fontWeight: 700, color: active === id ? "var(--teal)" : "var(--ink-1)" } }, label),
-        h("div", { style: { fontFamily: "var(--mono)", fontSize: 9.5, color: "var(--ink-3)", marginTop: 3, lineHeight: 1.45 } }, sub));
+        h("div", { style: { fontFamily: "var(--mono)", fontSize: 10, color: "var(--ink-3)", marginTop: 3, lineHeight: 1.45 } }, sub));
       return h("div", { style: { marginBottom: 14 } },
         h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 } }, "Valuation depth"),
         h("div", { style: { display: "flex", gap: 8, flexWrap: "wrap" } },
@@ -210,7 +210,7 @@ function ValuationPanel({ theCase, onChange }) {
           btn("full", "Full model", "Build peak from epidemiology, then a bottoms-up DCF with costs and timing."),
           active === "custom" && h("div", { key: "custom", style: { flex: "1 1 190px", padding: "9px 12px", borderRadius: 8, border: "1px dashed var(--amber)", background: "transparent" } },
             h("div", { style: { fontFamily: "var(--mono)", fontSize: 12, fontWeight: 700, color: "var(--amber)" } }, "Custom"),
-            h("div", { style: { fontFamily: "var(--mono)", fontSize: 9.5, color: "var(--ink-3)", marginTop: 3, lineHeight: 1.45 } },
+            h("div", { style: { fontFamily: "var(--mono)", fontSize: 10, color: "var(--ink-3)", marginTop: 3, lineHeight: 1.45 } },
               valMethod === "multiple" && allFull ? "Epidemiology build valued off a multiple — rigorous peak, comp-based value."
                 : valMethod === "dcf" && allQuick ? "Typed peak run through the full cost and timing model."
                 : "Programs are mixed between Quick and Full revenue builds."))
@@ -298,6 +298,8 @@ function ValuationPanel({ theCase, onChange }) {
     methodIgnores(valMethod, "terminalValue") && h(NotUsedInThisMode, { what: "Terminal value", compact: true }),
     h("div", { style: { display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 16 } },
       h(BenchField, { label: "Discount rate", value: discountRatePct, onChange: v => update({ discountRatePct: v }), suffix: "%",
+        // Blank means the benchmark is used — say so in the box itself.
+        placeholder: DISCOUNT_RATE_GUIDANCE.earlyBiotechSelfView[0] + " (benchmark, used while blank)",
         bench: { value: DISCOUNT_RATE_GUIDANCE.earlyBiotechSelfView[0], source: "Ch. 15 — \"for pre-commercial biotechs, up to 20%, depending on stage of portfolio\"" },
         help: "Compatible with the PoS risk-adjustment already applied here — avoid double-counting by not also using a naive market WACC." }),
       !methodIgnores(valMethod, "terminalValue") && h("div", { style: { flex: "1 1 100%" } },
@@ -343,7 +345,7 @@ function ValuationPanel({ theCase, onChange }) {
       isDesktop && h("div", { style: { padding: "10px 12px", borderRadius: 8, background: "var(--surface-2)", marginBottom: 14 } },
         h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginBottom: 6, textTransform: "uppercase" } }, "Pull financials from SEC EDGAR"),
         h("div", { style: { display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" } },
-          h("input", { type: "text", value: edgarQuery, placeholder: "Company name or ticker", onChange: e => setEdgarQuery(e.target.value),
+          h("input", { type: "text", "aria-label": "Company name or ticker to pull from EDGAR", value: edgarQuery, placeholder: "Company name or ticker", onChange: e => setEdgarQuery(e.target.value),
             style: { flex: "1 1 200px", padding: "6px 10px", borderRadius: 6, border: "1.5px solid var(--rule)", background: "var(--surface)", color: "var(--ink-1)", fontFamily: "var(--mono)", fontSize: 12 } }),
           h("button", { onClick: () => pullFromEdgar(false), disabled: edgarLoading,
             style: { padding: "6px 14px", borderRadius: 6, border: "1px solid var(--teal)", background: "var(--teal-bg)", color: "var(--teal)", fontFamily: "var(--mono)", fontSize: 11, fontWeight: 700, cursor: edgarLoading ? "default" : "pointer" }
@@ -539,7 +541,7 @@ function ValuationPanel({ theCase, onChange }) {
             // multiplier; multi-program cases still show the multiplier
             // (there's no one PoS to point at) but reworded so it can't be
             // mistaken for an absolute probability.
-            h("div", { style: { fontSize: 9, fontFamily: "var(--mono)", color: "var(--ink-3)", marginBottom: 6 } },
+            h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginBottom: 6 } },
               s.preset.shareMultiplierPct + "% share · " +
               (theCase.programs.length === 1 && s.result.programVals && s.result.programVals[0] && s.result.programVals[0].posToLaunch != null
                 ? "PoS " + (s.result.programVals[0].posToLaunch * 100).toFixed(1) + "%"
@@ -559,7 +561,7 @@ function ValuationPanel({ theCase, onChange }) {
           h("div", { style: { fontSize: 12, fontFamily: "var(--mono)", color: "var(--ink-2)", marginBottom: 6 } }, "Base-case risk-adjusted cash flow by year"),
           h(ExportableBlock, { title: (theCase.name || "Case") + " — base-case risk-adjusted cash flow" },
             h(RevenueChart, { series: cfSeries, showLegend: false, height: 180 })),
-          h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginTop: 4 } }, "Clips negative years to the axis floor — see actual pre-launch values in the P&L panel above.")
+          h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginTop: 4 } }, "Each year's free cash flow weighted by the odds of reaching it. Years below the solid zero line are burn; hover for any year's value.")
         ),
 
         // Implied PoS — the reverse direction from everything else on this
@@ -630,16 +632,16 @@ function ValuationPanel({ theCase, onChange }) {
               steps.map((s, i) => h(React.Fragment, { key: i },
                 i > 0 && h("span", { style: { fontSize: 16, fontFamily: "var(--mono)", color: "var(--ink-3)" } }, s.op),
                 h("div", { style: { padding: "8px 12px", borderRadius: 8, background: "var(--surface-2)", border: s.op === "=" ? "1.5px solid var(--teal)" : "1px solid var(--rule)", textAlign: "center" } },
-                  h("div", { style: { fontSize: 9, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase" } }, s.label),
+                  h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase" } }, s.label),
                   h("div", { style: { fontSize: 13, fontFamily: "var(--mono)", fontWeight: 700, color: s.op === "=" ? "var(--teal)" : "var(--ink-1)" } }, fmtMoney(s.value)))
               )),
               h("span", { style: { fontSize: 16, fontFamily: "var(--mono)", color: "var(--ink-3)" } }, "÷"),
               h("div", { style: { padding: "8px 12px", borderRadius: 8, background: "var(--surface-2)", border: "1px solid var(--rule)", textAlign: "center" } },
-                h("div", { style: { fontSize: 9, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase" } }, "Diluted shares"),
+                h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase" } }, "Diluted shares"),
                 h("div", { style: { fontSize: 13, fontFamily: "var(--mono)", fontWeight: 700, color: "var(--ink-1)" } }, fmtNum(baseR.equity.dilutedShares))),
               h("span", { style: { fontSize: 16, fontFamily: "var(--mono)", color: "var(--ink-3)" } }, "="),
               h("div", { style: { padding: "8px 14px", borderRadius: 8, background: "var(--teal-bg)", border: "1.5px solid var(--teal)", textAlign: "center" } },
-                h("div", { style: { fontSize: 9, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase" } }, "Per share"),
+                h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase" } }, "Per share"),
                 h("div", { style: { fontSize: 16, fontFamily: "var(--mono)", fontWeight: 800, color: "var(--teal)" } }, fmtShare(baseR.equity.perShare)))
             )
           );

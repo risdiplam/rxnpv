@@ -107,13 +107,25 @@ function renderHistogram(values, opts = {}) {
   // labels too printed a midpoint half a unit above a max equal to the min
   // ("100, 100.5, 100"), a non-monotonic axis implying a spread that does not
   // exist. Label the single real value instead.
-  const xTicks = (max === min
-    ? [{ v: min, i: 1 }]
-    : [min, min + range / 2, max].map((v, i) => ({ v, i }))
-  ).map(({ v, i }) => {
-    const x = marginLeft + (i / 2) * plotW;
-    return `<text x="${x.toFixed(1)}" y="${marginTop + plotH + 18}" fill="var(--ink-2)" font-size="10" text-anchor="middle">${fmt(v)}</text>`;
-  }).join('');
+  //
+  // Otherwise: round values at their true positions (niceTicks), not the old
+  // min / midpoint / max — three arbitrary decimals like -0.13, 0.16, 0.45
+  // that gave the eye nothing to measure a bar against.
+  let xTicks;
+  if (max === min) {
+    xTicks = `<text x="${(marginLeft + plotW / 2).toFixed(1)}" y="${marginTop + plotH + 18}" fill="var(--ink-2)" font-size="10" text-anchor="middle">${fmt(min)}</text>`;
+  } else {
+    const tv = niceTicks(min, max, 6).filter(v => v >= min && v <= max);
+    const xStep = tv.length > 1 ? tv[1] - tv[0] : range;
+    const tfmt = valueFormatter || (v => formatTick(v, xStep));
+    xTicks = tv.map(v => {
+      const x = marginLeft + ((v - min) / range) * plotW;
+      // Keep an end label inside the drawing instead of half off its edge.
+      const anchor = x > marginLeft + plotW - 18 ? 'end' : x < marginLeft + 18 ? 'start' : 'middle';
+      return `<line x1="${x.toFixed(1)}" y1="${marginTop + plotH}" x2="${x.toFixed(1)}" y2="${marginTop + plotH + 4}" stroke="var(--ink-2)" stroke-width="1" opacity="0.5" />` +
+        `<text x="${x.toFixed(1)}" y="${marginTop + plotH + 18}" fill="var(--ink-2)" font-size="10" text-anchor="${anchor}">${tfmt(v)}</text>`;
+    }).join('');
+  }
 
   const titleText = title ? `<text x="${width / 2}" y="18" fill="var(--ink-1)" font-size="13" text-anchor="middle" font-weight="600">${escapeXml(title)}</text>` : '';
   const xLabelText = xLabel ? `<text x="${width / 2}" y="${height - 6}" fill="var(--ink-2)" font-size="11" text-anchor="middle">${escapeXml(xLabel)}</text>` : '';
@@ -265,7 +277,10 @@ function renderTornadoChart(rows, opts = {}) {
     const label = `<text x="${(labelWidth - 10).toFixed(1)}" y="${(cy + 4).toFixed(1)}" fill="var(--ink-1)" font-size="11" text-anchor="end">${escapeXml(r.label)}</text>`;
     const tip = `${r.label}: ${r.value.toFixed(3)}${r.value >= 0 ? ' (pushes the outcome up)' : ' (pushes the outcome down)'}`;
     const bar = `<rect x="${x.toFixed(1)}" y="${(cy - barH / 2).toFixed(1)}" width="${w.toFixed(1)}" height="${barH.toFixed(1)}" fill="${color}" opacity="0.85"><title>${escapeXml(tip)}</title></rect>`;
-    const valLabel = `<text x="${(xVal + (r.value >= 0 ? 6 : -6)).toFixed(1)}" y="${(cy + 4).toFixed(1)}" fill="var(--ink-2)" font-size="10" text-anchor="${r.value >= 0 ? 'start' : 'end'}">${r.value.toFixed(2)}</text>`;
+    // A correlation that rounds to zero is printed as 0.00 on the positive
+    // side — "-0.00" is sampling noise dressed up as a direction.
+    const shown = Math.abs(r.value) < 0.005 ? 0 : r.value;
+    const valLabel = `<text x="${(xVal + (shown >= 0 ? 6 : -6)).toFixed(1)}" y="${(cy + 4).toFixed(1)}" fill="var(--ink-2)" font-size="10" text-anchor="${shown >= 0 ? 'start' : 'end'}">${shown.toFixed(2)}</text>`;
     rowsSvg += label + bar + valLabel;
   });
 
@@ -290,10 +305,17 @@ function renderIconArray(fraction, opts = {}) {
   const {
     width = 400, height = 300, cols = 10, rows = 10,
     highlightColor = 'var(--teal)', baseColor = 'var(--rule)',
-    title = '', subtitle = ''
+    title = '', subtitle = '', units = null, highlightCount = null
   } = opts;
-  const total = cols * rows;
-  const highlighted = Math.max(0, Math.min(total, Math.round(fraction * total)));
+  // `units` switches from "per 100" to one dot per real person — used when the
+  // caption states an exact count ("6 out of 50"), where a 100-dot grid with
+  // 12 lit reads as a different number from the one printed above it.
+  const countMode = units != null && units > 0;
+  const nRows = countMode ? Math.ceil(units / cols) : rows;
+  const total = countMode ? units : cols * rows;
+  const highlighted = countMode
+    ? Math.max(0, Math.min(total, highlightCount != null ? highlightCount : Math.round(fraction * total)))
+    : Math.max(0, Math.min(total, Math.round(fraction * total)));
 
   // The caption is a sentence ("For every 100 treated with …"), far wider than
   // one line of a 400-wide chart, and a single centred <text> was clipped at
@@ -307,14 +329,17 @@ function renderIconArray(fraction, opts = {}) {
     else capLines.push(word);
   });
   const extra = Math.max(0, capLines.length - 1) * 14;
-  const fullHeight = height + extra;
-
   const marginTop = title ? 30 : 10;
   const marginBottom = (subtitle ? 28 : 10) + extra;
   const marginSide = 20;
   const plotW = width - marginSide * 2;
+  // In count mode the grid is as tall as its rows need (square-ish cells), so
+  // 50 dots are five rows, not ten stretched ones.
+  const fullHeight = countMode
+    ? marginTop + marginBottom + nRows * Math.min(plotW / cols, (height - (title ? 30 : 10) - (subtitle ? 28 : 10)) / 10)
+    : height + extra;
   const plotH = fullHeight - marginTop - marginBottom;
-  const cellW = plotW / cols, cellH = plotH / rows;
+  const cellW = plotW / cols, cellH = plotH / nRows;
   const r = Math.min(cellW, cellH) * 0.36;
 
   let dots = '';

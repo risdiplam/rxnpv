@@ -92,8 +92,8 @@ function ReportView({ theCase, onBack, updateCase }) {
   const baseResult = scenarioResults && scenarioResults.find(s => s.key === "base").result;
 
   const rpt = reportDark
-    ? { bg: "#181B20", ink1: "#E5E2DA", ink2: "#A19C8E", ink3: "#6E695C", rule: "#2C3038", teal: "#6FAF9A", amber: "#C9A66B", red: "#C17A6B", surface2: "#20242B" }
-    : { bg: "#FFFFFF", ink1: "#26241F", ink2: "#5C574A", ink3: "#8F897A", rule: "#DDD7C9", teal: "#4A8B78", amber: "#A6793D", red: "#B0574A", surface2: "#F5F3EC" };
+    ? { bg: "#181B20", ink1: "#E5E2DA", ink2: "#A19C8E", ink3: "#979388", rule: "#2C3038", teal: "#6FAF9A", onTeal: "#101414", amber: "#C9A66B", red: "#C17A6B", surface2: "#20242B" }
+    : { bg: "#FFFFFF", ink1: "#26241F", ink2: "#5C574A", ink3: "#6B6557", rule: "#DDD7C9", teal: "#387762", onTeal: "#FFFFFF", amber: "#8C6630", red: "#A14B3F", surface2: "#F5F3EC" };
   usePrintBackground(rpt.bg);
   const revenueSeries = (baseResult && baseResult.calendar) ? [{ name: "Company revenue", color: rpt.teal, points: baseResult.calendar.map(c => ({ v: c.revenue, label: c.calendarYear })) }] : [];
   const fcfSeries = (baseResult && baseResult.calendar) ? [{ name: "Risk-adjusted FCF", color: rpt.amber, points: baseResult.calendar.map(c => ({ v: c.riskAdjFCF, label: c.calendarYear })) }] : [];
@@ -128,7 +128,7 @@ function ReportView({ theCase, onBack, updateCase }) {
       h("button", { onClick: onBack, style: { padding: "6px 14px", borderRadius: 6, border: "1px solid " + rpt.rule, background: "transparent", color: rpt.ink2, fontFamily: "monospace", fontSize: 12, cursor: "pointer" } }, "← Back to Workspace"),
       h("button", { onClick: () => setReportDark(!reportDark), style: { padding: "6px 14px", borderRadius: 6, border: "1px solid " + rpt.rule, background: "transparent", color: rpt.ink2, fontFamily: "monospace", fontSize: 12, cursor: "pointer" } }, reportDark ? "☀ Light report" : "☾ Dark report"),
       h("button", { onClick: doExport, disabled: exporting,
-        style: { padding: "6px 14px", borderRadius: 6, border: "1px solid " + rpt.teal, background: rpt.teal, color: "#fff", fontFamily: "monospace", fontSize: 12, fontWeight: 700, cursor: exporting ? "default" : "pointer" }
+        style: { padding: "6px 14px", borderRadius: 6, border: "1px solid " + rpt.teal, background: rpt.teal, color: rpt.onTeal, fontFamily: "monospace", fontSize: 12, fontWeight: 700, cursor: exporting ? "default" : "pointer" }
       }, exporting ? "Exporting…" : "Export as PDF"),
       h("button", { onClick: doExportCSV,
         style: { padding: "6px 14px", borderRadius: 6, border: "1px solid " + rpt.rule, background: "transparent", color: rpt.ink2, fontFamily: "monospace", fontSize: 12, cursor: "pointer" }
@@ -160,7 +160,7 @@ function ReportView({ theCase, onBack, updateCase }) {
           const items = REPORT_SECTIONS.filter(s => s.group === group);
           if (!items.length) return null;
           return h("div", { key: group, style: { marginBottom: 10 } },
-            h("div", { style: { fontSize: 9, fontFamily: "monospace", color: rpt.ink3, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 5 } }, group),
+            h("div", { style: { fontSize: 10, fontFamily: "monospace", color: rpt.ink3, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 5 } }, group),
             h("div", { style: { display: "flex", gap: 14, flexWrap: "wrap" } },
               items.map(s => h("label", { key: s.id,
                 style: { display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontFamily: "monospace", color: inc(s.id) ? rpt.ink1 : rpt.ink3, cursor: "pointer" } },
@@ -180,9 +180,9 @@ function ReportView({ theCase, onBack, updateCase }) {
           const save = next => updateCase({ ...theCase, pinnedResults: next, updatedAt: Date.now() });
           const move = (i, by) => { const next = pins.slice(); const [x] = next.splice(i, 1); next.splice(i + by, 0, x); save(next); };
           const arrow = (label, tip, disabled, onClick) => h("button", { type: "button", title: tip, "aria-label": tip, disabled, onClick,
-            style: { padding: "1px 6px", borderRadius: 4, border: "1px solid " + rpt.rule, background: "transparent", color: disabled ? rpt.rule : rpt.ink2, fontFamily: "monospace", fontSize: 10, cursor: disabled ? "default" : "pointer" } }, label);
+            style: { padding: "1px 6px", minWidth: 26, minHeight: 26, borderRadius: 4, border: "1px solid " + rpt.rule, background: "transparent", color: disabled ? rpt.rule : rpt.ink2, fontFamily: "monospace", fontSize: 10, cursor: disabled ? "default" : "pointer" } }, label);
           return h("div", { id: "report-added-picker", style: { marginTop: 12, paddingTop: 10, borderTop: "1px solid " + rpt.rule } },
-            h("div", { style: { fontSize: 9, fontFamily: "monospace", color: rpt.ink3, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6 } },
+            h("div", { style: { fontSize: 10, fontFamily: "monospace", color: rpt.ink3, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6 } },
               "Added sections (" + pins.filter(p => p.included !== false).length + " of " + pins.length + " included · up to " + PINNED_MAX_PER_CASE_V2 + ")"),
             !pins.length && h("div", { style: { fontSize: 11, fontFamily: "monospace", color: rpt.ink3, lineHeight: 1.6 } },
               "None yet. Every section in Tools, Simulation, the Reference Sheet, Portfolio and the Workspace has a “+ Report” button — each one you click lands here, and you choose and order them."),
@@ -195,7 +195,7 @@ function ReportView({ theCase, onBack, updateCase }) {
                 arrow("↑", "Move up", i === 0, () => move(i, -1)),
                 arrow("↓", "Move down", i === pins.length - 1, () => move(i, 1)),
                 h(ConfirmXButton, { onConfirm: () => save(pins.filter(x => x !== pin)),
-                  title: "Remove this section from the report", style: { padding: "2px 8px", fontSize: 10 } })
+                  title: "Remove this section from the report", style: { padding: "2px 8px", minWidth: 26, minHeight: 26, fontSize: 10 } })
               ))
             ));
         })()
@@ -248,7 +248,7 @@ function ReportView({ theCase, onBack, updateCase }) {
         // Revenue chart (DCF-only — Simple Multiple doesn't compute year-by-year cash flows)
         inc("revenueChart") && (valMethod === "dcf" ? h("div", { style: cardStyle },
           h("div", { style: { fontSize: 13, fontWeight: 700, marginBottom: 10, textTransform: "uppercase", letterSpacing: "0.05em", color: rpt.ink2 } }, "Company Revenue Projection (Base Case)"),
-          h(RevenueChart, { series: revenueSeries, height: 200 })
+          h(RevenueChart, { series: revenueSeries, height: 200, label: "Company revenue projection, base case, by year" })
         ) : h("div", { style: cardStyle },
           h("div", { style: { fontSize: 13, fontWeight: 700, marginBottom: 10, textTransform: "uppercase", letterSpacing: "0.05em", color: rpt.ink2 } }, "Company Revenue Projection"),
           h("div", { style: { fontSize: 11, color: rpt.ink3 } }, "Not shown — this case uses Simple Multiple valuation, which doesn't build a year-by-year revenue projection. Switch to DCF mode to see this chart.")
@@ -257,7 +257,7 @@ function ReportView({ theCase, onBack, updateCase }) {
         // Cash flow chart (DCF-only, same reason)
         inc("cashFlow") && valMethod === "dcf" ? h("div", { style: cardStyle },
           h("div", { style: { fontSize: 13, fontWeight: 700, marginBottom: 10, textTransform: "uppercase", letterSpacing: "0.05em", color: rpt.ink2 } }, "Risk-Adjusted Cash Flow (Base Case)"),
-          h(RevenueChart, { series: fcfSeries, height: 180 })
+          h(RevenueChart, { series: fcfSeries, height: 180, label: "Risk-adjusted free cash flow, base case, by year" })
         ) : null,
 
         // Sum-of-the-Parts — multi-program, DCF-mode only, same rule as the
@@ -374,10 +374,10 @@ function ReportView({ theCase, onBack, updateCase }) {
             h("div", { style: { fontSize: 13, fontWeight: 700, marginBottom: 10, textTransform: "uppercase", letterSpacing: "0.05em", color: rpt.ink2 } }, "Peak Sales — Where This Case Sits Among Real Comps"),
             h("div", { style: { display: "flex", flexDirection: "column", gap: 3 } },
               chartDrugs.map((d, i) => h("div", { key: i, style: { display: "flex", alignItems: "center", gap: 8 } },
-                h("div", { style: { width: 100, fontSize: 9, color: d._own ? rpt.amber : rpt.ink3, fontWeight: d._own ? 700 : 400, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flexShrink: 0 } }, d.drug),
+                h("div", { style: { width: 100, fontSize: 10, color: d._own ? rpt.amber : rpt.ink3, fontWeight: d._own ? 700 : 400, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flexShrink: 0 } }, d.drug),
                 h("div", { style: { flex: 1, height: 11, borderRadius: 3, background: rpt.surface2, overflow: "hidden" } },
                   h("div", { style: { height: "100%", width: (d.peakSalesB / maxB) * 100 + "%", background: d._own ? rpt.amber : rpt.teal, borderRadius: 3 } })),
-                h("div", { style: { width: 46, fontSize: 9, color: d._own ? rpt.amber : rpt.ink2, fontWeight: d._own ? 700 : 400, textAlign: "right", flexShrink: 0 } }, "$" + d.peakSalesB.toFixed(1) + "B")
+                h("div", { style: { width: 46, fontSize: 10, color: d._own ? rpt.amber : rpt.ink2, fontWeight: d._own ? 700 : 400, textAlign: "right", flexShrink: 0 } }, "$" + d.peakSalesB.toFixed(1) + "B")
               ))
             )
           );
@@ -426,11 +426,11 @@ function ReportView({ theCase, onBack, updateCase }) {
             h("div", { style: { fontSize: 13, fontWeight: 700, marginBottom: 10, textTransform: "uppercase", letterSpacing: "0.05em", color: rpt.ink2 } }, "Forward-Looking Cash Runway"),
             h("div", { style: { fontSize: 11, marginBottom: 10, color: rpt.ink2 } },
               "Starting cash " + fmtMoney(fr.startingCash) + " — modeled runway " + (fr.runwayMonths != null ? fr.runwayMonths.toFixed(0) + " months" : "25yr+")),
-            h(RevenueChart, { series: [{ name: "Projected cash balance", color: rpt.teal, points: fr.path.map(p => ({ v: p.balanceEnd, label: p.year })) }], height: 160 })
+            h(RevenueChart, { series: [{ name: "Projected cash balance", color: rpt.teal, points: fr.path.map(p => ({ v: p.balanceEnd, label: p.year })) }], height: 160, label: "Projected cash balance by year" })
           );
         })(),
 
-        h("div", { style: { fontSize: 9, fontFamily: "monospace", color: rpt.ink3, marginTop: 20, borderTop: "1px solid " + rpt.rule, paddingTop: 10, lineHeight: 1.6 } },
+        h("div", { style: { fontSize: 10, fontFamily: "monospace", color: rpt.ink3, marginTop: 20, borderTop: "1px solid " + rpt.rule, paddingTop: 10, lineHeight: 1.6 } },
           "Generated by RxNPV. This is a modeling exercise built on stated assumptions, benchmark data, and simplifications documented in the app's Reference Sheet — it is not investment advice and should not be relied on as the sole basis for any investment decision.")
       )
     )
@@ -487,8 +487,8 @@ function BundleView({ onBack }) {
   const [busy, setBusy] = React.useState(null);
   const [msg, setMsg] = React.useState(null);
   const rpt = dark
-    ? { bg: "#181B20", ink1: "#E5E2DA", ink2: "#A19C8E", ink3: "#6E695C", rule: "#2C3038", teal: "#6FAF9A", surface2: "#20242B" }
-    : { bg: "#FFFFFF", ink1: "#26241F", ink2: "#5C574A", ink3: "#8F897A", rule: "#DDD7C9", teal: "#4A8B78", surface2: "#F5F3EC" };
+    ? { bg: "#181B20", ink1: "#E5E2DA", ink2: "#A19C8E", ink3: "#979388", rule: "#2C3038", teal: "#6FAF9A", onTeal: "#101414", surface2: "#20242B" }
+    : { bg: "#FFFFFF", ink1: "#26241F", ink2: "#5C574A", ink3: "#6B6557", rule: "#DDD7C9", teal: "#387762", onTeal: "#FFFFFF", surface2: "#F5F3EC" };
   usePrintBackground(rpt.bg);
   const included = items.filter(it => it.included !== false);
   const save = (next) => { if (!saveBundle(next)) setMsg({ tone: "err", text: "Couldn't save the bundle — storage is full." }); };
@@ -514,7 +514,7 @@ function BundleView({ onBack }) {
 
   const tbtn = (label, onClick, opts) => h("button", Object.assign({ type: "button", onClick,
     style: { padding: "6px 14px", borderRadius: 6, border: "1px solid " + rpt.rule, background: "transparent", color: rpt.ink2, fontFamily: "monospace", fontSize: 12, cursor: "pointer" } }, opts || {}), label);
-  const primary = { padding: "6px 14px", borderRadius: 6, border: "1px solid " + rpt.teal, background: rpt.teal, color: "#fff", fontFamily: "monospace", fontSize: 12, fontWeight: 700, cursor: "pointer" };
+  const primary = { padding: "6px 14px", borderRadius: 6, border: "1px solid " + rpt.teal, background: rpt.teal, color: rpt.onTeal, fontFamily: "monospace", fontSize: 12, fontWeight: 700, cursor: "pointer" };
   const none = !included.length;
 
   return h("div", { style: { minHeight: "100vh", background: rpt.bg, color: rpt.ink1, fontFamily: "'IBM Plex Sans', sans-serif" } },
@@ -527,7 +527,7 @@ function BundleView({ onBack }) {
         style: Object.assign({}, primary, { background: "transparent", color: rpt.teal }, (none || busy) ? { opacity: 0.5, cursor: "default" } : {}) }, busy === "separate" ? "Exporting…" : "Export as separate PDFs"),
       h("label", { style: { display: "flex", alignItems: "center", gap: 6, fontSize: 11, fontFamily: "monospace", color: rpt.ink2, cursor: "pointer" } },
         h("input", { type: "checkbox", checked: pageEach, onChange: () => setPageEach(!pageEach) }), "one PDF: each item on its own page"),
-      msg && h("span", { role: "status", style: { fontSize: 11, fontFamily: "monospace", color: msg.tone === "ok" ? rpt.teal : "#B0574A" } }, msg.text)),
+      msg && h("span", { role: "status", style: { fontSize: 11, fontFamily: "monospace", color: msg.tone === "ok" ? rpt.teal : (dark ? "#C17A6B" : "#A14B3F") } }, msg.text)),
 
     h("div", { className: "no-print", style: { background: rpt.surface2, borderBottom: "1px solid " + rpt.rule, padding: "14px 20px" } },
       h("div", { style: { maxWidth: 800, margin: "0 auto" } },
@@ -545,10 +545,10 @@ function BundleView({ onBack }) {
             h("span", { style: { flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textDecoration: it.included === false ? "line-through" : "none" } },
               it.title, it.source ? h("span", { style: { color: rpt.ink3 } }, " · " + it.source) : null),
             h("button", { type: "button", "aria-label": "Move up", title: "Move up", disabled: i === 0, onClick: () => move(i, -1),
-              style: { padding: "1px 6px", borderRadius: 4, border: "1px solid " + rpt.rule, background: "transparent", color: i === 0 ? rpt.rule : rpt.ink2, fontFamily: "monospace", fontSize: 10, cursor: i === 0 ? "default" : "pointer" } }, "↑"),
+              style: { padding: "1px 6px", minWidth: 26, minHeight: 26, borderRadius: 4, border: "1px solid " + rpt.rule, background: "transparent", color: i === 0 ? rpt.rule : rpt.ink2, fontFamily: "monospace", fontSize: 10, cursor: i === 0 ? "default" : "pointer" } }, "↑"),
             h("button", { type: "button", "aria-label": "Move down", title: "Move down", disabled: i === items.length - 1, onClick: () => move(i, 1),
-              style: { padding: "1px 6px", borderRadius: 4, border: "1px solid " + rpt.rule, background: "transparent", color: i === items.length - 1 ? rpt.rule : rpt.ink2, fontFamily: "monospace", fontSize: 10, cursor: i === items.length - 1 ? "default" : "pointer" } }, "↓"),
-            h(ConfirmXButton, { onConfirm: () => save(items.filter(x => x !== it)), title: "Remove from the bundle", style: { padding: "2px 8px", fontSize: 10 } })))))),
+              style: { padding: "1px 6px", minWidth: 26, minHeight: 26, borderRadius: 4, border: "1px solid " + rpt.rule, background: "transparent", color: i === items.length - 1 ? rpt.rule : rpt.ink2, fontFamily: "monospace", fontSize: 10, cursor: i === items.length - 1 ? "default" : "pointer" } }, "↓"),
+            h(ConfirmXButton, { onConfirm: () => save(items.filter(x => x !== it)), title: "Remove from the bundle", style: { padding: "2px 8px", minWidth: 26, minHeight: 26, fontSize: 10 } })))))),
 
     // The document — what "Export as one PDF" prints.
     h("div", { id: "bundle-document", style: { maxWidth: 800, margin: "0 auto", padding: "32px 40px" } },
@@ -564,7 +564,7 @@ function BundleView({ onBack }) {
           h("div", { style: { fontSize: 12, fontWeight: 700, color: rpt.ink1 } }, it.title || "Section"),
           h("div", { style: { fontSize: 10, color: rpt.ink3, flexShrink: 0 } }, (it.source ? it.source + " · " : "") + (it.capturedAt ? "captured " + new Date(it.capturedAt).toLocaleDateString() : ""))),
         h(ReportSnapshot, { pin: it, dark }))),
-      h("div", { style: { fontSize: 9.5, color: rpt.ink3, marginTop: 20, lineHeight: 1.6 } },
+      h("div", { style: { fontSize: 10, color: rpt.ink3, marginTop: 20, lineHeight: 1.6 } },
         "Generated by RxNPV. Each item is the section or chart as it stood when it was collected; it is not investment advice.")));
 }
 

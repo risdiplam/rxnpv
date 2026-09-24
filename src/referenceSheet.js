@@ -548,8 +548,8 @@ function ReferenceSheet({ activeCase }) {
       h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10, flexWrap: "wrap", gap: 8 } },
         label("Deals (" + filtered.length + " of " + allDeals.length + ")"),
         h("div", { style: { display: "flex", gap: 8, alignItems: "center" } },
-          h("input", { type: "text", value: maFilter, placeholder: "Filter by company, area, or stage…", onChange: e => setMaFilter(e.target.value),
-            style: { padding: "5px 10px", borderRadius: 6, border: "1px solid var(--rule)", background: "var(--surface)", color: "var(--ink-1)", fontFamily: "var(--mono)", fontSize: 11, width: 220 } }),
+          h("input", { type: "text", "aria-label": "Filter M&A deals", value: maFilter, placeholder: "Filter by company, area, or stage…", onChange: e => setMaFilter(e.target.value),
+            style: { padding: "7px 10px", borderRadius: 6, border: "1.5px solid var(--rule)", background: "var(--surface)", color: "var(--ink-1)", fontFamily: "var(--mono)", fontSize: 12, width: 240 } }),
           h("button", { onClick: () => downloadCSV("RxNPV-MA-Comps.csv",
               ["Acquirer", "Target", "Year", "Deal Value ($B)", "Premium (%)", "Area", "Stage", "Asset", "Note"],
               filtered.map(d => [d.acquirer, d.target, d.year, d.valueB, d.premiumPct, d.area, d.stage, d.asset || "", d.note || ""])),
@@ -641,10 +641,10 @@ function ReferenceSheet({ activeCase }) {
           h("div", { style: { fontFamily: "var(--mono)", fontSize: 12, fontWeight: 700, color: "var(--teal)", marginBottom: 6 } }, p.phase),
           h("div", { style: { display: "flex", gap: 18, flexWrap: "wrap" } },
             h("div", { style: { flex: "1 1 260px" } },
-              h("div", { style: { fontSize: 9, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 } }, "Can establish"),
+              h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 } }, "Can establish"),
               h("ul", { style: { margin: 0, paddingLeft: 16 } }, p.canShow.map((t, i) => h("li", { key: i, style: { fontSize: 11.5, fontFamily: "var(--sans)", color: "var(--ink-2)", lineHeight: 1.6, marginBottom: 3 } }, t)))),
             h("div", { style: { flex: "1 1 260px" } },
-              h("div", { style: { fontSize: 9, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 } }, "Cannot"),
+              h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 } }, "Cannot"),
               h("ul", { style: { margin: 0, paddingLeft: 16 } }, p.cannotShow.map((t, i) => h("li", { key: i, style: { fontSize: 11.5, fontFamily: "var(--sans)", color: "var(--ink-2)", lineHeight: 1.6, marginBottom: 3 } }, t))))
           )
         )))

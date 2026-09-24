@@ -135,9 +135,16 @@ app.whenReady().then(async () => {
     const rows = [];
     for (const it of items) {
       const slug = (stop + "-" + it.id + "-" + it.kind).replace(/[^a-z0-9]+/gi, "-").toLowerCase();
-      const rc = await js(`__t.rect(${it.id})`); await sleep(120);
+      const rc = await js(`__t.rect(${it.id})`);
+      // The screen side of the ink comparison is taken without export rows
+      // (hidden, not removed, so the layout and rect stay put). Exports leave
+      // those rows out by design; once they stopped being faded to 50% they
+      // outweighed a small search form's own content and made correct
+      // exports read as half-empty.
+      await js(`document.querySelectorAll(".section-export-bar, .chart-export-bar").forEach(b => b.style.visibility = "hidden")`); await sleep(120);
       const shot = await dbg.sendCommand("Page.captureScreenshot", { format: "png", captureBeyondViewport: true,
         clip: { x: rc.x, y: rc.y, width: Math.max(1, rc.w), height: Math.max(1, Math.min(rc.h, 6000)), scale: 1 } });
+      await js(`document.querySelectorAll(".section-export-bar, .chart-export-bar").forEach(b => b.style.visibility = "")`);
       const screenFile = path.join(OUT, "files", slug + "-screen.png");
       fs.writeFileSync(screenFile, Buffer.from(shot.data, "base64"));
       const screenInk = inkOf(screenFile);

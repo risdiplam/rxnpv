@@ -235,13 +235,13 @@ function MaPremiumTool({ cases, updateCase, activeCase }) {
       h("div", { style: { display: "flex", gap: 12, flexWrap: "wrap", alignItems: "flex-end" } },
         h("div", { style: { flex: "1 1 180px" } },
           h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-2)", marginBottom: 5 } }, "Starting value per share"),
-          h("input", { type: "number", value: startValue, onChange: e => setStartValue(e.target.value), placeholder: "e.g. 12.50",
+          h("input", { type: "number", "aria-label": "Starting value per share", value: startValue, onChange: e => setStartValue(e.target.value), placeholder: "e.g. 12.50",
             style: { width: "100%", padding: "7px 10px", borderRadius: 6, border: "1.5px solid var(--rule)", background: "var(--surface)", color: "var(--ink-1)", fontFamily: "var(--mono)", fontSize: 13 } })
         ),
         h("div", { style: { flex: "1 1 180px" } },
           h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-2)", marginBottom: 5 } }, "Assumed takeout premium"),
           h("div", { style: { display: "flex", alignItems: "center", gap: 6 } },
-            h("input", { type: "number", value: premiumPct, onChange: e => setPremiumPct(e.target.value), placeholder: String(medianPremium),
+            h("input", { type: "number", "aria-label": "Assumed takeout premium (%)", value: premiumPct, onChange: e => setPremiumPct(e.target.value), placeholder: String(medianPremium),
               style: { flex: 1, padding: "7px 10px", borderRadius: 6, border: "1.5px solid var(--rule)", background: "var(--surface)", color: "var(--ink-1)", fontFamily: "var(--mono)", fontSize: 13 } }),
             h("span", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-3)" } }, "%"))
         )
@@ -498,10 +498,10 @@ function CompanyLookupTool({ cases, updateCase, activeCase, onWatchTrial }) {
                         + (t.strikePrice != null && t.strikePrice > 0 ? " · strike $" + t.strikePrice.toFixed(2) : t.strikePrice === 0 ? " · no exercise price (RSU-type)" : "")
                         + (t.underlyingShares != null && t.underlyingShares !== t.shares ? " · over " + fmtNum(t.underlyingShares) + " underlying shares" : "")
                         + (t.expiresOn ? " · expires " + t.expiresOn : ""),
-                      h(ExternalLink, { href: t.sourceUrl, style: { fontSize: 9, marginLeft: 8 } }, "→ Filing"))
+                      h(ExternalLink, { href: t.sourceUrl, style: { fontSize: 10, marginLeft: 8 } }, "→ Filing"))
                   : h("div", null,
                       fmtNum(t.shares) + " shares" + (t.pricePerShare ? " @ $" + t.pricePerShare.toFixed(2) : "") + (t.valueUsd ? " (" + fmtMoney(t.valueUsd) + ")" : ""),
-                      h(ExternalLink, { href: t.sourceUrl, style: { fontSize: 9, marginLeft: 8 } }, "→ Filing"))
+                      h(ExternalLink, { href: t.sourceUrl, style: { fontSize: 10, marginLeft: 8 } }, "→ Filing"))
               ))),
 
             h("div", { className: "prose", style: { fontSize: 10, fontFamily: "var(--sans)", color: "var(--ink-3)", lineHeight: 1.6, marginTop: 8 } },
@@ -519,11 +519,11 @@ function CompanyLookupTool({ cases, updateCase, activeCase, onWatchTrial }) {
           trialsResult.studies.map((s, i) => h("div", { key: i, style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-2)", padding: "6px 0", borderBottom: "1px solid var(--rule)" } },
             h("div", { style: { display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" } },
               h("span", { style: { color: "var(--ink-1)" } }, s.nctId + " · " + s.phase + " · " + s.status),
-              s.hasResults && h(ExternalLink, { href: "https://clinicaltrials.gov/study/" + s.nctId + "?tab=results", style: { fontSize: 9, color: "var(--teal)", fontWeight: 700 } }, "✓ Results posted →"),
+              s.hasResults && h(ExternalLink, { href: "https://clinicaltrials.gov/study/" + s.nctId + "?tab=results", style: { fontSize: 10, color: "var(--teal)", fontWeight: 700 } }, "✓ Results posted →"),
               onWatchTrial && h("span", { onClick: () => onWatchTrial(s.nctId),
                 role: "button", tabIndex: 0,
                 onKeyDown: (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onWatchTrial(s.nctId); } },
-                style: { fontSize: 9, color: "var(--ink-3)", cursor: "pointer", textDecoration: "underline" } }, "Watch this trial →")),
+                style: { fontSize: 10, color: "var(--ink-3)", cursor: "pointer", textDecoration: "underline" } }, "Watch this trial →")),
             h("div", null, (s.interventions[0] || s.title) + " — " + (s.conditions[0] || ""))
           ))
         )
@@ -534,7 +534,7 @@ function CompanyLookupTool({ cases, updateCase, activeCase, onWatchTrial }) {
       toolLabel(h, "Competitor search by indication"),
       h("div", { style: { fontSize: 11, fontFamily: "var(--sans)", color: "var(--ink-2)", marginBottom: 10 } }, "Not tied to any case — a general research tool. Cross-references sponsors against EDGAR when running as the desktop app."),
       h("div", { style: { display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10 } },
-        h("input", { type: "text", value: condQuery, placeholder: "Indication / condition", onChange: e => setCondQuery(e.target.value),
+        h("input", { type: "text", "aria-label": "Indication or condition", value: condQuery, placeholder: "Indication / condition", onChange: e => setCondQuery(e.target.value),
           style: { flex: "1 1 220px", padding: "7px 10px", borderRadius: 6, border: "1.5px solid var(--rule)", background: "var(--surface)", color: "var(--ink-1)", fontFamily: "var(--mono)", fontSize: 13 } }),
         h("button", { onClick: searchCompetitors, disabled: competitorsLoading,
           style: { padding: "7px 16px", borderRadius: 6, border: "1px solid var(--amber)", background: "var(--amber-bg)", color: "var(--amber)", fontFamily: "var(--mono)", fontSize: 12, fontWeight: 700, cursor: competitorsLoading ? "default" : "pointer" }
@@ -552,7 +552,7 @@ function CompanyLookupTool({ cases, updateCase, activeCase, onWatchTrial }) {
           ),
           h("div", { style: { color: "var(--ink-2)", marginTop: 2, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" } },
             h("span", null, (s.interventions[0] || s.title) + " · " + s.phase + " · " + s.status),
-            s.hasResults && h(ExternalLink, { href: "https://clinicaltrials.gov/study/" + s.nctId + "?tab=results", style: { fontSize: 9, color: "var(--teal)", fontWeight: 700 } }, "✓ Results posted →"))
+            s.hasResults && h(ExternalLink, { href: "https://clinicaltrials.gov/study/" + s.nctId + "?tab=results", style: { fontSize: 10, color: "var(--teal)", fontWeight: 700 } }, "✓ Results posted →"))
         ))
       )
     ])
@@ -804,7 +804,7 @@ function RunwayTool({ cases, updateCase, activeCase }) {
               series: [{ name: "Projected cash balance", color: "var(--teal)", points: fr.path.map(p => ({ v: p.balanceEnd, label: p.year })) }],
               height: 160, showLegend: false
             })),
-          h("div", { style: { fontSize: 9, fontFamily: "var(--mono)", color: "var(--ink-3)", marginTop: 4 } }, "Clamped to zero for display — the model doesn't project negative cash, it projects when a raise becomes necessary.")
+          h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginTop: 4 } }, "Clamped to zero for display — the model doesn't project negative cash, it projects when a raise becomes necessary.")
         )
       ]);
     })(),
@@ -873,7 +873,7 @@ function RunwayVsCatalystTool({ cases, activeCase }) {
           h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)" } }, "MODELED RUNWAY"),
           h("div", { style: { fontSize: 26, fontFamily: "var(--mono)", fontWeight: 800, color: (!res.beyondHorizon && res.runwayMonths < 12) ? "var(--red)" : "var(--teal)" } },
             res.beyondHorizon ? "No end" : res.runwayMonths.toFixed(0) + " mo"),
-          res.beyondHorizon && h("div", { style: { fontSize: 9, fontFamily: "var(--mono)", color: "var(--ink-3)", maxWidth: 150, lineHeight: 1.4 } },
+          res.beyondHorizon && h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", maxWidth: 150, lineHeight: 1.4 } },
             "modeled cash flow turns positive before cash runs out")),
         h("div", null,
           h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)" } }, "DATED CATALYSTS"),
@@ -932,7 +932,7 @@ function RunwayVsCatalystTool({ cases, activeCase }) {
                 r.label + " · " + r.dateText)
             ))
           ),
-          h("div", { style: { display: "flex", justifyContent: "space-between", fontFamily: "var(--mono)", fontSize: 9, color: "var(--ink-3)", marginTop: 4 } },
+          h("div", { style: { display: "flex", justifyContent: "space-between", fontFamily: "var(--mono)", fontSize: 10, color: "var(--ink-3)", marginTop: 4 } },
             h("span", null, "today"), h("span", null, "+" + (horizon / 2).toFixed(0) + " mo"), h("span", null, "+" + horizon.toFixed(0) + " mo"))
         );
       })(),
@@ -1016,7 +1016,7 @@ function ExclusivityTool({ cases, updateCase }) {
       h("div", { style: { fontSize: 11, fontFamily: "var(--sans)", color: "var(--ink-2)", marginBottom: 12, lineHeight: 1.6 } },
         "Live patent expiry from FDA's Orange Book — where the LOE year comes from instead of a guess. Look up an approved comparable in the same class."),
       h("div", { style: { display: "flex", gap: 8, flexWrap: "wrap" } },
-        h("input", { value: name, placeholder: "Brand name — e.g. Eliquis, Jardiance, Uptravi",
+        h("input", { "aria-label": "Brand name", value: name, placeholder: "Brand name — e.g. Eliquis, Jardiance, Uptravi",
           onChange: e => setName(e.target.value), onKeyDown: e => { if (e.key === "Enter") run(); },
           style: { flex: "1 1 300px", padding: "9px 12px", borderRadius: 7, border: "1.5px solid var(--rule)", background: "var(--surface)", color: "var(--ink-1)", fontFamily: "var(--mono)", fontSize: 13 } }),
         h("button", { onClick: run, disabled: loading || !name.trim(),
@@ -1099,9 +1099,9 @@ function BinaryEventTool({ cases, activeCase }) {
 
   const field = (label, value, onChange, placeholder, hint) => h("div", { style: { flex: "1 1 150px" } },
     h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginBottom: 4 } }, label),
-    h("input", { type: "number", value, placeholder, onChange: e => onChange(e.target.value),
+    h("input", { type: "number", "aria-label": label, value, placeholder, onChange: e => onChange(e.target.value),
       style: { width: "100%", padding: "8px 10px", borderRadius: 7, border: "1.5px solid var(--rule)", background: "var(--surface)", color: "var(--ink-1)", fontFamily: "var(--mono)", fontSize: 13 } }),
-    hint && h("div", { style: { fontSize: 9, fontFamily: "var(--mono)", color: "var(--ink-3)", marginTop: 3, lineHeight: 1.4 } }, hint)
+    hint && h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginTop: 3, lineHeight: 1.4 } }, hint)
   );
 
   return h("div", null,
@@ -1120,10 +1120,10 @@ function BinaryEventTool({ cases, activeCase }) {
           h("option", { value: "marketCap" }, "market cap ($M)"))
       ),
       h("div", { style: { display: "flex", gap: 12, flexWrap: "wrap" } },
-        field("Today", current, setCurrent, "10", "what it costs now"),
-        field("If it works", success, setSuccess, "30", "your success-case value"),
-        field("If it fails", fail, setFail, "5", "cash/other assets left"),
-        field("Your PoS (%)", yourPoS, setYourPoS, "40", "optional — your own odds")
+        field("Today", current, setCurrent, "e.g. 10", "what it costs now"),
+        field("If it works", success, setSuccess, "e.g. 30", "your success-case value"),
+        field("If it fails", fail, setFail, "e.g. 5", "cash/other assets left"),
+        field("Your PoS (%)", yourPoS, setYourPoS, "e.g. 40", "optional — your own odds")
       )
     ]),
 
@@ -1162,7 +1162,7 @@ function BinaryEventTool({ cases, activeCase }) {
             res.yourPoSPct != null && h("div", { title: "Your PoS: " + res.yourPoSPct + "%",
               style: { position: "absolute", left: Math.max(0, Math.min(100, res.yourPoSPct)) + "%", top: 0, bottom: 0, width: 3, background: "var(--amber)" } })
           ),
-          h("div", { style: { display: "flex", justifyContent: "space-between", fontFamily: "var(--mono)", fontSize: 9, color: "var(--ink-3)", marginTop: 4 } },
+          h("div", { style: { display: "flex", justifyContent: "space-between", fontFamily: "var(--mono)", fontSize: 10, color: "var(--ink-3)", marginTop: 4 } },
             h("span", null, "0% — fails ", fmt(res.fail)),
             h("span", null, "100% — works ", fmt(res.success))),
           res.yourPoSPct != null && h("div", { style: { fontFamily: "var(--mono)", fontSize: 10, color: "var(--amber)", marginTop: 3 } },
@@ -1233,7 +1233,7 @@ function SensitivityTool({ cases, updateCase, activeCase }) {
             h("div", { style: { height: 8, borderRadius: 4, background: "var(--surface-2)", overflow: "hidden" } },
               h("div", { style: { height: "100%", width: (maxSwing > 0 ? (r.swing / maxSwing) * 100 : 0) + "%", background: "var(--amber)", borderRadius: 4 } })),
             h("div", { style: { display: "flex", gap: 10, marginTop: 4, flexWrap: "wrap" } },
-              r.values.map((v, j) => h("span", { key: j, style: { fontSize: 9, fontFamily: "var(--mono)", color: "var(--ink-3)" } }, v.label + ": " + fmtShare(v.value)))
+              r.values.map((v, j) => h("span", { key: j, style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)" } }, v.label + ": " + fmtShare(v.value)))
             )
           ))
         ))
@@ -1275,7 +1275,11 @@ function SensitivityTool({ cases, updateCase, activeCase }) {
           )))
         )
       ),
-      h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginTop: 8 } }, "Highlighted cell = current Base scenario (100% / 100%).")
+      h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginTop: 8 } }, "Highlighted cell = current Base scenario (100% / 100%). " +
+        // The shading is upside against today's price, not the sign of the
+        // value — without saying so, a grid of positive values all shaded red
+        // (because all are below the price) read as a colouring bug.
+        (gridData.currentPrice ? "Shading is fair value vs today's price (" + fmtShare(gridData.currentPrice) + "): green above +20%, amber within -5% to +20%, red below -5%. Hover a cell for its exact upside." : "Enter a current share price on the case to shade cells by upside."))
     ])
   );
 }
@@ -1405,17 +1409,17 @@ function PeakSalesCompsTool({ cases, updateCase, activeCase }) {
             "Amber = " + (exportCase ? exportCase.name : "your case") + "'s own asset" + (ownDrugs.length > 1 ? "s" : "") + " (" + ownDrugs.map(d => d.drug + " $" + d.peakSalesB.toFixed(2) + "B").join(", ") + ") — shown in its correct position among real comps, not pinned to the bottom."),
           h("div", { style: { display: "flex", flexDirection: "column", gap: 3, maxHeight: 320, overflowY: "auto" } },
             chartDrugs.map((d, i) => h("div", { key: i, style: { display: "flex", alignItems: "center", gap: 8 } },
-              h("div", { style: { width: 90, fontSize: 9, fontFamily: "var(--mono)", color: d._own ? "var(--amber)" : "var(--ink-3)", fontWeight: d._own ? 700 : 400, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flexShrink: 0 } }, d.drug),
+              h("div", { title: d.drug, style: { width: 170, fontSize: 10, fontFamily: "var(--mono)", color: d._own ? "var(--amber)" : "var(--ink-3)", fontWeight: d._own ? 700 : 400, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flexShrink: 0 } }, d.drug),
               h("div", { style: { flex: 1, height: 12, borderRadius: 3, background: "var(--surface)", overflow: "hidden" } },
                 h("div", { style: { height: "100%", width: (d.peakSalesB / maxB) * 100 + "%", background: d._own ? "var(--amber)" : "var(--teal)", opacity: d._own ? 1 : 0.75, borderRadius: 3 } })),
-              h("div", { style: { width: 46, fontSize: 9, fontFamily: "var(--mono)", color: d._own ? "var(--amber)" : "var(--ink-2)", fontWeight: d._own ? 700 : 400, textAlign: "right", flexShrink: 0 } }, "$" + d.peakSalesB.toFixed(1) + "B")
+              h("div", { style: { width: 46, fontSize: 10, fontFamily: "var(--mono)", color: d._own ? "var(--amber)" : "var(--ink-2)", fontWeight: d._own ? 700 : 400, textAlign: "right", flexShrink: 0 } }, "$" + d.peakSalesB.toFixed(1) + "B")
             ))
           )
         );
       })(),
 
       h("div", { style: { display: "flex", gap: 8, marginBottom: 12 } },
-        h("input", { type: "text", value: filter, placeholder: "Filter by drug, company, area…", onChange: e => setFilter(e.target.value),
+        h("input", { type: "text", "aria-label": "Filter peak sales comps", value: filter, placeholder: "Filter by drug, company, area…", onChange: e => setFilter(e.target.value),
           style: { flex: 1, padding: "7px 10px", borderRadius: 6, border: "1.5px solid var(--rule)", background: "var(--surface)", color: "var(--ink-1)", fontFamily: "var(--mono)", fontSize: 13 } }),
         h("button", { onClick: () => downloadCSV("RxNPV-Peak-Sales-Comps.csv",
             ["Drug", "Company", "Area", "Modality", "Peak Sales ($B)", "As Of Year", "Status"],
@@ -1450,7 +1454,7 @@ function PeakSalesCompsTool({ cases, updateCase, activeCase }) {
             h("div", { style: { display: "flex", alignItems: "center", gap: 10 } },
               h("span", { style: { fontFamily: "var(--mono)", fontSize: 15, fontWeight: 700, color: "var(--amber)" } }, "$" + d.peakSalesB + "B"),
               h("button", { onClick: () => exportToCase(d), disabled: !exportCaseId || !exportProgramId,
-                style: { padding: "4px 10px", borderRadius: 6, border: "1px solid var(--teal)", background: "var(--teal-bg)", color: "var(--teal)", fontFamily: "var(--mono)", fontSize: 10, fontWeight: 700, cursor: exportCaseId ? "pointer" : "default", opacity: exportCaseId ? 1 : 0.5 } }, "Export →"),
+                style: { padding: "5px 10px", minHeight: 26, borderRadius: 6, border: "1px solid var(--teal)", background: "var(--teal-bg)", color: "var(--teal)", fontFamily: "var(--mono)", fontSize: 10, fontWeight: 700, cursor: exportCaseId ? "pointer" : "default", opacity: exportCaseId ? 1 : 0.5 } }, "Export →"),
               d._custom && h("button", { onClick: () => { setEditingDrugIdx(customPeakSales.indexOf(d)); setShowAddDrug(false); }, style: { padding: "4px 10px", borderRadius: 6, border: "1px solid var(--rule)", background: "transparent", color: "var(--ink-2)", fontFamily: "var(--mono)", fontSize: 10, cursor: "pointer" } }, "Edit"),
               d._custom && h(ConfirmXButton, { onConfirm: () => deleteCustomDrug(customPeakSales.indexOf(d)), title: "Delete this custom drug" }))
           ),
@@ -1459,7 +1463,7 @@ function PeakSalesCompsTool({ cases, updateCase, activeCase }) {
           h("div", { style: { fontFamily: "var(--mono)", fontSize: 10, color: "var(--ink-3)", marginTop: 2 } }, d.status),
           h("div", { style: { marginTop: 6, paddingTop: 6, borderTop: "1px dashed var(--rule)" } },
             !fdaData[d.drug] && h("button", { onClick: () => lookupFDA(d.drug), disabled: fdaLoading === d.drug,
-              style: { padding: "5px 10px", borderRadius: 5, border: "1px solid var(--rule)", background: "transparent", color: "var(--ink-2)", fontFamily: "var(--mono)", fontSize: 9, cursor: fdaLoading === d.drug ? "default" : "pointer" } },
+              style: { padding: "5px 10px", minHeight: 26, borderRadius: 5, border: "1px solid var(--rule)", background: "transparent", color: "var(--ink-2)", fontFamily: "var(--mono)", fontSize: 10, cursor: fdaLoading === d.drug ? "default" : "pointer" } },
               fdaLoading === d.drug ? "Checking FDA…" : "Check real FDA approval →"),
             fdaData[d.drug] && fdaData[d.drug].ok && fdaData[d.drug].results[0] && (() => {
               const f = fdaData[d.drug].results[0];
@@ -1590,7 +1594,7 @@ function LicensingCompsTool({ cases, updateCase, activeCase }) {
         "Real out-license deals — what a company received for granting a partner development/commercialization rights, in upfront cash, milestones, and royalties. A sanity check for the Partnership Economics overlay, and exportable straight into it. Every deal below is confirmed against the companies' own disclosures, not a single secondary source."),
 
       h("div", { style: { display: "flex", gap: 8, marginBottom: 12 } },
-        h("input", { type: "text", value: filter, placeholder: "Filter by company, asset, area…", onChange: e => setFilter(e.target.value),
+        h("input", { type: "text", "aria-label": "Filter licensing comps", value: filter, placeholder: "Filter by company, asset, area…", onChange: e => setFilter(e.target.value),
           style: { flex: 1, padding: "7px 10px", borderRadius: 6, border: "1.5px solid var(--rule)", background: "var(--surface)", color: "var(--ink-1)", fontFamily: "var(--mono)", fontSize: 13 } }),
         h("button", { onClick: () => downloadCSV("RxNPV-Licensing-Comps.csv",
             ["Licensor", "Licensee", "Year", "Asset", "Area", "Stage", "Territory", "Upfront ($M)", "Total Deal Value ($M)", "Royalty Low %", "Royalty High %", "Royalty Note"],
@@ -1623,7 +1627,7 @@ function LicensingCompsTool({ cases, updateCase, activeCase }) {
               ),
               h("div", { style: { display: "flex", flexDirection: "column", gap: 4, flexShrink: 0 } },
                 h("button", { onClick: () => exportToCase(d), disabled: !exportCase || !exportProgramId,
-                  style: { padding: "5px 12px", borderRadius: 6, border: "1px solid var(--teal)", background: "var(--teal-bg)", color: "var(--teal)", fontFamily: "var(--mono)", fontSize: 10, fontWeight: 700, cursor: (exportCase && exportProgramId) ? "pointer" : "default", opacity: (exportCase && exportProgramId) ? 1 : 0.5 } }, "Export →"),
+                  style: { padding: "5px 12px", minHeight: 26, borderRadius: 6, border: "1px solid var(--teal)", background: "var(--teal-bg)", color: "var(--teal)", fontFamily: "var(--mono)", fontSize: 10, fontWeight: 700, cursor: (exportCase && exportProgramId) ? "pointer" : "default", opacity: (exportCase && exportProgramId) ? 1 : 0.5 } }, "Export →"),
                 isCustom && h("button", { onClick: () => { setEditingDealIdx(customDeals.indexOf(d)); setShowAddDeal(false); },
                   style: { padding: "5px 12px", borderRadius: 6, border: "1px solid var(--rule)", background: "transparent", color: "var(--ink-2)", fontFamily: "var(--mono)", fontSize: 10, cursor: "pointer" } }, "Edit"),
                 isCustom && h(ConfirmXButton, { onConfirm: () => deleteCustomDeal(customDeals.indexOf(d)), title: "Delete this custom licensing deal", style: { padding: "5px 12px", borderRadius: 6 } })
@@ -1827,7 +1831,7 @@ function CatalystCalendarTool({ cases, updateCase, activeCase }) {
             h("span", { style: { color: "var(--ink-3)" } }, e.caseName + " · " + e.progName)),
           h("div", { style: { color: "var(--ink-1)", marginTop: 2, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" } },
             h("span", null, e.nctId + " · " + e.phase + " · " + e.status),
-            e.hasResults && h(ExternalLink, { href: "https://clinicaltrials.gov/study/" + e.nctId + "?tab=results", style: { fontSize: 9, color: "var(--teal)", fontWeight: 700 } }, "✓ Results posted →")),
+            e.hasResults && h(ExternalLink, { href: "https://clinicaltrials.gov/study/" + e.nctId + "?tab=results", style: { fontSize: 10, color: "var(--teal)", fontWeight: 700 } }, "✓ Results posted →")),
           h("div", { style: { color: "var(--ink-2)", marginTop: 2 } }, e.title)
         ))
       )
@@ -2068,17 +2072,17 @@ function TargetDossierTool() {
         h("div", { style: { fontSize: 11.5, fontFamily: "var(--sans)", color: "var(--ink-2)", marginTop: 2, marginBottom: 10 } }, dossier.name),
         h("div", { style: { display: "flex", gap: 22, flexWrap: "wrap" } },
           h("div", null,
-            h("div", { style: { fontSize: 9, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.06em" } }, "Human genetic evidence"),
+            h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.06em" } }, "Human genetic evidence"),
             h("div", { style: { fontSize: 18, fontFamily: "var(--mono)", fontWeight: 800, color: dossier.anyGeneticEvidence ? "var(--teal)" : "var(--ink-2)" } },
               dossier.anyGeneticEvidence ? "Present" : "None found")),
           h("div", null,
-            h("div", { style: { fontSize: 9, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.06em" } }, "Associated diseases"),
+            h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.06em" } }, "Associated diseases"),
             h("div", { style: { fontSize: 18, fontFamily: "var(--mono)", fontWeight: 800, color: "var(--ink-1)" } }, dossier.diseaseCount.toLocaleString())),
           h("div", null,
-            h("div", { style: { fontSize: 9, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.06em" } }, "Drugs against it"),
+            h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.06em" } }, "Drugs against it"),
             h("div", { style: { fontSize: 18, fontFamily: "var(--mono)", fontWeight: 800, color: "var(--ink-1)" } }, dossier.drugCount.toLocaleString())),
           h("div", null,
-            h("div", { style: { fontSize: 9, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.06em" } }, "Reached Phase 3+"),
+            h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.06em" } }, "Reached Phase 3+"),
             h("div", { style: { fontSize: 18, fontFamily: "var(--mono)", fontWeight: 800, color: "var(--ink-1)" } }, dossier.approvedOrLateStage))
         ),
         h("div", { style: { fontSize: 10.5, fontFamily: "var(--sans)", color: "var(--ink-3)", marginTop: 12, lineHeight: 1.6 } },
@@ -2229,7 +2233,7 @@ function LaunchTrackerTool() {
               h("th", { key: t, style: { padding: "6px 10px", background: "var(--surface-2)", borderBottom: "1px solid var(--rule)", fontSize: 10, color: "var(--ink-3)", fontWeight: 500, textAlign: t === "Period" ? "left" : "right", whiteSpace: "nowrap" } }, t)))),
             h("tbody", null, primary.series.map((p, i) => h("tr", { key: i },
               h("td", { style: { padding: "6px 10px", borderBottom: "1px solid var(--rule)", fontSize: 11, color: "var(--ink-1)", whiteSpace: "nowrap" } },
-                p.label, !p.isFullYear && h("span", { style: { color: "var(--amber)", fontSize: 9.5, marginLeft: 6 } }, "partial")),
+                p.label, !p.isFullYear && h("span", { style: { color: "var(--amber)", fontSize: 10, marginLeft: 6 } }, "partial")),
               h("td", { style: { padding: "6px 10px", borderBottom: "1px solid var(--rule)", fontSize: 11, textAlign: "right", color: "var(--ink-1)" } }, money(p.spending)),
               h("td", { style: { padding: "6px 10px", borderBottom: "1px solid var(--rule)", fontSize: 11, textAlign: "right", color: "var(--ink-2)" } }, p.beneficiaries != null ? p.beneficiaries.toLocaleString() : "suppressed"),
               h("td", { style: { padding: "6px 10px", borderBottom: "1px solid var(--rule)", fontSize: 11, textAlign: "right", color: "var(--ink-2)" } }, p.claims != null ? p.claims.toLocaleString() : "—"),
@@ -2360,7 +2364,7 @@ function ActualVsModelTool({ cases, updateCase, activeCase }) {
                 h("tbody", null, cmp.rows.map((r, i) => h("tr", { key: i },
                   h("td", { style: { padding: "6px 10px", borderBottom: "1px solid var(--rule)", fontSize: 11, color: "var(--ink-1)" } }, r.year),
                   h("td", { style: { padding: "6px 10px", borderBottom: "1px solid var(--rule)", fontSize: 11, textAlign: "right", color: "var(--ink-1)" } },
-                    fmtMoney(r.actualUsd), r.impliedAnnualUsd != null && h("div", { style: { fontSize: 9.5, color: "var(--ink-3)" } }, "→ " + fmtMoney(r.impliedAnnualUsd) + " annualised")),
+                    fmtMoney(r.actualUsd), r.impliedAnnualUsd != null && h("div", { style: { fontSize: 10, color: "var(--ink-3)" } }, "→ " + fmtMoney(r.impliedAnnualUsd) + " annualised")),
                   h("td", { style: { padding: "6px 10px", borderBottom: "1px solid var(--rule)", fontSize: 10, color: "var(--ink-3)" } }, r.comparisonBasis),
                   h("td", { style: { padding: "6px 10px", borderBottom: "1px solid var(--rule)", fontSize: 11, textAlign: "right", color: "var(--ink-2)" } },
                     r.outsideModel ? "outside the model" : r.modelPreLaunch ? "pre-launch" : fmtMoney(r.modelledUsd)),
@@ -2490,20 +2494,20 @@ function AssetProgramTool({ onDecodeTrial, onWatchTrial }) {
                   h("span", { style: { color: "var(--ink-1)" } }, s.nctId),
                   h("span", { style: { color: statusColor(s.status) } }, s.status),
                   s.enrollment != null && h("span", { style: { color: "var(--ink-3)" } }, "n=" + s.enrollment.toLocaleString()),
-                  s.hasResults && h("span", { style: { color: "var(--teal)", fontSize: 9.5, fontWeight: 700 } }, "RESULTS POSTED"),
-                  s.allocation === "RANDOMIZED" && h("span", { style: { color: "var(--ink-3)", fontSize: 9.5 } }, "randomised"),
-                  s.masking && s.masking !== "NONE" && h("span", { style: { color: "var(--ink-3)", fontSize: 9.5 } }, "blinded")),
+                  s.hasResults && h("span", { style: { color: "var(--teal)", fontSize: 10, fontWeight: 700 } }, "RESULTS POSTED"),
+                  s.allocation === "RANDOMIZED" && h("span", { style: { color: "var(--ink-3)", fontSize: 10 } }, "randomised"),
+                  s.masking && s.masking !== "NONE" && h("span", { style: { color: "var(--ink-3)", fontSize: 10 } }, "blinded")),
                 h("div", { style: { fontSize: 11, fontFamily: "var(--sans)", color: "var(--ink-2)", lineHeight: 1.5, marginTop: 2 } }, truncatedSpan(h, s.title || "", 110)),
                 h("div", { style: { fontSize: 10, color: "var(--ink-3)", marginTop: 2 } },
                   [s.sponsor, (s.conditions || []).slice(0, 2).join(", "), s.startDate ? "started " + s.startDate : null].filter(Boolean).join(" · ")),
                 h("div", { style: { display: "flex", gap: 10, marginTop: 3, flexWrap: "wrap" } },
                   onDecodeTrial && h("span", { onClick: () => onDecodeTrial(s.nctId), role: "button", tabIndex: 0,
                     onKeyDown: e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onDecodeTrial(s.nctId); } },
-                    style: { fontSize: 9.5, fontFamily: "var(--mono)", color: "var(--teal)", cursor: "pointer", textDecoration: "underline" } }, "Decode this trial →"),
+                    style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--teal)", cursor: "pointer", textDecoration: "underline" } }, "Decode this trial →"),
                   onWatchTrial && h("span", { onClick: () => onWatchTrial(s.nctId), role: "button", tabIndex: 0,
                     onKeyDown: e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onWatchTrial(s.nctId); } },
-                    style: { fontSize: 9.5, fontFamily: "var(--mono)", color: "var(--teal)", cursor: "pointer", textDecoration: "underline" } }, "Watch it →"),
-                  h(ExternalLink, { href: "https://clinicaltrials.gov/study/" + s.nctId, style: { fontSize: 9 } }, "→ Registry"))
+                    style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--teal)", cursor: "pointer", textDecoration: "underline" } }, "Watch it →"),
+                  h(ExternalLink, { href: "https://clinicaltrials.gov/study/" + s.nctId, style: { fontSize: 10 } }, "→ Registry"))
               )))
           )))
       ]),
@@ -2570,14 +2574,14 @@ function LiteratureList({ result, emptyText }) {
         const meta = LIT_EVIDENCE_META[r.evidence] || LIT_EVIDENCE_META.unclassified;
         return h("div", { key: r.id || i, style: { padding: "8px 0 8px 10px", borderLeft: "3px solid " + meta.color, borderBottom: "1px solid var(--rule)" } },
           h("div", { style: { display: "flex", gap: 8, alignItems: "baseline", flexWrap: "wrap", marginBottom: 2 } },
-            h("span", { style: { fontSize: 9.5, fontFamily: "var(--mono)", color: meta.color, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em" } }, r.kindLabel),
-            r.freeFullText && h("span", { style: { fontSize: 9, fontFamily: "var(--mono)", color: "var(--teal)" } }, "free full text"),
-            r.citedBy != null && h("span", { style: { fontSize: 9, fontFamily: "var(--mono)", color: "var(--ink-3)" } }, r.citedBy.toLocaleString() + " citations")),
+            h("span", { style: { fontSize: 10, fontFamily: "var(--mono)", color: meta.color, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em" } }, r.kindLabel),
+            r.freeFullText && h("span", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--teal)" } }, "free full text"),
+            r.citedBy != null && h("span", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)" } }, r.citedBy.toLocaleString() + " citations")),
           h("div", { style: { fontSize: 12, fontFamily: "var(--sans)", color: "var(--ink-1)", lineHeight: 1.5 } }, r.title),
           h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginTop: 2 } },
             [r.venue, r.year].filter(Boolean).join(" · ")
               + (r.authors ? " · " + truncateText(r.authors, 60) : "")),
-          h(ExternalLink, { href: r.url, style: { fontSize: 9, marginTop: 3, display: "inline-block" } }, "→ Read it"));
+          h(ExternalLink, { href: r.url, style: { fontSize: 10, marginTop: 3, display: "inline-block" } }, "→ Read it"));
       })),
 
     h("div", { className: "prose", style: { fontSize: 10, fontFamily: "var(--sans)", color: "var(--ink-3)", lineHeight: 1.6, marginTop: 10 } },
@@ -2784,8 +2788,8 @@ function TrialResultsPanels({ results, study }) {
     ]),
 
     results.secondaryOutcomes.length > 0 && toolCard(h, [
-      h("button", { onClick: () => setOpenSecondary(v => !v),
-        style: { background: "none", border: "none", padding: 0, cursor: "pointer", fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.07em" } },
+      h("button", { onClick: () => setOpenSecondary(v => !v), "aria-expanded": openSecondary,
+        style: { background: "none", border: "none", padding: "6px 0", minHeight: 24, cursor: "pointer", fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.07em" } },
         (openSecondary ? "▾" : "▸") + " Secondary endpoints (" + results.secondaryOutcomes.length + ")"),
       openSecondary
         ? h("div", null, results.secondaryOutcomes.slice(0, 10).map((o, i) => outcomeBlock(o, i)),
@@ -2841,7 +2845,7 @@ function TrialResultsPanels({ results, study }) {
             h("tbody", null, aeRows.map((e, i) => h("tr", { key: i },
               h("td", { style: tdL },
                 h("div", null, e.term),
-                e.organSystem && h("div", { style: { fontSize: 9.5, color: "var(--ink-3)" } }, e.organSystem)),
+                e.organSystem && h("div", { style: { fontSize: 10, color: "var(--ink-3)" } }, e.organSystem)),
               // Every rate carries its denominator, as in the summary table
               // above: 50% of 4 and 50% of 400 are not the same finding (FIN-004).
               safety.primaryGroups.map(g => { const c = e.byGroup[g.id]; return h("td", { key: g.id, style: tdS },
@@ -3050,8 +3054,8 @@ function TrialDecoderTool({ initialNctId, onConsumedInitialNctId }) {
       ]),
 
       raw && toolCard(h, [
-        h("button", { onClick: () => setShowRaw(v => !v),
-          style: { background: "none", border: "none", padding: 0, cursor: "pointer", fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)" } },
+        h("button", { onClick: () => setShowRaw(v => !v), "aria-expanded": showRaw,
+          style: { background: "none", border: "none", padding: "6px 0", minHeight: 24, cursor: "pointer", fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)" } },
           (showRaw ? "▾" : "▸") + " Registered fields this was derived from"),
         showRaw && h("pre", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-2)", background: "var(--surface-2)", padding: 10, borderRadius: 6, overflowX: "auto", marginTop: 8, lineHeight: 1.5 } },
           JSON.stringify({ allocation: raw.allocation, interventionModel: raw.interventionModel, masking: raw.masking,
@@ -3284,12 +3288,12 @@ function TrialWatchTool({ initialNctId, onConsumedInitialNctId }) {
             ctSummary.studies.map((s, i) => h("div", { key: s.nctId || i, style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-2)", padding: "6px 0", borderBottom: "1px solid var(--rule)" } },
               h("div", { style: { display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" } },
                 h("span", { style: { color: "var(--ink-1)" } }, (s.nctId || "—") + " · " + (s.phase || "—") + " · " + (s.status || "—")),
-                s.hasResults && h(ExternalLink, { href: "https://clinicaltrials.gov/study/" + s.nctId + "?tab=results", style: { fontSize: 9, color: "var(--teal)", fontWeight: 700 } }, "✓ Results posted →"),
-                s.nctId && h(ExternalLink, { href: "https://clinicaltrials.gov/study/" + s.nctId, style: { fontSize: 9 } }, "→ View on ClinicalTrials.gov"),
+                s.hasResults && h(ExternalLink, { href: "https://clinicaltrials.gov/study/" + s.nctId + "?tab=results", style: { fontSize: 10, color: "var(--teal)", fontWeight: 700 } }, "✓ Results posted →"),
+                s.nctId && h(ExternalLink, { href: "https://clinicaltrials.gov/study/" + s.nctId, style: { fontSize: 10 } }, "→ View on ClinicalTrials.gov"),
                 s.nctId && h("span", { onClick: () => { setNctInput(s.nctId); check(s.nctId); },
                   role: "button", tabIndex: 0,
                   onKeyDown: (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setNctInput(s.nctId); check(s.nctId); } },
-                  style: { fontSize: 9, color: "var(--ink-3)", cursor: "pointer", textDecoration: "underline" } }, "Watch this trial →")
+                  style: { fontSize: 10, color: "var(--ink-3)", cursor: "pointer", textDecoration: "underline" } }, "Watch this trial →")
               ),
               h("div", null, (s.title || "untitled") + (s.sponsor ? " — " + s.sponsor : "") + (s.enrollment ? " · n=" + s.enrollment : ""))
             ))
@@ -3338,7 +3342,7 @@ function TrialWatchTool({ initialNctId, onConsumedInitialNctId }) {
                       + (worth ? " — " + worth + " worth reading" : " — all routine") + ":"),
                   result.changes.map((c, i) => h("div", { key: i, style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-1)", padding: "6px 0 6px 9px", marginTop: i > 0 ? 4 : 0, borderLeft: "3px solid " + sevColor(c.severity) } },
                     h("b", { style: { color: sevColor(c.severity) } }, c.label),
-                    h("span", { style: { color: "var(--ink-3)", fontSize: 9.5, marginLeft: 7 } }, "· " + sevWord(c.severity)),
+                    h("span", { style: { color: "var(--ink-3)", fontSize: 10, marginLeft: 7 } }, "· " + sevWord(c.severity)),
                     c.note
                       ? h("div", { style: { marginTop: 3, fontFamily: "var(--sans)", fontSize: 11, color: "var(--ink-2)", lineHeight: 1.6 } }, c.note)
                       : c.from !== undefined
@@ -3352,7 +3356,7 @@ function TrialWatchTool({ initialNctId, onConsumedInitialNctId }) {
                     "This compares your last two checks, not every revision the sponsor filed. CT.gov keeps a full version history; if something important moved, read it there rather than assuming this caught the whole sequence.")
                 );
               })(),
-        h(ExternalLink, { href: "https://clinicaltrials.gov/study/" + result.nctId, style: { fontSize: 9, marginTop: 8, display: "inline-block" } }, "→ View on ClinicalTrials.gov")
+        h(ExternalLink, { href: "https://clinicaltrials.gov/study/" + result.nctId, style: { fontSize: 10, marginTop: 8, display: "inline-block" } }, "→ View on ClinicalTrials.gov")
       )
     ]),
 

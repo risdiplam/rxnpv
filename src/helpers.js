@@ -95,11 +95,13 @@ function BenchField({ label, value, onChange, bench, suffix, placeholder, step, 
   const isCustom = hasValue && !isBenchmark;
   const borderColor = isCustom ? "var(--teal)" : isBenchmark ? "var(--amber)" : "var(--rule)";
 
-  return h("div", { style: { marginBottom: 14, flex: wide ? "1 1 100%" : "1 1 200px", minWidth: 180 } },
+  // Capped so a field alone on its row doesn't stretch to the full 1,240px
+  // container for a two-digit number; in a row of three each still gets ~370.
+  return h("div", { style: { marginBottom: 14, flex: wide ? "1 1 100%" : "1 1 200px", minWidth: 180, maxWidth: wide ? "none" : 420 } },
     h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-2)", marginBottom: 5, display: "flex", alignItems: "center", gap: 6 } },
       label,
-      isCustom && h("span", { title: "Overridden from benchmark", style: { color: "var(--teal)", fontSize: 9 } }, "● custom"),
-      isBenchmark && h("span", { title: "Using benchmark default", style: { color: "var(--amber)", fontSize: 9 } }, "◆ benchmark")
+      isCustom && h("span", { title: "Overridden from benchmark", style: { color: "var(--teal)", fontSize: 10 } }, "● custom"),
+      isBenchmark && h("span", { title: "Using benchmark default", style: { color: "var(--amber)", fontSize: 10 } }, "◆ benchmark")
     ),
     h("div", { style: { display: "flex", alignItems: "center", gap: 6 } },
       h("input", {
@@ -335,8 +337,8 @@ function ExportBar({ scope, title, heading, reportSection, source }) {
 
   const btn = (text, kind, onClick, tip, extra) => h("button", Object.assign({
     key: kind, type: "button", title: tip, disabled: busy != null, onClick,
-    style: { padding: "3px 9px", borderRadius: 5, border: "1px solid var(--rule)", background: "transparent",
-      color: busy === kind ? "var(--teal)" : "var(--ink-3)", fontFamily: "var(--mono)", fontSize: 10,
+    style: { padding: "4px 10px", minHeight: 26, borderRadius: 5, border: "1px solid var(--rule)", background: "transparent",
+      color: busy === kind ? "var(--teal)" : "var(--ink-2)", fontFamily: "var(--mono)", fontSize: 10,
       cursor: busy ? "default" : "pointer", whiteSpace: "nowrap" }
   }, extra || {}), busy === kind ? "…" : text);
 
@@ -354,7 +356,7 @@ function ExportBar({ scope, title, heading, reportSection, source }) {
       msg.bundle && h("button", { type: "button", onClick: () => { const src = liveSource(); if (src && src.openBundle) src.openBundle(); },
         style: { marginLeft: 8, background: "none", border: "none", padding: 0, color: "var(--teal)", textDecoration: "underline", fontFamily: "var(--mono)", fontSize: 10, cursor: "pointer" } },
         "Open bundle →")),
-    h("span", { title: label, style: { fontSize: 9, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.05em", maxWidth: 360, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } },
+    h("span", { title: label, style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.05em", maxWidth: 360, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } },
       (isChart ? "Export chart" : "Export section") + (shortLabel ? " · " : ""),
       shortLabel && h("span", { style: { textTransform: "none", letterSpacing: 0 } }, shortLabel)),
     btn("PNG", "png", () => doExport("png"), isChart
@@ -371,11 +373,11 @@ function ExportBar({ scope, title, heading, reportSection, source }) {
         : reportSection
           ? (inReport ? "This section is in " + (target && target.name) + "'s report — click to take it out" : "Include this section in " + (target && target.name) + "'s report (it renders live from the model there)")
           : "Add " + (isChart ? "just this chart" : "this whole section") + " to " + (target && target.name) + "'s report, to build a PDF of only what you choose",
-      noCase ? { disabled: true, style: { padding: "3px 9px", borderRadius: 5, border: "1px dashed var(--rule)", background: "transparent", color: "var(--ink-3)", fontFamily: "var(--mono)", fontSize: 10, opacity: 0.6, cursor: "not-allowed" } }
-        : (inReport ? { style: { padding: "3px 9px", borderRadius: 5, border: "1px solid var(--teal)", background: "var(--teal-bg)", color: "var(--teal)", fontFamily: "var(--mono)", fontSize: 10, cursor: busy ? "default" : "pointer", whiteSpace: "nowrap" } } : null)),
+      noCase ? { disabled: true, style: { padding: "4px 10px", minHeight: 26, borderRadius: 5, border: "1px dashed var(--rule)", background: "transparent", color: "var(--ink-3)", fontFamily: "var(--mono)", fontSize: 10, opacity: 0.6, cursor: "not-allowed" } }
+        : (inReport ? { style: { padding: "4px 10px", minHeight: 26, borderRadius: 5, border: "1px solid var(--teal)", background: "var(--teal-bg)", color: "var(--teal)", fontFamily: "var(--mono)", fontSize: 10, cursor: busy ? "default" : "pointer", whiteSpace: "nowrap" } } : null)),
     btn("+ Bundle", "bundle", doBundle, "Collect " + (isChart ? "just this chart" : "this whole section") + " into your PDF bundle — then export everything you collected as one PDF, or each as its own PDF, from Bundle in the top bar. No case needed."),
     cases.length > 1 && h("select", { "aria-label": "Case whose report this goes to", value: targetId || "", onChange: e => setPickedCaseId(e.target.value),
-      style: { padding: "2px 6px", borderRadius: 5, border: "1px solid var(--rule)", background: "var(--surface)", color: "var(--ink-3)", fontFamily: "var(--mono)", fontSize: 9, maxWidth: 150 } },
+      style: { padding: "2px 6px", borderRadius: 5, border: "1px solid var(--rule)", background: "var(--surface)", color: "var(--ink-3)", fontFamily: "var(--mono)", fontSize: 10, maxWidth: 150 } },
       cases.map(c => h("option", { key: c.id, value: c.id }, c.name || "Untitled")))
   );
 }
@@ -489,7 +491,7 @@ function ConfirmXButton({ onConfirm, title, label, armedLabel, style }) {
   }, [armed]);
 
   const base = {
-    padding: "4px 10px", borderRadius: 5, border: "1px solid var(--red)",
+    padding: "4px 10px", minWidth: 26, minHeight: 26, borderRadius: 5, border: "1px solid var(--red)",
     background: armed ? "var(--red)" : "var(--red-bg)",
     color: armed ? "var(--surface)" : "var(--red)",
     fontFamily: "var(--mono)", fontSize: 11, cursor: "pointer",
@@ -723,7 +725,7 @@ function CustomCompForm({ fields, onSave, onCancel, initialValues, saveLabel }) 
   return h("div", { style: { padding: "12px 14px", borderRadius: 8, background: "var(--surface-2)", marginTop: 8 } },
     h("div", { style: { display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, marginBottom: 10 } },
       fields.map(f => h("div", { key: f.key },
-        h("div", { style: { fontSize: 9, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 3 } },
+        h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 3 } },
           f.label + (f.key === requiredKey ? " *" : "")),
         h("input", {
           type: f.numeric ? "number" : "text", value: vals[f.key], placeholder: f.placeholder,
@@ -767,7 +769,7 @@ function MilestoneEntryForm({ onSave, onCancel, initialValues, saveLabel }) {
   const [gate, setGate] = React.useState(iv.gate || "phase3");
   const [valueM, setValueM] = React.useState(iv.valueM != null ? String(iv.valueM) : "");
   const inputStyle = { width: "100%", padding: "5px 8px", borderRadius: 5, border: "1px solid var(--rule)", background: "var(--surface)", color: "var(--ink-1)", fontFamily: "var(--mono)", fontSize: 11 };
-  const fieldLabelStyle = { fontSize: 9, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 3 };
+  const fieldLabelStyle = { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 3 };
   const canSave = label.trim().length > 0 && valueM !== "" && Number(valueM) > 0;
 
   return h("div", { style: { padding: "10px 12px", borderRadius: 7, background: "var(--surface)", marginTop: 6, border: "1px solid var(--rule)" } },
@@ -804,7 +806,7 @@ function CalibrationEntryForm({ onSave, onCancel, initialValues, saveLabel }) {
   const [outcome, setOutcome] = React.useState(iv.outcome || "pending");
   const [notes, setNotes] = React.useState(iv.notes || "");
   const inputStyle = { width: "100%", padding: "5px 8px", borderRadius: 5, border: "1px solid var(--rule)", background: "var(--surface)", color: "var(--ink-1)", fontFamily: "var(--mono)", fontSize: 11 };
-  const fieldLabelStyle = { fontSize: 9, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 3 };
+  const fieldLabelStyle = { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 3 };
   const canSave = catalystLabel.trim().length > 0;
 
   return h("div", { style: { padding: "12px 14px", borderRadius: 8, background: "var(--surface-2)", marginTop: 8 } },
@@ -858,7 +860,7 @@ function EvidenceEntryForm({ onSave, onCancel, initialValues, saveLabel }) {
   const [date, setDate] = React.useState(iv.date || "");
   const [thesis, setThesis] = React.useState(iv.thesis || "");
   const inputStyle = { width: "100%", padding: "5px 8px", borderRadius: 5, border: "1px solid var(--rule)", background: "var(--surface)", color: "var(--ink-1)", fontFamily: "var(--mono)", fontSize: 11 };
-  const fieldLabelStyle = { fontSize: 9, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 3 };
+  const fieldLabelStyle = { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 3 };
   const canSave = label.trim().length > 0;
 
   return h("div", { style: { padding: "12px 14px", borderRadius: 8, background: "var(--surface-2)", marginTop: 8 } },
@@ -946,8 +948,19 @@ function MonteCarloBox({ theCase, discountRatePct, tv }) {
   };
 
   const fmt = fmtShare;
-  const maxP90 = result ? result.percentiles.p90 : 1;
-  const barStyle = (v, color) => ({ height: "100%", borderRadius: 3, width: Math.max(2, (v / maxP90) * 100) + "%", background: color });
+  // All five bars share one axis that always contains zero, and each bar runs
+  // from zero to its value. Scaling by v / P90 (as this once did) drew every
+  // negative percentile as a 2% stub and a small positive P90 as the full
+  // width — so a distribution centred on -$0.15 looked like it sat at +$0.05.
+  const axisLo = result ? Math.min(0, result.percentiles.p10) : 0;
+  const axisHi = result ? Math.max(0, result.percentiles.p90) : 1;
+  const axisSpan = (axisHi - axisLo) || 1;
+  const axisPos = v => ((v - axisLo) / axisSpan) * 100;
+  const zeroPct = axisPos(0);
+  const barStyle = (v, color) => {
+    const a = axisPos(v), left = Math.min(a, zeroPct), width = Math.abs(a - zeroPct);
+    return { position: "absolute", top: 0, bottom: 0, left: left + "%", width: "max(3px, " + width + "%)", borderRadius: 3, background: color };
+  };
 
   return h(ExportSection, { title: "Full-case Monte Carlo", style: { marginTop: 16, padding: "14px 16px", borderRadius: 10, background: "var(--surface-2)", border: "1.5px solid var(--teal)" } },
     h("div", { style: { fontSize: 13, fontFamily: "var(--display)", fontWeight: 700, color: "var(--ink-1)", marginBottom: 4 } }, "Full-case Monte Carlo"),
@@ -961,14 +974,23 @@ function MonteCarloBox({ theCase, discountRatePct, tv }) {
       h(ExportableBlock, { title: (theCase.name || "Case") + " — Monte Carlo fair-value distribution" },
       h("div", { style: { display: "flex", gap: 20, flexWrap: "wrap", marginBottom: 14 } },
         [["P10", result.percentiles.p10], ["P25", result.percentiles.p25], ["P50 (median)", result.percentiles.p50], ["P75", result.percentiles.p75], ["P90", result.percentiles.p90]].map(([label, v]) =>
-          h("div", { key: label }, h("div", { style: { fontSize: 9, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase" } }, label),
+          h("div", { key: label }, h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase" } }, label),
             h("div", { style: { fontSize: 15, fontFamily: "var(--mono)", fontWeight: 700, color: label.startsWith("P50") ? "var(--teal)" : "var(--ink-1)" } }, fmt(v))))
       ),
-      [["P10", result.percentiles.p10, "var(--red)"], ["P25", result.percentiles.p25, "var(--amber)"], ["P50", result.percentiles.p50, "var(--teal)"], ["P75", result.percentiles.p75, "var(--amber)"], ["P90", result.percentiles.p90, "var(--red)"]].map(([label, v, color]) =>
+      [["P10", result.percentiles.p10, "var(--ink-3)"], ["P25", result.percentiles.p25, "var(--amber)"], ["P50", result.percentiles.p50, "var(--teal)"], ["P75", result.percentiles.p75, "var(--amber)"], ["P90", result.percentiles.p90, "var(--ink-3)"]].map(([label, v, color]) =>
         h("div", { key: label, style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 4 } },
-          h("div", { style: { width: 28, fontSize: 9, fontFamily: "var(--mono)", color: "var(--ink-3)" } }, label),
-          h("div", { style: { flex: 1, height: 6, borderRadius: 3, background: "var(--surface)" } }, h("div", { style: barStyle(v, color) })))
-      )),
+          h("div", { style: { width: 28, fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)" } }, label),
+          h("div", { style: { position: "relative", flex: 1, height: 6, borderRadius: 3, background: "var(--surface)" } },
+            axisLo < 0 && axisHi > 0 && h("div", { style: { position: "absolute", top: -3, bottom: -3, left: zeroPct + "%", width: 1, background: "var(--ink-3)" } }),
+            h("div", { style: barStyle(v, color) })))
+      ),
+      h("div", { style: { display: "flex", alignItems: "center", gap: 8, marginTop: 2 } },
+        h("div", { style: { width: 28 } }),
+        h("div", { style: { position: "relative", flex: 1, height: 14, fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)" } },
+          h("span", { style: { position: "absolute", left: 0 } }, fmt(axisLo)),
+          axisLo < 0 && axisHi > 0 && zeroPct > 8 && zeroPct < 92 && h("span", { style: { position: "absolute", left: zeroPct + "%", transform: "translateX(-50%)" } }, "0"),
+          h("span", { style: { position: "absolute", right: 0 } }, fmt(axisHi))))
+      ),
       h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginTop: 10, lineHeight: 1.6 } },
         "Median can differ from the Base-case point estimate above — that's expected, not a discrepancy: discounting is non-linear (a higher rate hurts value more than an equal-sized lower rate helps it), so averaging across a range captures that in a way three fixed points can't."),
       h("div", { style: { marginTop: 12 } },
@@ -1376,7 +1398,7 @@ function WorkspaceNav({ sections }) {
       background: "var(--bg)", borderBottom: "1px solid var(--rule)",
       padding: "9px 0", display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center"
     } },
-    h("span", { style: { fontSize: 9, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.05em", marginRight: 2 } }, "Jump to"),
+    h("span", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.05em", marginRight: 2 } }, "Jump to"),
     visible.map(s => h("button", {
       key: s.id, onClick: () => jump(s.id),
       style: {
@@ -1398,7 +1420,17 @@ function ExportableBlock({ title, style, children }) {
   // be taken out on its own (with its title) as well as inside its section.
   // The section's bar still exports everything, chart included.
   const h = React.createElement;
-  return h("div", { "data-export-chart": title || "", style: style || null },
+  const ref = React.useRef(null);
+  // A screen reader announces a bare <svg> as "graphic"; the block's title is
+  // the chart's name, so give it to any chart inside that has none better.
+  React.useEffect(() => {
+    if (!ref.current || !title) return;
+    ref.current.querySelectorAll("svg").forEach(s => {
+      if (s.getAttribute("data-titled") === "1" || (s.getBoundingClientRect().width || 0) < 120 && s.getBoundingClientRect().width !== 0) return;
+      s.setAttribute("role", "img"); s.setAttribute("aria-label", title); s.setAttribute("data-titled", "1");
+    });
+  });
+  return h("div", { ref, "data-export-chart": title || "", style: style || null },
     children, h(ChartExportBar, { title }));
 }
 

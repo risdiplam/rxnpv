@@ -412,16 +412,23 @@ function sectionTitleOf(root) {
   if (copy.querySelectorAll) copy.querySelectorAll("[data-no-export], .badge").forEach(n => n.remove());
   const heading = copy.querySelector && copy.querySelector("h1,h2,h3,h4,[data-section-title]");
   if (heading && heading.textContent.trim()) return heading.textContent.trim().slice(0, 90);
-  // A panel whose heading sits just before it (Simulation's Meta-Analysis).
-  const prev = root.previousElementSibling;
-  if (prev && /^H[1-4]$/.test(prev.tagName)) {
+  // A panel whose heading sits just before it (Simulation's Meta-Analysis),
+  // possibly with a description paragraph in between.
+  let prev = root.previousElementSibling;
+  for (let hops = 0; prev && hops < 3; hops++, prev = prev.previousElementSibling) {
+    if (!/^H[1-4]$/.test(prev.tagName)) continue;
     const p = prev.cloneNode(true); p.querySelectorAll(".badge").forEach(n => n.remove());
     if (p.textContent.trim()) return p.textContent.trim().slice(0, 90);
+    break;
   }
   // Last resort: the first line of text. innerText keeps line breaks (the
   // live copy is used, since a detached clone has no layout); textContent
   // would run every line together ("Base fair value: -$0.10Peak market…").
-  const live = (root.innerText || "").split("\n").map(t => t.trim()).find(t => t && !/^Export (section|chart)/.test(t));
+  // Case-insensitive: the export row is styled uppercase, and innerText
+  // returns the text as rendered — "EXPORT SECTION · …" slipped past a
+  // case-sensitive check and fed itself back in on every render.
+  const controlLine = /^(export (section|chart)\b|png|pdf|svg|\+ report|\+ bundle|✓ in report|✓ in bundle)$|^export (section|chart)\b/i;
+  const live = (root.innerText || "").split("\n").map(t => t.trim()).find(t => t && !controlLine.test(t));
   const first = live || (copy.textContent || "").trim().split("\n")[0];
   return (first || "Section").slice(0, 90);
 }

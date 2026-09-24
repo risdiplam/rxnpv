@@ -8,6 +8,23 @@
 // of thing a DOM-free numeric check would have caught immediately if this
 // logic had been a standalone function from the start.
 // allVals must include every point across every series being charted.
+// Gridline values a person would pick: steps of 1, 2, 2.5 or 5 x 10^n, with
+// the axis widened to whole steps. Because every tick is a multiple of the
+// step, zero is always one of them whenever the axis spans it — the old
+// quarter-of-the-range gridlines labelled the profit/loss line "$1M".
+function niceAxisTicks(minV, maxV, target) {
+  target = target || 4;
+  if (!(maxV > minV)) maxV = minV + 1;
+  const rough = (maxV - minV) / target;
+  const mag = Math.pow(10, Math.floor(Math.log10(rough)));
+  const norm = rough / mag;
+  const step = (norm <= 1 ? 1 : norm <= 2 ? 2 : norm <= 2.5 ? 2.5 : norm <= 5 ? 5 : 10) * mag;
+  const lo = Math.floor(minV / step + 1e-9) * step, hi = Math.ceil(maxV / step - 1e-9) * step;
+  const ticks = [];
+  for (let v = lo; v <= hi + step * 1e-6; v += step) ticks.push(Math.abs(v) < step * 1e-9 ? 0 : +v.toPrecision(12));
+  return { lo, hi, step, ticks };
+}
+
 function revenueChartYScale(allVals) {
   const maxV = Math.max(1, ...allVals);
   const minV = Math.min(0, ...allVals);
@@ -18,16 +35,37 @@ function revenueChartYScale(allVals) {
 // xPrefix defaults to "Year " because every original caller plots the model's
 // own relative calendar. The commercial tools plot real period labels
 // ("2026 (Q1)"), where "Year 2026 (Q1)" would read as a mistake.
-function RevenueChart({ series, height, showLegend, xPrefix, xAxisPrefix }) {
+// The width a chart is actually drawn at, followed as the window resizes. A
+// chart drawn on a fixed 900-wide canvas and scaled to fit shrank its axis text
+// with it — to 7.5px at the 900px window minimum. Drawing at the real width
+// keeps every label at its designed size. (jsdom has no layout: fallback.)
+function useMeasuredWidth(ref, fallback) {
+  const [w, setW] = React.useState(fallback);
+  React.useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const measure = () => { const cw = Math.round(el.getBoundingClientRect().width); if (cw > 0) setW(prev => Math.abs(prev - cw) > 1 ? cw : prev); };
+    measure();
+    if (typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  return w;
+}
+
+function RevenueChart({ series, height, showLegend, xPrefix, xAxisPrefix, label }) {
   const h = React.createElement;
   height = height || 220;
-  const W = 900, H = height, padL = 56, padR = 16, padT = 16, padB = 28;
+  const wrapRef = React.useRef(null);
+  const measured = useMeasuredWidth(wrapRef, 900);
+  const W = Math.max(320, measured), H = height, padL = 56, padR = 16, padT = 16, padB = 28;
   const plotW = W - padL - padR, plotH = H - padT - padB;
   const [hoverIdx, setHoverIdx] = React.useState(null);
   const svgRef = React.useRef(null);
 
   if (!series || !series.length || !series[0].points || !series[0].points.length) {
-    return h("div", { style: { height, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--ink-3)", fontSize: 12, fontFamily: "var(--mono)" } }, "No data yet — fill in the revenue build to see a projection.");
+    return h("div", { ref: wrapRef, style: { height, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--ink-3)", fontSize: 12, fontFamily: "var(--mono)" } }, "No data yet — fill in the revenue build to see a projection.");
   }
 
   // Was fixed at [0, maxV] on the assumption every series is non-negative —
@@ -40,14 +78,21 @@ function RevenueChart({ series, height, showLegend, xPrefix, xAxisPrefix }) {
   // Supporting the true [minV, maxV] range here removes the need for any
   // caller to pre-clamp its own data.
   const allVals = series.flatMap(s => s.points.map(p => p.v));
-  const { minV, maxV, range } = revenueChartYScale(allVals);
+  const scale = revenueChartYScale(allVals);
+  // For an all-negative series the scale's maxV is floored at 1 (see its
+  // tests); the axis itself only needs to reach 0.
+  const axis = niceAxisTicks(scale.minV, allVals.some(v => v > 0) ? scale.maxV : 0);
+  const minV = axis.lo, maxV = axis.hi, range = (maxV - minV) || 1;
   const nPoints = series[0].points.length;
   const x = i => padL + (i / Math.max(1, nPoints - 1)) * plotW;
   const y = v => padT + plotH - ((v - minV) / range) * plotH;
 
   const fmtM = v => {
     const av = Math.abs(v);
-    const s = av >= 1e9 ? "$" + (av / 1e9).toFixed(1) + "B" : "$" + Math.round(av / 1e6) + "M";
+    // Enough decimals that neighbouring ticks never print the same label
+    // (a 2.5M step would otherwise read $3M, $5M, $8M).
+    const s = av >= 1e9 ? "$" + (av / 1e9).toFixed(axis.step < 1e8 ? 2 : 1).replace(/\.?0+$/, "") + "B"
+      : av === 0 ? "$0" : "$" + (av / 1e6).toFixed(axis.step < 1e6 ? 2 : axis.step % 1e6 ? 1 : 0) + "M";
     return (v < 0 ? "-" : "") + s;
   };
 
@@ -63,17 +108,17 @@ function RevenueChart({ series, height, showLegend, xPrefix, xAxisPrefix }) {
   // series dips negative, 0 itself won't generally land on a 0/0.25/0.5 band —
   // it gets its own explicit, distinct gridline so the profit/loss threshold
   // stays visible rather than only implied by where the line crosses.
-  const gridLines = [0, 0.25, 0.5, 0.75, 1].map(f => ({ v: minV + range * f, yy: y(minV + range * f) }));
-  const hasZeroLine = minV < 0 && maxV > 0;
+  const gridLines = axis.ticks.map(v => ({ v, yy: y(v) }));
+  const hasZeroLine = minV < 0;
   const zeroY = y(0);
   const tooltipOnRight = hoverIdx != null && x(hoverIdx) > padL + plotW * 0.65;
 
-  return h("div", { style: { position: "relative" } },
-    h("svg", { ref: svgRef, viewBox: `0 0 ${W} ${H}`, style: { width: "100%", height, display: "block", cursor: "crosshair" },
+  return h("div", { ref: wrapRef, style: { position: "relative" } },
+    h("svg", { ref: svgRef, viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": label || "Chart by year", style: { width: "100%", height, display: "block", cursor: "crosshair" },
         onMouseMove: handleMove, onMouseLeave: () => setHoverIdx(null) },
       gridLines.map((g, i) => h("g", { key: i },
-        h("line", { x1: padL, x2: W - padR, y1: g.yy, y2: g.yy, stroke: "var(--rule)", strokeWidth: 1, strokeDasharray: i === 0 ? "none" : "3,3" }),
-        h("text", { x: padL - 8, y: g.yy + 3, textAnchor: "end", fontSize: 9, fontFamily: "var(--mono)", fill: "var(--ink-3)" }, fmtM(g.v))
+        h("line", { x1: padL, x2: W - padR, y1: g.yy, y2: g.yy, stroke: "var(--rule)", strokeWidth: 1, strokeDasharray: i === 0 || g.v === 0 ? "none" : "3,3" }),
+        h("text", { x: padL - 8, y: g.yy + 3, textAnchor: "end", fontSize: 10, fontFamily: "var(--mono)", fill: "var(--ink-3)" }, fmtM(g.v))
       )),
       hasZeroLine && h("line", { x1: padL, x2: W - padR, y1: zeroY, y2: zeroY, stroke: "var(--ink-3)", strokeWidth: 1.25 }),
       series.map((s, si) => {
@@ -86,7 +131,7 @@ function RevenueChart({ series, height, showLegend, xPrefix, xAxisPrefix }) {
       }),
       // X-axis year labels (every ~3rd year)
       series[0].points.map((p, i) => (i % Math.ceil(nPoints / 8) === 0) && h("text", {
-        key: i, x: x(i), y: H - 6, textAnchor: "middle", fontSize: 9, fontFamily: "var(--mono)", fill: "var(--ink-3)"
+        key: i, x: x(i), y: H - 6, textAnchor: "middle", fontSize: 10, fontFamily: "var(--mono)", fill: "var(--ink-3)"
       }, (xAxisPrefix != null ? xAxisPrefix : "Y") + p.label)),
       // Hover guideline + point markers
       hoverIdx != null && h("g", null,
@@ -121,7 +166,7 @@ function RevenueChart({ series, height, showLegend, xPrefix, xAxisPrefix }) {
 // optional single "your case" point rendered distinctly so you can see where
 // your own assumption sits among real comps.
 // ════════════════════════════════════════════════════════════════════════════
-function ScatterChart({ points, highlightPoint, xLabel, yLabel, xFmt, yFmt, height }) {
+function ScatterChart({ points, highlightPoint, xLabel, yLabel, xFmt, yFmt, height, label }) {
   const h = React.createElement;
   height = height || 280;
   const W = 560, H = height, padL = 60, padR = 20, padT = 16, padB = 40;
@@ -159,12 +204,12 @@ function ScatterChart({ points, highlightPoint, xLabel, yLabel, xFmt, yFmt, heig
   const tooltipOnRight = hoveredPoint && toX(hoveredPoint.x) > padL + plotW * 0.6;
 
   return h("div", { style: { position: "relative" } },
-    h("svg", { viewBox: `0 0 ${W} ${H}`, style: { width: "100%", maxWidth: 560, height: "auto", display: "block" } },
+    h("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": label || ((yLabel || "") + " against " + (xLabel || "")), style: { width: "100%", maxWidth: 560, height: "auto", display: "block" } },
       gridFracs.map((f, i) => h("g", { key: "y" + i },
         h("line", { x1: padL, x2: W - padR, y1: toY(minY + f * (maxY - minY)), y2: toY(minY + f * (maxY - minY)), stroke: "var(--rule)", strokeWidth: 1, strokeDasharray: "3,3" }),
-        h("text", { x: padL - 8, y: toY(minY + f * (maxY - minY)) + 3, textAnchor: "end", fontSize: 9, fontFamily: "var(--mono)", fill: "var(--ink-3)" }, fmtY(minY + f * (maxY - minY)))
+        h("text", { x: padL - 8, y: toY(minY + f * (maxY - minY)) + 3, textAnchor: "end", fontSize: 10, fontFamily: "var(--mono)", fill: "var(--ink-3)" }, fmtY(minY + f * (maxY - minY)))
       )),
-      gridFracs.map((f, i) => h("text", { key: "x" + i, x: toX(minX + f * (maxX - minX)), y: H - padB + 16, textAnchor: "middle", fontSize: 9, fontFamily: "var(--mono)", fill: "var(--ink-3)" }, fmtX(minX + f * (maxX - minX)))),
+      gridFracs.map((f, i) => h("text", { key: "x" + i, x: toX(minX + f * (maxX - minX)), y: H - padB + 16, textAnchor: "middle", fontSize: 10, fontFamily: "var(--mono)", fill: "var(--ink-3)" }, fmtX(minX + f * (maxX - minX)))),
       h("text", { x: padL + plotW / 2, y: H - 4, textAnchor: "middle", fontSize: 10, fontFamily: "var(--mono)", fill: "var(--ink-2)" }, xLabel || ""),
       h("text", { x: 14, y: padT + plotH / 2, textAnchor: "middle", fontSize: 10, fontFamily: "var(--mono)", fill: "var(--ink-2)", transform: `rotate(-90, 14, ${padT + plotH / 2})` }, yLabel || ""),
       points.map((p, i) => h("circle", {
@@ -208,14 +253,18 @@ function ScatterChart({ points, highlightPoint, xLabel, yLabel, xFmt, yFmt, heig
 // direction; a signed two-bar comparison stays honest and legible whichever
 // way the delta actually points.
 // ════════════════════════════════════════════════════════════════════════════
-function RiskWaterfallChart({ unriskedNPV, riskedNPV, posToLaunchPct, height }) {
+function RiskWaterfallChart({ unriskedNPV, riskedNPV, posToLaunchPct, height, label }) {
   const h = React.createElement;
   height = height || 190;
-  const W = 420, H = height, padL = 74, padR = 24, padT = 20, padB = 42;
+  const wrapRef = React.useRef(null);
+  // Drawn at its real width (capped — two bars don't need 1,200px), not a
+  // fixed 420 canvas pinned to the left of a wide panel.
+  const measured = useMeasuredWidth(wrapRef, 520);
+  const W = Math.max(340, Math.min(640, measured)), H = height, padL = 16, padR = 16, padT = 22, padB = 40;
   const plotW = W - padL - padR, plotH = H - padT - padB;
 
   if (unriskedNPV == null || riskedNPV == null) {
-    return h("div", { style: { height, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--ink-3)", fontSize: 12, fontFamily: "var(--mono)" } }, "Not computable yet.");
+    return h("div", { ref: wrapRef, style: { height, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--ink-3)", fontSize: 12, fontFamily: "var(--mono)" } }, "Not computable yet.");
   }
 
   const fmtM = v => {
@@ -224,33 +273,43 @@ function RiskWaterfallChart({ unriskedNPV, riskedNPV, posToLaunchPct, height }) 
     return (v < 0 ? "-" : "") + s;
   };
 
-  const maxAbs = Math.max(Math.abs(unriskedNPV), Math.abs(riskedNPV), 1);
-  const zeroY = padT + plotH / 2; // zero line at vertical center; bars extend up (positive) or down (negative)
-  const scale = (plotH / 2 - 8) / maxAbs;
-  const barY = v => v >= 0 ? zeroY - v * scale : zeroY;
-  const barH = v => Math.abs(v) * scale;
+  // The axis spans exactly [min(0, values), max(0, values)]. Zero used to be
+  // pinned at mid-height, which left the lower half empty whenever both values
+  // were positive — the usual case — and stranded the labels far below the bars.
+  const hi = Math.max(0, unriskedNPV, riskedNPV), lo = Math.min(0, unriskedNPV, riskedNPV);
+  const span = (hi - lo) || 1;
+  const valueRoom = 16; // space above/below a bar for its value label
+  const y = v => padT + valueRoom + (hi - v) / span * (plotH - valueRoom * (lo < 0 ? 2 : 1));
+  const zeroY = y(0);
+  const barY = v => Math.min(y(v), zeroY);
+  const barH = v => Math.abs(y(v) - zeroY);
 
+  const barW = Math.min(96, plotW * 0.2);
   const bars = [
-    { label: "Unrisked", sub: "if success were certain", v: unriskedNPV, x: padL + plotW * 0.18, color: "var(--ink-3)" },
-    { label: "Risk-adjusted", sub: posToLaunchPct != null ? posToLaunchPct.toFixed(1) + "% PoS" : "rNPV", v: riskedNPV, x: padL + plotW * 0.68, color: "var(--teal)" }
+    { label: "Unrisked", sub: "if success were certain", v: unriskedNPV, x: padL + plotW * 0.25, color: "var(--ink-3)" },
+    { label: "Risk-adjusted", sub: posToLaunchPct != null ? posToLaunchPct.toFixed(1) + "% PoS" : "rNPV", v: riskedNPV, x: padL + plotW * 0.75, color: "var(--teal)" }
   ];
-  const barW = 64;
   const delta = riskedNPV - unriskedNPV;
+  const valueY = b => b.v >= 0 ? barY(b.v) - 6 : barY(b.v) + barH(b.v) + 13;
 
-  return h("div", null,
-    h("svg", { viewBox: `0 0 ${W} ${H}`, style: { width: "100%", maxWidth: 420, height: "auto", display: "block" } },
+  return h("div", { ref: wrapRef },
+    h("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": label || "Risk waterfall: unrisked vs. risk-adjusted value", style: { width: W, maxWidth: "100%", height: "auto", display: "block" } },
       h("line", { x1: padL, x2: W - padR, y1: zeroY, y2: zeroY, stroke: "var(--rule)", strokeWidth: 1 }),
+      // Connector from the top of one bar to the other, so the gap reads as
+      // the thing being measured rather than as empty space.
+      h("line", { x1: bars[0].x + barW / 2, x2: bars[1].x - barW / 2, y1: y(unriskedNPV), y2: y(unriskedNPV), stroke: "var(--ink-3)", strokeWidth: 1, strokeDasharray: "3,3" }),
+      h("line", { x1: bars[1].x - barW / 2 - 6, x2: bars[1].x - barW / 2 - 6, y1: y(unriskedNPV), y2: y(riskedNPV), stroke: delta >= 0 ? "var(--green)" : "var(--red)", strokeWidth: 1.5 }),
       bars.map((b, i) => h("g", { key: i },
         h("rect", { x: b.x - barW / 2, y: barY(b.v), width: barW, height: Math.max(1, barH(b.v)), fill: b.color, fillOpacity: 0.75, rx: 3 }),
-        h("text", { x: b.x, y: b.v >= 0 ? barY(b.v) - 8 : barY(b.v) + barH(b.v) + 16, textAnchor: "middle", fontSize: 11, fontFamily: "var(--mono)", fontWeight: 700, fill: "var(--ink-1)" }, fmtM(b.v)),
-        h("text", { x: b.x, y: H - 16, textAnchor: "middle", fontSize: 10, fontFamily: "var(--mono)", fontWeight: 700, fill: "var(--ink-2)" }, b.label),
-        h("text", { x: b.x, y: H - 5, textAnchor: "middle", fontSize: 9, fontFamily: "var(--mono)", fill: "var(--ink-3)" }, b.sub)
+        h("text", { x: b.x, y: valueY(b), textAnchor: "middle", fontSize: 11, fontFamily: "var(--mono)", fontWeight: 700, fill: "var(--ink-1)" }, fmtM(b.v)),
+        h("text", { x: b.x, y: H - 18, textAnchor: "middle", fontSize: 10, fontFamily: "var(--mono)", fontWeight: 700, fill: "var(--ink-2)" }, b.label),
+        h("text", { x: b.x, y: H - 5, textAnchor: "middle", fontSize: 10, fontFamily: "var(--mono)", fill: "var(--ink-3)" }, b.sub)
       )),
       // Delta annotation between the two bars — the number alone doesn't say
       // what it is, so it needs its own caption same as the two bars do.
-      h("text", { x: padL + plotW * 0.43, y: padT + 8, textAnchor: "middle", fontSize: 10, fontFamily: "var(--mono)", fontWeight: 700, fill: delta >= 0 ? "var(--green)" : "var(--red)" },
+      h("text", { x: padL + plotW * 0.5, y: (y(unriskedNPV) + y(riskedNPV)) / 2 - 2, textAnchor: "middle", fontSize: 11, fontFamily: "var(--mono)", fontWeight: 700, fill: delta >= 0 ? "var(--green)" : "var(--red)" },
         (delta >= 0 ? "+" : "") + fmtM(delta)),
-      h("text", { x: padL + plotW * 0.43, y: padT + 19, textAnchor: "middle", fontSize: 8, fontFamily: "var(--mono)", fill: "var(--ink-3)" }, "risk-adjustment"),
+      h("text", { x: padL + plotW * 0.5, y: (y(unriskedNPV) + y(riskedNPV)) / 2 + 11, textAnchor: "middle", fontSize: 10, fontFamily: "var(--mono)", fill: "var(--ink-3)" }, "risk-adjustment")
     )
   );
 }
@@ -311,7 +370,7 @@ function PeakSalesCompsChart({ ownDrugs, allDrugs, windowSize, height }) {
       " by peak sales. Showing the ", rows.length, " comps nearest that rank — the ones your assumption is implicitly claiming to be comparable to."),
     h("div", { style: { display: "flex", flexDirection: "column", gap: 4 } },
       rows.map((d, i) => h("div", { key: i, style: { display: "flex", alignItems: "center", gap: 8 }, title: d.drug + " — $" + d.peakSalesB + "B" + (d.company ? " (" + d.company + ")" : "") },
-        h("div", { style: { width: 120, fontFamily: "var(--mono)", fontSize: 10, color: d._own ? "var(--amber)" : "var(--ink-3)", fontWeight: d._own ? 700 : 400, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flexShrink: 0 } }, d.drug),
+        h("div", { title: d.drug, style: { width: 170, fontFamily: "var(--mono)", fontSize: 10, color: d._own ? "var(--amber)" : "var(--ink-3)", fontWeight: d._own ? 700 : 400, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flexShrink: 0 } }, d.drug),
         h("div", { style: { flex: 1, height: 13, borderRadius: 3, background: "var(--surface-2)", overflow: "hidden" } },
           h("div", { style: { height: "100%", width: (d.peakSalesB / maxB) * 100 + "%", background: d._own ? "var(--amber)" : "var(--teal)", borderRadius: 3, opacity: d._own ? 1 : 0.75 } })),
         h("div", { style: { width: 52, textAlign: "right", fontFamily: "var(--mono)", fontSize: 10, color: d._own ? "var(--amber)" : "var(--ink-2)", fontWeight: d._own ? 700 : 400, flexShrink: 0 } },

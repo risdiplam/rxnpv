@@ -88,6 +88,19 @@ const dom = new JSDOM(html, { runScripts: "dangerously", pretendToBeVisual: true
   const badged = d.createElement("div");
   badged.innerHTML = '<h2>Trial-outcome assurance (Bayesian PoS)<span class="badge info">→ Forward-looking</span></h2>';
   ok("a heading's badge is not part of the title", w.sectionTitleOf(badged) === "Trial-outcome assurance (Bayesian PoS)");
+  // Meta-Analysis: heading, then a description, then the headingless panel.
+  // Only the immediately-preceding sibling used to be checked, and the
+  // fallback then read the panel's own (uppercase-rendered) export row.
+  const host = d.createElement("div");
+  host.innerHTML = '<h2>Meta-Analysis<span class="badge">↔</span></h2><p class="subtle">Pools studies.</p><div class="panel"><div class="section-export-bar">EXPORT SECTION · x</div><p>body</p></div>';
+  d.body.appendChild(host);
+  ok("a headingless panel takes the heading above its description", w.sectionTitleOf(host.querySelector(".panel")) === "Meta-Analysis");
+  host.remove();
+  const rowFirst = d.createElement("div");
+  // innerText is what the live fallback reads; jsdom has none, so stand one in
+  // with the uppercase text a real renderer returns.
+  Object.defineProperty(rowFirst, "innerText", { value: "EXPORT SECTION · Export section · x\nPNG\nPDF\nPooled estimate" });
+  ok("an uppercase-rendered export row is never read back as the title", w.sectionTitleOf(rowFirst) === "Pooled estimate");
   const inner = d.createElement("span"); card.appendChild(inner);
   ok("a control finds the section it sits inside", w.closestExportSection(inner) === card);
 

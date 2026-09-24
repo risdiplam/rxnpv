@@ -201,6 +201,8 @@ function appendChartWithExport(parent, chartHtml, exportName) {
     svg.style.cssText = 'display:block;width:100%;height:auto';
     wrap.style.maxWidth = Math.round(vb.width * 1.25) + 'px';
   }
+  // Named for screen readers, which otherwise announce a bare "graphic".
+  if (svg) { svg.setAttribute('role', 'img'); svg.setAttribute('aria-label', title); }
   wrap.appendChild(box);
   // Its own export row: this chart alone, as PNG / PDF / SVG, or into a report.
   const host = el('div', { class: 'sim-chart-export-host' });
@@ -1453,11 +1455,17 @@ function runFragilityIndex() {
 
   if (!fi.exhausted && fi.fragilityIndex != null) {
     const flipArmN = fi.flipArm === 'A' ? nA : nB;
-    const iconArraySvg = renderIconArray(fi.fragilityIndex / flipArmN, {
+    // One dot per patient when the arm is small enough to draw that way, so
+    // the picture shows the same count the title states. Past 200 the dots
+    // get too small to read, and it falls back to a per-100 grid that says so.
+    const perPatient = flipArmN <= 200;
+    const iconArraySvg = renderIconArray(fi.fragilityIndex / flipArmN, Object.assign({
       highlightColor: 'var(--amber)',
       title: `${fi.fragilityIndex} out of ${flipArmN}`,
-      subtitle: `share of ${flipLabel}'s patients whose outcome would need to flip to erase significance`
-    });
+      subtitle: perPatient
+        ? `each dot is one of ${flipLabel}'s ${flipArmN} patients; lit dots are the outcomes that would need to flip to erase significance`
+        : `per 100 of ${flipLabel}'s patients: the share whose outcome would need to flip to erase significance`
+    }, perPatient ? { units: flipArmN, highlightCount: fi.fragilityIndex } : {}));
     appendChartWithExport(resultsDiv, iconArraySvg, 'fragility-index');
   } else {
     appendResultCapture(resultsDiv, 'fragility-index');
@@ -1613,19 +1621,48 @@ function renderPeakSalesTab(content) {
     else if (type === 'normal') setIfBlank(bEl, (a * 0.2).toPrecision(4));
     else if (type === 'triangular') { setIfBlank(bEl, (a * 1.2).toPrecision(4)); setIfBlank(cEl, (a * 1.5).toPrecision(4)); }
   }
+  // What each box means under each distribution. The boxes used to be
+  // unlabelled, with one line of prose ("A: point value / low / mean…") as the
+  // only key, and the unused ones stayed editable though nothing read them.
+  const DIST_SLOTS = {
+    point: ['Value', null, null],
+    uniform: ['Low', 'High', null],
+    normal: ['Mean', 'SD', null],
+    triangular: ['Low', 'Most likely', 'High']
+  };
+  function relabelDist(prefix) {
+    const type = document.getElementById(prefix + 'Type').value;
+    const slots = DIST_SLOTS[type] || DIST_SLOTS.point;
+    ['A', 'B', 'C'].forEach((k, i) => {
+      const input = document.getElementById(prefix + k);
+      const lbl = document.getElementById(prefix + k + 'Lbl');
+      if (!input || !lbl) return;
+      const used = slots[i] != null;
+      lbl.textContent = used ? slots[i] : '\u2014';
+      input.disabled = !used;
+      input.setAttribute('aria-label', used ? slots[i] : 'Not used by this distribution');
+      input.closest('.distcell').classList.toggle('unused', !used);
+    });
+  }
   function distFields(prefix, defaults) {
     const typeSelect = selectInput(prefix + 'Type', distTypes, defaults.type);
-    typeSelect.addEventListener('change', () => seedDistDefaults(prefix));
-    return el('div', { class: 'distfields' }, [
-      typeSelect,
-      numberInput(prefix + 'A', defaults.a),
-      numberInput(prefix + 'B', defaults.b),
-      numberInput(prefix + 'C', defaults.c)
+    typeSelect.setAttribute('aria-label', 'Distribution');
+    typeSelect.addEventListener('change', () => { seedDistDefaults(prefix); relabelDist(prefix); });
+    const cell = (k, v) => el('div', { class: 'distcell' }, [
+      el('span', { class: 'distlbl', id: prefix + k + 'Lbl' }, ''),
+      numberInput(prefix + k, v)
     ]);
+    const wrap = el('div', { class: 'distfields' }, [
+      el('div', { class: 'distcell' }, [el('span', { class: 'distlbl' }, 'Distribution'), typeSelect]),
+      cell('A', defaults.a), cell('B', defaults.b), cell('C', defaults.c)
+    ]);
+    // Label once mounted (relabelDist looks the inputs up by id).
+    setTimeout(() => relabelDist(prefix), 0);
+    return wrap;
   }
   const form = el('div', { class: 'panel' }, [
     el('h2', {}, ['Peak-sales Monte Carlo', el('span', { class: 'badge info' }, '→ Forward-looking')]),
-    el('p', { class: 'subtle' }, 'Each input below can be a fixed value or a distribution. A: point value / low / mean. B: high / SD / mode. C: high (triangular only).'),
+    el('p', { class: 'subtle' }, 'Each input below can be a fixed value or a distribution; the boxes relabel to match the one you pick.'),
     note('Which distribution type should I pick?', '"Fixed" is for anything you actually know or want to hold constant — a stated price, a fixed population count. "Uniform" (low/high) says any value in that range is equally plausible — a reasonable default when you have a range but no real opinion on where within it the true value sits, like peak market share here. "Normal" (mean/SD) is for a value you have a real point estimate for plus a sense of how uncertain it is — most values cluster near the mean, symmetric in both directions. "Triangular" (low/mode/high) is for when you have a most-likely case plus a plausible low and high, but the low and high aren’t equally far from the most-likely value — common when a range is asymmetric (e.g. "probably $2B, could be as low as $1B, but a real blowout could hit $5B").'),
     field('Addressable population', distFields('pop', { type: 'point', a: 1000000, b: '', c: '' })),
     // Rates are whole percents, like everywhere else in the app (FIN-003).
@@ -1633,7 +1670,7 @@ function renderPeakSalesTab(content) {
     field('Treatment rate (%)', distFields('tx', { type: 'point', a: 50, b: '', c: '' })),
     field('Peak market share (%)', distFields('share', { type: 'uniform', a: 15, b: 35, c: '' })),
     field('Annual price (USD)', distFields('price', { type: 'point', a: 100000, b: '', c: '' })),
-    field('Iterations', numberInput('peakIterations', 10000, { step: '1000' })),
+    fieldGrid([field('Iterations', numberInput('peakIterations', 10000, { step: '1000' }))]),
     el('button', { class: 'runbtn', onclick: runPeakSales }, 'Run simulation'),
     el('div', { id: 'peakSalesResults', class: 'results' })
   ]);
@@ -1760,28 +1797,36 @@ function renderPkpdTab(content) {
     el('h2', {}, ['PK/PD forward simulation', el('span', { class: 'badge info' }, '→ Forward-looking')]),
     el('p', { class: 'subtle' }, sci('Projects a concentration-time profile from published PK parameters, then maps exposure through a dose-response (Emax) curve. Not a fit to patient data, a forward projection from parameters you supply.')),
     note('New to PK/PD modeling? Start here', 'This is the most jargon-heavy tool in the app, but the parameters below aren’t something you derive — you look them up. A drug’s FDA label (Clinical Pharmacology section), a published Phase 1 PK paper, or a comparable already-approved drug’s label are the usual sources; company investor decks sometimes state half-life and bioavailability directly too. A worked example: a label states "oral bioavailability ~80%, elimination half-life ~6 hours, volume of distribution ~50L, Tmax ~2 hours" for a 500mg dose. You’d enter F=0.8, Vd=50, Ke≈ln(2)/6≈0.116 (see the note below the fields for why), and pick a Ka that makes the simulated Tmax land near 2 hours (start around Ka=1.0 and adjust — Tmax isn’t a direct input for oral dosing, it falls out of Ka and Ke together). If you don’t have a dose-response relationship to model, you can still run just the concentration-time profile — Emax/EC50/Hill only affect the dose-response chart at the bottom, not Cmax/half-life/AUC.'),
-    field('Route', selectInput('route', [{ value: 'oral', label: 'Oral (first-order absorption)' }, { value: 'iv', label: 'IV bolus' }], 'oral')),
-    field('Dose (mg)', numberInput('dose', 500)),
-    field('Ka — absorption rate constant (1/hr, oral only)', numberInput('ka', 1.0, { step: '0.01' })),
-    field('Ke — elimination rate constant (1/hr)', numberInput('ke', 0.1, { step: '0.01' })),
-    field('Vd — volume of distribution (L)', numberInput('Vd', 50)),
-    field('F — bioavailability (oral only)', numberInput('F', 1, { step: '0.01', min: 0, max: 1 })),
-    field('Dosing interval \u03C4 (hr, 0 = single dose)', numberInput('tau', 0)),
-    field('Number of doses', numberInput('numDoses', 1)),
-    field('Simulation window (hr)', numberInput('tEnd', 48)),
+    // Grouped into the same responsive grid as every other Simulation form;
+    // one field per full-width row made this the longest page in the app.
+    fieldGrid([
+      field('Route', selectInput('route', [{ value: 'oral', label: 'Oral (first-order absorption)' }, { value: 'iv', label: 'IV bolus' }], 'oral')),
+      field('Dose (mg)', numberInput('dose', 500)),
+      field('Ka — absorption rate constant (1/hr, oral only)', numberInput('ka', 1.0, { step: '0.01' })),
+      field('Ke — elimination rate constant (1/hr)', numberInput('ke', 0.1, { step: '0.01' })),
+      field('Vd — volume of distribution (L)', numberInput('Vd', 50)),
+      field('F — bioavailability (oral only)', numberInput('F', 1, { step: '0.01', min: 0, max: 1 })),
+      field('Dosing interval \u03C4 (hr, 0 = single dose)', numberInput('tau', 0)),
+      field('Number of doses', numberInput('numDoses', 1)),
+      field('Simulation window (hr)', numberInput('tEnd', 48))
+    ]),
     note('Where these numbers actually come from', 'Ka and Ke are rarely stated directly — what’s usually published is elimination half-life (Ke = ln(2) ÷ half-life, e.g. a 6-hour half-life → Ke ≈ 0.116/hr) and, for oral drugs, Tmax (roughly when concentration peaks — Ka is typically the value you’d adjust to match a reported Tmax, since there’s no closed-form Tmax → Ka formula for the two-parameter absorption model used here). Vd is sometimes given directly (L, or L/kg × 70kg for a typical adult); if only clearance (CL) is reported, Ke = CL ÷ Vd. F (bioavailability) only matters for oral dosing — IV bolus assumes 100% by definition, which is why the field is disabled for that route.'),
     el('h3', {}, 'Receptor occupancy (optional)'),
     el('p', { class: 'subtle' }, sci('Bridges concentration to target engagement before the Emax curve below — leave K_D blank to skip this and go straight to Emax, same as before.')),
-    field('K_D — receptor binding affinity (same units as concentration, mg/L)', numberInput('kd', '')),
-    field('Occupancy hill coefficient', numberInput('roHill', 1, { step: '0.1' })),
+    fieldGrid([
+      field('K_D — receptor binding affinity (same units as concentration, mg/L)', numberInput('kd', '')),
+      field('Occupancy hill coefficient', numberInput('roHill', 1, { step: '0.1' }))
+    ]),
     note('Already have a concentration and just want occupancy?', 'If you already know a real concentration — a trough level from a paper, a Cmax reported in a label, or any single number you don’t want to re-derive by simulating dose/Ka/Ke/Vd — use the standalone Receptor Occupancy Calculator further down this page instead of running the full simulation. Same underlying Hill-Langmuir formula, just takes a concentration directly rather than deriving one from a dosing regimen.'),
     el('h3', {}, 'Dose-response (Emax)'),
     el('p', { class: 'subtle' }, sci('A sigmoidal (Hill/Emax) curve mapping concentration to effect — the standard dose-response shape.')),
     note('Where E0, Emax, EC50 and Hill come from', 'E0 and Emax are usually reported directly in a paper\u2019s figure or table (the observed baseline and plateau effect). EC50 — the concentration producing half of Emax — and the Hill coefficient are typically fitted parameters reported alongside a dose-response study rather than values you would estimate from scratch. A Hill of 1 is a standard hyperbolic curve; above 1 is steeper and more switch-like.'),
-    field('E0 — baseline effect', numberInput('E0', 0)),
-    field('Emax — maximum effect', numberInput('Emax', 100)),
-    field('EC50 — concentration at half-max effect', numberInput('EC50', 5)),
-    field('Hill coefficient', numberInput('hill', 1, { step: '0.1' })),
+    fieldGrid([
+      field('E0 — baseline effect', numberInput('E0', 0)),
+      field('Emax — maximum effect', numberInput('Emax', 100)),
+      field('EC50 — concentration at half-max effect', numberInput('EC50', 5)),
+      field('Hill coefficient', numberInput('hill', 1, { step: '0.1' }))
+    ]),
     el('button', { class: 'runbtn', onclick: runPkpd }, 'Run simulation'),
     el('div', { id: 'pkpdResults', class: 'results' })
   ]);

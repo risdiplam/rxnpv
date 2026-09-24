@@ -61,12 +61,14 @@ function PortfolioView({ cases }) {
         (() => {
           const withPoS = valid.filter(s => s.modeledPoSPct != null).sort((a, b) => b.modeledPoSPct - a.modeledPoSPct);
           if (!withPoS.length) return h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-3)" } }, "No programs with a computable PoS yet.");
-          const maxPoS = Math.max(...withPoS.map(s => s.modeledPoSPct), 1);
+          // Drawn against 100%, not against the highest PoS in the list: a
+          // probability has a natural full scale, and relative scaling drew a
+          // lone 9% program as a full bar.
           return withPoS.map(s => h("div", { key: s.id, style: { marginBottom: 8 } },
             h("div", { style: { display: "flex", justifyContent: "space-between", fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-2)", marginBottom: 2 } },
               h("span", null, s.name), h("span", null, s.modeledPoSPct.toFixed(0) + "%")),
             h("div", { style: { height: 6, borderRadius: 3, background: "var(--surface-2)" } },
-              h("div", { style: { height: "100%", borderRadius: 3, width: (s.modeledPoSPct / maxPoS * 100) + "%", background: "var(--teal)" } }))
+              h("div", { style: { height: "100%", borderRadius: 3, width: Math.max(2, Math.min(100, s.modeledPoSPct)) + "%", background: "var(--teal)" } }))
           ));
         })()
       ),
