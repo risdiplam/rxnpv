@@ -182,7 +182,8 @@
   }
   /* Focus visibility. The app previously removed outlines on inputs without
      replacing them, which left keyboard navigation with no visible position. */
-  button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-visible, a:focus-visible {
+  button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-visible, a:focus-visible,
+  [role="button"]:focus-visible, [tabindex]:not([tabindex="-1"]):focus-visible {
     outline: 2px solid var(--teal); outline-offset: 2px; border-radius: 4px;
   }
 

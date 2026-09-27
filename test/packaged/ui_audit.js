@@ -96,6 +96,18 @@ window.__t = {
       if (!named) out.push({ type: "chart with no accessible name", text: (s.closest("[data-export-chart]") || {}).getAttribute ? s.closest("[data-export-chart]").getAttribute("data-export-chart") : "", where: where(s) });
       s.querySelectorAll("text").forEach(t => { const h = t.getBoundingClientRect().height; if (h > 0 && h < 8) out.push({ type: "chart text drawn under 8px", text: t.textContent.slice(0, 30), detail: h.toFixed(1) + "px", where: where(s) }); });
     });
+    // Mouse-only: looks clickable (pointer cursor, set on the element itself,
+    // not inherited from a real control around it) but Tab can never reach it.
+    document.querySelectorAll("div, span, td, tr, li, svg, g, rect, circle, path, p").forEach(el => {
+      if (!vis(el)) return;
+      const cs = getComputedStyle(el);
+      if (cs.cursor !== "pointer") return;
+      const parentCursor = el.parentElement ? getComputedStyle(el.parentElement).cursor : "";
+      if (parentCursor === "pointer") return;                       // inherited — the ancestor is the one checked
+      if (el.closest("button, a[href], label, summary, [tabindex]")) return;
+      if (el.tabIndex >= 0) return;
+      out.push({ type: "clickable but not keyboard-reachable", text: label(el), detail: el.tagName.toLowerCase(), where: where(el) });
+    });
     const over = document.documentElement.scrollWidth - innerWidth;
     if (over > 1) out.push({ type: "sideways scroll", text: "", detail: over + "px" });
     return out;
@@ -122,6 +134,48 @@ app.whenReady().then(async () => {
     await js("window.scrollTo(0,0)");
     const f = await js("__t.audit()");
     f.forEach(x => findings.push(Object.assign({ pass, stop: name }, x)));
+    // A real keyboard walk (first pass only — focus styling doesn't change
+    // with theme width): press Tab through the view and, at each stop, check
+    // that something visibly marks focus. Keyboard modality matters —
+    // :focus-visible only fires for real key events, not element.focus().
+    if (pass === "dark-1470") {
+      await js("document.activeElement && document.activeElement.blur && document.activeElement.blur()");
+      const seen = new Set();
+      for (let i = 0; i < 40; i++) {
+        await dbg.sendCommand("Input.dispatchKeyEvent", { type: "keyDown", key: "Tab", code: "Tab", windowsVirtualKeyCode: 9 });
+        await dbg.sendCommand("Input.dispatchKeyEvent", { type: "keyUp", key: "Tab", code: "Tab", windowsVirtualKeyCode: 9 });
+        const st = await js(`(() => { const el = document.activeElement; if (!el || el === document.body) return { none: true };
+          const cs = getComputedStyle(el);
+          const ring = (cs.outlineStyle !== "none" && parseFloat(cs.outlineWidth) > 0) || (cs.boxShadow && cs.boxShadow !== "none");
+          const r = el.getBoundingClientRect();
+          return { key: el.tagName + "|" + (el.getAttribute("aria-label") || el.textContent || el.placeholder || "").trim().slice(0, 50), ring, offscreen: r.width < 1 || r.height < 1 };
+        })()`);
+        if (st.none) continue;
+        if (seen.has(st.key)) continue; seen.add(st.key);
+        if (!st.ring) findings.push({ pass, stop: name, type: "keyboard focus not visible", text: st.key.split("|")[1] || st.key, detail: st.key.split("|")[0].toLowerCase() });
+        if (st.offscreen) findings.push({ pass, stop: name, type: "keyboard focus lands on an invisible element", text: st.key.split("|")[1] || st.key, detail: st.key.split("|")[0].toLowerCase() });
+      }
+      await js("document.activeElement && document.activeElement.blur && document.activeElement.blur()");
+      // What a screen reader actually reads: Chromium's accessibility tree, not
+      // the DOM. Any interactive node whose computed name is empty is announced
+      // as a bare "button" / "edit text".
+      try {
+        await dbg.sendCommand("Accessibility.enable");
+        const { nodes } = await dbg.sendCommand("Accessibility.getFullAXTree");
+        const interactive = new Set(["button", "textbox", "combobox", "checkbox", "radio", "link", "spinbutton", "slider", "switch", "tab", "menuitem", "searchbox", "listbox"]);
+        let named = 0;
+        nodes.forEach(n => {
+          const role = n.role && n.role.value;
+          if (!interactive.has(role) || n.ignored) return;
+          const nm = (n.name && n.name.value || "").trim();
+          if (nm) { named++; return; }
+          findings.push({ pass, stop: name, type: "screen reader: control announced with no name", text: role, detail: "AX node " + n.nodeId });
+        });
+        console.log("ax tree · " + name + ": " + named + " named interactive nodes");
+      } catch (e) { console.log("ax tree failed on " + name + ": " + e.message); }
+      // Logged so a clean result can be told apart from a walk that never ran.
+      console.log("keyboard walk · " + name + ": " + seen.size + " distinct focus stops");
+    }
     const m = await dbg.sendCommand("Page.getLayoutMetrics");
     const shot = await dbg.sendCommand("Page.captureScreenshot", { format: "png", captureBeyondViewport: true,
       clip: { x: 0, y: 0, width: Math.ceil(m.cssVisualViewport.clientWidth), height: Math.min(Math.ceil(m.cssContentSize.height), 5000), scale: 1 } });

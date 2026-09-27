@@ -215,12 +215,12 @@ function ScatterChart({ points, highlightPoint, xLabel, yLabel, xFmt, yFmt, heig
       points.map((p, i) => h("circle", {
         key: i, cx: toX(p.x), cy: toY(p.y), r: hover && hover.kind === "point" && hover.idx === i ? 7 : 5,
         fill: "var(--teal)", fillOpacity: hover && hover.kind === "point" && hover.idx === i ? 0.85 : 0.55, stroke: "var(--teal)", strokeWidth: 1,
-        style: { cursor: "pointer" }, onMouseEnter: () => setHover({ kind: "point", idx: i }), onMouseLeave: () => setHover(null)
+        style: { cursor: "help" }, onMouseEnter: () => setHover({ kind: "point", idx: i }), onMouseLeave: () => setHover(null)
       })),
       highlightPoint && h("g", null,
         h("circle", {
           cx: toX(highlightPoint.x), cy: toY(highlightPoint.y), r: hover && hover.kind === "highlight" ? 10 : 8,
-          fill: "var(--amber)", stroke: "var(--ink-1)", strokeWidth: 2, style: { cursor: "pointer" },
+          fill: "var(--amber)", stroke: "var(--ink-1)", strokeWidth: 2, style: { cursor: "help" },
           onMouseEnter: () => setHover({ kind: "highlight" }), onMouseLeave: () => setHover(null)
         }),
         h("text", { x: toX(highlightPoint.x) + 12, y: toY(highlightPoint.y) - 8, fontSize: 10, fontFamily: "var(--mono)", fontWeight: 700, fill: "var(--amber)" }, highlightPoint.label || "Your case")

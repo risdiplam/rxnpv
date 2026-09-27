@@ -200,11 +200,12 @@ function App() {
         h("div", { style: { flex: 1, overflowY: "auto", minHeight: 0 } },
           cases.length === 0 && h("div", { style: { fontSize: 12, fontFamily: "var(--mono)", color: "var(--ink-3)", marginBottom: 14, lineHeight: 1.6 } }, "No cases yet. Create one to start building a revenue model."),
           cases.map(c => h("div", { key: c.id, style: { marginBottom: 4 } },
-            h("div", {
-              onClick: () => setActiveCaseId(c.id),
+            h("div", buttonLikeProps(() => setActiveCaseId(c.id), {
+              "aria-current": activeCaseId === c.id ? "true" : undefined,
+              "aria-label": "Open case " + c.name + ", " + (c.programs || []).length + " program" + ((c.programs || []).length === 1 ? "" : "s"),
               style: { padding: "8px 10px", borderRadius: 7, cursor: "pointer", background: activeCaseId === c.id ? "var(--teal-bg)" : "transparent",
                 border: "1px solid " + (activeCaseId === c.id ? "var(--teal)" : "transparent"), display: "flex", justifyContent: "space-between", alignItems: "center", gap: 6 }
-            },
+            }),
               h("div", { style: { minWidth: 0 } },
                 h("div", { style: { fontSize: 13, fontFamily: "var(--sans)", fontWeight: 600, color: activeCaseId === c.id ? "var(--teal)" : "var(--ink-1)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" } }, c.name),
                 h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)" } }, (c.programs || []).length + " program" + ((c.programs || []).length === 1 ? "" : "s"))

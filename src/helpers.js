@@ -638,6 +638,18 @@ function MillionsField({ label, value, onChange, bench, help, wide }) {
   });
 }
 
+// Props that make a non-button element behave like one for the keyboard:
+// reachable with Tab, activated with Enter or Space, announced as a button.
+// For block-level clickable rows where a real <button> would fight the layout
+// (a card header holding a title and subtitle, a case row). Never nest a real
+// button inside an element given these props.
+function buttonLikeProps(onActivate, extra) {
+  return Object.assign({
+    role: "button", tabIndex: 0, onClick: onActivate,
+    onKeyDown: e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onActivate(e); } }
+  }, extra || {});
+}
+
 function SectionCard({ title, subtitle, children, defaultOpen }) {
   const h = React.createElement;
   const [open, setOpen] = React.useState(defaultOpen !== false);
@@ -645,10 +657,12 @@ function SectionCard({ title, subtitle, children, defaultOpen }) {
   // relevant information for an assumptions card. The bar only shows while the
   // card is open, since a collapsed card has nothing in it to export.
   return h("div", { className: open ? "export-section" : undefined, "data-export-section": open ? (typeof title === "string" ? title : "") : undefined, style: { background: "var(--surface)", border: "1px solid var(--rule)", borderRadius: 10, marginBottom: 14, overflow: "hidden", boxShadow: "0 1px 2px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.03)" } },
-    h("div", {
-      onClick: () => setOpen(!open),
+    // Was a bare onClick div: no Tab stop, so a keyboard user could not open
+    // a single input card in the Workspace.
+    h("div", buttonLikeProps(() => setOpen(!open), {
+      "aria-expanded": open,
       style: { padding: "13px 18px", display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer", background: "var(--surface-2)" }
-    },
+    }),
       h("div", null,
         h("div", { style: { fontFamily: "var(--display)", fontSize: 15, fontWeight: 600, color: "var(--ink-1)" } }, title),
         subtitle && h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-3)", marginTop: 2 } }, subtitle)
