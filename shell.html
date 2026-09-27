@@ -212,6 +212,12 @@
   .li-range { color: var(--ink-3); font-size: 11.5px; }
   .li-explain { margin-top: 6px; font-size: 12px; line-height: 1.5; color: var(--ink-2); background: var(--surface-2); border-radius: 8px; padding: 9px 10px; }
   .li-explain b { color: var(--ink-1); font-weight: 600; }
+  /* ── Plain-English reading under a result ─────────────────────────── */
+  .explain { display: flex; gap: 9px; align-items: flex-start; margin-top: 12px; padding: 9px 12px; border-radius: 8px; background: var(--surface-2);
+    font: 400 12.5px/1.55 var(--sans); color: var(--ink-2); max-width: var(--prose-width); }
+  .explain.on-tint { background: var(--surface); }
+  .explain svg { flex: none; margin-top: 2px; color: var(--teal); }
+  .explain b { color: var(--ink-1); font-weight: 600; }
   /* ── Assumptions: section list ────────────────────────────────────── */
   .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
   .assume-grid.has-nav { grid-template-columns: 176px minmax(0, 1fr) 272px; }

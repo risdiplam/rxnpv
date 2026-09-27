@@ -180,6 +180,9 @@ function useValuationSections({ theCase, onChange, goToTab }) {
             h("div", { style: { fontSize: 22, fontFamily: "var(--mono)", fontWeight: 800, color: impliedSolved.impliedAbsolutePct >= impliedSolved.baseAbsolutePct ? "var(--green)" : "var(--red)" } },
               impliedSolved.impliedAbsolutePct.toFixed(0) + "%"))
         ),
+        (() => { const by = k => (scenarioResults.find(s => s.key === k) || { result: { equity: {} } }).result.equity.perShare;
+          const r = readPriceVsScenarios(price, by("bear"), by("base"), by("bull"));
+          return r && h(Explain, Object.assign({ onTint: true }, r)); })(),
         valMethod === "multiple" && h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginTop: 8 } }, "Implied PoS is DCF-only — switch off Simple Multiple to see what the price requires."),
         price == null && h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginTop: 8 } }, "Set a current price above to see upside/downside and implied PoS."),
         valMethod === "dcf" && price != null && theCase.programs.length > 1 && h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginTop: 8 } }, "Implied PoS as a single absolute number needs one program — see \"as a multiple\" further down for the multi-program version.")
@@ -581,7 +584,8 @@ function useValuationSections({ theCase, onChange, goToTab }) {
           h("div", { style: { fontSize: 12, fontFamily: "var(--mono)", color: "var(--ink-2)", marginBottom: 6 } }, "Base-case risk-adjusted cash flow by year"),
           h(ExportableBlock, { title: (theCase.name || "Case") + " — base-case risk-adjusted cash flow" },
             h(RevenueChart, { series: cfSeries, showLegend: false, height: 180 })),
-          h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginTop: 4 } }, "Each year's free cash flow weighted by the odds of reaching it. Years below the solid zero line are burn; hover for any year's value.")
+          h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginTop: 4 } }, "Each year's free cash flow weighted by the odds of reaching it. Years below the solid zero line are burn; hover for any year's value."),
+          cfSeries.length > 0 && h(Explain, readCashFlow(cfSeries[0].points))
         )),
 
         // Implied PoS — the reverse direction from everything else on this
@@ -694,7 +698,8 @@ function useValuationSections({ theCase, onChange, goToTab }) {
             ),
             h("div", { style: { display: "flex", justifyContent: "space-between", fontSize: 13, fontFamily: "var(--mono)", padding: "8px 10px", marginTop: 8, borderTop: "1px solid var(--rule)", fontWeight: 700 } },
               h("span", { style: { color: "var(--ink-1)" } }, "Total Enterprise Value"),
-              h("span", { style: { color: "var(--ink-1)" } }, fmtMoney(sotp.sumOfParts)))
+              h("span", { style: { color: "var(--ink-1)" } }, fmtMoney(sotp.sumOfParts))),
+            h(Explain, readSotp(sotp.programBreakdown, sotp.gaDrag))
           );
         })()),
 
@@ -724,7 +729,8 @@ function useValuationSections({ theCase, onChange, goToTab }) {
             h("div", { "data-section-title": "", style: { fontSize: 13, fontFamily: "var(--display)", fontWeight: 600, color: "var(--ink-1)", marginBottom: 4 } }, "Pipeline risk waterfall (Base case)"),
             h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginBottom: 12 } }, "The whole pipeline's value if every program succeeded for certain, vs. the actual risk-adjusted total — shared G&A included both ways. Each asset's own version is in its own editor above."),
             h(ExportableBlock, { title: (theCase.name || "Case") + " — pipeline risk waterfall" },
-              h(RiskWaterfallChart, { unriskedNPV, riskedNPV, posToLaunchPct: null, height: 190 }))
+              h(RiskWaterfallChart, { unriskedNPV, riskedNPV, posToLaunchPct: null, height: 190 })),
+            h(Explain, readRiskWaterfall(unriskedNPV, riskedNPV))
           );
         })()),
 

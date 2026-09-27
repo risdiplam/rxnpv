@@ -626,6 +626,8 @@ function runPValueCI() {
     const forestSvg = renderForestPlot([
       { label: 'Implied CI', estimate: point, lower: r.lower, upper: r.upper }
     ], { scale: scale === 'ratio' ? 'log' : 'linear', referenceLine: scale === 'ratio' ? 1 : 0, xLabel: (scale === 'ratio' ? 'Ratio (log scale)' : 'Difference') });
+    const ciRead = explainNode(readInterval(r.lower, r.upper, scale, levelPct));
+    if (ciRead) resultsDiv.appendChild(ciRead);
     appendChartWithExport(resultsDiv, forestSvg, 'p-value-to-ci');
   } else {
     const lower = numVal('pciLower'), upper = numVal('pciUpper');
@@ -644,6 +646,8 @@ function runPValueCI() {
     const forestSvg = renderForestPlot([
       { label: 'Reported CI', estimate: point, lower, upper }
     ], { scale: scale === 'ratio' ? 'log' : 'linear', referenceLine: scale === 'ratio' ? 1 : 0, xLabel: (scale === 'ratio' ? 'Ratio (log scale)' : 'Difference') });
+    const pRead = explainNode(readPValue(r.pTwoSided));
+    if (pRead) resultsDiv.appendChild(pRead);
     appendChartWithExport(resultsDiv, forestSvg, 'ci-to-p-value');
   }
 }
@@ -687,6 +691,8 @@ function runSingleArmCI() {
     el('span', { class: 'sublabel' }, `observed rate — ${(confidence*100).toFixed(0)}% CI: ${(r.lower*100).toFixed(1)}% to ${(r.upper*100).toFixed(1)}%`)
   ]));
   resultsDiv.appendChild(el('p', { class: 'subtle' }, `${events}/${n} patients.`));
+  const saRead = explainNode(readSingleArm(n, r.lower, r.upper));
+  if (saRead) resultsDiv.appendChild(saRead);
   const forestSvg = renderForestPlot([
     { label: `${events}/${n}`, estimate: r.phat * 100, lower: r.lower * 100, upper: r.upper * 100 }
   ], { scale: 'linear', xLabel: 'Rate (%)' });
@@ -1556,6 +1562,8 @@ function runTrialOutcome() {
     el('span', { class: 'bignum' }, (result.pos * 100).toFixed(1) + '%'),
     el('span', { class: 'sublabel' }, `assurance (PoS)  \u00B1${(result.posStdErr * 100).toFixed(2)}pp Monte Carlo SE, ${result.iterations.toLocaleString()} iterations`)
   ]));
+  const asRead = explainNode(readAssurance(result.pos * 100, sided));
+  if (asRead) resultsDiv.appendChild(asRead);
   const chartHtml = renderHistogram(result.observedEffects.filter(v => isFinite(v)), {
     title: 'Simulated observed effect across replicates', xLabel: 'Observed effect', markerValue: priorMean, markerLabel: 'prior mean'
   });
@@ -1725,6 +1733,10 @@ function runPeakSales() {
   const chartHtml = renderHistogram(result.samples.map(s => s.peakSalesUSD), {
     title: 'Peak sales distribution', xLabel: 'Peak sales (USD)', markerValue: result.summary.p50, markerLabel: 'median'
   });
+  const topDriver = drivers.slice().sort((a, b) => Math.abs(b.correlation) - Math.abs(a.correlation))[0];
+  const psRead = explainNode(readPeakSalesRange(result.summary.p10, result.summary.p50, result.summary.p90,
+    topDriver ? ({ population: 'Addressable population', diagnosisRate: 'Diagnosis rate', treatmentRate: 'Treatment rate', peakShare: 'Peak market share', price: 'Annual price' })[topDriver.driver] || topDriver.driver : null));
+  if (psRead) resultsDiv.appendChild(psRead);
   appendChartWithExport(resultsDiv, chartHtml, 'peak-sales-monte-carlo');
 
   resultsDiv.appendChild(el('h3', {}, 'What is actually driving this range'));

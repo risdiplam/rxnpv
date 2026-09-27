@@ -81,6 +81,7 @@ const EXPORTS = [
   "applyTaxToCalendar", "computeMoleculeTypePoSRatios", "POS_BY_MOLECULE",
   "computeProgramValuation",
   "revenueChartYScale", "niceAxisTicks", "localDateStamp", "selectPeakSalesCompWindow",
+  "readPriceVsScenarios", "readMonteCarlo", "readCashFlow", "readSotp", "readRiskWaterfall", "readTornado", "readPriceGrid", "readInterval", "readPValue", "readSingleArm", "readAssurance", "readPeakSalesRange", "readBinaryImplied", "readPremium", "readForwardRunway",
   "measureStorage", "STORAGE_ASSUMED_QUOTA_BYTES", "STORAGE_WARN_FRACTION", "STORAGE_CRITICAL_FRACTION",
   "computeTreatedPopulation", "launchCurveForYears", "erosionMultiplier", "computeProgramRevenue",
   "resolveNetPrice", "aspPctOfBasis", "PRICE_BASIS_OPTIONS", "getRevenueBuild", "PRICING_CONVERSION_MATRIX", "priceBasisArticle",
@@ -4064,6 +4065,106 @@ section("Icon-array captions wrap instead of being clipped");
     near("the default per-100 grid is unchanged: 100 dots", (pct.match(/<circle/g) || []).length, 100, 0);
     near("with 12 lit (6/50 = 12 per 100)", (pct.match(/fill="HL"/g) || []).length, 12, 0);
   }
+}
+report();
+
+section("Plain-English readings: each sentence matches the numbers under it");
+{
+  // Price vs scenarios. Bear -0.48 / Base -0.10 / Bull 0.71, price 10:
+  // above the highest (0.71) by 10 - 0.71 = 9.29.
+  let r = api.readPriceVsScenarios(10, -0.48, -0.10, 0.71);
+  ok("price above Bull -> 'above even your Bull case'", r.verdict === "Priced above even your Bull case.");
+  ok("gap to Bull is $9.29", r.text.includes("$9.29 more") && r.text.includes("($0.71)"));
+  // Price 2, Bear 3, Base 5, Bull 8: below Bear; (3/2 - 1) = 50% above.
+  r = api.readPriceVsScenarios(2, 3, 5, 8);
+  ok("price below Bear -> 'below even your Bear case', Bear 50% above", r.verdict.startsWith("Priced below even your Bear") && r.text.includes("($3.00) is 50% above"));
+  // Price 6 between Base 5 and Bull 8.
+  ok("between Base and Bull", api.readPriceVsScenarios(6, 3, 5, 8).verdict === "Priced between your Base and Bull cases.");
+  // Price 4 between Bear 3 and Base 5: Base is 5/4 - 1 = 25% above.
+  r = api.readPriceVsScenarios(4, 3, 5, 8);
+  ok("between Bear and Base, Base 25% above", r.verdict === "Priced between your Bear and Base cases." && r.text.includes("($5.00) is 25% above"));
+  ok("no price -> no reading", api.readPriceVsScenarios(null, 3, 5, 8) === null);
+
+  // Monte Carlo: 10 values 1..10, price 8 -> 8, 9, 10 are >= 8 -> 30%.
+  const vals = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+  r = api.readMonteCarlo(vals, 1.9, 9.1, 8, [{ label: "PoS", correlation: 0.4 }, { label: "Peak share/revenue", correlation: -0.7 }]);
+  ok("30% of trials at or above the price", r.verdict === "Fair value beats today's price in 30% of simulations.");
+  ok("top driver by |correlation| is Peak share (|-0.7| > 0.4)", r.text.includes("Peak share/revenue moves the answer most"));
+  ok("price above every trial -> 'almost none'", api.readMonteCarlo(vals, 1, 10, 50, []).verdict.includes("almost none of the 10"));
+
+  // Cash flow -5, -10, 4, 8, 6, 3: first positive in year 2; running totals
+  // -5, -15, -11, -3, 3, 6 -> lowest -15 in year 1, back to >= 0 in year 4;
+  // annual peak 8 in year 3.
+  const cf = [-5, -10, 4, 8, 6, 3].map((v, i) => ({ v: v * 1e6, label: i }));
+  r = api.readCashFlow(cf);
+  ok("spends until year 2", r.verdict === "Spends cash until year 2.");
+  ok("outlay $15.0M by year 1, earned back by year 4, best year $8.0M in year 3", r.text.includes("reaches $15.0M by year 1") && r.text.includes("earned back by year 4") && r.text.includes("$8.0M in year 3"));
+  ok("all negative -> never turns positive", api.readCashFlow([{ v: -1, label: 0 }, { v: -2, label: 1 }]).verdict === "Never turns positive.");
+  // -5, 2, 1: running -5, -3, -2 -> never back to zero.
+  ok("never earned back inside the window", api.readCashFlow([-5, 2, 1].map((v, i) => ({ v: v * 1e6, label: i }))).text.includes("not earned back within the model"));
+
+  // SOTP: A 60, B 20, C -10, G&A -15 ($M). Gross positive 80; A = 60/80 = 75%.
+  r = api.readSotp([{ name: "A", npv: 60e6 }, { name: "B", npv: 20e6 }, { name: "C", npv: -10e6 }], -15e6);
+  ok("A carries most of the value, 75%", r.verdict === "A carries most of the value." && r.text.includes("A is 75% of"));
+  ok("C subtracts $10.0M; G&A $15.0M", r.text.includes("C subtracts $10.0M") && r.text.includes("Shared G&A costs $15.0M"));
+  r = api.readSotp([{ name: "New Program", npv: 5e6 }, { name: "New Program", npv: -2e6 }], -1e6);
+  ok("two programs with one name are numbered, not merged", r.verdict === "New Program (1) carries all of the value." && r.text.includes("New Program (2) subtracts $2.0M"));
+
+  // Risk waterfall: unrisked 200, risked 50 -> keep 25%, risk takes 150.
+  r = api.readRiskWaterfall(200e6, 50e6);
+  ok("keeps 25%, odds take $150.0M", r.verdict === "You keep 25% of the success-case value." && r.text.includes("take $150.0M"));
+  ok("unrisked <= 0 -> costs issue", api.readRiskWaterfall(-5e6, -20e6).verdict.startsWith("Even certain success"));
+  ok("risked < 0 < unrisked", api.readRiskWaterfall(100e6, -10e6).verdict.includes("negative at today's odds"));
+  ok("risked > unrisked (late costs) is called out, not '150% kept'", api.readRiskWaterfall(40e6, 60e6).verdict.startsWith("Certain success is worth less"));
+
+  // Tornado: base 1, price 1.5. Share range 0.5..1.6 (reaches), PoS 0.7..1.3 (doesn't).
+  r = api.readTornado([{ label: "PoS", low: 0.7, high: 1.3 }, { label: "Peak share", low: 0.5, high: 1.6 }], 1, 1.5);
+  ok("widest bar first: Peak share (1.1 wide vs 0.6)", r.text.startsWith("Peak share matters most") && r.text.includes("from $0.50 to $1.60"));
+  ok("only Peak share reaches $1.50", r.verdict === "Only Peak share reaches today's $1.50 on its own.");
+  ok("nothing reaches -> says so", api.readTornado([{ label: "PoS", low: 0.7, high: 1.3 }], 1, 10).verdict.startsWith("No single input"));
+  // Price BELOW base: reaching means the low end gets down to it.
+  ok("price below base: low end at or under it counts", api.readTornado([{ label: "PoS", low: 0.7, high: 1.3 }], 1, 0.8).verdict.startsWith("Any one"));
+
+  // Price grid 2x2 [[1,2],[3,4]] at price 2.5 -> 3 and 4 reach: 2 of 4.
+  ok("grid: 2 of 4 reach $2.50", api.readPriceGrid([[1, 2], [3, 4]], 2.5).verdict === "2 of the 4 combinations reach today's $2.50.");
+  ok("grid: none reach, best corner $4.00", api.readPriceGrid([[1, 2], [3, 4]], 9).text.includes("$4.00"));
+
+  // Interval, ratio 0.60..0.95: 40% lower to 5% lower, excludes 1.
+  r = api.readInterval(0.60, 0.95, "ratio", "95");
+  ok("0.60-0.95 excludes no effect; 40% lower to 5% lower", r.verdict === "The 95% interval excludes no effect." && r.text.includes("from 40% lower to 5% lower"));
+  r = api.readInterval(0.80, 1.12, "ratio", "95");
+  ok("0.80-1.12 includes no effect; 20% lower to 12% higher", r.verdict === "The 95% interval includes no effect." && r.text.includes("from 20% lower to 12% higher"));
+  ok("difference -3.2..1.1 includes 0", api.readInterval(-3.2, 1.1, "linear", "95").text.includes("from -3.20 to +1.10"));
+
+  ok("p 0.004 -> significant at 1%", api.readPValue(0.004).verdict.includes("stricter 1%"));
+  ok("p 0.03 -> 5% but not 1%", api.readPValue(0.03).verdict === "Significant at the usual 5% level, but not at 1%.");
+  ok("p 0.07 -> not significant, 'trend' caveat", api.readPValue(0.07).verdict === "Not significant at 5%.");
+
+  // Wilson 9/20 at 95%: 0.2582..0.6579 -> 26% to 66%, 40 points wide.
+  const w = api.wilsonScoreInterval(9, 20, 0.95);
+  r = api.readSingleArm(20, w.lower, w.upper);
+  ok("9/20: too few patients, 26% to 66%, 40-point range", r.verdict === "Too few patients to pin the rate down." && r.text.includes("from 26% to 66%, a 40-point range"));
+
+  ok("assurance 70.3% -> about 7 in 10", api.readAssurance(70.3, "two").verdict === "About 7 in 10 simulated trials read out significant.");
+  ok("two-sided caveat only when two-sided", api.readAssurance(70.3, "two").text.includes("wrong direction") && !api.readAssurance(70.3, "one").text.includes("wrong direction"));
+
+  // Peak sales P10 200M, P50 500M, P90 1.2B -> 1.2B / 200M = 6.0x.
+  r = api.readPeakSalesRange(200e6, 500e6, 1.2e9, "Peak market share");
+  ok("peak sales: 6.0x spread, $200.0M to $1.20B", r.verdict === "The optimistic end is 6.0× the cautious end." && r.text.includes("between $200.0M and $1.20B"));
+
+  // Binary: 45% implied -> 'roughly a 5 in 10' (45/10 = 4.5 rounds to 5).
+  ok("binary 45% -> roughly 5 in 10", api.readBinaryImplied(45).verdict === "The price assumes roughly a 5 in 10 chance that it works.");
+
+  // Premiums [20,30,40,50,60,70,80,90], 75%: 6 below (20..70) of 8 = 0.75 -> richer.
+  // Median by linear interpolation: (50+60)/2 = 55.
+  r = api.readPremium(75, [20, 30, 40, 50, 60, 70, 80, 90]);
+  ok("75% premium above 6 of 8, median 55% -> richer than most", r.verdict === "Richer than most real deals." && r.text.includes("above 6 of the 8") && r.text.includes("median is 55%"));
+  ok("45% premium: 3 of 8 below -> in line", api.readPremium(45, [20, 30, 40, 50, 60, 70, 80, 90]).verdict === "In line with real deals.");
+
+  // Forward runway: balances 50, 10, -40, -20 -> lowest -40 in year 2.
+  r = api.readForwardRunway(14.4, [50, 10, -40, -20].map((b, i) => ({ year: i, balanceEnd: b * 1e6 })));
+  ok("runway 14.4 mo -> about 14 months; needs $40.0M at year 2", r.verdict === "Cash runs out in about 14 months." && r.text.includes("in year 2, it needs about $40.0M"));
+  ok("never negative -> never runs out", api.readForwardRunway(null, [{ year: 0, balanceEnd: 5e6 }, { year: 1, balanceEnd: 3e6 }]).verdict === "The plan never runs out of cash.");
 }
 report();
 

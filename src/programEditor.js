@@ -561,7 +561,8 @@ function ProgramEditor({ program, onChange, onDelete, discountRatePct, terminalV
           "\"Unrisked\" means 100% PoS on both sides — the full peak revenue AND the full R&D cost paid with certainty, not just revenue scaled up. For early-stage assets this can come out more negative than the risk-adjusted number: paying the full R&D cost for certain can outweigh a distant, heavily time-discounted payoff — that's a real feature of rNPV, not an error.",
           valuationMethod === "multiple" && " This waterfall always uses the full DCF/cost-structure math, regardless of the case's Simple Multiple setting — it's a diagnostic, not the number driving your headline valuation while Simple Multiple is active."),
         h(ExportableBlock, { title: (program.drugName || program.name || "Program") + " — risk waterfall" },
-          h(RiskWaterfallChart, { unriskedNPV: wf.unriskedNPV, riskedNPV: wf.riskedNPV, posToLaunchPct: wf.posToLaunch * 100 }))
+          h(RiskWaterfallChart, { unriskedNPV: wf.unriskedNPV, riskedNPV: wf.riskedNPV, posToLaunchPct: wf.posToLaunch * 100 })),
+        h(Explain, readRiskWaterfall(wf.unriskedNPV, wf.riskedNPV))
       );
     })()),
 

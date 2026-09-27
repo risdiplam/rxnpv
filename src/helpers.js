@@ -1049,6 +1049,7 @@ function MonteCarloBox({ theCase, discountRatePct, tv }) {
           axisLo < 0 && axisHi > 0 && zeroPct > 8 && zeroPct < 92 && h("span", { style: { position: "absolute", left: zeroPct + "%", transform: "translateX(-50%)" } }, "0"),
           h("span", { style: { position: "absolute", right: 0 } }, fmt(axisHi))))
       ),
+      h(Explain, Object.assign({ onTint: true }, readMonteCarlo(result.sortedValues, result.percentiles.p10, result.percentiles.p90, theCase.currentPrice !== "" && theCase.currentPrice != null ? Number(theCase.currentPrice) : null, result.drivers))),
       h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginTop: 10, lineHeight: 1.6 } },
         "Median can differ from the Base-case point estimate above — that's expected, not a discrepancy: discounting is non-linear (a higher rate hurts value more than an equal-sized lower rate helps it), so averaging across a range captures that in a way three fixed points can't."),
       h("div", { style: { marginTop: 12 } },
@@ -1743,4 +1744,216 @@ function SectionNav({ groups, rootId, active: tabActive, onHide }) {
     h("div", { className: "secnav-legend", "aria-hidden": "true" },
       h("span", null, h("i", { className: "secnav-dot set" }), "changed from default"),
       h("span", null, h("i", { className: "secnav-dot todo" }), "needs an input")));
+}
+
+// ── Plain-English readings of a result ──────────────────────────────────────
+// One bold verdict and one sentence under a result, saying what THIS result
+// means rather than how the tool works (the "New here?" notes do that). Each
+// reading is a pure function of numbers already on screen, returns null when
+// it has nothing honest to say, and is checked against hand-worked cases in
+// math_verification.js. None of them computes a new number.
+function Explain({ verdict, text, onTint }) {
+  const h = React.createElement;
+  if (!verdict && !text) return null;
+  return h("div", { className: "explain" + (onTint ? " on-tint" : "") },
+    h("svg", { width: 15, height: 15, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2, "aria-hidden": "true" },
+      h("circle", { cx: 12, cy: 12, r: 9 }), h("path", { d: "M12 11v5M12 8h.01" })),
+    h("div", null, verdict && h("b", null, verdict), verdict && text ? " " : null, text));
+}
+// Same box for the Simulation side, which builds plain DOM.
+function explainNode(reading) {
+  if (!reading || (!reading.verdict && !reading.text)) return null;
+  const box = document.createElement("div");
+  box.className = "explain";
+  box.innerHTML = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg>';
+  const body = document.createElement("div");
+  if (reading.verdict) { const b = document.createElement("b"); b.textContent = reading.verdict; body.appendChild(b); }
+  if (reading.text) body.appendChild(document.createTextNode((reading.verdict ? " " : "") + reading.text));
+  box.appendChild(body);
+  return box;
+}
+const pctWord = (x) => Math.round(x) + "%";
+// "$0.71 is 7% above" style helper: how far a sits from b, as a share of b.
+function relGap(a, b) { return b !== 0 ? Math.abs(a / b - 1) * 100 : null; }
+
+// Where today's price sits against the Bear / Base / Bull fair values.
+function readPriceVsScenarios(price, bear, base, bull) {
+  if (!(price > 0) || ![bear, base, bull].every(isFinite)) return null;
+  const lo = Math.min(bear, base, bull), hi = Math.max(bear, base, bull);
+  if (price > hi) return { verdict: "Priced above even your Bull case.",
+    text: "Today's " + fmtShare(price) + " is " + fmtShare(price - hi) + " more than your most optimistic fair value (" + fmtShare(hi) + "). Either the market sees something this case leaves out, such as other programs, better odds or a takeover, or your assumptions are more cautious than the market's." };
+  if (price < lo) return { verdict: "Priced below even your Bear case.",
+    text: "Your most cautious fair value (" + fmtShare(lo) + ") is " + pctWord(relGap(lo, price)) + " above today's " + fmtShare(price) + ". If your assumptions hold, the market is pricing in something worse than your worst case, which is worth understanding before calling it cheap." };
+  if (price >= base) return { verdict: "Priced between your Base and Bull cases.",
+    text: "The market already pays more than your Base case (" + fmtShare(base) + ") but less than your Bull case (" + fmtShare(bull) + "). Owning it at " + fmtShare(price) + " is a bet that things go better than your central view." };
+  return { verdict: "Priced between your Bear and Base cases.",
+    text: "Your Base case (" + fmtShare(base) + ") is " + pctWord(relGap(base, price)) + " above today's " + fmtShare(price) + ", and your Bear case (" + fmtShare(bear) + ") is the downside if things go worse than you expect." };
+}
+
+// A Monte Carlo distribution against today's price.
+function readMonteCarlo(sortedValues, p10, p90, price, drivers) {
+  if (!sortedValues || !sortedValues.length) return null;
+  const n = sortedValues.length;
+  const top = (drivers || []).slice().sort((a, b) => Math.abs(b.correlation) - Math.abs(a.correlation))[0];
+  const range = "The middle 80% of outcomes runs from " + fmtShare(p10) + " to " + fmtShare(p90) + "." + (top ? " " + top.label + " moves the answer most." : "");
+  if (!(price > 0)) return { verdict: null, text: range };
+  const above = sortedValues.filter(v => v >= price).length / n;
+  const verdict = above < 0.01 ? "Fair value beats today's price in almost none of the " + n.toLocaleString() + " simulations."
+    : above > 0.99 ? "Fair value beats today's price in almost every simulation."
+    : "Fair value beats today's price in " + pctWord(above * 100) + " of simulations.";
+  return { verdict, text: range };
+}
+
+// Year-by-year risk-adjusted cash flow: when it turns positive and when the
+// spending before that is earned back. points: [{ v, label }], label = year.
+function readCashFlow(points) {
+  if (!points || points.length < 2) return null;
+  const firstPos = points.findIndex(p => p.v > 0);
+  if (firstPos === -1) return { verdict: "Never turns positive.", text: "At these odds, no year's expected cash flow covers its costs, so the programs subtract value rather than add it." };
+  const peak = points.reduce((b, p) => p.v > b.v ? p : b, points[0]);
+  // Deepest point of the running total, then the first year after it where
+  // the running total is back to zero or better.
+  const cums = []; let cum = 0;
+  points.forEach(p => { cum += p.v; cums.push(cum); });
+  let ti = 0; cums.forEach((c, i) => { if (c < cums[ti]) ti = i; });
+  const trough = Math.min(0, cums[ti]), troughAt = points[ti].label;
+  const pi = cums.findIndex((c, i) => i > ti && c >= 0);
+  const payback = pi === -1 ? null : points[pi].label;
+  if (firstPos === 0) return { verdict: "Positive from the start.", text: "Expected cash flow peaks at " + fmtMoney(peak.v) + " in year " + peak.label + "." };
+  return { verdict: "Spends cash until year " + points[firstPos].label + ".",
+    text: "The net outlay reaches " + fmtMoney(-trough) + " by year " + troughAt + (payback != null ? " and is earned back by year " + payback : " and is not earned back within the model") + "; the best single year is " + fmtMoney(peak.v) + " in year " + peak.label + ". These are odds-weighted amounts, not what happens if the drug works." };
+}
+
+// Sum of the parts: which program carries the value, and which subtract it.
+function readSotp(parts, gaDrag) {
+  if (!parts || parts.length < 2) return null;
+  // Two programs left as "New Program" would read as one: number the repeats.
+  const seen = {};
+  parts = parts.map(p => { const n = (seen[p.name] = (seen[p.name] || 0) + 1); return n > 1 || parts.filter(q => q.name === p.name).length > 1 ? Object.assign({}, p, { name: p.name + " (" + n + ")" }) : p; });
+  const pos = parts.filter(p => p.npv > 0).sort((a, b) => b.npv - a.npv);
+  const neg = parts.filter(p => p.npv < 0).sort((a, b) => a.npv - b.npv);
+  if (!pos.length) return { verdict: "No program adds value at its current odds.", text: "Every program's expected costs outweigh its expected revenue, before " + fmtMoney(-gaDrag) + " of shared G&A." };
+  const gross = pos.reduce((s, p) => s + p.npv, 0);
+  const share = pos[0].npv / gross * 100;
+  const text = (pos.length > 1 ? pos[0].name + " is " + pctWord(share) + " of the value the programs add. " : "") +
+    (neg.length ? neg.map(p => p.name).join(" and ") + (neg.length > 1 ? " subtract" : " subtracts") + " " + fmtMoney(-neg.reduce((s, p) => s + p.npv, 0)) + ": at current odds, expected costs outweigh expected revenue. " : "") +
+    "Shared G&A costs " + fmtMoney(-gaDrag) + " on top.";
+  return { verdict: pos.length === 1 ? pos[0].name + " carries all of the value." : pos[0].name + " carries most of the value.", text };
+}
+
+// Risk waterfall: how much of the success-certain value survives the odds.
+function readRiskWaterfall(unrisked, risked) {
+  if (![unrisked, risked].every(isFinite)) return null;
+  if (unrisked <= 0) return { verdict: "Even certain success doesn't pay back the costs.", text: "With every trial assumed to work, value is still " + fmtMoney(unrisked) + ", so the issue is the revenue and cost assumptions, not the odds." };
+  // "Unrisked" pays every remaining trial's cost for certain too, so it can
+  // come out below the odds-weighted value when late costs outrun revenue.
+  if (risked > unrisked) return { verdict: "Certain success is worth less than today's odds-weighted value.",
+    text: "Paying for every remaining trial for certain costs more than the extra revenue it brings (" + fmtMoney(unrisked) + " against " + fmtMoney(risked) + "), which usually means the revenue looks thin for what it costs to get there." };
+  if (risked < 0) return { verdict: "Worth " + fmtMoney(unrisked) + " if it works, negative at today's odds.", text: "The odds of failure cost " + fmtMoney(unrisked - risked) + ": expected spending on the way to launch outweighs the odds-weighted revenue." };
+  return { verdict: "You keep " + pctWord(risked / unrisked * 100) + " of the success-case value.", text: "Certain success would be worth " + fmtMoney(unrisked) + "; the odds of failing along the way take " + fmtMoney(unrisked - risked) + " off that." };
+}
+
+// A tornado chart against today's price: which single input could, on its
+// own, carry fair value to the price. drivers: [{ label, low, high }] per share.
+function readTornado(drivers, base, price) {
+  if (!drivers || !drivers.length || !isFinite(base)) return null;
+  const sorted = drivers.slice().sort((a, b) => Math.abs(b.high - b.low) - Math.abs(a.high - a.low));
+  const t = sorted[0];
+  const lead = t.label + " matters most: across its tested range, fair value runs from " + fmtShare(Math.min(t.low, t.high)) + " to " + fmtShare(Math.max(t.low, t.high)) + ".";
+  if (!(price > 0)) return { verdict: null, text: lead };
+  const reach = sorted.filter(d => (price >= base ? Math.max(d.low, d.high) >= price : Math.min(d.low, d.high) <= price)).map(d => d.label);
+  const verdict = reach.length === 0
+    ? "No single input, moved across its range, gets fair value to today's " + fmtShare(price) + "."
+    : reach.length === sorted.length ? "Any one of these inputs, moved far enough, reaches today's " + fmtShare(price) + "."
+    : "Only " + reach.join(" and ") + (reach.length === 1 ? " reaches" : " reach") + " today's " + fmtShare(price) + " on its own.";
+  return { verdict, text: lead };
+}
+
+// The two-way grid: how many of its combinations reach today's price.
+function readPriceGrid(cells, price) {
+  if (!(price > 0) || !cells || !cells.length) return null;
+  const all = [].concat.apply([], cells).filter(v => v != null && isFinite(v));
+  if (!all.length) return null;
+  const n = all.filter(v => v >= price).length;
+  if (n === 0) return { verdict: "None of the " + all.length + " combinations reaches today's " + fmtShare(price) + ".", text: "Even the most generous corner of the grid, " + fmtShare(Math.max.apply(null, all)) + ", is below it. Peak revenue and PoS together cannot explain the price on these assumptions." };
+  if (n === all.length) return { verdict: "Every combination is above today's " + fmtShare(price) + ".", text: "Even the harshest corner of the grid, " + fmtShare(Math.min.apply(null, all)) + ", clears it." };
+  return { verdict: n + " of the " + all.length + " combinations reach today's " + fmtShare(price) + ".", text: "Those are the peak revenue and PoS pairs you would need to believe for today's price to be fair or cheap; hover a cell for its exact gap." };
+}
+
+// ── Readings for the Simulation tools ──
+// A confidence interval against "no effect" (1 for a ratio, 0 for a
+// difference). Says which way the interval sits, never which way is good:
+// the tool does not know whether the endpoint is a benefit or a harm.
+function readInterval(lower, upper, scale, levelPct) {
+  if (![lower, upper].every(isFinite) || upper <= lower) return null;
+  const nullV = scale === "ratio" ? 1 : 0;
+  const crosses = lower <= nullV && upper >= nullV;
+  const words = (v) => {
+    if (scale !== "ratio") return (v > 0 ? "+" : "") + (Math.abs(v) >= 100 ? v.toFixed(0) : Math.abs(v) >= 10 ? v.toFixed(1) : v.toFixed(2));
+    const pct = Math.abs(v - 1) * 100;
+    return pct < 0.5 ? "no different" : pctWord(pct) + (v < 1 ? " lower" : " higher");
+  };
+  const range = scale === "ratio"
+    ? "The data fit anything from " + words(lower) + " to " + words(upper) + " than the comparator."
+    : "The data fit a true difference anywhere from " + words(lower) + " to " + words(upper) + ".";
+  return crosses
+    ? { verdict: "The " + levelPct + "% interval includes no effect.", text: range + " A result like this does not rule out that the drug does nothing on this measure." }
+    : { verdict: "The " + levelPct + "% interval excludes no effect.", text: range + " How wide that range is tells you how precisely the effect is known." };
+}
+function readPValue(p) {
+  if (!isFinite(p)) return null;
+  if (p < 0.01) return { verdict: "Significant at the usual 5% level, and at the stricter 1%.", text: "It would survive the tighter thresholds used when a trial tests several endpoints." };
+  if (p < 0.05) return { verdict: "Significant at the usual 5% level, but not at 1%.", text: "If this is one of several endpoints, a multiplicity adjustment could take it past the line; see Multiplicity Adjustment." };
+  if (p < 0.10) return { verdict: "Not significant at 5%.", text: "Close enough that companies sometimes call it a 'trend'. That is not evidence the drug works." };
+  return { verdict: "Not significant.", text: "A result this far from the threshold is consistent with no effect." };
+}
+// One observed rate: how much a trial of this size pins it down.
+function readSingleArm(n, lower, upper) {
+  if (![n, lower, upper].every(isFinite) || n <= 0) return null;
+  const width = (upper - lower) * 100;
+  const verdict = width >= 30 ? "Too few patients to pin the rate down." : width >= 15 ? "A rough estimate." : "A fairly precise estimate.";
+  return { verdict, text: "With " + n + " patient" + (n === 1 ? "" : "s") + ", the true rate could be anywhere from " + (lower * 100).toFixed(0) + "% to " + (upper * 100).toFixed(0) + "%, a " + width.toFixed(0) + "-point range. A comparator's rate inside that range cannot be ruled out." };
+}
+// Assurance: the share of simulated trials that read out significant.
+function readAssurance(pct, sided) {
+  if (!isFinite(pct)) return null;
+  const inTen = Math.round(pct / 10);
+  const verdict = pct >= 99.5 ? "Nearly every simulated trial reads out significant."
+    : pct < 0.5 ? "Almost no simulated trial reads out significant."
+    : "About " + inTen + " in 10 simulated trials read out significant.";
+  return { verdict, text: "That is the chance of a statistically significant result given your belief about the effect and this trial's size, not the chance of approval." + (sided === "two" ? " Two-sided: a significant result in the wrong direction counts too." : "") };
+}
+// Peak-sales Monte Carlo: how wide the range is, and what drives it.
+function readPeakSalesRange(p10, p50, p90, topDriverLabel) {
+  if (![p10, p50, p90].every(isFinite) || p10 <= 0) return null;
+  const spread = p90 / p10;
+  return { verdict: "The optimistic end is " + (spread >= 10 ? spread.toFixed(0) : spread.toFixed(1)) + "× the cautious end.",
+    text: "Eight in ten simulations land between " + fmtMoney(p10) + " and " + fmtMoney(p90) + ", around a median of " + fmtMoney(p50) + "." + (topDriverLabel ? " " + topDriverLabel + " moves it most, so that is the input worth researching." : "") };
+}
+
+// ── Readings for Tools ──
+// Binary event with no PoS of your own: what the price already assumes.
+function readBinaryImplied(impliedPct) {
+  if (!isFinite(impliedPct) || impliedPct < 0 || impliedPct > 100) return null;
+  const inTen = Math.round(impliedPct / 10);
+  const odds = inTen === 0 ? "less than a 1 in 10 chance" : inTen === 10 ? "near-certain success" : "roughly a " + inTen + " in 10 chance";
+  return { verdict: "The price assumes " + odds + " that it works.", text: "If your own odds are higher than " + impliedPct.toFixed(0) + "%, the bet pays on average at these values; if lower, it doesn't. Add your PoS above to see the expected value." };
+}
+// A takeout premium against the premiums actually paid in tracked deals.
+function readPremium(pct, premiumsKnown) {
+  if (!isFinite(pct) || !premiumsKnown || premiumsKnown.length < 4) return null;
+  const n = premiumsKnown.length;
+  const below = premiumsKnown.filter(p => p < pct).length;
+  const median = percentile(premiumsKnown.slice().sort((a, b) => a - b), 0.5);
+  const verdict = below / n >= 0.75 ? "Richer than most real deals." : below / n <= 0.25 ? "Leaner than most real deals." : "In line with real deals.";
+  return { verdict, text: "A " + pctWord(pct) + " premium is above " + below + " of the " + n + " tracked deals with a disclosed premium; the median is " + pctWord(median) + "." };
+}
+// Forward runway from the case's own plan: when cash runs out, and how much
+// the plan would need raised at its lowest point.
+function readForwardRunway(runwayMonths, path) {
+  if (!path || !path.length) return null;
+  const low = path.reduce((b, p) => p.balanceEnd < b.balanceEnd ? p : b, path[0]);
+  if (low.balanceEnd >= 0) return { verdict: "The plan never runs out of cash.", text: "The balance stays positive throughout the projection, lowest at " + fmtMoney(low.balanceEnd) + " in year " + low.year + "." };
+  const when = runwayMonths == null ? "" : runwayMonths < 1 ? "The plan needs outside money from the start." : "Cash runs out in about " + Math.round(runwayMonths) + " months.";
+  return { verdict: when || "The plan runs short of cash.", text: "At its lowest, in year " + low.year + ", it needs about " + fmtMoney(-low.balanceEnd) + " more than the company holds. That assumes every trial succeeds on schedule and nothing is raised along the way, so real dilution usually starts sooner." };
 }

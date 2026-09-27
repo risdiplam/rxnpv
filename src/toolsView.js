@@ -258,6 +258,7 @@ function MaPremiumTool({ cases, updateCase, activeCase }) {
         h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", } }, "Implied takeout value"),
         h("div", { style: { fontSize: 22, fontFamily: "var(--mono)", fontWeight: 700, color: "var(--ink-1)" } }, fmtShare(takeout))
       ),
+      takeout != null && h(Explain, readPremium(pct, premiumsKnown)),
       h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginTop: 10 } }, "Default premium is the median across " + premiumsKnown.length + " tracked deals with a disclosed premium.")
     ]),
     toolCard(h, [
@@ -804,7 +805,8 @@ function RunwayTool({ cases, updateCase, activeCase }) {
               series: [{ name: "Projected cash balance", color: "var(--teal)", points: fr.path.map(p => ({ v: p.balanceEnd, label: p.year })) }],
               height: 160, showLegend: false
             })),
-          h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginTop: 4 } }, "Below the zero line is the cumulative cash the plan would need raised — the model never raises money on its own, so where the line crosses zero is when a raise becomes necessary.")
+          h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginTop: 4 } }, "Below the zero line is the cumulative cash the plan would need raised — the model never raises money on its own, so where the line crosses zero is when a raise becomes necessary."),
+          h(Explain, readForwardRunway(fr.runwayMonths, fr.path))
         )
       ]);
     })(),
@@ -1177,6 +1179,7 @@ function BinaryEventTool({ cases, activeCase }) {
           : h("span", null, h("b", null, "Trading above your success case. "),
               "The implied probability exceeds 100%, so the market is paying for more than this single readout — another asset, a platform, or a takeout premium your two anchors don't capture. The binary frame is too narrow here.")),
 
+      res.expectedValue == null && !res.rangeFlag && h(Explain, readBinaryImplied(res.impliedPoSPct)),
       res.expectedValue != null && h("div", { style: { padding: "12px 14px", borderRadius: 8, lineHeight: 1.65, fontFamily: "var(--sans)", fontSize: 12,
           background: res.evVsCurrentPct > 0 ? "var(--green-bg)" : "var(--red-bg)", border: "1px solid " + (res.evVsCurrentPct > 0 ? "var(--green)" : "var(--red)"), color: "var(--ink-1)" } },
         h("b", { style: { color: res.evVsCurrentPct > 0 ? "var(--green)" : "var(--red)" } },
@@ -1236,7 +1239,9 @@ function SensitivityTool({ cases, updateCase, activeCase }) {
               r.values.map((v, j) => h("span", { key: j, style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)" } }, v.label + ": " + fmtShare(v.value)))
             )
           ))
-        ))
+        )),
+      h(Explain, readTornado(rows.filter(r => r.lo != null).map(r => ({ label: r.name, low: r.lo, high: r.hi })), baseline,
+        theCase.currentPrice !== "" && theCase.currentPrice != null ? Number(theCase.currentPrice) : null))
     ]),
 
     theCase && !error && gridData && toolCard(h, [
@@ -1279,7 +1284,8 @@ function SensitivityTool({ cases, updateCase, activeCase }) {
         // The shading is upside against today's price, not the sign of the
         // value — without saying so, a grid of positive values all shaded red
         // (because all are below the price) read as a colouring bug.
-        (gridData.currentPrice ? "Shading is fair value vs today's price (" + fmtShare(gridData.currentPrice) + "): green above +20%, amber within -5% to +20%, red below -5%. Hover a cell for its exact upside." : "Enter a current share price on the case to shade cells by upside."))
+        (gridData.currentPrice ? "Shading is fair value vs today's price (" + fmtShare(gridData.currentPrice) + "): green above +20%, amber within -5% to +20%, red below -5%. Hover a cell for its exact upside." : "Enter a current share price on the case to shade cells by upside.")),
+      h(Explain, readPriceGrid(gridData.cells, gridData.currentPrice))
     ])
   );
 }
