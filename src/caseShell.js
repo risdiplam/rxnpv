@@ -308,7 +308,7 @@ function CaseView({ theCase, onChange, onDelete, onNavigateToTools }) {
 
     ),
 
-    panel("assumptions",
+    panel("assumptions", h("div", { className: "assume-grid" }, h("div", { className: "assume-main" },
     // Case-level master mode — one click sets every program's revenue mode AND
     // the capital structure mode at once. Per-section toggles still work
     // afterward if you want to mix modes within the case. Highlighted state is
@@ -369,7 +369,7 @@ function CaseView({ theCase, onChange, onDelete, onNavigateToTools }) {
       )),
       programPicker(true),
       editorFor("inputs")
-    ),
+    ), theCase.programs.length > 0 && h(LiveImpactPanel, { theCase, active: tab === "assumptions" }))),
 
     panel("scenarios", vs.scenarios),
 

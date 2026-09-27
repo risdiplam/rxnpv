@@ -190,6 +190,32 @@
   .flag-pointer > span:first-child { color: var(--warn); font-size: 10px; }
   .flag-pointer-go { margin-left: auto; color: var(--warn); font-weight: 600; }
   .empty-note { padding: 16px 18px; border-radius: 10px; background: var(--surface); border: 1px dashed var(--rule); color: var(--ink-2); font-size: 13px; margin-bottom: 16px; }
+  /* ── Assumptions: inputs + live impact ─────────────────────────────── */
+  .assume-grid { display: grid; grid-template-columns: minmax(0, 1fr) 272px; gap: 20px; align-items: start; }
+  .assume-main { min-width: 0; }
+  .live-impact { position: sticky; top: 16px; background: var(--surface); border: 1px solid var(--rule); border-radius: 12px;
+    padding: 16px; box-shadow: var(--shadow-card); font-family: var(--sans); }
+  .li-title { font: 600 14px var(--sans); color: var(--ink-1); margin-bottom: 12px; }
+  .li-label { font: 500 12px var(--sans); color: var(--ink-2); }
+  .li-value { font: 600 30px/1.1 var(--sans); letter-spacing: -0.03em; color: var(--ink-1); margin: 4px 0 2px; }
+  .li-value.neg { color: var(--red); }
+  .li-sub { font-size: 12.5px; color: var(--ink-3); }
+  .li-delta { margin-top: 8px; font: 600 12.5px var(--sans); }
+  .li-delta.up { color: var(--green); } .li-delta.down { color: var(--red); }
+  .li-drivers { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--rule); }
+  .li-pending { color: var(--ink-3); font-weight: 400; }
+  .li-row { display: grid; grid-template-columns: 1fr; gap: 3px; margin-bottom: 10px; font-size: 12px; color: var(--ink-2); }
+  .li-name { color: var(--ink-1); font-weight: 500; }
+  .li-bar { position: relative; height: 8px; border-radius: 4px; background: var(--surface-2); }
+  .li-bar i { position: absolute; top: 0; bottom: 0; border-radius: 4px; background: var(--teal-fill); opacity: 0.8; }
+  .li-bar b { position: absolute; top: -3px; bottom: -3px; width: 2px; margin-left: -1px; border-radius: 1px; background: var(--ink-1); }
+  .li-range { color: var(--ink-3); font-size: 11.5px; }
+  .li-explain { margin-top: 6px; font-size: 12px; line-height: 1.5; color: var(--ink-2); background: var(--surface-2); border-radius: 8px; padding: 9px 10px; }
+  .li-explain b { color: var(--ink-1); font-weight: 600; }
+  @media (max-width: 1180px) {
+    .assume-grid { grid-template-columns: minmax(0, 1fr); }
+    .live-impact { position: static; order: -1; }
+  }
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; background: var(--bg); }
   body { font-family: var(--sans); }

@@ -64,7 +64,7 @@ const EXPORTS = [
   "ciToSE", "computeFixedEffectMetaAnalysis", "computeHeterogeneity", "computeRandomEffectsMetaAnalysis",
   "POS_MODIFIERS", "POS_REGULATORY", "POS_REGULATORY_MODIFIERS",
   "SCENARIO_PRESETS", "getEffectiveScenarioPreset", "applyBasePosAdjustment",
-  "computeProgramValuation", "computeCaseValuation", "computeProgramRiskWaterfall",
+  "computeProgramValuation", "computeCaseValuation", "baseCaseFairValue", "computeSensitivityDrivers", "computeProgramRiskWaterfall",
   "computeEffectivePoS", "computeRnDToLaunch", "resolveLaunchYearOffset",
   "computeFullCaseMonteCarlo", "solveImpliedPoSMultiplier", "computeEquityBridgeSteps", "computeRedFlags",
   "computePortfolioSummary", "shrinkBinaryResponseRate", "shrinkHazardRatio",
@@ -2373,6 +2373,29 @@ section("Royalty income carries no COGS or marketing — the partner bears those
     splitPeak.cogs < Math.round(splitPeak.revenue * 0.15));
 }
 report();
+
+section("Live impact: the panel's number is the Overview's number");
+{
+  // baseCaseFairValue must reproduce the Base-case per-share value the
+  // Valuation card computes (effective Base preset, the case's discount rate)
+  // and the Sensitivity tool's baseline — one number, three places.
+  const c = {
+    name: "LI", currentPrice: "10", discountRatePct: "12",
+    capitalStructure: { mode: "simple", dilutedSharesSimple: "50000000", cash: "100000000", debt: "0" },
+    corporateGA: { preCommercialAnnualM: "10", gaShareOfMatureSgaPct: "50" },
+    programs: [{ id: "p1", name: "A", therapeuticArea: "Oncology", currentPhase: "phase2", modality: "small molecule",
+      revenueMode: "quick", quickRevenue: { peakRevenue: "1500000000", yearsToPeak: "6" }, launchYearOffset: "5" }]
+  };
+  const direct = api.computeCaseValuation(c, api.getEffectiveScenarioPreset(c, "base"), "base", 12, { enabled: false }).equity.perShare;
+  near("baseCaseFairValue equals the Valuation card's Base per-share value", api.baseCaseFairValue(c), direct, 1e-9);
+  const sens = api.computeSensitivityDrivers(c, { skipGrid: true });
+  near("and the Sensitivity tool's baseline", sens.baseline, direct, 1e-9);
+  // This fixture has no saved costStructure — which used to crash the COGS
+  // driver and empty the whole list (fixed alongside this check).
+  ok("a program with no saved cost structure no longer breaks the drivers", !sens.error);
+  ok("skipGrid leaves the price grid out and keeps the drivers", sens.gridData === null && sens.rows.length >= 4);
+  ok("an empty case has no value rather than a wrong one", api.baseCaseFairValue({ programs: [] }) === null);
+}
 
 section("Upfront and milestone value survives the Simple Multiple method");
 {

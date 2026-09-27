@@ -1597,3 +1597,68 @@ class ErrorBoundary extends React.Component {
     return this.props.children;
   }
 }
+
+// ── Live impact (Workspace › Assumptions) ─────────────────────────────────
+// The thing a spreadsheet can't give you: while you edit, the base-case fair
+// value, what your last edit did to it, and which inputs move it most — in
+// view the whole time, not a scroll away. The headline number is one cheap
+// valuation (baseCaseFairValue, the same path as the Overview); the drivers
+// reuse the Sensitivity tool's own engine, skip its price grid, and run a
+// moment after typing stops, only while the tab is open.
+function LiveImpactPanel({ theCase, active }) {
+  const h = React.createElement;
+  const value = baseCaseFairValue(theCase);
+  const prev = React.useRef(value);
+  const [lastChange, setLastChange] = React.useState(null);
+  const [drivers, setDrivers] = React.useState(null);
+  const [pending, setPending] = React.useState(false);
+  React.useEffect(() => {
+    if (value != null && prev.current != null && Math.abs(value - prev.current) > 0.0005) setLastChange(value - prev.current);
+    prev.current = value;
+  }, [value]);
+  const sig = JSON.stringify(theCase.programs) + "|" + theCase.discountRatePct + "|" + JSON.stringify(theCase.capitalStructure) + "|" + theCase.valuationMethod + "|" + JSON.stringify(theCase.terminalValue);
+  React.useEffect(() => {
+    if (!active || value == null) return;
+    setPending(true);
+    const t = setTimeout(() => {
+      const r = computeSensitivityDrivers(theCase, { skipGrid: true });
+      setDrivers(r.error ? null : r.rows.slice(0, 4));
+      setPending(false);
+    }, 450);
+    return () => clearTimeout(t);
+  }, [active, sig]);
+
+  const cp = theCase.currentPrice !== "" && theCase.currentPrice != null ? Number(theCase.currentPrice) : null;
+  const gap = (value != null && cp > 0) ? value - cp : null;
+  // Every driver is drawn as its low-to-high range on ONE shared axis, with a
+  // tick at today's value — so the bars show direction and reach, not just
+  // swing sizes that all look full when the drivers are similar.
+  const axLo = drivers && drivers.length ? Math.min(value, ...drivers.map(d => d.lo)) : 0;
+  const axHi = drivers && drivers.length ? Math.max(value, ...drivers.map(d => d.hi)) : 1;
+  const pos = (v) => ((v - axLo) / ((axHi - axLo) || 1)) * 100;
+  const top = drivers && drivers[0];
+  return h("aside", { className: "live-impact", "aria-label": "Live impact", "aria-live": "polite" },
+    h("div", { className: "li-title" }, "Live impact"),
+    h("div", { className: "li-label" }, "Fair value per share · Base"),
+    h("div", { className: "li-value" + (value != null && value < 0 ? " neg" : "") }, value == null ? "—" : fmtShare(value)),
+    value == null
+      ? h("div", { className: "li-sub" }, "Fill in the inputs flagged above to see a value.")
+      : h("div", { className: "li-sub" }, cp > 0
+          ? (gap >= 0 ? fmtShare(gap) + " above today's " : fmtShare(-gap) + " below today's ") + fmtShare(cp)
+          : "Add a current price to compare"),
+    lastChange != null && h("div", { className: "li-delta " + (lastChange >= 0 ? "up" : "down") },
+      (lastChange >= 0 ? "▲ +" : "▼ ") + fmtShare(lastChange).replace("-", "") + " from your last change"),
+    value != null && h("div", { className: "li-drivers" },
+      h("div", { className: "li-label", style: { marginBottom: 8 } }, "What moves it most", pending && h("span", { className: "li-pending" }, " · updating…")),
+      (drivers || []).map(d => {
+        const lo = d.lo, hi = d.hi;
+        return h("div", { key: d.name, className: "li-row", title: d.name + ": " + fmtShare(lo) + " to " + fmtShare(hi) },
+          h("span", { className: "li-name" }, d.name.replace(" / revenue", "").replace(" (PoS)", "").replace(" (% of revenue)", "")),
+          h("span", { className: "li-bar" },
+            h("i", { style: { left: pos(lo) + "%", width: Math.max(2, pos(hi) - pos(lo)) + "%" } }),
+            h("b", { style: { left: pos(value) + "%" }, "aria-hidden": "true" })),
+          h("span", { className: "li-range" }, fmtShare(lo) + " – " + fmtShare(hi)));
+      }),
+      top && h("div", { className: "li-explain" },
+        h("b", null, top.name.replace(" / revenue", "").replace(" (PoS)", "")), " swings fair value by " + fmtShare(top.swing) + " across its tested range — it's the input most worth getting right.")));
+}

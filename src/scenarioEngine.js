@@ -966,7 +966,7 @@ function computeRedFlags(theCase) {
 // component) specifically so the PDF report can call the exact same logic
 // when a chart is included in it, instead of a second, hand-maintained copy
 // that could quietly drift out of sync with the tool's own numbers.
-function computeSensitivityDrivers(theCase) {
+function computeSensitivityDrivers(theCase, opts) {
   let rows = [], error = null, baseline = null, gridData = null;
   if (theCase) {
     try {
@@ -1019,7 +1019,11 @@ function computeSensitivityDrivers(theCase) {
           clone.programs.forEach(p => {
             const bench = getCogsBenchmark(p.modality).value;
             const effective = (p.costStructure && p.costStructure.cogsPct !== "" && p.costStructure.cogsPct != null) ? Number(p.costStructure.cogsPct) : bench;
-            if (!p.costStructure) p.costStructure = {};
+            // Fill the same defaults the rest of the engine assumes for a
+            // program with no saved cost structure: a bare {} here crashed the
+            // valuation (reps.primaryCare) and emptied the whole driver list.
+            p.costStructure = Object.assign({ cogsPct: "", reps: {}, marketingPctOfPeak: "" }, p.costStructure || {});
+            if (!p.costStructure.reps) p.costStructure.reps = {};
             p.costStructure.cogsPct = String(Math.max(0, Math.min(100, effective * mult)));
           });
           const r = computeCaseValuation(clone, effectiveBase, "base", dr, tvParams);
@@ -1046,16 +1050,38 @@ function computeSensitivityDrivers(theCase) {
         return { ...d, lo, hi, swing: (lo != null && hi != null) ? hi - lo : 0 };
       }).sort((a, b) => b.swing - a.swing);
 
-      const shareSteps = [60, 80, 100, 120, 150, 180];
-      const posSteps = [60, 80, 100, 120, 150, 180];
-      const cp = theCase.currentPrice !== "" && theCase.currentPrice != null ? Number(theCase.currentPrice) : null;
-      gridData = {
-        shareSteps, posSteps, currentPrice: cp,
-        cells: shareSteps.map(sPct => posSteps.map(pPct => perShareAt(sPct, pPct, null)))
-      };
+      // The 36-cell price grid is the expensive half; the live-impact panel
+      // only needs the drivers and asks to skip it.
+      if (!(opts && opts.skipGrid)) {
+        const shareSteps = [60, 80, 100, 120, 150, 180];
+        const posSteps = [60, 80, 100, 120, 150, 180];
+        const cp = theCase.currentPrice !== "" && theCase.currentPrice != null ? Number(theCase.currentPrice) : null;
+        gridData = {
+          shareSteps, posSteps, currentPrice: cp,
+          cells: shareSteps.map(sPct => posSteps.map(pPct => perShareAt(sPct, pPct, null)))
+        };
+      }
     } catch (e) { error = e.message; }
   }
   return { rows, error, baseline, gridData };
+}
+
+// Base-case fair value per share by exactly the path the Valuation card and
+// the Sensitivity tool take (effective Base preset, the case's discount rate,
+// terminal value or multiple), so the live-impact panel can never disagree
+// with the Overview. Returns null when the case can't be valued yet.
+function baseCaseFairValue(theCase) {
+  if (!theCase || !theCase.programs || !theCase.programs.length) return null;
+  try {
+    const dr = theCase.discountRatePct !== "" && theCase.discountRatePct != null ? Number(theCase.discountRatePct) : DISCOUNT_RATE_GUIDANCE.earlyBiotechSelfView[0];
+    const tv = theCase.terminalValue || { enabled: false };
+    const preset = getEffectiveScenarioPreset(theCase, "base");
+    if ((theCase.valuationMethod || "dcf") === "multiple") {
+      const m = numOr((theCase.multipleAssumptions || {}).base, 3);
+      return computeSimpleMultipleValuation(theCase, preset, "base", m, dr).equity.perShare;
+    }
+    return computeCaseValuation(theCase, preset, "base", dr, { enabled: tv.enabled, method: tv.method, growthPct: tv.growthPct, exitMultiple: tv.exitMultiple }).equity.perShare;
+  } catch (e) { return null; }
 }
 
 // ── Portfolio summary — aggregates every case's already-computed valuation,
