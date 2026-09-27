@@ -195,7 +195,7 @@ function ProgramEditor({ program, onChange, onDelete, discountRatePct, terminalV
       // discounted back across — while the per-stage costs are read by nothing.
       // Hiding the section would take a live input away with it.
       methodIgnores(valuationMethod, "rndCost") && h("div", { style: { display: "flex", gap: 8, alignItems: "flex-start", padding: "7px 10px", borderRadius: 7, background: "var(--surface-2)", border: "1px dashed var(--rule)", fontFamily: "var(--mono)", fontSize: 10, color: "var(--ink-3)", lineHeight: 1.55, marginBottom: 10 } },
-        h("span", { style: { color: "var(--amber)", flexShrink: 0 } }, "◇"),
+        h("span", { style: { color: "var(--teal)", flexShrink: 0 } }, "◇"),
         h("span", null, "Simple Multiple reads the ", h("b", { style: { color: "var(--ink-2)" } }, "timeline"), " here — it sets how far back the value is discounted — but not the ", h("b", { style: { color: "var(--ink-2)" } }, "costs"), ". Switch to DCF to have R&D spend affect the valuation.")),
       rnd.items.length === 0
         ? h("div", { style: { flex: "1 1 100%", fontSize: 12, fontFamily: "var(--mono)", color: "var(--green)" } }, "Already approved — nothing remaining.")
@@ -215,7 +215,7 @@ function ProgramEditor({ program, onChange, onDelete, discountRatePct, terminalV
                 h("div", { style: { fontSize: 20, fontFamily: "var(--mono)", fontWeight: 700, color: "var(--teal)" } }, rnd.totalYears.toFixed(1) + "yr")),
               h("div", null,
                 h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", } }, "Total cost to launch"),
-                h("div", { style: { fontSize: 20, fontFamily: "var(--mono)", fontWeight: 700, color: "var(--amber)" } }, "$" + rnd.totalCostM.toFixed(1) + "M"))
+                h("div", { style: { fontSize: 20, fontFamily: "var(--mono)", fontWeight: 700, color: "var(--ink-1)" } }, "$" + rnd.totalCostM.toFixed(1) + "M"))
             ),
             h(BenchField, { label: "Override total years (optional)", value: rndOv.totalYears, onChange: v => set("rndOverride.totalYears", v), suffix: "yr",
               bench: { value: rnd.totalYears.toFixed(1), source: "Computed from the breakdown above" } }),
@@ -301,7 +301,7 @@ function ProgramEditor({ program, onChange, onDelete, discountRatePct, terminalV
               h("input", { type: "number", value: tr, placeholder: "e.g. 70", style: fieldStyle,
                 onChange: e => setEligibleHelper({ ...eligibleHelper, testingRate: e.target.value }) })),
             computed != null && h("span", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-2)", paddingBottom: 6 } },
-              "= ", h("b", { style: { color: "var(--amber)" } }, computed.toFixed(1) + "%")),
+              "= ", h("b", { style: { color: "var(--ink-1)" } }, computed.toFixed(1) + "%")),
             computed != null && h("button", { onClick: () => set("revenueBuild.population.eligiblePct", String(Math.round(computed * 10) / 10)),
               style: { padding: "5px 10px", borderRadius: 5, border: "1px solid var(--amber)", background: "transparent", color: "var(--amber)", fontFamily: "var(--mono)", fontSize: 10, cursor: "pointer" }
             }, "Use as eligible % →")));
@@ -436,7 +436,7 @@ function ProgramEditor({ program, onChange, onDelete, discountRatePct, terminalV
             h("div", { style: { fontSize: 22, fontFamily: "var(--mono)", fontWeight: 700, color: "var(--teal)" } }, result ? fmtMoney(result.peakUSRevenue) : "—")),
           rb.pricing.includeExUS && h("div", null,
             h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", } }, "Peak total revenue (WW)"),
-            h("div", { style: { fontSize: 22, fontFamily: "var(--mono)", fontWeight: 700, color: "var(--amber)" } }, result ? fmtMoney(result.peakTotalRevenue) : "—")),
+            h("div", { style: { fontSize: 22, fontFamily: "var(--mono)", fontWeight: 700, color: "var(--ink-1)" } }, result ? fmtMoney(result.peakTotalRevenue) : "—")),
           revenueMode === "full" && h("div", null,
             h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", } }, "Peak share used"),
             h("div", { style: { fontSize: 22, fontFamily: "var(--mono)", fontWeight: 700, color: "var(--ink-1)" } }, (result && result.peakShare != null) ? result.peakShare + "%" : "—")),
@@ -523,7 +523,7 @@ function ProgramEditor({ program, onChange, onDelete, discountRatePct, terminalV
                 " adjustments together assumes they're independent, and at this combination they clearly aren't — a rare disease is often biomarker-defined, and both correlate with modality. The capped number is a floor on the absurdity, not a real estimate: set an explicit override below instead of trusting it.");
             }
             if (w.axesApplied > 1) {
-              return h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--amber)", marginTop: 6, lineHeight: 1.6, paddingLeft: 8, borderLeft: "2px solid var(--amber)" } },
+              return h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--warn)", marginTop: 6, lineHeight: 1.6, paddingLeft: 8, borderLeft: "2px solid var(--warn)" } },
                 w.axesApplied, " adjustments are being multiplied together (", 
                 [mods.applied.map(a => a.label.toLowerCase()), w.moleculeType.applied ? ["molecule type"] : []].flat().join(", "),
                 "), which assumes they're independent. The source doesn't publish the combined cell, and these categories overlap in practice, so this likely overstates the combined lift. Consider an explicit override below instead.");
@@ -579,7 +579,7 @@ function ProgramEditor({ program, onChange, onDelete, discountRatePct, terminalV
         h("label", { style: { display: "flex", alignItems: "center", gap: 8, fontSize: 12, fontFamily: "var(--mono)", color: "var(--ink-2)", cursor: "pointer", marginBottom: prv.enabled ? 10 : 0 } },
           h("input", { type: "checkbox", checked: prv.enabled, onChange: e => setPrv({ enabled: e.target.checked }) }),
           "Priority Review Voucher-eligible (e.g. rare pediatric disease designation)"),
-        showNudge && h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--amber)", marginBottom: 8 } },
+        showNudge && h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--warn)", marginBottom: 8 } },
           "Worth checking against FDA's rare pediatric / tropical disease PRV lists — not a determination, just a prompt to look."),
         prv.enabled && h(BenchField, { label: "PRV value", value: prv.valueM, onChange: v => setPrv({ valueM: v }), suffix: "$M",
           bench: { value: 150, source: "Representative PRV market value — actual trading value has ranged $100-350M" },
@@ -680,7 +680,7 @@ function ProgramEditor({ program, onChange, onDelete, discountRatePct, terminalV
         set("evidenceLog", log.filter((_, i) => i !== idx));
       };
 
-      const classColor = { fact: "var(--green)", inference: "var(--amber)", speculation: "var(--red)" };
+      const classColor = { fact: "var(--green)", inference: "var(--warn)", speculation: "var(--red)" };
       const classLabel = { fact: "Fact", inference: "Inference", speculation: "Speculation" };
       const confLabel = { high: "High", moderate: "Moderate", low: "Low" };
 

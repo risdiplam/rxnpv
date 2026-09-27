@@ -466,12 +466,12 @@ function StorageWarningBanner({ onCleared }) {
   if (!info || info.level === "ok" || dismissed) return null;
   const critical = info.level === "critical";
   return h("div", { style: {
-      background: critical ? "var(--red-bg)" : "var(--amber-bg)",
-      borderBottom: "1px solid " + (critical ? "var(--red)" : "var(--amber)"),
+      background: critical ? "var(--red-bg)" : "var(--warn-bg)",
+      borderBottom: "1px solid " + (critical ? "var(--red)" : "var(--warn)"),
       padding: "9px 20px", fontFamily: "var(--mono)", fontSize: 11,
       color: "var(--ink-1)", display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap"
     } },
-    h("span", { style: { color: critical ? "var(--red)" : "var(--amber)", fontWeight: 700 } },
+    h("span", { style: { color: critical ? "var(--red)" : "var(--warn)", fontWeight: 700 } },
       critical ? "⚠ Storage almost full" : "⚠ Storage filling up"),
     h("span", null,
       fmtBytes(info.total), " used — ", fmtBytes(info.userBytes), " your cases, ",
@@ -756,7 +756,7 @@ function CustomCompForm({ fields, onSave, onCancel, initialValues, saveLabel }) 
     ),
     // Name the specific problem rather than just disabling the button, so it's
     // obvious which field is holding the save back.
-    (numericProblem || missingRequired) && h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--amber)", marginBottom: 8 } },
+    (numericProblem || missingRequired) && h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--warn)", marginBottom: 8 } },
       numericProblem ? ("“" + numericProblem.label + "” must be a number.")
         : ("“" + missingRequired.label + "” is required.")),
     h("div", { style: { display: "flex", gap: 8 } },
@@ -1327,7 +1327,7 @@ function NotUsedInThisMode({ what, compact }) {
       lineHeight: 1.55, marginBottom: 10
     }
   },
-    h("span", { style: { color: "var(--amber)", flexShrink: 0 } }, "◇"),
+    h("span", { style: { color: "var(--teal)", flexShrink: 0 } }, "◇"),
     h("span", null, what || "This section", " is not used while Simple Multiple is the valuation method — that method values peak revenue directly and never builds a year-by-year cash flow. Switch to DCF to make it count."));
 }
 
@@ -1470,7 +1470,7 @@ function ReverseSolveBox({ theCase, discountRatePct, tv, options }) {
   // eleven-digit "$14,417,500,064" is easy to misread by a factor of ten.
   const fmtVal = (v, suffix) => suffix === "$" ? fmtMoney(v) : v.toFixed(suffix === "yr" ? 0 : 1) + suffix;
 
-  return h(ExportSection, { title: "What else " + caseLabel + "'s price implies", style: { marginTop: 16, padding: "14px 16px", borderRadius: 10, background: "var(--amber-bg)", border: "1.5px solid var(--amber)" } },
+  return h(ExportSection, { title: "What else " + caseLabel + "'s price implies", style: { marginTop: 16, padding: "14px 16px 14px 18px", borderRadius: 10, background: "var(--surface)", border: "1px solid var(--rule)", boxShadow: "inset 3px 0 0 var(--teal)" } },
     h("div", { style: { fontSize: 13, fontFamily: "var(--display)", fontWeight: 700, color: "var(--ink-1)", marginBottom: 4 } }, "What else " + caseLabel + "'s price implies"),
     h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-2)", marginBottom: 10 } }, "Same idea as Implied PoS above, holding every other assumption fixed and solving for this one instead."),
     options.length > 1 && h("div", { style: { display: "flex", gap: 6, marginBottom: 10 } },

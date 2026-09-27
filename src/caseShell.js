@@ -165,8 +165,8 @@ function CaseView({ theCase, onChange, onDelete, onNavigateToTools }) {
       });
       if (missing.length === 0) return null;
       const shown = missing.slice(0, 4).join(", ") + (missing.length > 4 ? ", +" + (missing.length - 4) + " more" : "");
-      return h("div", { style: { padding: "7px 14px", marginBottom: 16, background: "var(--surface)", borderLeft: "2px solid var(--amber)", borderRadius: 4, fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-2)", display: "flex", alignItems: "center", gap: 8 } },
-        h("span", { style: { color: "var(--amber)", fontSize: 10 } }, "●"),
+      return h("div", { style: { padding: "7px 14px", marginBottom: 16, background: "var(--surface)", borderLeft: "2px solid var(--warn)", borderRadius: 4, fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-2)", display: "flex", alignItems: "center", gap: 8 } },
+        h("span", { style: { color: "var(--warn)", fontSize: 10 } }, "●"),
         h("span", null, "Add to complete the model: " + shown)
       );
     })(),
@@ -244,9 +244,9 @@ function CaseView({ theCase, onChange, onDelete, onNavigateToTools }) {
       h("div", { style: { display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 10, flexWrap: "wrap", gap: 8 } },
         h("div", { style: { fontFamily: "var(--display)", fontSize: 16, fontWeight: 600, color: "var(--ink-1)" } }, "Company revenue rollup — all programs"),
         peakCalendarYear && h("div", { style: { fontSize: 12, fontFamily: "var(--mono)", color: "var(--ink-2)" } },
-          "Peak: ", h("b", { style: { color: "var(--amber)" } }, fmtMoney(peakCalendarYear.totalRevenue)), " in year ", peakCalendarYear.calendarYear)
+          "Peak: ", h("b", { style: { color: "var(--ink-1)" } }, fmtMoney(peakCalendarYear.totalRevenue)), " in year ", peakCalendarYear.calendarYear)
       ),
-      excludedPrograms.length > 0 && h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--amber)", background: "var(--amber-bg, transparent)", border: "1px solid var(--amber)", borderRadius: 6, padding: "8px 10px", marginBottom: 10, lineHeight: 1.6 } },
+      excludedPrograms.length > 0 && h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--warn)", background: "var(--warn-bg)", border: "1px solid var(--warn)", borderRadius: 6, padding: "8px 10px", marginBottom: 10, lineHeight: 1.6 } },
         (excludedPrograms.length === 1 ? "“" + excludedPrograms[0] + "” is" : excludedPrograms.length + " programs are")
         + " not included in this rollup or in any valuation below — their revenue build couldn't be computed, usually because a required field is still blank. "
         + "Every total on this page excludes " + (excludedPrograms.length === 1 ? "it" : "them") + "."),
@@ -259,7 +259,7 @@ function CaseView({ theCase, onChange, onDelete, onNavigateToTools }) {
       h("div", { style: { display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 12, flexWrap: "wrap", gap: 8 } },
         h("div", { style: { fontFamily: "var(--display)", fontSize: 16, fontWeight: 600, color: "var(--ink-1)" } }, "Company P&L — costs applied"),
         peakEbitYear && h("div", { style: { fontSize: 12, fontFamily: "var(--mono)", color: "var(--ink-2)" } },
-          "Peak EBIT: ", h("b", { style: { color: "var(--amber)" } }, fmtMoney(peakEbitYear.ebit)), " in year ", peakEbitYear.calendarYear)
+          "Peak EBIT: ", h("b", { style: { color: "var(--ink-1)" } }, fmtMoney(peakEbitYear.ebit)), " in year ", peakEbitYear.calendarYear)
       ),
       h("div", { style: { display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 14, padding: "10px 14px", background: "var(--surface-2)", borderRadius: 8 } },
         h("div", { style: { flex: "1 1 200px" } },
@@ -298,7 +298,7 @@ function CaseView({ theCase, onChange, onDelete, onNavigateToTools }) {
               fmtMoney(troughYear.ebit), " (yr " + troughYear.calendarYear + ")")),
           h("div", null,
             h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", } }, "Peak EBIT"),
-            h("div", { style: { fontSize: 18, fontFamily: "var(--mono)", fontWeight: 700, color: "var(--amber)" } }, fmtMoney(peakEbitYear.ebit), " (yr " + peakEbitYear.calendarYear + ")"))
+            h("div", { style: { fontSize: 18, fontFamily: "var(--mono)", fontWeight: 700, color: "var(--ink-1)" } }, fmtMoney(peakEbitYear.ebit), " (yr " + peakEbitYear.calendarYear + ")"))
         );
       })()
     ),

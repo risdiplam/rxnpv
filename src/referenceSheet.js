@@ -318,7 +318,7 @@ function ReferenceSheet({ activeCase }) {
     card([ label("Trial duration by phase & therapeutic area (initiation → results, yrs)"),
       table(["Area", "Phase 2", "Phase 3"], Object.entries(TRIAL_DURATION_BY_AREA.byArea).map(([a,v]) => [a, v.phase2, v.phase3])),
       h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-2)", marginTop: 8, maxWidth: PROSE } }, "Phase 1 base: " + TRIAL_DURATION_BY_AREA.phase1BaseYears + "yr. Nonclinical add-on: +" + TRIAL_DURATION_BY_AREA.nonclinicalAddYears.phase2 + "yr (Ph2), +" + TRIAL_DURATION_BY_AREA.nonclinicalAddYears.phase3 + "yr (Ph3). All-area total dev benchmark: " + TRIAL_DURATION_BY_AREA.totalDevBenchmarkYears + "yr."),
-      h("div", { style: { maxWidth: PROSE, fontSize: 11, fontFamily: "var(--sans)", color: "var(--ink-1)", marginTop: 10, padding: "8px 12px", background: "var(--amber-bg)", borderRadius: 6 } },
+      h("div", { style: { maxWidth: PROSE, fontSize: 11, fontFamily: "var(--sans)", color: "var(--ink-1)", marginTop: 10, padding: "9px 12px 9px 14px", borderRadius: 8, background: "var(--surface)", border: "1px solid var(--rule)", boxShadow: "inset 3px 0 0 var(--teal)" } },
         h("b", null, "Breakthrough Therapy Designation: "), TRIAL_DURATION_BY_AREA.breakthroughDesignation.withBTD + "yr median vs " + TRIAL_DURATION_BY_AREA.breakthroughDesignation.withoutBTD + "yr without — the only expedited pathway found to shorten duration (priority review, accelerated approval, fast track showed no significant difference). ",
         h("span", { style: { color: "var(--ink-3)", fontStyle: "italic" } }, "(" + TRIAL_DURATION_BY_AREA.breakthroughDesignation.source + ")"))
     ]),
@@ -364,7 +364,7 @@ function ReferenceSheet({ activeCase }) {
           h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-2)" } }, "This is CONDITIONAL on already succeeding through Phase 3 — not an overall figure")
         )
       ),
-      h("div", { style: { fontSize: 12, fontFamily: "var(--sans)", color: "var(--ink-1)", lineHeight: 1.6, padding: "10px 14px", background: "var(--amber-bg)", border: "1px solid var(--amber)", borderRadius: 8, maxWidth: PROSE } },
+      h("div", { style: { fontSize: 12, fontFamily: "var(--sans)", color: "var(--ink-1)", lineHeight: 1.6, padding: "10px 14px 10px 16px", borderRadius: 8, background: "var(--surface)", border: "1px solid var(--rule)", boxShadow: "inset 3px 0 0 var(--teal)", maxWidth: PROSE } },
         "These two numbers get confused easily because they're both called \"probability of success.\" The 88% one only covers the last mile (filed → approved), given the drug already survived Phase 1/2/3. Multiply all four stage probabilities together to get the real end-to-end odds — about ",
         h("b", null, (POS_BY_AREA.allIndications.phase1/100 * POS_BY_AREA.allIndications.phase2/100 * POS_BY_AREA.allIndications.phase3/100 * POS_REGULATORY.median/100 * 100).toFixed(0) + "%"),
         " for an all-indications Phase 1 asset, per this source.")

@@ -116,8 +116,8 @@ function ValuationPanel({ theCase, onChange }) {
       const flags = computeRedFlags(theCase);
       if (flags.length === 0) return null;
       const highCount = flags.filter(f => f.severity === "high").length;
-      return h("div", { style: { marginBottom: 16, padding: "12px 14px", borderRadius: 8, background: "var(--amber-bg)", border: "1px solid var(--amber)" } },
-        h("div", { style: { fontSize: 12, fontFamily: "var(--display)", fontWeight: 600, color: "var(--amber)", marginBottom: 8 } },
+      return h("div", { style: { marginBottom: 16, padding: "12px 14px", borderRadius: 8, background: "var(--warn-bg)", border: "1px solid var(--warn)" } },
+        h("div", { style: { fontSize: 12, fontFamily: "var(--display)", fontWeight: 600, color: "var(--warn)", marginBottom: 8 } },
           flags.length + " input" + (flags.length > 1 ? "s" : "") + " worth a second look" + (highCount > 0 ? " (" + highCount + " large deviation" + (highCount > 1 ? "s" : "") + ")" : "")),
         flags.map((f, i) => h("div", { key: i, style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-2)", lineHeight: 1.5, marginBottom: i < flags.length - 1 ? 8 : 0, paddingLeft: 10, borderLeft: "2px solid " + (f.severity === "high" ? "var(--red)" : "var(--amber)") } },
           f.programName && h("span", { style: { fontWeight: 700, color: "var(--ink-1)" } }, f.programName + ": "),
@@ -240,8 +240,8 @@ function ValuationPanel({ theCase, onChange }) {
           const postApproval = SIMPLE_MULTIPLE_PRECEDENTS.deals.filter(d => /post-approval/i.test(d.timing)).length;
           const preApprovalPrograms = theCase.programs.filter(p => (p.currentPhase || "phase1") !== "approved");
           if (!preApprovalPrograms.length) return null;
-          return h("div", { style: { marginTop: 10, padding: "10px 12px", borderRadius: 7, background: "var(--amber-bg)", border: "1px solid var(--amber)", fontFamily: "var(--sans)", fontSize: 11, color: "var(--ink-1)", lineHeight: 1.6 } },
-            h("b", { style: { color: "var(--amber)" } }, "Match the multiple to the stage. "),
+          return h("div", { style: { marginTop: 10, padding: "10px 12px", borderRadius: 7, background: "var(--warn-bg)", border: "1px solid var(--warn)", fontFamily: "var(--sans)", fontSize: 11, color: "var(--ink-1)", lineHeight: 1.6 } },
+            h("b", { style: { color: "var(--warn)" } }, "Match the multiple to the stage. "),
             postApproval, " of ", SIMPLE_MULTIPLE_PRECEDENTS.deals.length, " precedents are post-approval, and this case has ",
             preApprovalPrograms.length, " pre-approval program", preApprovalPrograms.length > 1 ? "s" : "", ".",
             h("div", { style: { marginTop: 6 } },
@@ -367,7 +367,7 @@ function ValuationPanel({ theCase, onChange }) {
             h("div", null, "Options: ", edgarResult.options ? fmtNum(edgarResult.options.count) + (edgarResult.options.priceFound ? " @ avg $" + edgarResult.options.avgStrike.toFixed(2) : " (strike price not tagged — enter manually)") : "not found in XBRL — enter manually"),
             h("div", null, "Warrants: ", edgarResult.warrants ? fmtNum(edgarResult.warrants.count) + (edgarResult.warrants.priceFound ? " @ avg $" + edgarResult.warrants.avgStrike.toFixed(2) : " (strike price not tagged — enter manually)") : "not found in XBRL — enter manually"),
             h("div", null, "Convertible notes: ", edgarResult.convertibleFace != null ? fmtMoney(edgarResult.convertibleFace) + " face value (conversion price is never in XBRL — enter manually)" : "not found in XBRL — enter manually"),
-            h("div", { style: { color: "var(--amber)", fontSize: 10, marginTop: 3 } }, "Dilutive securities are tagged less reliably — cross-check against the filing's \"Stockholders' Equity\" note.")
+            h("div", { style: { color: "var(--warn)", fontSize: 10, marginTop: 3 } }, "Dilutive securities are tagged less reliably — cross-check against the filing's \"Stockholders' Equity\" note.")
           ),
           h("div", { style: { color: "var(--ink-3)", fontSize: 10, marginTop: 2 } }, "Filled into the fields below where found — double-check before relying on them."),
           h("div", { style: { marginTop: 6, display: "flex", gap: 14, flexWrap: "wrap" } },
@@ -579,8 +579,8 @@ function ValuationPanel({ theCase, onChange }) {
           const solved = impliedSolved, solveError = impliedSolveError;
           if (solveError || !solved) return null;
           const caseLabel = theCase.name || "This case";
-          if (!solved.ok) return h("div", { style: { marginTop: 16, padding: "12px 14px", borderRadius: 8, background: "var(--amber-bg)", border: "1px solid var(--amber)", fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-2)" } }, "Implied PoS: " + solved.error);
-          return h(ExportSection, { title: "What " + caseLabel + "'s price implies", style: { marginTop: 16, padding: "14px 16px", borderRadius: 10, background: "var(--amber-bg)", border: "1.5px solid var(--amber)" } },
+          if (!solved.ok) return h("div", { style: { marginTop: 16, padding: "12px 14px", borderRadius: 8, background: "var(--warn-bg)", border: "1px solid var(--warn)", fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-2)" } }, "Implied PoS: " + solved.error);
+          return h(ExportSection, { title: "What " + caseLabel + "'s price implies", style: { marginTop: 16, padding: "14px 16px 14px 18px", borderRadius: 10, background: "var(--surface)", border: "1px solid var(--rule)", boxShadow: "inset 3px 0 0 var(--teal)" } },
             h("div", { style: { fontSize: 13, fontFamily: "var(--display)", fontWeight: 700, color: "var(--ink-1)", marginBottom: 4 } }, "What " + caseLabel + "'s price implies"),
             h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-2)", marginBottom: 10 } }, "The PoS the current price requires, given your assumptions — the reverse of fair value."),
             solved.degenerate
@@ -730,7 +730,7 @@ function ValuationPanel({ theCase, onChange }) {
             h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginBottom: 12 } },
               "Peak EV (if success were certain) → cut by PoS risk → discounted to today. Same logic as the risk waterfall, applied to this method's own multiple mechanic, summed across all programs."),
             row("Peak EV (unrisked, at peak year)", totalPeakEV, "var(--ink-3)"),
-            row("Risked EV (× PoS)", totalRiskedEV, "var(--amber)"),
+            row("Risked EV (× PoS)", totalRiskedEV, "var(--ink-1)"),
             row("Present Value (discounted to today)", totalPV, "var(--teal)")
           );
         })(),

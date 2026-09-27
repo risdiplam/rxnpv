@@ -152,7 +152,7 @@ function App() {
   // names are also what every test and harness clicks by. no-print: app
   // navigation is not part of a printed report.
   const rail = h("nav", { className: "no-print app-rail", "aria-label": "Main" },
-    h("div", { className: "app-rail-logo", title: "RxNPV", "aria-hidden": "true" }, "Rx"),
+    h("div", { className: "app-rail-logo", title: "RxNPV" }, h(RxLogo, { size: 36 })),
     [["workspace", "Workspace"], ["tools", "Tools"], ["simulation", "Simulation"], ["portfolio", "Portfolio"], ["reference", "Reference Sheet"]].map(([id, label]) =>
       h("button", { key: id, onClick: () => setView(id), className: "app-rail-btn" + (view === id ? " on" : ""), "aria-current": view === id ? "page" : undefined },
         h(RailIcon, { name: id }), h("span", null, label))),
@@ -235,11 +235,11 @@ function App() {
                 h("div", { style: { display: "flex", justifyContent: "flex-end", marginBottom: 4 } },
                   h("button", { onClick: () => setView("report"),
                     title: "Build and export a PDF of this case — every Workspace section, plus anything added from Tools, Simulation, the Reference Sheet or Portfolio with “+ Report”",
-                    style: { padding: "6px 14px", borderRadius: 7, border: "1px solid var(--amber)", background: "transparent", color: "var(--amber)", fontFamily: "var(--mono)", fontSize: 11, fontWeight: 700, cursor: "pointer" } },
-                    "📄 Generate Report",
+                    style: { padding: "7px 14px", borderRadius: 8, border: "none", background: "var(--teal-fill)", color: "var(--on-teal)", fontFamily: "var(--sans)", fontSize: 12.5, fontWeight: 600, cursor: "pointer", display: "inline-flex", alignItems: "center" } },
+                    "Generate Report",
                     (() => {
                       const n = pinnedResultsOf(activeCase).length;
-                      return n ? h("span", { style: { marginLeft: 8, padding: "1px 7px", borderRadius: 10, background: "var(--amber-bg)", fontSize: 10 } }, n + " added") : null;
+                      return n ? h("span", { style: { marginLeft: 8, padding: "1px 7px", borderRadius: 10, background: "rgba(255,255,255,0.22)", fontSize: 11, fontWeight: 500 } }, n + " added") : null;
                     })())
                 ),
                 h(CaseView, { theCase: activeCase, onChange: updateCase, onDelete: () => deleteCase(activeCase.id), onNavigateToTools: navigateToTools })
@@ -254,6 +254,21 @@ function App() {
     )
   )));
 }
+// The RxNPV mark: the prescription sign ℞ as one geometric figure — an R
+// whose leg is crossed near its foot by a second stroke, forming the X. The
+// same drawing as electron/icon.svg (the Dock icon), cropped to its tile.
+function RxLogo({ size }) {
+  const h = React.createElement;
+  return h("svg", { width: size, height: size, viewBox: "100 100 824 824", role: "img", "aria-label": "RxNPV" },
+    h("defs", null, h("linearGradient", { id: "rxlogo-bg", x1: 0, y1: 0, x2: 1, y2: 1 },
+      h("stop", { offset: 0, stopColor: "#5B6CF3" }), h("stop", { offset: 1, stopColor: "#2E3BB0" }))),
+    h("rect", { x: 100, y: 100, width: 824, height: 824, rx: 186, fill: "url(#rxlogo-bg)" }),
+    h("g", { transform: "translate(512 512) scale(0.92) translate(-565 -527)", fill: "none", stroke: "#FFFFFF", strokeWidth: 86, strokeLinecap: "round", strokeLinejoin: "round" },
+      h("path", { d: "M378 770 V 262 H 552 A 128 128 0 0 1 552 518 H 378" }),
+      h("path", { d: "M478 518 L 752 792" }),
+      h("path", { d: "M568 790 L 752 606" })));
+}
+
 // Rail icons: 24px line icons drawn inline (no icon font to embed or load).
 function RailIcon({ name }) {
   const h = React.createElement;

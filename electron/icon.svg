@@ -1,20 +1,22 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <!-- RxNPV app icon: the prescription sign ℞ drawn as one geometric mark — an R
+       whose leg is crossed near its foot by a second stroke, forming the X.
+       macOS icon grid: 824px tile inset 100px on a 1024 canvas. -->
   <defs>
-    <linearGradient id="bgGrad" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#1B1F25"/>
-      <stop offset="1" stop-color="#14171B"/>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#5B6CF3"/>
+      <stop offset="1" stop-color="#2E3BB0"/>
     </linearGradient>
-    <clipPath id="pillClip">
-      <path d="M -180,-110 L 180,-110 A 110,110 0 0 1 180,110 L -180,110 A 110,110 0 0 1 -180,-110 Z"/>
-    </clipPath>
+    <linearGradient id="sheen" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.16"/>
+      <stop offset="0.5" stop-color="#FFFFFF" stop-opacity="0"/>
+    </linearGradient>
   </defs>
-
-  <rect x="0" y="0" width="1024" height="1024" rx="228" ry="228" fill="url(#bgGrad)"/>
-  <rect x="0" y="0" width="1024" height="1024" rx="228" ry="228" fill="none" stroke="#2A2F37" stroke-width="2"/>
-
-  <g transform="translate(512,512) rotate(-25)">
-    <rect x="-400" y="-200" width="400" height="400" fill="#6FA99A" clip-path="url(#pillClip)"/>
-    <rect x="0" y="-200" width="400" height="400" fill="#C4A06B" clip-path="url(#pillClip)"/>
-    <line x1="0" y1="-110" x2="0" y2="110" stroke="#14171B" stroke-width="10"/>
+  <rect x="100" y="100" width="824" height="824" rx="186" fill="url(#bg)"/>
+  <rect x="100" y="100" width="824" height="824" rx="186" fill="url(#sheen)"/>
+  <g transform="translate(512 512) scale(0.92) translate(-565 -527)" fill="none" stroke="#FFFFFF" stroke-width="86" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M378 770 V 262 H 552 A 128 128 0 0 1 552 518 H 378"/>
+    <path d="M478 518 L 752 792"/>
+    <path d="M568 790 L 752 606"/>
   </g>
 </svg>

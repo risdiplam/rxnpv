@@ -1222,7 +1222,7 @@ function stressPowerCell(power, planned) {
   // Coloured against the planned power, not against an absolute 80% line: the
   // question is how far this moves from what was designed for.
   const delta = planned != null ? power - planned : 0;
-  const color = delta < -0.10 ? 'var(--red)' : delta < -0.03 ? 'var(--amber)'
+  const color = delta < -0.10 ? 'var(--red)' : delta < -0.03 ? 'var(--warn)'
     : delta > 0.03 ? 'var(--green)' : 'var(--ink-1)';
   return el('td', { style: 'color:' + color }, pct);
 }

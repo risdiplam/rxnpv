@@ -73,7 +73,8 @@
     --bg: #111418; --bg-2: #0C0E11; --surface: #181C22; --surface-2: #1F242C;
     --rule: #2A313B; --ink-1: #E6EAF0; --ink-2: #A7B0BD; --ink-3: #939DAB;
     --teal: #8D9BFF; --teal-bg: rgba(141,155,255,0.13); --teal-fill: #8D9BFF; --on-teal: #0B0D10;
-    --amber: #E0B25C; --amber-bg: rgba(224,178,92,0.13);
+    --amber: #E68AD6; --amber-bg: rgba(230,138,214,0.13);
+    --warn: #F59A5B; --warn-bg: rgba(245,154,91,0.13);
     --red: #F2766E; --red-bg: rgba(242,118,110,0.14); --red-fill: #C9423A;
     --green: #4CC98F; --green-bg: rgba(76,201,143,0.13);
     --slate: #9AA5B4; --slate-bg: rgba(154,165,180,0.12);
@@ -82,13 +83,16 @@
   }
   :root[data-theme="light"], .theme-scope-light {
     /* "Mist": a cool grey page with slightly lighter cards, so boxes stand out
-       without the glare of pure white. Every text colour below clears 4.5:1
+       without the glare of pure white. --amber is now ORCHID, the highlight
+       colour (benchmarks, "your case", chart markers); the name is historical
+       and kept so no view had to change. Caution has its own --warn orange. Every text colour below clears 4.5:1
        on every surface it can sit on (measured: ink-3 is 4.56:1 on --bg-2,
        its worst case). */
     --bg: #ECEEF1; --bg-2: #E3E6EA; --surface: #F8F9FA; --surface-2: #EEF0F3;
     --rule: #D6DAE0; --ink-1: #15181D; --ink-2: #4D5663; --ink-3: #5E6776;
     --teal: #4353E0; --teal-bg: rgba(67,83,224,0.10); --teal-fill: #4353E0; --on-teal: #FFFFFF;
-    --amber: #8A5B00; --amber-bg: rgba(138,91,0,0.10);
+    --amber: #9C2F8A; --amber-bg: rgba(156,47,138,0.09);
+    --warn: #A8420B; --warn-bg: rgba(168,66,11,0.09);
     --red: #B8322B; --red-bg: rgba(184,50,43,0.09); --red-fill: #B8322B;
     --green: #16744A; --green-bg: rgba(22,116,74,0.10);
     --slate: #56606F; --slate-bg: rgba(86,96,111,0.10);
@@ -139,8 +143,7 @@
   /* ── Icon rail ─────────────────────────────────────────────────────── */
   .app-rail { position: sticky; top: 0; height: 100vh; width: 76px; flex-shrink: 0; z-index: 20;
     background: var(--rail); display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 12px 0 10px; }
-  .app-rail-logo { width: 34px; height: 34px; border-radius: 9px; background: var(--teal-fill); color: var(--on-teal);
-    font: 700 13px/34px var(--sans); text-align: center; letter-spacing: -0.02em; margin-bottom: 12px; }
+  .app-rail-logo { width: 36px; height: 36px; margin-bottom: 12px; display: flex; }
   .app-rail-btn { position: relative; width: 66px; padding: 7px 2px 6px; border: 0; border-radius: 10px; background: transparent;
     color: var(--rail-ink); cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 4px;
     font: 500 10.5px/1.15 var(--sans); text-align: center; }
@@ -230,16 +233,21 @@
      out — but a paragraph sitting between two inputs breaks the form's flow
      and makes a simple tool look daunting. Collapsed by default, one line,
      open on click: available when wanted, out of the way when not. */
-  details.note { margin: 2px 0 12px; }
-  details.note > summary { cursor: pointer; list-style: none; font-size: 11.5px; color: var(--ink-3); font-family: var(--mono); padding: 3px 0; user-select: none; transition: color 0.12s; }
+  /* Tips ("New here? …", "Why this split exists"): a small pill with a
+     lightbulb that opens into a tinted panel — the same explainer look used
+     under results, so help reads as one system rather than grey fine print. */
+  details.note { margin: 4px 0 12px; }
+  details.note > summary { cursor: pointer; list-style: none; display: inline-flex; align-items: center; gap: 7px;
+    font: 500 12px/1.3 var(--sans); color: var(--teal); background: var(--teal-bg); padding: 5px 11px 5px 9px;
+    border-radius: 999px; user-select: none; transition: background 0.12s ease; }
   details.note > summary::-webkit-details-marker { display: none; }
-  /* margin-right rather than a trailing space in content: a trailing space in
-     a generated-content string collapses, so the marker rendered flush against
-     the label ("▸What ..."). */
-  details.note > summary::before { content: "▸"; display: inline-block; margin-right: 6px; }
-  details.note[open] > summary::before { content: "▾"; }
-  details.note > summary:hover { color: var(--ink-2); }
-  details.note .note-body { font-size: 12px; color: var(--ink-2); line-height: 1.65; padding: 6px 0 2px 12px; border-left: 2px solid var(--rule); margin-top: 4px; }
+  details.note > summary::before { content: ""; width: 14px; height: 14px; flex: none; background: currentColor;
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2V16h5v-.1c0-.8.4-1.5 1-2A6 6 0 0 0 12 3z'/%3E%3C/svg%3E") center / contain no-repeat; }
+  details.note > summary::after { content: "›"; font-size: 14px; line-height: 1; transition: transform 0.12s ease; }
+  details.note[open] > summary::after { transform: rotate(90deg); }
+  details.note > summary:hover { background: color-mix(in srgb, var(--teal) 18%, transparent); }
+  details.note .note-body { font: 400 12.5px/1.65 var(--sans); color: var(--ink-2); background: var(--surface-2);
+    border-radius: 10px; padding: 11px 14px; margin-top: 8px; }
 
   .chart-export-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 6px; opacity: 0.45; transition: opacity 0.15s; }
   .chart-export-row:hover { opacity: 1; }

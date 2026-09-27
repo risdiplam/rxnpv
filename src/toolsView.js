@@ -256,7 +256,7 @@ function MaPremiumTool({ cases, updateCase, activeCase }) {
       ),
       h("div", { style: { marginTop: 14 } },
         h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", } }, "Implied takeout value"),
-        h("div", { style: { fontSize: 22, fontFamily: "var(--mono)", fontWeight: 700, color: "var(--amber)" } }, fmtShare(takeout))
+        h("div", { style: { fontSize: 22, fontFamily: "var(--mono)", fontWeight: 700, color: "var(--ink-1)" } }, fmtShare(takeout))
       ),
       h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginTop: 10 } }, "Default premium is the median across " + premiumsKnown.length + " tracked deals with a disclosed premium.")
     ]),
@@ -839,7 +839,7 @@ function RunwayVsCatalystTool({ cases, activeCase }) {
 
   const STATUS = {
     funded: { color: "var(--teal)", word: "Funded through it" },
-    tight:  { color: "var(--amber)", word: "Reaches it, but on fumes" },
+    tight:  { color: "var(--warn)", word: "Reaches it, but on fumes" },
     gap:    { color: "var(--red)", word: "Runs out first" }
   };
   const fmtMonths = m => (m >= 0 ? "" : "−") + Math.abs(m).toFixed(1) + " mo";
@@ -863,20 +863,20 @@ function RunwayVsCatalystTool({ cases, activeCase }) {
       "Pick a case. It needs starting cash and a cost model (for runway), plus at least one calibration-log entry with a date like 2027-Q2 (for the catalyst).")]),
 
     theCase && res && !res.ok && toolCard(h, [
-      h("div", { style: { fontFamily: "var(--mono)", fontSize: 12, color: "var(--amber)" } }, res.error)
+      h("div", { style: { fontFamily: "var(--mono)", fontSize: 12, color: "var(--warn)" } }, res.error)
     ]),
 
     theCase && res && res.ok && h("div", { ref: rvcRef }, toolCard(h, [
       toolLabel(h, (theCase.name || "This case") + " — does the cash reach the next catalyst?"),
       h("div", { style: { display: "flex", gap: 26, flexWrap: "wrap", marginBottom: 14 } },
         h("div", null,
-          h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)" } }, "MODELED RUNWAY"),
+          h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)" } }, "Modeled runway"),
           h("div", { style: { fontSize: 26, fontFamily: "var(--mono)", fontWeight: 800, color: (!res.beyondHorizon && res.runwayMonths < 12) ? "var(--red)" : "var(--green)" } },
             res.beyondHorizon ? "No end" : res.runwayMonths.toFixed(0) + " mo"),
           res.beyondHorizon && h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", maxWidth: 150, lineHeight: 1.4 } },
             "modeled cash flow turns positive before cash runs out")),
         h("div", null,
-          h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)" } }, "DATED CATALYSTS"),
+          h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)" } }, "Dated catalysts"),
           h("div", { style: { fontSize: 26, fontFamily: "var(--mono)", fontWeight: 800, color: "var(--ink-1)" } }, String(res.rows.length))),
         res.gapCount > 0 && h("div", null,
           h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)" } }, "UNFUNDED"),
@@ -891,7 +891,7 @@ function RunwayVsCatalystTool({ cases, activeCase }) {
             + (res.undatedCount ? " (" + res.undatedCount + " undated prediction" + (res.undatedCount > 1 ? "s" : "") + " skipped.)" : ""))
         : h("div", { style: {
             padding: "12px 14px", borderRadius: 8, lineHeight: 1.65, fontFamily: "var(--sans)", fontSize: 12,
-            background: res.firstProblem ? (res.firstProblem.status === "gap" ? "var(--red-bg)" : "var(--amber-bg)") : "var(--green-bg)",
+            background: res.firstProblem ? (res.firstProblem.status === "gap" ? "var(--red-bg)" : "var(--warn-bg)") : "var(--green-bg)",
             border: "1px solid " + (res.firstProblem ? STATUS[res.firstProblem.status].color : "var(--teal)"),
             color: "var(--ink-1)"
           } },
@@ -1028,7 +1028,7 @@ function ExclusivityTool({ cases, updateCase }) {
     ]),
 
     res && !res.ok && toolCard(h, [
-      h("div", { style: { fontFamily: "var(--sans)", fontSize: 12, lineHeight: 1.6, color: res.isBiologic ? "var(--ink-1)" : "var(--amber)" } }, res.error)
+      h("div", { style: { fontFamily: "var(--sans)", fontSize: 12, lineHeight: 1.6, color: res.isBiologic ? "var(--ink-1)" : "var(--warn)" } }, res.error)
     ]),
 
     s && h("div", { ref: exRef }, toolCard(h, [
@@ -1046,7 +1046,7 @@ function ExclusivityTool({ cases, updateCase }) {
           note: "The earliest date any listed protection lapses." })
       ),
 
-      !s.latestSubstance && h("div", { style: { padding: "10px 12px", borderRadius: 7, background: "var(--amber-bg)", border: "1px solid var(--amber)", fontFamily: "var(--sans)", fontSize: 11, color: "var(--ink-1)", lineHeight: 1.55, marginBottom: 14 } },
+      !s.latestSubstance && h("div", { style: { padding: "10px 12px", borderRadius: 7, background: "var(--warn-bg)", border: "1px solid var(--warn)", fontFamily: "var(--sans)", fontSize: 11, color: "var(--ink-1)", lineHeight: 1.55, marginBottom: 14 } },
         "No patent here is flagged as a drug-substance (compound) patent — every listed patent is formulation or method-of-use. That's a genuinely weaker position: those are the patents most often designed around or challenged, so the last-expiry date above is a soft ceiling."),
 
       h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginBottom: 8 } }, "All listed patents"),
@@ -1128,14 +1128,14 @@ function BinaryEventTool({ cases, activeCase }) {
     ]),
 
     showing && !res.ok && toolCard(h, [
-      h("div", { style: { fontFamily: "var(--mono)", fontSize: 12, color: "var(--amber)" } }, res.error)
+      h("div", { style: { fontFamily: "var(--mono)", fontSize: 12, color: "var(--warn)" } }, res.error)
     ]),
 
     showing && res.ok && h("div", { ref: beRef }, toolCard(h, [
       h("div", { style: { display: "flex", gap: 30, flexWrap: "wrap", marginBottom: 16 } },
         h("div", null,
           h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", } }, "Market-implied PoS"),
-          h("div", { style: { fontSize: 34, fontFamily: "var(--mono)", fontWeight: 800, color: res.rangeFlag ? "var(--amber)" : "var(--teal)" } },
+          h("div", { style: { fontSize: 34, fontFamily: "var(--mono)", fontWeight: 800, color: res.rangeFlag ? "var(--warn)" : "var(--teal)" } },
             res.impliedPoSPct.toFixed(1) + "%"),
           h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)" } }, "also the breakeven — below this you lose money on average")),
         h("div", null,
@@ -1170,7 +1170,7 @@ function BinaryEventTool({ cases, activeCase }) {
         );
       })(),
 
-      res.rangeFlag && h("div", { style: { padding: "12px 14px", borderRadius: 8, background: "var(--amber-bg)", border: "1px solid var(--amber)", fontFamily: "var(--sans)", fontSize: 12, color: "var(--ink-1)", lineHeight: 1.6, marginBottom: 14 } },
+      res.rangeFlag && h("div", { style: { padding: "12px 14px", borderRadius: 8, background: "var(--warn-bg)", border: "1px solid var(--warn)", fontFamily: "var(--sans)", fontSize: 12, color: "var(--ink-1)", lineHeight: 1.6, marginBottom: 14 } },
         res.rangeFlag === "belowFailure"
           ? h("span", null, h("b", null, "Trading below your failure case. "),
               "The implied probability is negative, which can't be true — so one of your inputs is. Either the market disputes that " + fmt(res.fail) + " of value survives a failure (often the case when the cash burns down before liquidation), or it's genuinely mispriced. Check the failure floor before treating this as free money.")
@@ -1452,7 +1452,7 @@ function PeakSalesCompsTool({ cases, updateCase, activeCase }) {
                 d._custom && h("span", { style: { color: "var(--amber)", marginRight: 6 } }, "✦"), d.drug),
               h("span", { style: { fontFamily: "var(--mono)", fontSize: 11, color: "var(--ink-3)", marginLeft: 8 } }, d.company)),
             h("div", { style: { display: "flex", alignItems: "center", gap: 10 } },
-              h("span", { style: { fontFamily: "var(--mono)", fontSize: 15, fontWeight: 700, color: "var(--amber)" } }, "$" + d.peakSalesB + "B"),
+              h("span", { style: { fontFamily: "var(--mono)", fontSize: 15, fontWeight: 700, color: "var(--ink-1)" } }, "$" + d.peakSalesB + "B"),
               h("button", { onClick: () => exportToCase(d), disabled: !exportCaseId || !exportProgramId,
                 style: { padding: "5px 10px", minHeight: 26, borderRadius: 6, border: "1px solid var(--teal)", background: "var(--teal-bg)", color: "var(--teal)", fontFamily: "var(--mono)", fontSize: 10, fontWeight: 700, cursor: exportCaseId ? "pointer" : "default", opacity: exportCaseId ? 1 : 0.5 } }, "Export →"),
               d._custom && h("button", { onClick: () => { setEditingDrugIdx(customPeakSales.indexOf(d)); setShowAddDrug(false); }, style: { padding: "4px 10px", borderRadius: 6, border: "1px solid var(--rule)", background: "transparent", color: "var(--ink-2)", fontFamily: "var(--mono)", fontSize: 10, cursor: "pointer" } }, "Edit"),
@@ -1805,7 +1805,7 @@ function CatalystCalendarTool({ cases, updateCase, activeCase }) {
       toolLabel(h, "Catalyst calendar"),
       h("div", { style: { fontSize: 11, fontFamily: "var(--sans)", color: "var(--ink-2)", marginBottom: 12, lineHeight: 1.6 } },
         "Pulls estimated trial completion dates from ClinicalTrials.gov, plus searches each company's own SEC filings for catalyst language (PDUFA, topline results, advisory committee, breakthrough/priority designations) instead of just listing recent filings by type. ",
-        h("b", { style: { color: "var(--amber)" } }, "Worth knowing: "), "there's still no public structured API for actual PDUFA/FDA decision dates — a filing search finds where a company has already *mentioned* one, not a calendar of dates that haven't been announced yet."),
+        h("b", { style: { color: "var(--warn)" } }, "Worth knowing: "), "there's still no public structured API for actual PDUFA/FDA decision dates — a filing search finds where a company has already *mentioned* one, not a calendar of dates that haven't been announced yet."),
 
       h("div", { style: { display: "flex", flexDirection: "column", gap: 4, marginBottom: 12, maxHeight: 150, overflowY: "auto" } },
         cases.map(c => h("label", { key: c.id, style: { display: "flex", alignItems: "center", gap: 8, fontSize: 12, fontFamily: "var(--mono)", color: "var(--ink-2)", cursor: "pointer" } },
@@ -1953,7 +1953,7 @@ function FdaLookupTool() {
       )
     ]),
 
-    error && toolCard(h, h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--amber)", lineHeight: 1.6 } }, error)),
+    error && toolCard(h, h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--warn)", lineHeight: 1.6 } }, error)),
 
     noResults && toolCard(h, h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-3)" } }, "No openFDA data found for that name. Try the exact brand or generic name.")),
 
@@ -2055,7 +2055,7 @@ function TargetDossierTool() {
       )
     ]),
 
-    error && toolCard(h, h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--amber)", lineHeight: 1.6 } }, error)),
+    error && toolCard(h, h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--warn)", lineHeight: 1.6 } }, error)),
 
     candidates && toolCard(h, [
       toolLabel(h, "Which target did you mean?"),
@@ -2216,7 +2216,7 @@ function LaunchTrackerTool() {
         "Part B covers what a clinician administers — infusions, injections given in a clinic. Part D covers what a pharmacy dispenses. A drug appears in one or the other, occasionally both, and picking the wrong one returns nothing rather than a zero.")
     ]),
 
-    error && toolCard(h, h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--amber)", lineHeight: 1.6 } },
+    error && toolCard(h, h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--warn)", lineHeight: 1.6 } },
       error + " This is a connection problem, not a finding that the drug has no Medicare spending.")),
 
     primary && !primary.found && toolCard(h, h("div", { className: "prose", style: { fontSize: 11.5, fontFamily: "var(--sans)", color: "var(--ink-2)", lineHeight: 1.6 } }, primary.error)),
@@ -2224,7 +2224,7 @@ function LaunchTrackerTool() {
     primary && primary.found && h("div", null,
       toolCard(h, [
         toolLabel(h, primary.brand + (primary.generic ? " (" + primary.generic + ")" : "") + " — Medicare " + primary.programme),
-        primary.freshness && primary.freshness.stale && h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--amber)", lineHeight: 1.6, marginBottom: 8 } },
+        primary.freshness && primary.freshness.stale && h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--warn)", lineHeight: 1.6, marginBottom: 8 } },
           "The newest period in this dataset is " + primary.freshness.latestPeriod + ", which is " + primary.freshness.monthsBehind
             + " months old. CMS mints a new dataset address for each release, so this is most likely the app pointing at a version that has stopped being updated rather than CMS having gone quiet."),
         h("div", { style: { overflowX: "auto" } },
@@ -2233,7 +2233,7 @@ function LaunchTrackerTool() {
               h("th", { key: t, style: { padding: "6px 10px", background: "var(--surface-2)", borderBottom: "1px solid var(--rule)", fontSize: 10, color: "var(--ink-3)", fontWeight: 500, textAlign: t === "Period" ? "left" : "right", whiteSpace: "nowrap" } }, t)))),
             h("tbody", null, primary.series.map((p, i) => h("tr", { key: i },
               h("td", { style: { padding: "6px 10px", borderBottom: "1px solid var(--rule)", fontSize: 11, color: "var(--ink-1)", whiteSpace: "nowrap" } },
-                p.label, !p.isFullYear && h("span", { style: { color: "var(--amber)", fontSize: 10, marginLeft: 6 } }, "partial")),
+                p.label, !p.isFullYear && h("span", { style: { color: "var(--warn)", fontSize: 10, marginLeft: 6 } }, "partial")),
               h("td", { style: { padding: "6px 10px", borderBottom: "1px solid var(--rule)", fontSize: 11, textAlign: "right", color: "var(--ink-1)" } }, money(p.spending)),
               h("td", { style: { padding: "6px 10px", borderBottom: "1px solid var(--rule)", fontSize: 11, textAlign: "right", color: "var(--ink-2)" } }, p.beneficiaries != null ? p.beneficiaries.toLocaleString() : "suppressed"),
               h("td", { style: { padding: "6px 10px", borderBottom: "1px solid var(--rule)", fontSize: 11, textAlign: "right", color: "var(--ink-2)" } }, p.claims != null ? p.claims.toLocaleString() : "—"),
@@ -2265,7 +2265,7 @@ function LaunchTrackerTool() {
                 })),
                 height: 220, showLegend: true
               })),
-            predating.length > 0 && h("div", { style: { fontSize: 10.5, fontFamily: "var(--sans)", color: "var(--amber)", lineHeight: 1.6, marginTop: 6 } },
+            predating.length > 0 && h("div", { style: { fontSize: 10.5, fontFamily: "var(--sans)", color: "var(--warn)", lineHeight: 1.6, marginTop: 6 } },
               predating.map(x => x.result.brand).join(" and ") + (predating.length === 1 ? " was" : " were")
                 + " already selling when this dataset begins, so “year 1” here is the first year CMS covers, not the launch year. "
                 + (predating.length === 1 ? "That curve is a plateau" : "Those curves are plateaus")
@@ -2274,7 +2274,7 @@ function LaunchTrackerTool() {
         })(),
         rows.length > 1 && h("div", { className: "prose", style: { fontSize: 10, fontFamily: "var(--sans)", color: "var(--ink-3)", lineHeight: 1.6, marginTop: 6 } },
           "Indexed to each drug's first year of Medicare spending, so launches from different years sit on the same axis. Year 1 is almost never a full commercial year — a drug approved in March shows nine months of it — so the first point understates every curve by a different amount depending on approval date. A mature analog's later years are its plateau, not its ramp."),
-        rows.some(r => r.found && r.series.some(p => !p.isFullYear)) && h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--amber)", marginTop: 4 } },
+        rows.some(r => r.found && r.series.some(p => !p.isFullYear)) && h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--warn)", marginTop: 4 } },
           "One or more points is a partial period plotted at its reported value, not annualized — the line dips there for a reporting reason, not a commercial one.")
       ])
     )
@@ -2376,7 +2376,7 @@ function ActualVsModelTool({ cases, updateCase, activeCase }) {
                 )))))
       ]),
 
-      cmp.rows.some(r => r.outsideModel) && toolCard(h, h("div", { style: { fontSize: 11.5, fontFamily: "var(--sans)", color: "var(--amber)", lineHeight: 1.6 } },
+      cmp.rows.some(r => r.outsideModel) && toolCard(h, h("div", { style: { fontSize: 11.5, fontFamily: "var(--sans)", color: "var(--warn)", lineHeight: 1.6 } },
         "At least one reported year falls outside the model's projection window. That almost always means Model Year 0 is set to the wrong calendar year rather than that the model is wildly off — check that first.")),
 
       toolCard(h, [
@@ -2420,7 +2420,7 @@ function AssetProgramTool({ onDecodeTrial, onWatchTrial }) {
     setLoading(false);
   };
 
-  const toneColor = (tone) => tone === "thin" ? "var(--amber)" : tone === "watch" ? "var(--red)"
+  const toneColor = (tone) => tone === "thin" ? "var(--warn)" : tone === "watch" ? "var(--red)"
     : tone === "solid" ? "var(--teal)" : "var(--ink-2)";
   const statusColor = (s) => /TERMINATED|WITHDRAWN|SUSPENDED/.test(s) ? "var(--red)"
     : /COMPLETED/.test(s) ? "var(--teal)" : "var(--ink-2)";
@@ -2442,7 +2442,7 @@ function AssetProgramTool({ onDecodeTrial, onWatchTrial }) {
           loading ? "Reading the registry…" : "Build the program"))
     ]),
 
-    error && toolCard(h, h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--amber)", lineHeight: 1.6 } },
+    error && toolCard(h, h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--warn)", lineHeight: 1.6 } },
       error + " This is a connection problem, not a finding that no trials exist.")),
 
     summary && summary.trialCount === 0 && toolCard(h, h("div", { className: "prose", style: { fontSize: 11.5, fontFamily: "var(--sans)", color: "var(--ink-2)", lineHeight: 1.6 } },
@@ -2473,7 +2473,7 @@ function AssetProgramTool({ onDecodeTrial, onWatchTrial }) {
             h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-1)" } },
               s.nctId + " · " + s.phase + " · " + s.status + (s.enrollment ? " · n=" + s.enrollment.toLocaleString() : "")),
             h("div", { style: { fontSize: 11.5, fontFamily: "var(--sans)", color: "var(--ink-2)", lineHeight: 1.5, marginTop: 2 } }, truncatedSpan(h, s.title || "", 110)),
-            h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: s.whyStopped ? "var(--amber)" : "var(--ink-3)", marginTop: 3 } },
+            h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: s.whyStopped ? "var(--warn)" : "var(--ink-3)", marginTop: 3 } },
               s.whyStopped ? "Reason given: " + s.whyStopped : "No reason registered.")))),
         h("div", { className: "prose", style: { fontSize: 10, fontFamily: "var(--sans)", color: "var(--ink-3)", lineHeight: 1.6, marginTop: 10 } },
           "A sponsor stops a trial for business reasons — reprioritization, funding, a partner walking — about as often as for scientific ones, and the registered reason is frequently a single vague sentence or absent entirely. Read the reason, not the fact.")
@@ -2494,7 +2494,7 @@ function AssetProgramTool({ onDecodeTrial, onWatchTrial }) {
                   h("span", { style: { color: "var(--ink-1)" } }, s.nctId),
                   h("span", { style: { color: statusColor(s.status) } }, s.status),
                   s.enrollment != null && h("span", { style: { color: "var(--ink-3)" } }, "n=" + s.enrollment.toLocaleString()),
-                  s.hasResults && h("span", { style: { color: "var(--teal)", fontSize: 10, fontWeight: 700 } }, "RESULTS POSTED"),
+                  s.hasResults && h("span", { style: { color: "var(--teal)", fontSize: 10, fontWeight: 700 } }, "Results posted"),
                   s.allocation === "RANDOMIZED" && h("span", { style: { color: "var(--ink-3)", fontSize: 10 } }, "randomized"),
                   s.masking && s.masking !== "NONE" && h("span", { style: { color: "var(--ink-3)", fontSize: 10 } }, "blinded")),
                 h("div", { style: { fontSize: 11, fontFamily: "var(--sans)", color: "var(--ink-2)", lineHeight: 1.5, marginTop: 2 } }, truncatedSpan(h, s.title || "", 110)),
@@ -2539,8 +2539,8 @@ const LIT_EVIDENCE_META = {
   primary:      { one: "primary paper",      many: "primary papers",      color: "var(--teal)",  note: "new evidence — a trial reporting its own result" },
   synthesis:    { one: "synthesis",          many: "syntheses",           color: "var(--ink-1)", note: "pools other people's trials" },
   secondary:    { one: "review",             many: "reviews",             color: "var(--ink-2)", note: "discusses evidence it did not generate" },
-  unreviewed:   { one: "preprint",           many: "preprints",           color: "var(--amber)", note: "posted without peer review" },
-  abstract:     { one: "conference abstract", many: "conference abstracts", color: "var(--amber)", note: "a few hundred words, no methods section" },
+  unreviewed:   { one: "preprint",           many: "preprints",           color: "var(--warn)", note: "posted without peer review" },
+  abstract:     { one: "conference abstract", many: "conference abstracts", color: "var(--warn)", note: "a few hundred words, no methods section" },
   anecdote:     { one: "case report",        many: "case reports",        color: "var(--ink-3)", note: "one patient, no control" },
   opinion:      { one: "opinion piece",      many: "opinion pieces",      color: "var(--ink-3)", note: "editorial or correspondence" },
   unclassified: { one: "paper of unstated type", many: "papers of unstated type", color: "var(--ink-3)", note: "indexed, but with no publication type saying what kind of study it is" }
@@ -2638,7 +2638,7 @@ function LiteratureTool({ initialQuery }) {
         h("input", { type: "checkbox", checked: excludePreprints, onChange: e => setExcludePreprints(e.target.checked) }),
         "Peer-reviewed only (exclude preprints)")
     ]),
-    error && toolCard(h, h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--amber)", lineHeight: 1.6 } },
+    error && toolCard(h, h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--warn)", lineHeight: 1.6 } },
       error + " This is a connection problem, not a finding that no papers exist.")),
     result && toolCard(h, [toolLabel(h, "Results for “" + result.query + "”"), h(LiteratureList, { result })])
   );
@@ -2652,7 +2652,7 @@ function TrialResultsPanels({ results, study }) {
 
   const pct = (x) => x == null ? "—" : (x * 100).toFixed(1) + "%";
   const num = (x) => x == null ? "—" : x.toLocaleString();
-  const sevColor = (s) => s === "high" ? "var(--red)" : s === "medium" ? "var(--amber)" : "var(--ink-2)";
+  const sevColor = (s) => s === "high" ? "var(--red)" : s === "medium" ? "var(--warn)" : "var(--ink-2)";
   const thS = { padding: "6px 10px", background: "var(--surface-2)", borderBottom: "1px solid var(--rule)", fontSize: 10, color: "var(--ink-3)", fontWeight: 500, textAlign: "right", whiteSpace: "nowrap" };
   const thL = Object.assign({}, thS, { textAlign: "left" });
   const tdS = { padding: "6px 10px", borderBottom: "1px solid var(--rule)", fontSize: 11, color: "var(--ink-1)", textAlign: "right", whiteSpace: "nowrap" };
@@ -2693,7 +2693,7 @@ function TrialResultsPanels({ results, study }) {
         "The sponsor registered only \u201C" + compared[0] + "\u201D against this comparison, so the record does not state which two arms the estimate runs between, or which way round. Read the direction from the per-arm numbers above rather than from the ratio."),
       compared.length === 0 && h("div", { className: "prose", style: { fontSize: 10.5, fontFamily: "var(--sans)", color: "var(--ink-3)", marginTop: 3, lineHeight: 1.5 } },
         "No arms are registered against this comparison, so the record does not state what it was computed between."),
-      a.crossesNull === true && h("div", { style: { fontSize: 10.5, fontFamily: "var(--sans)", color: "var(--amber)", marginTop: 4, lineHeight: 1.5 } },
+      a.crossesNull === true && h("div", { style: { fontSize: 10.5, fontFamily: "var(--sans)", color: "var(--warn)", marginTop: 4, lineHeight: 1.5 } },
         "This interval spans " + a.nullValue + ", the value meaning no difference — the data are consistent with no effect."),
       a.crossesNull === false && h("div", { style: { fontSize: 10.5, fontFamily: "var(--sans)", color: "var(--ink-3)", marginTop: 4, lineHeight: 1.5 } },
         "The interval excludes " + a.nullValue + " (no difference). That is a statement about this endpoint only."),
@@ -2713,7 +2713,7 @@ function TrialResultsPanels({ results, study }) {
       o.population && h("div", { style: { fontSize: 10, fontFamily: "var(--sans)", color: "var(--ink-3)", marginTop: 3, lineHeight: 1.5 } }, o.population),
 
       !o.posted
-        ? h("div", { style: { fontSize: 11.5, fontFamily: "var(--sans)", color: "var(--amber)", marginTop: 8, lineHeight: 1.6 } },
+        ? h("div", { style: { fontSize: 11.5, fontFamily: "var(--sans)", color: "var(--warn)", marginTop: 8, lineHeight: 1.6 } },
             "Registered as an endpoint but not reported in the results record. That is a gap, not a null result.")
       : o.layout === "simple"
         ? scroll(h("table", { style: { borderCollapse: "collapse", marginTop: 8, fontFamily: "var(--mono)", minWidth: 380 } },
@@ -2759,7 +2759,7 @@ function TrialResultsPanels({ results, study }) {
       h("td", { style: tdL }, r.title),
       h("td", { style: tdS }, num(r.started)),
       h("td", { style: tdS }, num(r.completed) + (r.completionRate != null ? "  (" + pct(r.completionRate) + ")" : "")),
-      h("td", { style: Object.assign({}, tdS, { color: r.nonDeathDiscontinuationRate != null && r.nonDeathDiscontinuationRate >= 0.2 ? "var(--amber)" : "var(--ink-1)" }) },
+      h("td", { style: Object.assign({}, tdS, { color: r.nonDeathDiscontinuationRate != null && r.nonDeathDiscontinuationRate >= 0.2 ? "var(--warn)" : "var(--ink-1)" }) },
         num(r.nonDeathDiscontinued) + (r.nonDeathDiscontinuationRate != null ? "  (" + pct(r.nonDeathDiscontinuationRate) + ")" : "")),
       h("td", { style: tdS }, r.deaths == null ? "not registered" : num(r.deaths)),
       h("td", { style: tdS }, r.withdrewForAE == null ? "not registered" : num(r.withdrewForAE) + "  (" + pct(r.aeWithdrawalRate) + ")"),
@@ -2850,7 +2850,7 @@ function TrialResultsPanels({ results, study }) {
               // above: 50% of 4 and 50% of 400 are not the same finding (FIN-004).
               safety.primaryGroups.map(g => { const c = e.byGroup[g.id]; return h("td", { key: g.id, style: tdS },
                 c ? pct(c.rate) + (c.atRisk ? "  (" + num(c.affected) + "/" + num(c.atRisk) + ")" : "") : "—"); }),
-              safety.comparable && h("td", { style: Object.assign({}, tdS, { color: e.pairDiff == null ? "var(--ink-3)" : Math.abs(e.pairDiff) >= 0.05 ? "var(--amber)" : "var(--ink-2)" }) },
+              safety.comparable && h("td", { style: Object.assign({}, tdS, { color: e.pairDiff == null ? "var(--ink-3)" : Math.abs(e.pairDiff) >= 0.05 ? "var(--warn)" : "var(--ink-2)" }) },
                 e.pairDiff == null ? "—" : (e.pairDiff > 0 ? "+" : "") + (e.pairDiff * 100).toFixed(1) + " pt"))))))
         : h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-3)" } }, "No events of this kind are registered."),
 
@@ -2943,7 +2943,7 @@ function TrialDecoderTool({ initialNctId, onConsumedInitialNctId }) {
     }
   }, [initialNctId]);
 
-  const sevColor = (s) => s === "high" ? "var(--red)" : s === "medium" ? "var(--amber)" : "var(--ink-2)";
+  const sevColor = (s) => s === "high" ? "var(--red)" : s === "medium" ? "var(--warn)" : "var(--ink-2)";
   const factRow = (label, value, note) => h("div", { style: { display: "flex", gap: 10, padding: "7px 0", borderBottom: "1px solid var(--rule)", alignItems: "baseline", flexWrap: "wrap" } },
     h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", minWidth: 150 } }, label),
     h("div", { style: { fontSize: 12, fontFamily: "var(--mono)", color: "var(--ink-1)", flex: "1 1 200px" } }, value),
@@ -2966,7 +2966,7 @@ function TrialDecoderTool({ initialNctId, onConsumedInitialNctId }) {
       )
     ]),
 
-    error && toolCard(h, h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--amber)", lineHeight: 1.6 } }, error)),
+    error && toolCard(h, h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--warn)", lineHeight: 1.6 } }, error)),
 
     decoded && h("div", null,
       toolCard(h, [
@@ -3026,7 +3026,7 @@ function TrialDecoderTool({ initialNctId, onConsumedInitialNctId }) {
       results && h(TrialResultsPanels, { results: results, study: raw }),
 
       !results && decoded.hasResults && toolCard(h, [
-        h("div", { style: { fontSize: 11.5, fontFamily: "var(--sans)", color: "var(--amber)", lineHeight: 1.6 } },
+        h("div", { style: { fontSize: 11.5, fontFamily: "var(--sans)", color: "var(--warn)", lineHeight: 1.6 } },
           "ClinicalTrials.gov marks this trial as having posted results, but the results section could not be read from the record. That is a parsing gap on this side, not a finding about the trial — open the record directly.")
       ]),
 
@@ -3044,7 +3044,7 @@ function TrialDecoderTool({ initialNctId, onConsumedInitialNctId }) {
             style: { padding: "7px 16px", borderRadius: 7, border: "1px solid var(--rule)", background: "transparent", color: "var(--ink-2)", fontFamily: "var(--mono)", fontSize: 11, cursor: "pointer" } },
             "Find the papers")),
         papersLoading && h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-3)" } }, "Searching Europe PMC…"),
-        papersError && h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--amber)", lineHeight: 1.6 } },
+        papersError && h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--warn)", lineHeight: 1.6 } },
           papersError + " This is a connection problem, not a finding that nothing has been published."),
         papers && h("div", null,
           h(LiteratureList, { result: papers,
@@ -3212,7 +3212,7 @@ function TrialWatchTool({ initialNctId, onConsumedInitialNctId }) {
               effectsLoading ? "Reading results\u2026" : (effects ? "Refresh" : "Load what these trials actually reported"))),
           !effects && !effectsLoading && !effectsError && h("div", { style: { fontSize: 10.5, fontFamily: "var(--sans)", color: "var(--ink-3)", lineHeight: 1.6 } },
             "A separate call, because posted results are excluded from the landscape query above for speed. This reads the structured analysis fields of trials that posted results, so you can see what winning has actually looked like here rather than only how often it happened."),
-          effectsError && h("div", { style: { fontSize: 10.5, fontFamily: "var(--mono)", color: "var(--amber)", lineHeight: 1.6 } }, effectsError),
+          effectsError && h("div", { style: { fontSize: 10.5, fontFamily: "var(--mono)", color: "var(--warn)", lineHeight: 1.6 } }, effectsError),
           effects && h("div", null,
             h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-2)", lineHeight: 1.7, marginBottom: 8 } },
               h("div", null, effects.sampleSize + " trials read \u00B7 " + effects.withPostedResults + " posted results \u00B7 " +
@@ -3264,7 +3264,7 @@ function TrialWatchTool({ initialNctId, onConsumedInitialNctId }) {
                       : pct <= 20
                         ? "Towards the thin end of what has been posted here. It can still clear a p-value and still be a modest result, which is exactly the gap between statistically real and commercially interesting."
                         : "Squarely inside the range this indication has actually produced.";
-                    return h("div", { key: scale, style: { borderLeft: "3px solid " + (pct >= 80 ? "var(--amber)" : "var(--teal)"), paddingLeft: 10 } },
+                    return h("div", { key: scale, style: { borderLeft: "3px solid " + (pct >= 80 ? "var(--warn)" : "var(--teal)"), paddingLeft: 10 } },
                       h("div", { style: { fontSize: 11.5, fontFamily: "var(--mono)", color: "var(--ink-1)" } },
                         v + " is more favorable than " + pos.beats + " of " + pos.n + " posted "
                           + (scale === "ratio" ? "ratio-scale" : "difference-scale") + " results (" + pct + "th percentile)"
@@ -3332,7 +3332,7 @@ function TrialWatchTool({ initialNctId, onConsumedInitialNctId }) {
             : (() => {
                 // Ranked by what the change means, not by field order: an
                 // endpoint swap and a status flip are not the same event.
-                const sevColor = (sv) => sv === "high" ? "var(--red)" : sv === "medium" ? "var(--amber)" : "var(--ink-3)";
+                const sevColor = (sv) => sv === "high" ? "var(--red)" : sv === "medium" ? "var(--warn)" : "var(--ink-3)";
                 const sevWord = (sv) => sv === "high" ? "changes what the trial can show"
                   : sv === "medium" ? "changes the terms" : "routine";
                 const worth = result.changes.filter(c => c.severity === "high" || c.severity === "medium").length;
