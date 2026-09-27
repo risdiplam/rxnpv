@@ -10,10 +10,7 @@ The bulk of this list came out of an exhaustive audit pass (September 2026) cove
 
 ## Still open
 
-The September 2026 external audit (`RxNPV_MUSE_AUDIT.md`) reopened this list. Its fourteen findings, the packaged-app worklist B-001–B-013, and seven further items found while working through them are all dispositioned in that file's §13 and recorded under Fixed below. What remains is two small things that need the user rather than code:
-
-### 🔵 Schedule the live canary — needs the user's go-ahead
-`npm run canary` (B-012) is built and clean. Running it on a schedule would be standing configuration on the user's machine, so it waits for a yes. Until then, run it before trusting the decoder on new trials.
+The September 2026 external audit (`RxNPV_MUSE_AUDIT.md`) reopened this list. Its fourteen findings, the packaged-app worklist B-001–B-013, and seven further items found while working through them are all dispositioned in that file's §13 and recorded under Fixed below. What remains is one small thing that needs the user rather than code:
 
 ### 🔵 One manual click
 The packaged-app harness replaces only the native save sheet. Clicking **Export as PDF** once in the real app and choosing a location is the single step it cannot perform.
