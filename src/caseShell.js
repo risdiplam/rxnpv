@@ -293,11 +293,11 @@ function CaseView({ theCase, onChange, onDelete, onNavigateToTools }) {
         const troughYear = companyPnL.reduce((worst, c) => c.ebit < worst.ebit ? c : worst, companyPnL[0]);
         return h("div", { style: { display: "flex", gap: 24, marginTop: 12, flexWrap: "wrap" } },
           h("div", null,
-            h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase" } }, troughYear.ebit < 0 ? "Deepest annual loss (burn)" : "Lowest annual EBIT (still profitable)"),
+            h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", } }, troughYear.ebit < 0 ? "Deepest annual loss (burn)" : "Lowest annual EBIT (still profitable)"),
             h("div", { style: { fontSize: 18, fontFamily: "var(--mono)", fontWeight: 700, color: troughYear.ebit < 0 ? "var(--red)" : "var(--ink-1)" } },
               fmtMoney(troughYear.ebit), " (yr " + troughYear.calendarYear + ")")),
           h("div", null,
-            h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase" } }, "Peak EBIT"),
+            h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", } }, "Peak EBIT"),
             h("div", { style: { fontSize: 18, fontFamily: "var(--mono)", fontWeight: 700, color: "var(--amber)" } }, fmtMoney(peakEbitYear.ebit), " (yr " + peakEbitYear.calendarYear + ")"))
         );
       })()

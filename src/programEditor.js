@@ -211,10 +211,10 @@ function ProgramEditor({ program, onChange, onDelete, discountRatePct, terminalV
             ),
             h("div", { style: { display: "flex", gap: 24, marginBottom: 14, flexWrap: "wrap" } },
               h("div", null,
-                h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase" } }, "Total time to launch"),
+                h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", } }, "Total time to launch"),
                 h("div", { style: { fontSize: 20, fontFamily: "var(--mono)", fontWeight: 700, color: "var(--teal)" } }, rnd.totalYears.toFixed(1) + "yr")),
               h("div", null,
-                h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase" } }, "Total cost to launch"),
+                h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", } }, "Total cost to launch"),
                 h("div", { style: { fontSize: 20, fontFamily: "var(--mono)", fontWeight: 700, color: "var(--amber)" } }, "$" + rnd.totalCostM.toFixed(1) + "M"))
             ),
             h(BenchField, { label: "Override total years (optional)", value: rndOv.totalYears, onChange: v => set("rndOverride.totalYears", v), suffix: "yr",
@@ -429,19 +429,19 @@ function ProgramEditor({ program, onChange, onDelete, discountRatePct, terminalV
     : h(ExportSection, { title: (program.drugName || program.name || "Program") + " — revenue build output", style: { background: "var(--surface)", border: "1px solid var(--rule)", borderRadius: 10, padding: "16px 18px" } },
         h("div", { style: { display: "flex", gap: 24, flexWrap: "wrap", marginBottom: 14 } },
           h("div", null,
-            h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.06em" } }, "Peak patients on drug (US)"),
+            h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", } }, "Peak patients on drug (US)"),
             h("div", { style: { fontSize: 22, fontFamily: "var(--mono)", fontWeight: 700, color: "var(--ink-1)" } }, result ? fmtNum(result.peakPatients) : "—")),
           h("div", null,
-            h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.06em" } }, "Peak US revenue"),
+            h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", } }, "Peak US revenue"),
             h("div", { style: { fontSize: 22, fontFamily: "var(--mono)", fontWeight: 700, color: "var(--teal)" } }, result ? fmtMoney(result.peakUSRevenue) : "—")),
           rb.pricing.includeExUS && h("div", null,
-            h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.06em" } }, "Peak total revenue (WW)"),
+            h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", } }, "Peak total revenue (WW)"),
             h("div", { style: { fontSize: 22, fontFamily: "var(--mono)", fontWeight: 700, color: "var(--amber)" } }, result ? fmtMoney(result.peakTotalRevenue) : "—")),
           revenueMode === "full" && h("div", null,
-            h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.06em" } }, "Peak share used"),
+            h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", } }, "Peak share used"),
             h("div", { style: { fontSize: 22, fontFamily: "var(--mono)", fontWeight: 700, color: "var(--ink-1)" } }, (result && result.peakShare != null) ? result.peakShare + "%" : "—")),
           pnl && h("div", null,
-            h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.06em" } }, "Peak product contribution"),
+            h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", } }, "Peak product contribution"),
             h("div", { style: { fontSize: 22, fontFamily: "var(--mono)", fontWeight: 700, color: "var(--ink-1)" } }, fmtMoney(Math.max(...pnl.map(y => y.productContribution)))),
             h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)" } }, "revenue − COGS − sales − marketing"))
         ),
@@ -496,7 +496,7 @@ function ProgramEditor({ program, onChange, onDelete, discountRatePct, terminalV
             mods.applied.map(a => a.label + " (Phase 2 ×" + a.perPhase.phase2.toFixed(2) + (a.regulatoryDeltaPct ? ", regulatory " + (a.regulatoryDeltaPct > 0 ? "+" : "") + a.regulatoryDeltaPct + "pp" : "") + ")").join(" · "),
             h("div", { style: { marginTop: 3 } },
               "Cumulative PoS to launch: ", h("b", { style: { color: "var(--ink-3)" } }, baseline.toFixed(1) + "%"), " → ",
-              h("b", { style: { color: cumulativePoS >= baseline ? "var(--teal)" : "var(--red)" } }, cumulativePoS.toFixed(1) + "%"))),
+              h("b", { style: { color: cumulativePoS >= baseline ? "var(--green)" : "var(--red)" } }, cumulativePoS.toFixed(1) + "%"))),
           // Modality now shifts PoS too (POS_BY_MOLECULE), and it is applied
           // automatically from the program's own modality rather than chosen
           // here — so it has to be stated, or a number would move for reasons
@@ -627,7 +627,7 @@ function ProgramEditor({ program, onChange, onDelete, discountRatePct, terminalV
               onKeyDown: (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onNavigateToTools("licensing"); } },
               style: { color: "var(--teal)", cursor: "pointer", textDecoration: "underline" } }, "Tools → Licensing Comps"), "."),
           program.revenueMode === "full" && h("div", { style: { marginTop: 4, marginBottom: 4 } },
-            h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 4 } }, "Territory partnered"),
+            h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginBottom: 4 } }, "Territory partnered"),
             h("div", { style: { display: "flex", gap: 6 } },
               ["us", "exUS", "global"].map(t => h("button", {
                 key: t, onClick: () => setPartnership({ territory: t }),
@@ -680,7 +680,7 @@ function ProgramEditor({ program, onChange, onDelete, discountRatePct, terminalV
         set("evidenceLog", log.filter((_, i) => i !== idx));
       };
 
-      const classColor = { fact: "var(--teal)", inference: "var(--amber)", speculation: "var(--red)" };
+      const classColor = { fact: "var(--green)", inference: "var(--amber)", speculation: "var(--red)" };
       const classLabel = { fact: "Fact", inference: "Inference", speculation: "Speculation" };
       const confLabel = { high: "High", moderate: "Moderate", low: "Low" };
 
@@ -740,7 +740,7 @@ function ProgramEditor({ program, onChange, onDelete, discountRatePct, terminalV
         set("calibrationLog", log.filter((_, i) => i !== idx));
       };
 
-      const outcomeColor = { pending: "var(--ink-3)", success: "var(--teal)", failure: "var(--red)" };
+      const outcomeColor = { pending: "var(--ink-3)", success: "var(--green)", failure: "var(--red)" };
       const outcomeLabel = { pending: "Pending", success: "Success", failure: "Failure" };
 
       return h(SectionCard, { title: "Calibration Log", subtitle: "Your PoS call vs. the market's, recorded before a catalyst — score both against the actual outcome after", defaultOpen: log.length > 0 },

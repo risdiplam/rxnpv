@@ -766,7 +766,7 @@ function runOutcome2x2() {
   } else {
     const pct100 = (100 / nnt.nnt);
     const iconArraySvg = renderIconArray(pct100 / 100, {
-      highlightColor: armAIsBetter ? 'var(--teal)' : 'var(--red)',
+      highlightColor: armAIsBetter ? 'var(--green)' : 'var(--red)',
       title: `${measureLabel} = ${Math.ceil(nnt.nnt)}`,
       subtitle: `out of every 100 treated with ${labelA}, about ${pct100.toFixed(1)} more ${armAIsBetter ? 'benefit' : 'are harmed'} than would have with ${labelB}`
     });
@@ -949,8 +949,8 @@ function runMultiplicity() {
 
   const dotRows = entries.flatMap((e, i) => [
     { label: e.label + ' — raw', estimate: e.p, lower: e.p, upper: e.p, color: 'var(--ink-3)' },
-    { label: e.label + ' — Bonferroni', estimate: bonf[i].adjustedP, lower: bonf[i].adjustedP, upper: bonf[i].adjustedP, color: bonf[i].significant ? 'var(--teal)' : 'var(--red)' },
-    { label: e.label + ' — Holm', estimate: holm[i].adjustedP, lower: holm[i].adjustedP, upper: holm[i].adjustedP, color: holm[i].significant ? 'var(--teal)' : 'var(--red)' }
+    { label: e.label + ' — Bonferroni', estimate: bonf[i].adjustedP, lower: bonf[i].adjustedP, upper: bonf[i].adjustedP, color: bonf[i].significant ? 'var(--green)' : 'var(--red)' },
+    { label: e.label + ' — Holm', estimate: holm[i].adjustedP, lower: holm[i].adjustedP, upper: holm[i].adjustedP, color: holm[i].significant ? 'var(--green)' : 'var(--red)' }
   ]);
   const dotPlotSvg = renderForestPlot(dotRows, { scale: 'linear', referenceLine: alpha, xLabel: 'p-value — dashed line is α = ' + alpha, labelWidth: 180 });
   appendChartWithExport(resultsDiv, dotPlotSvg, 'multiplicity-adjustment');
@@ -1223,7 +1223,7 @@ function stressPowerCell(power, planned) {
   // question is how far this moves from what was designed for.
   const delta = planned != null ? power - planned : 0;
   const color = delta < -0.10 ? 'var(--red)' : delta < -0.03 ? 'var(--amber)'
-    : delta > 0.03 ? 'var(--teal)' : 'var(--ink-1)';
+    : delta > 0.03 ? 'var(--green)' : 'var(--ink-1)';
   return el('td', { style: 'color:' + color }, pct);
 }
 
@@ -1728,7 +1728,7 @@ function runPeakSales() {
   appendChartWithExport(resultsDiv, chartHtml, 'peak-sales-monte-carlo');
 
   resultsDiv.appendChild(el('h3', {}, 'What is actually driving this range'));
-  resultsDiv.appendChild(el('p', { class: 'subtle' }, 'Correlation between each input’s sampled value and the resulting peak sales, across every simulated trial — the longer the bar, the more that one assumption is moving your range. Teal pushes peak sales up, red pushes it down (only meaningful for an input where you’d expect a negative relationship; here all five are naturally positive).'));
+  resultsDiv.appendChild(el('p', { class: 'subtle' }, 'Correlation between each input’s sampled value and the resulting peak sales, across every simulated trial — the longer the bar, the more that one assumption is moving your range. Green pushes peak sales up, red pushes it down (only meaningful for an input where you’d expect a negative relationship; here all five are naturally positive).'));
   const driverLabels = { population: 'Addressable population', diagnosisRate: 'Diagnosis rate', treatmentRate: 'Treatment rate', peakShare: 'Peak market share', price: 'Annual price' };
   const tornadoSvg = renderTornadoChart(drivers.map(d => ({ label: driverLabels[d.driver] || d.driver, value: d.correlation })), {
     xLabel: 'Correlation with peak sales'

@@ -10,7 +10,7 @@ function ReferenceSheet({ activeCase }) {
 
   // Each card is its own exportable section, like the tool cards.
   const card = (children, key) => h.apply(null, ["div", { key, className: "export-section", "data-export-section": "", style: { background: "var(--surface)", border: "1px solid var(--rule)", borderRadius: 10, padding: "18px 20px", marginBottom: 16 } }].concat(Array.isArray(children) ? children : [children]).concat([h(SectionExportBar, { key: "__export" })]));
-  const label = (t) => h("div", { "data-section-title": "", style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 10 } }, t);
+  const label = (t) => h("div", { "data-section-title": "", style: { fontSize: 14, fontWeight: 600, fontFamily: "var(--sans)", color: "var(--ink-1)", letterSpacing: "-0.005em", marginBottom: 12 } }, t);
   const src = (t) => h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginTop: 10, fontStyle: "italic", lineHeight: 1.5 } }, t);
   // Numbers in a column share one precision: the source tables drop trailing
   // zeros (65 beside 62.2, 76 beside 50.6), which reads as a different kind
@@ -23,7 +23,7 @@ function ReferenceSheet({ activeCase }) {
   };
   const table = (headers, rows) => h("div", { style: { overflowX: "auto", maxWidth: 880 } },
     h("table", { style: { width: "100%", borderCollapse: "collapse", fontSize: 12, fontFamily: "var(--mono)" } },
-      h("thead", null, h("tr", null, headers.map((hd, i) => h("th", { key: i, style: { textAlign: i === 0 ? "left" : "right", padding: "6px 10px", borderBottom: "1px solid var(--rule)", color: "var(--ink-3)", fontSize: 10, textTransform: "uppercase" } }, hd)))),
+      h("thead", null, h("tr", null, headers.map((hd, i) => h("th", { key: i, style: { textAlign: i === 0 ? "left" : "right", padding: "6px 10px", borderBottom: "1px solid var(--rule)", color: "var(--ink-3)", fontSize: 10, } }, hd)))),
       h("tbody", null, alignColumns(rows).map((r, i) => h("tr", { key: i, style: { borderBottom: "1px solid var(--rule)" } },
         r.map((c, j) => h("td", { key: j, style: { padding: "7px 10px", textAlign: j === 0 ? "left" : "right", color: j === 0 ? "var(--ink-1)" : "var(--ink-2)" } }, c)))))
     ));
@@ -650,10 +650,10 @@ function ReferenceSheet({ activeCase }) {
           h("div", { style: { fontFamily: "var(--mono)", fontSize: 12, fontWeight: 700, color: "var(--teal)", marginBottom: 6 } }, p.phase),
           h("div", { style: { display: "flex", gap: 18, flexWrap: "wrap" } },
             h("div", { style: { flex: "1 1 260px" } },
-              h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 } }, "Can establish"),
+              h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginBottom: 4 } }, "Can establish"),
               h("ul", { style: { margin: 0, paddingLeft: 16 } }, p.canShow.map((t, i) => h("li", { key: i, style: { fontSize: 11.5, fontFamily: "var(--sans)", color: "var(--ink-2)", lineHeight: 1.6, marginBottom: 3 } }, t)))),
             h("div", { style: { flex: "1 1 260px" } },
-              h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 } }, "Cannot"),
+              h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginBottom: 4 } }, "Cannot"),
               h("ul", { style: { margin: 0, paddingLeft: 16 } }, p.cannotShow.map((t, i) => h("li", { key: i, style: { fontSize: 11.5, fontFamily: "var(--sans)", color: "var(--ink-2)", lineHeight: 1.6, marginBottom: 3 } }, t))))
           )
         )))

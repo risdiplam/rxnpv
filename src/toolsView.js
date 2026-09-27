@@ -129,7 +129,7 @@ function toolCard(h, children) {
   return h.apply(null, ["div", { className: "export-section", "data-export-section": "", style: { background: "var(--surface)", border: "1px solid var(--rule)", borderRadius: 10, padding: "18px 20px", marginBottom: 16, boxShadow: "0 1px 2px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.03)" } }].concat(kids));
 }
 function toolLabel(h, t) {
-  return h("div", { "data-section-title": "", style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 10 } }, t);
+  return h("div", { "data-section-title": "", style: { fontSize: 14, fontWeight: 600, fontFamily: "var(--sans)", color: "var(--ink-1)", letterSpacing: "-0.005em", marginBottom: 12 } }, t);
 }
 
 // ── M&A Target Premium calculator ──
@@ -255,7 +255,7 @@ function MaPremiumTool({ cases, updateCase, activeCase }) {
         )
       ),
       h("div", { style: { marginTop: 14 } },
-        h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase" } }, "Implied takeout value"),
+        h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", } }, "Implied takeout value"),
         h("div", { style: { fontSize: 22, fontFamily: "var(--mono)", fontWeight: 700, color: "var(--amber)" } }, fmtShare(takeout))
       ),
       h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginTop: 10 } }, "Default premium is the median across " + premiumsKnown.length + " tracked deals with a disclosed premium.")
@@ -490,7 +490,7 @@ function CompanyLookupTool({ cases, updateCase, activeCase, onWatchTrial }) {
             h("div", { style: { display: "flex", flexDirection: "column", gap: 6, maxHeight: 340, overflowY: "auto" } },
               rows.map((t, i) => h("div", { key: i, style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-2)", padding: "6px 0", borderBottom: "1px solid var(--rule)" } },
                 h("div", { style: { display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" } },
-                  h("span", { style: { color: t.code === "P" ? "var(--teal)" : t.code === "S" ? "var(--red)" : t.acquiredDisposed === "A" ? "var(--ink-1)" : "var(--ink-2)", fontWeight: 700 } }, t.codeLabel),
+                  h("span", { style: { color: t.code === "P" ? "var(--green)" : t.code === "S" ? "var(--red)" : t.acquiredDisposed === "A" ? "var(--ink-1)" : "var(--ink-2)", fontWeight: 700 } }, t.codeLabel),
                   h("span", null, t.date), h("span", { style: { color: "var(--ink-3)" } }, "· " + t.ownerName + " (" + t.role + ")")),
                 t.isDerivative
                   ? h("div", null,
@@ -673,11 +673,11 @@ function FdmcTool({ cases, updateCase, activeCase }) {
       ),
 
       h("div", { style: { display: "flex", gap: 24, flexWrap: "wrap", padding: "12px 14px", borderRadius: 8, background: "var(--surface-2)", marginBottom: 12 } },
-        h("div", null, h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase" } }, "Diluted shares"),
+        h("div", null, h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", } }, "Diluted shares"),
           h("div", { style: { fontSize: 18, fontFamily: "var(--mono)", fontWeight: 700, color: "var(--ink-1)" } }, fmtNum(capResult.dilutedShares))),
-        mode === "detailed" && h("div", null, h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase" } }, "From dilutive securities"),
+        mode === "detailed" && h("div", null, h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", } }, "From dilutive securities"),
           h("div", { style: { fontSize: 18, fontFamily: "var(--mono)", fontWeight: 700, color: "var(--ink-2)" } }, "+" + fmtNum(capResult.optionShares + capResult.warrantShares + capResult.convertShares))),
-        h("div", null, h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase" } }, "Fully diluted market cap"),
+        h("div", null, h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", } }, "Fully diluted market cap"),
           h("div", { style: { fontSize: 22, fontFamily: "var(--mono)", fontWeight: 800, color: "var(--teal)" } }, fdmc != null ? fmtMoney(fdmc) : "—"))
       ),
 
@@ -752,12 +752,12 @@ function RunwayTool({ cases, updateCase, activeCase }) {
       pullResult && h("div", { style: { padding: "12px 14px", borderRadius: 8, background: "var(--surface-2)" } },
         h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-2)", marginBottom: 8 } }, "✓ ", h("b", { style: { color: "var(--teal)" } }, pullResult.name), pullResult.asOf ? " · as of " + pullResult.asOf : ""),
         h("div", { style: { display: "flex", gap: 24, flexWrap: "wrap" } },
-          h("div", null, h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase" } }, "Cash & investments"),
+          h("div", null, h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", } }, "Cash & investments"),
             h("div", { style: { fontSize: 18, fontFamily: "var(--mono)", fontWeight: 700, color: "var(--ink-1)" } }, pullResult.cash != null ? fmtMoney(pullResult.cash) : "n/a")),
-          h("div", null, h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase" } }, "Quarterly burn"),
+          h("div", null, h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", } }, "Quarterly burn"),
             h("div", { style: { fontSize: 18, fontFamily: "var(--mono)", fontWeight: 700, color: "var(--ink-1)" } }, pullResult.quarterlyBurnUSD != null ? fmtMoney(pullResult.quarterlyBurnUSD) : "n/a")),
-          h("div", null, h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase" } }, "Runway"),
-            h("div", { style: { fontSize: 22, fontFamily: "var(--mono)", fontWeight: 800, color: pullResult.runwayMonths != null && pullResult.runwayMonths < 12 ? "var(--red)" : "var(--teal)" } },
+          h("div", null, h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", } }, "Runway"),
+            h("div", { style: { fontSize: 22, fontFamily: "var(--mono)", fontWeight: 800, color: pullResult.runwayMonths != null && pullResult.runwayMonths < 12 ? "var(--red)" : "var(--green)" } },
               pullResult.runwayMonths != null ? pullResult.runwayMonths.toFixed(0) + " mo" : "n/a"))
         ),
         pullResult.runwayNote && h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginTop: 8 } }, pullResult.runwayNote)
@@ -769,8 +769,8 @@ function RunwayTool({ cases, updateCase, activeCase }) {
         h(MillionsField, { label: "Cash & investments", value: manualCash, onChange: setManualCash }),
         h(MillionsField, { label: "Monthly burn", value: manualMonthlyBurn, onChange: setManualMonthlyBurn })
       ),
-      h("div", null, h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase" } }, "Runway"),
-        h("div", { style: { fontSize: 22, fontFamily: "var(--mono)", fontWeight: 800, color: manualRunway != null && manualRunway < 12 ? "var(--red)" : "var(--teal)" } },
+      h("div", null, h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", } }, "Runway"),
+        h("div", { style: { fontSize: 22, fontFamily: "var(--mono)", fontWeight: 800, color: manualRunway != null && manualRunway < 12 ? "var(--red)" : "var(--green)" } },
           manualRunway != null ? manualRunway.toFixed(0) + " months" : "—"))
     ]),
 
@@ -793,10 +793,10 @@ function RunwayTool({ cases, updateCase, activeCase }) {
         frError && h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--red)", marginTop: 10 } }, "Calculation error: " + frError),
         fr && !frError && h("div", { style: { marginTop: 14 } },
           h("div", { style: { display: "flex", gap: 24, flexWrap: "wrap", marginBottom: 14 } },
-            h("div", null, h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase" } }, "Starting cash"),
+            h("div", null, h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", } }, "Starting cash"),
               h("div", { style: { fontSize: 18, fontFamily: "var(--mono)", fontWeight: 700, color: "var(--ink-1)" } }, fmtMoney(fr.startingCash))),
-            h("div", null, h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase" } }, "Modeled runway"),
-              h("div", { style: { fontSize: 22, fontFamily: "var(--mono)", fontWeight: 800, color: fr.runwayMonths != null && fr.runwayMonths < 12 ? "var(--red)" : "var(--teal)" } },
+            h("div", null, h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", } }, "Modeled runway"),
+              h("div", { style: { fontSize: 22, fontFamily: "var(--mono)", fontWeight: 800, color: fr.runwayMonths != null && fr.runwayMonths < 12 ? "var(--red)" : "var(--green)" } },
                 fr.runwayMonths != null ? fr.runwayMonths.toFixed(0) + " mo" : "25yr+ (beyond projection window)"))
           ),
           h(ExportableBlock, { title: (fc ? fc.name + " — " : "") + "cash runway" },
@@ -871,7 +871,7 @@ function RunwayVsCatalystTool({ cases, activeCase }) {
       h("div", { style: { display: "flex", gap: 26, flexWrap: "wrap", marginBottom: 14 } },
         h("div", null,
           h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)" } }, "MODELED RUNWAY"),
-          h("div", { style: { fontSize: 26, fontFamily: "var(--mono)", fontWeight: 800, color: (!res.beyondHorizon && res.runwayMonths < 12) ? "var(--red)" : "var(--teal)" } },
+          h("div", { style: { fontSize: 26, fontFamily: "var(--mono)", fontWeight: 800, color: (!res.beyondHorizon && res.runwayMonths < 12) ? "var(--red)" : "var(--green)" } },
             res.beyondHorizon ? "No end" : res.runwayMonths.toFixed(0) + " mo"),
           res.beyondHorizon && h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", maxWidth: 150, lineHeight: 1.4 } },
             "modeled cash flow turns positive before cash runs out")),
@@ -891,7 +891,7 @@ function RunwayVsCatalystTool({ cases, activeCase }) {
             + (res.undatedCount ? " (" + res.undatedCount + " undated prediction" + (res.undatedCount > 1 ? "s" : "") + " skipped.)" : ""))
         : h("div", { style: {
             padding: "12px 14px", borderRadius: 8, lineHeight: 1.65, fontFamily: "var(--sans)", fontSize: 12,
-            background: res.firstProblem ? (res.firstProblem.status === "gap" ? "var(--red-bg)" : "var(--amber-bg)") : "var(--teal-bg)",
+            background: res.firstProblem ? (res.firstProblem.status === "gap" ? "var(--red-bg)" : "var(--amber-bg)") : "var(--green-bg)",
             border: "1px solid " + (res.firstProblem ? STATUS[res.firstProblem.status].color : "var(--teal)"),
             color: "var(--ink-1)"
           } },
@@ -917,7 +917,7 @@ function RunwayVsCatalystTool({ cases, activeCase }) {
         const horizon = (res.beyondHorizon ? Math.max(...res.rows.map(r => r.monthsAway)) : Math.max(res.runwayMonths, ...res.rows.map(r => r.monthsAway))) * 1.15 || 12;
         const pct = m => Math.max(0, Math.min(100, (m / horizon) * 100));
         return h(ExportableBlock, { title: (theCase.name || "Case") + " — cash runway vs. catalysts", style: { marginTop: 18 } },
-          h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 8 } }, "Timeline from today"),
+          h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginBottom: 8 } }, "Timeline from today"),
           h("div", { style: { position: "relative", height: 26, borderRadius: 5, background: "var(--surface-2)", overflow: "hidden", marginBottom: 6 } },
             h("div", { title: res.beyondHorizon ? "Cash never runs out in the projection window" : "Modeled runway: " + res.runwayMonths.toFixed(1) + " months",
               style: { position: "absolute", left: 0, top: 0, bottom: 0, width: (res.beyondHorizon ? 100 : pct(res.runwayMonths)) + "%", background: "var(--teal)", opacity: 0.35 } }),
@@ -1001,7 +1001,7 @@ function ExclusivityTool({ cases, updateCase }) {
 
   const s = res && res.ok ? res.summary : null;
   const KeyDate = ({ label, row, tone, note }) => h("div", { style: { flex: "1 1 190px" } },
-    h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.06em" } }, label),
+    h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", } }, label),
     h("div", { style: { fontSize: 24, fontFamily: "var(--mono)", fontWeight: 800, color: tone } }, row ? fmtDate(row.expiry) : "—"),
     row && h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)" } }, fmtYears(row.yearsAway), " · US", row.patentNumber),
     note && h("div", { style: { fontSize: 10, fontFamily: "var(--sans)", color: "var(--ink-2)", marginTop: 4, lineHeight: 1.45, maxWidth: 230 } }, note)
@@ -1049,7 +1049,7 @@ function ExclusivityTool({ cases, updateCase }) {
       !s.latestSubstance && h("div", { style: { padding: "10px 12px", borderRadius: 7, background: "var(--amber-bg)", border: "1px solid var(--amber)", fontFamily: "var(--sans)", fontSize: 11, color: "var(--ink-1)", lineHeight: 1.55, marginBottom: 14 } },
         "No patent here is flagged as a drug-substance (compound) patent — every listed patent is formulation or method-of-use. That's a genuinely weaker position: those are the patents most often designed around or challenged, so the last-expiry date above is a soft ceiling."),
 
-      h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 } }, "All listed patents"),
+      h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginBottom: 8 } }, "All listed patents"),
       h("div", { style: { display: "flex", flexDirection: "column", gap: 4, maxHeight: 320, overflowY: "auto" } },
         s.all.map((r, i) => h("div", { key: i, style: { display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10, padding: "7px 11px", borderRadius: 6, background: "var(--surface-2)" } },
           h("div", { style: { fontFamily: "var(--mono)", fontSize: 11, color: "var(--ink-1)" } },
@@ -1134,12 +1134,12 @@ function BinaryEventTool({ cases, activeCase }) {
     showing && res.ok && h("div", { ref: beRef }, toolCard(h, [
       h("div", { style: { display: "flex", gap: 30, flexWrap: "wrap", marginBottom: 16 } },
         h("div", null,
-          h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.06em" } }, "Market-implied PoS"),
+          h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", } }, "Market-implied PoS"),
           h("div", { style: { fontSize: 34, fontFamily: "var(--mono)", fontWeight: 800, color: res.rangeFlag ? "var(--amber)" : "var(--teal)" } },
             res.impliedPoSPct.toFixed(1) + "%"),
           h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)" } }, "also the breakeven — below this you lose money on average")),
         h("div", null,
-          h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.06em" } }, "Upside / downside"),
+          h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", } }, "Upside / downside"),
           h("div", { style: { fontSize: 20, fontFamily: "var(--mono)", fontWeight: 700, marginTop: 6 } },
             h("span", { style: { color: "var(--teal)" } }, "+" + res.upsidePct.toFixed(0) + "%"),
             h("span", { style: { color: "var(--ink-3)" } }, "  /  "),
@@ -1147,8 +1147,8 @@ function BinaryEventTool({ cases, activeCase }) {
           res.riskReward != null && h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)" } },
             res.riskReward.toFixed(1) + ":1 reward-to-risk")),
         res.edgePoSPct != null && h("div", null,
-          h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.06em" } }, "Your edge"),
-          h("div", { style: { fontSize: 34, fontFamily: "var(--mono)", fontWeight: 800, color: res.edgePoSPct > 0 ? "var(--teal)" : res.edgePoSPct < 0 ? "var(--red)" : "var(--ink-2)" } },
+          h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", } }, "Your edge"),
+          h("div", { style: { fontSize: 34, fontFamily: "var(--mono)", fontWeight: 800, color: res.edgePoSPct > 0 ? "var(--green)" : res.edgePoSPct < 0 ? "var(--red)" : "var(--ink-2)" } },
             (res.edgePoSPct > 0 ? "+" : "") + res.edgePoSPct.toFixed(1) + "pts"),
           h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)" } }, "your PoS vs. the market's"))
       ),
@@ -1178,8 +1178,8 @@ function BinaryEventTool({ cases, activeCase }) {
               "The implied probability exceeds 100%, so the market is paying for more than this single readout — another asset, a platform, or a takeout premium your two anchors don't capture. The binary frame is too narrow here.")),
 
       res.expectedValue != null && h("div", { style: { padding: "12px 14px", borderRadius: 8, lineHeight: 1.65, fontFamily: "var(--sans)", fontSize: 12,
-          background: res.evVsCurrentPct > 0 ? "var(--teal-bg)" : "var(--red-bg)", border: "1px solid " + (res.evVsCurrentPct > 0 ? "var(--teal)" : "var(--red)"), color: "var(--ink-1)" } },
-        h("b", { style: { color: res.evVsCurrentPct > 0 ? "var(--teal)" : "var(--red)" } },
+          background: res.evVsCurrentPct > 0 ? "var(--green-bg)" : "var(--red-bg)", border: "1px solid " + (res.evVsCurrentPct > 0 ? "var(--green)" : "var(--red)"), color: "var(--ink-1)" } },
+        h("b", { style: { color: res.evVsCurrentPct > 0 ? "var(--green)" : "var(--red)" } },
           "Expected value at your " + res.yourPoSPct + "% : " + fmt(res.expectedValue) + " "),
         res.evVsCurrentPct > 0
           ? "— " + res.evVsCurrentPct.toFixed(0) + "% above today's " + fmt(res.current) + ". You're more optimistic than the market by " + res.edgePoSPct.toFixed(1) + " points; that difference is the whole position, so it's worth asking what the market knows that you don't."
@@ -1439,7 +1439,7 @@ function PeakSalesCompsTool({ cases, updateCase, activeCase }) {
       exportMsg && h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--teal)", marginBottom: 10 } }, exportMsg),
 
       h("div", { style: { marginBottom: 14, paddingBottom: 14, borderBottom: "1px solid var(--rule)" } },
-        h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 8 } }, "Where this case sits among real comps"),
+        h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginBottom: 8 } }, "Where this case sits among real comps"),
         h(ExportableBlock, { title: "Peak sales comps — where this lands" },
           h(PeakSalesCompsChart, { ownDrugs: ownPeakDrugs, allDrugs: allPeakSalesDrugs }))
       ),
@@ -1975,15 +1975,15 @@ function FdaLookupTool() {
       toolLabel(h, "Label summary"),
       label.boxedWarning && h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--red)", padding: "8px 10px", borderRadius: 6, background: "var(--red-bg)", marginBottom: 10, lineHeight: 1.6 } }, truncatedSpan(h, label.boxedWarning, 3000)),
       label.indicationsAndUsage && h("div", { style: { marginBottom: 10 } },
-        h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 } }, "Indications and usage"),
+        h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginBottom: 4 } }, "Indications and usage"),
         h("div", { style: { fontSize: 11, fontFamily: "var(--sans)", color: "var(--ink-2)", lineHeight: 1.6 } }, truncatedSpan(h, label.indicationsAndUsage, 3000))
       ),
       label.warningsAndPrecautions && h("div", { style: { marginBottom: 10 } },
-        h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 } }, "Warnings and precautions"),
+        h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginBottom: 4 } }, "Warnings and precautions"),
         h("div", { style: { fontSize: 11, fontFamily: "var(--sans)", color: "var(--ink-2)", lineHeight: 1.6 } }, truncatedSpan(h, label.warningsAndPrecautions, 3000))
       ),
       label.adverseReactionsSummary && h("div", null,
-        h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 } }, "Adverse reactions (from label)"),
+        h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginBottom: 4 } }, "Adverse reactions (from label)"),
         h("div", { style: { fontSize: 11, fontFamily: "var(--sans)", color: "var(--ink-2)", lineHeight: 1.6 } }, truncatedSpan(h, label.adverseReactionsSummary, 3000))
       )
     ]),
@@ -2072,17 +2072,17 @@ function TargetDossierTool() {
         h("div", { style: { fontSize: 11.5, fontFamily: "var(--sans)", color: "var(--ink-2)", marginTop: 2, marginBottom: 10 } }, dossier.name),
         h("div", { style: { display: "flex", gap: 22, flexWrap: "wrap" } },
           h("div", null,
-            h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.06em" } }, "Human genetic evidence"),
+            h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", } }, "Human genetic evidence"),
             h("div", { style: { fontSize: 18, fontFamily: "var(--mono)", fontWeight: 800, color: dossier.anyGeneticEvidence ? "var(--teal)" : "var(--ink-2)" } },
               dossier.anyGeneticEvidence ? "Present" : "None found")),
           h("div", null,
-            h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.06em" } }, "Associated diseases"),
+            h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", } }, "Associated diseases"),
             h("div", { style: { fontSize: 18, fontFamily: "var(--mono)", fontWeight: 800, color: "var(--ink-1)" } }, dossier.diseaseCount.toLocaleString())),
           h("div", null,
-            h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.06em" } }, "Drugs against it"),
+            h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", } }, "Drugs against it"),
             h("div", { style: { fontSize: 18, fontFamily: "var(--mono)", fontWeight: 800, color: "var(--ink-1)" } }, dossier.drugCount.toLocaleString())),
           h("div", null,
-            h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.06em" } }, "Reached Phase 3+"),
+            h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", } }, "Reached Phase 3+"),
             h("div", { style: { fontSize: 18, fontFamily: "var(--mono)", fontWeight: 800, color: "var(--ink-1)" } }, dossier.approvedOrLateStage))
         ),
         h("div", { style: { fontSize: 10.5, fontFamily: "var(--sans)", color: "var(--ink-3)", marginTop: 12, lineHeight: 1.6 } },
@@ -2238,7 +2238,7 @@ function LaunchTrackerTool() {
               h("td", { style: { padding: "6px 10px", borderBottom: "1px solid var(--rule)", fontSize: 11, textAlign: "right", color: "var(--ink-2)" } }, p.beneficiaries != null ? p.beneficiaries.toLocaleString() : "suppressed"),
               h("td", { style: { padding: "6px 10px", borderBottom: "1px solid var(--rule)", fontSize: 11, textAlign: "right", color: "var(--ink-2)" } }, p.claims != null ? p.claims.toLocaleString() : "—"),
               h("td", { style: { padding: "6px 10px", borderBottom: "1px solid var(--rule)", fontSize: 11, textAlign: "right", color: "var(--ink-2)" } }, money(p.avgSpendPerBene)),
-              h("td", { style: { padding: "6px 10px", borderBottom: "1px solid var(--rule)", fontSize: 11, textAlign: "right", color: p.growthVsComparable == null ? "var(--ink-3)" : p.growthVsComparable >= 0 ? "var(--teal)" : "var(--red)" } },
+              h("td", { style: { padding: "6px 10px", borderBottom: "1px solid var(--rule)", fontSize: 11, textAlign: "right", color: p.growthVsComparable == null ? "var(--ink-3)" : p.growthVsComparable >= 0 ? "var(--green)" : "var(--red)" } },
                 p.growthVsComparable == null ? "—" : (p.growthVsComparable >= 0 ? "+" : "") + (p.growthVsComparable * 100).toFixed(0) + "% vs " + p.comparableTo)
             ))))),
         primary.impliedAnnual != null && h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-2)", marginTop: 8 } },
@@ -2369,7 +2369,7 @@ function ActualVsModelTool({ cases, updateCase, activeCase }) {
                   h("td", { style: { padding: "6px 10px", borderBottom: "1px solid var(--rule)", fontSize: 11, textAlign: "right", color: "var(--ink-2)" } },
                     r.outsideModel ? "outside the model" : r.modelPreLaunch ? "pre-launch" : fmtMoney(r.modelledUsd)),
                   h("td", { style: { padding: "6px 10px", borderBottom: "1px solid var(--rule)", fontSize: 11, textAlign: "right", fontWeight: 700,
-                      color: r.deltaVsModel == null ? "var(--ink-3)" : r.deltaVsModel >= 0 ? "var(--teal)" : "var(--red)" } },
+                      color: r.deltaVsModel == null ? "var(--ink-3)" : r.deltaVsModel >= 0 ? "var(--green)" : "var(--red)" } },
                     r.deltaVsModel == null ? "—" : (r.deltaVsModel >= 0 ? "+" : "") + (r.deltaVsModel * 100).toFixed(0) + "%"),
                   h("td", { style: { padding: "6px 10px", borderBottom: "1px solid var(--rule)", textAlign: "right" } },
                     h(ConfirmXButton, { label: "Remove", armedLabel: "Click again", title: "Remove this reported period", onConfirm: () => removeEntry(i) }))
@@ -2574,7 +2574,7 @@ function LiteratureList({ result, emptyText }) {
         const meta = LIT_EVIDENCE_META[r.evidence] || LIT_EVIDENCE_META.unclassified;
         return h("div", { key: r.id || i, style: { padding: "8px 0 8px 10px", borderLeft: "3px solid " + meta.color, borderBottom: "1px solid var(--rule)" } },
           h("div", { style: { display: "flex", gap: 8, alignItems: "baseline", flexWrap: "wrap", marginBottom: 2 } },
-            h("span", { style: { fontSize: 10, fontFamily: "var(--mono)", color: meta.color, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em" } }, r.kindLabel),
+            h("span", { style: { fontSize: 10, fontFamily: "var(--mono)", color: meta.color, fontWeight: 700, } }, r.kindLabel),
             r.freeFullText && h("span", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--teal)" } }, "free full text"),
             r.citedBy != null && h("span", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)" } }, r.citedBy.toLocaleString() + " citations")),
           h("div", { style: { fontSize: 12, fontFamily: "var(--sans)", color: "var(--ink-1)", lineHeight: 1.5 } }, r.title),
@@ -2768,7 +2768,7 @@ function TrialResultsPanels({ results, study }) {
   return h("div", null,
     h("div", { style: { display: "flex", alignItems: "center", gap: 10, margin: "26px 0 14px" } },
       h("div", { style: { height: 1, background: "var(--rule)", flex: 1 } }),
-      h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--teal)", textTransform: "uppercase", letterSpacing: "0.09em" } }, "What it actually reported"),
+      h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--teal)", } }, "What it actually reported"),
       h("div", { style: { height: 1, background: "var(--rule)", flex: 1 } })),
 
     toolCard(h, [
@@ -2789,7 +2789,7 @@ function TrialResultsPanels({ results, study }) {
 
     results.secondaryOutcomes.length > 0 && toolCard(h, [
       h("button", { onClick: () => setOpenSecondary(v => !v), "aria-expanded": openSecondary,
-        style: { background: "none", border: "none", padding: "6px 0", minHeight: 24, cursor: "pointer", fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.07em" } },
+        style: { background: "none", border: "none", padding: "6px 0", minHeight: 24, cursor: "pointer", fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", } },
         (openSecondary ? "▾" : "▸") + " Secondary endpoints (" + results.secondaryOutcomes.length + ")"),
       openSecondary
         ? h("div", null, results.secondaryOutcomes.slice(0, 10).map((o, i) => outcomeBlock(o, i)),
@@ -2945,7 +2945,7 @@ function TrialDecoderTool({ initialNctId, onConsumedInitialNctId }) {
 
   const sevColor = (s) => s === "high" ? "var(--red)" : s === "medium" ? "var(--amber)" : "var(--ink-2)";
   const factRow = (label, value, note) => h("div", { style: { display: "flex", gap: 10, padding: "7px 0", borderBottom: "1px solid var(--rule)", alignItems: "baseline", flexWrap: "wrap" } },
-    h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.05em", minWidth: 150 } }, label),
+    h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", minWidth: 150 } }, label),
     h("div", { style: { fontSize: 12, fontFamily: "var(--mono)", color: "var(--ink-1)", flex: "1 1 200px" } }, value),
     note && h("div", { className: "prose", style: { fontSize: 10, fontFamily: "var(--sans)", color: "var(--ink-3)", flex: "1 1 100%", lineHeight: 1.5 } }, note)
   );
@@ -3206,7 +3206,7 @@ function TrialWatchTool({ initialNctId, onConsumedInitialNctId }) {
         // ratio should actually be read against.
         h("div", { style: { marginTop: 12, paddingTop: 10, borderTop: "1px dashed var(--rule)" } },
           h("div", { style: { display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 6 } },
-            h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.06em" } }, "Posted effect sizes"),
+            h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", } }, "Posted effect sizes"),
             h("button", { onClick: loadEffects, disabled: effectsLoading,
               style: { padding: "4px 12px", borderRadius: 6, border: "1px solid var(--rule)", background: "transparent", color: "var(--ink-2)", fontFamily: "var(--mono)", fontSize: 10, cursor: effectsLoading ? "default" : "pointer" } },
               effectsLoading ? "Reading results\u2026" : (effects ? "Refresh" : "Load what these trials actually reported"))),
@@ -3282,7 +3282,7 @@ function TrialWatchTool({ initialNctId, onConsumedInitialNctId }) {
         ),
 
         ctSummary.studies.length > 0 && h("div", { style: { marginTop: 12, paddingTop: 10, borderTop: "1px dashed var(--rule)" } },
-          h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 } },
+          h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginBottom: 8 } },
             "Matched trials (" + ctSummary.studies.length + ")"),
           h("div", { style: { display: "flex", flexDirection: "column", gap: 6, maxHeight: 400, overflowY: "auto" } },
             ctSummary.studies.map((s, i) => h("div", { key: s.nctId || i, style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-2)", padding: "6px 0", borderBottom: "1px solid var(--rule)" } },

@@ -92,8 +92,8 @@ function ReportView({ theCase, onBack, updateCase }) {
   const baseResult = scenarioResults && scenarioResults.find(s => s.key === "base").result;
 
   const rpt = reportDark
-    ? { bg: "#181B20", ink1: "#E5E2DA", ink2: "#A19C8E", ink3: "#979388", rule: "#2C3038", teal: "#6FAF9A", onTeal: "#101414", amber: "#C9A66B", red: "#C17A6B", surface2: "#20242B" }
-    : { bg: "#FFFFFF", ink1: "#26241F", ink2: "#5C574A", ink3: "#6B6557", rule: "#DDD7C9", teal: "#387762", onTeal: "#FFFFFF", amber: "#8C6630", red: "#A14B3F", surface2: "#F5F3EC" };
+    ? { bg: "#15181D", ink1: "#E6EAF0", ink2: "#A7B0BD", ink3: "#939DAB", rule: "#2A313B", teal: "#8D9BFF", onTeal: "#0B0D10", amber: "#E0B25C", red: "#F2766E", surface2: "#1D2229" }
+    : { bg: "#FFFFFF", ink1: "#15181D", ink2: "#4D5663", ink3: "#5E6776", rule: "#DADEE4", teal: "#4353E0", onTeal: "#FFFFFF", amber: "#8A5B00", red: "#B8322B", surface2: "#F1F3F5" };
   usePrintBackground(rpt.bg);
   const revenueSeries = (baseResult && baseResult.calendar) ? [{ name: "Company revenue", color: rpt.teal, points: baseResult.calendar.map(c => ({ v: c.revenue, label: c.calendarYear })) }] : [];
   const fcfSeries = (baseResult && baseResult.calendar) ? [{ name: "Risk-adjusted FCF", color: rpt.amber, points: baseResult.calendar.map(c => ({ v: c.riskAdjFCF, label: c.calendarYear })) }] : [];
@@ -122,7 +122,7 @@ function ReportView({ theCase, onBack, updateCase }) {
 
   const cardStyle = { border: "1px solid " + rpt.rule, borderRadius: 8, padding: "16px 18px", marginBottom: 16, breakInside: "avoid" };
 
-  return h("div", { style: { minHeight: "100vh", background: rpt.bg, color: rpt.ink1, fontFamily: "'IBM Plex Sans', sans-serif", padding: "0" } },
+  return h("div", { style: { minHeight: "100vh", background: rpt.bg, color: rpt.ink1, fontFamily: "'Geist', sans-serif", padding: "0" } },
     // Toolbar — hidden in the actual PDF via no-print class
     h("div", { className: "no-print", style: { position: "sticky", top: 0, background: rpt.surface2, borderBottom: "1px solid " + rpt.rule, padding: "10px 20px", display: "flex", gap: 10, alignItems: "center", zIndex: 10 } },
       h("button", { onClick: onBack, style: { padding: "6px 14px", borderRadius: 6, border: "1px solid " + rpt.rule, background: "transparent", color: rpt.ink2, fontFamily: "monospace", fontSize: 12, cursor: "pointer" } }, "← Back to Workspace"),
@@ -147,7 +147,7 @@ function ReportView({ theCase, onBack, updateCase }) {
     updateCase && pickerOpen && h("div", { className: "no-print", style: { position: "sticky", top: 47, zIndex: 9, background: rpt.surface2, borderBottom: "1px solid " + rpt.rule, padding: "14px 20px" } },
       h("div", { style: { maxWidth: 800, margin: "0 auto" } },
         h("div", { style: { display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 12 } },
-          h("span", { style: { fontSize: 11, fontFamily: "monospace", color: rpt.ink3, textTransform: "uppercase", letterSpacing: "0.05em" } }, "Include in report"),
+          h("span", { style: { fontSize: 11, fontFamily: "monospace", color: rpt.ink3, } }, "Include in report"),
           h("div", { style: { flex: 1 } }),
           [["Everything", () => setAll(true)],
            ["Summary only", () => setPreset(["summary", "priceVsValue"])],
@@ -160,7 +160,7 @@ function ReportView({ theCase, onBack, updateCase }) {
           const items = REPORT_SECTIONS.filter(s => s.group === group);
           if (!items.length) return null;
           return h("div", { key: group, style: { marginBottom: 10 } },
-            h("div", { style: { fontSize: 10, fontFamily: "monospace", color: rpt.ink3, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 5 } }, group),
+            h("div", { style: { fontSize: 10, fontFamily: "monospace", color: rpt.ink3, marginBottom: 5 } }, group),
             h("div", { style: { display: "flex", gap: 14, flexWrap: "wrap" } },
               items.map(s => h("label", { key: s.id,
                 style: { display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontFamily: "monospace", color: inc(s.id) ? rpt.ink1 : rpt.ink3, cursor: "pointer" } },
@@ -182,7 +182,7 @@ function ReportView({ theCase, onBack, updateCase }) {
           const arrow = (label, tip, disabled, onClick) => h("button", { type: "button", title: tip, "aria-label": tip, disabled, onClick,
             style: { padding: "1px 6px", minWidth: 26, minHeight: 26, borderRadius: 4, border: "1px solid " + rpt.rule, background: "transparent", color: disabled ? rpt.rule : rpt.ink2, fontFamily: "monospace", fontSize: 10, cursor: disabled ? "default" : "pointer" } }, label);
           return h("div", { id: "report-added-picker", style: { marginTop: 12, paddingTop: 10, borderTop: "1px solid " + rpt.rule } },
-            h("div", { style: { fontSize: 10, fontFamily: "monospace", color: rpt.ink3, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6 } },
+            h("div", { style: { fontSize: 10, fontFamily: "monospace", color: rpt.ink3, marginBottom: 6 } },
               "Added sections (" + pins.filter(p => p.included !== false).length + " of " + pins.length + " included · up to " + PINNED_MAX_PER_CASE_V2 + ")"),
             !pins.length && h("div", { style: { fontSize: 11, fontFamily: "monospace", color: rpt.ink3, lineHeight: 1.6 } },
               "None yet. Every section in Tools, Simulation, the Reference Sheet, Portfolio and the Workspace has a “+ Report” button — each one you click lands here, and you choose and order them."),
@@ -213,10 +213,10 @@ function ReportView({ theCase, onBack, updateCase }) {
       error ? h("div", { style: { color: rpt.red } }, "Could not compute valuation: " + error) : h("div", null,
         // Executive summary
         inc("summary") && h("div", { style: cardStyle },
-          h("div", { style: { fontSize: 13, fontWeight: 700, marginBottom: 10, textTransform: "uppercase", letterSpacing: "0.05em", color: rpt.ink2 } }, "Valuation Summary"),
+          h("div", { style: { fontSize: 13, fontWeight: 700, marginBottom: 10, color: rpt.ink2 } }, "Valuation Summary"),
           h("div", { style: { display: "flex", gap: 24, flexWrap: "wrap" } },
             scenarioResults.map(s => h("div", { key: s.key, style: { flex: "1 1 150px" } },
-              h("div", { style: { fontSize: 10, fontFamily: "monospace", color: rpt.ink3, textTransform: "uppercase" } }, s.preset.label),
+              h("div", { style: { fontSize: 10, fontFamily: "monospace", color: rpt.ink3, } }, s.preset.label),
               h("div", { style: { fontSize: 24, fontFamily: "monospace", fontWeight: 700, color: s.key === "base" ? rpt.teal : rpt.ink2 } },
                 fmtShare(s.result.equity.perShare)),
               h("div", { style: { fontSize: 10, fontFamily: "monospace", color: rpt.ink3 } }, (valMethod === "multiple" ? "NPV (Simple Multiple) " : "rNPV ") + fmtMoney(s.result.npvResult.npv))
@@ -226,9 +226,9 @@ function ReportView({ theCase, onBack, updateCase }) {
 
         // Key assumptions
         inc("programs") && h("div", { style: cardStyle },
-          h("div", { style: { fontSize: 13, fontWeight: 700, marginBottom: 10, textTransform: "uppercase", letterSpacing: "0.05em", color: rpt.ink2 } }, "Programs & Key Assumptions"),
+          h("div", { style: { fontSize: 13, fontWeight: 700, marginBottom: 10, color: rpt.ink2 } }, "Programs & Key Assumptions"),
           h("table", { style: { width: "100%", borderCollapse: "collapse", fontSize: 12 } },
-            h("thead", null, h("tr", null, ["Program","Phase","Area","Mode","Peak Rev.","Launch Yr"].map(hd => h("th", { key: hd, style: { textAlign: "left", padding: "5px 8px", borderBottom: "1px solid " + rpt.rule, color: rpt.ink3, fontSize: 10, textTransform: "uppercase" } }, hd)))),
+            h("thead", null, h("tr", null, ["Program","Phase","Area","Mode","Peak Rev.","Launch Yr"].map(hd => h("th", { key: hd, style: { textAlign: "left", padding: "5px 8px", borderBottom: "1px solid " + rpt.rule, color: rpt.ink3, fontSize: 10, } }, hd)))),
             h("tbody", null, theCase.programs.map((p, i) => {
               const pv = baseResult ? baseResult.programVals.find(pv => pv.id === p.id) : null;
               return h("tr", { key: i, style: { borderBottom: "1px solid " + rpt.rule } },
@@ -247,16 +247,16 @@ function ReportView({ theCase, onBack, updateCase }) {
 
         // Revenue chart (DCF-only — Simple Multiple doesn't compute year-by-year cash flows)
         inc("revenueChart") && (valMethod === "dcf" ? h("div", { style: cardStyle },
-          h("div", { style: { fontSize: 13, fontWeight: 700, marginBottom: 10, textTransform: "uppercase", letterSpacing: "0.05em", color: rpt.ink2 } }, "Company Revenue Projection (Base Case)"),
+          h("div", { style: { fontSize: 13, fontWeight: 700, marginBottom: 10, color: rpt.ink2 } }, "Company Revenue Projection (Base Case)"),
           h(RevenueChart, { series: revenueSeries, height: 200, label: "Company revenue projection, base case, by year" })
         ) : h("div", { style: cardStyle },
-          h("div", { style: { fontSize: 13, fontWeight: 700, marginBottom: 10, textTransform: "uppercase", letterSpacing: "0.05em", color: rpt.ink2 } }, "Company Revenue Projection"),
+          h("div", { style: { fontSize: 13, fontWeight: 700, marginBottom: 10, color: rpt.ink2 } }, "Company Revenue Projection"),
           h("div", { style: { fontSize: 11, color: rpt.ink3 } }, "Not shown — this case uses Simple Multiple valuation, which doesn't build a year-by-year revenue projection. Switch to DCF mode to see this chart.")
         )),
 
         // Cash flow chart (DCF-only, same reason)
         inc("cashFlow") && valMethod === "dcf" ? h("div", { style: cardStyle },
-          h("div", { style: { fontSize: 13, fontWeight: 700, marginBottom: 10, textTransform: "uppercase", letterSpacing: "0.05em", color: rpt.ink2 } }, "Risk-Adjusted Cash Flow (Base Case)"),
+          h("div", { style: { fontSize: 13, fontWeight: 700, marginBottom: 10, color: rpt.ink2 } }, "Risk-Adjusted Cash Flow (Base Case)"),
           h(RevenueChart, { series: fcfSeries, height: 180, label: "Risk-adjusted free cash flow, base case, by year" })
         ) : null,
 
@@ -273,7 +273,7 @@ function ReportView({ theCase, onBack, updateCase }) {
           } catch (e) { return null; }
           if (!sotp) return null;
           return h("div", { style: cardStyle },
-            h("div", { style: { fontSize: 13, fontWeight: 700, marginBottom: 10, textTransform: "uppercase", letterSpacing: "0.05em", color: rpt.ink2 } }, "Sum-of-the-Parts (Base Case)"),
+            h("div", { style: { fontSize: 13, fontWeight: 700, marginBottom: 10, color: rpt.ink2 } }, "Sum-of-the-Parts (Base Case)"),
             h("table", { style: { width: "100%", borderCollapse: "collapse", fontSize: 12 } },
               h("tbody", null,
                 sotp.programBreakdown.map((p, i) => h("tr", { key: i, style: { borderBottom: "1px solid " + rpt.rule } },
@@ -304,7 +304,7 @@ function ReportView({ theCase, onBack, updateCase }) {
             ["= Per Share", fmtShare(baseR.equity.perShare)]
           ]);
           return h("div", { style: cardStyle },
-            h("div", { style: { fontSize: 13, fontWeight: 700, marginBottom: 10, textTransform: "uppercase", letterSpacing: "0.05em", color: rpt.ink2 } }, "Enterprise Value → Per-Share Bridge (Base Case)"),
+            h("div", { style: { fontSize: 13, fontWeight: 700, marginBottom: 10, color: rpt.ink2 } }, "Enterprise Value → Per-Share Bridge (Base Case)"),
             h("table", { style: { width: "100%", borderCollapse: "collapse", fontSize: 12 } },
               h("tbody", null, rows.map((r, i) => h("tr", { key: i, style: { borderBottom: i < rows.length - 1 ? "1px solid " + rpt.rule : "none" } },
                 h("td", { style: { padding: "5px 8px", fontWeight: r[0].startsWith("=") ? 700 : 400 } }, r[0]),
@@ -316,7 +316,7 @@ function ReportView({ theCase, onBack, updateCase }) {
 
         // Current price vs. fair value (only if a current price is set)
         inc("priceVsValue") && theCase.currentPrice !== "" && theCase.currentPrice != null && h("div", { style: cardStyle },
-          h("div", { style: { fontSize: 13, fontWeight: 700, marginBottom: 10, textTransform: "uppercase", letterSpacing: "0.05em", color: rpt.ink2 } }, "Current Price vs. Fair Value"),
+          h("div", { style: { fontSize: 13, fontWeight: 700, marginBottom: 10, color: rpt.ink2 } }, "Current Price vs. Fair Value"),
           h("div", { style: { display: "flex", gap: 24, flexWrap: "wrap" } },
             h("div", null, h("div", { style: { fontSize: 10, color: rpt.ink3 } }, "Current price"), h("div", { style: { fontSize: 16, fontWeight: 700 } }, fmtShare(Number(theCase.currentPrice)))),
             scenarioResults.map(s => {
@@ -344,7 +344,7 @@ function ReportView({ theCase, onBack, updateCase }) {
           if (sens.error || !sens.rows.length) return null;
           const maxSwing = Math.max(...sens.rows.map(r => r.swing), 1);
           return h("div", { style: cardStyle },
-            h("div", { style: { fontSize: 13, fontWeight: 700, marginBottom: 10, textTransform: "uppercase", letterSpacing: "0.05em", color: rpt.ink2 } }, "Sensitivity — Base fair value " + (sens.baseline != null ? fmtShare(sens.baseline) : "—")),
+            h("div", { style: { fontSize: 13, fontWeight: 700, marginBottom: 10, color: rpt.ink2 } }, "Sensitivity — Base fair value " + (sens.baseline != null ? fmtShare(sens.baseline) : "—")),
             h("div", { style: { display: "flex", flexDirection: "column", gap: 10 } },
               sens.rows.map((r, i) => h("div", { key: i },
                 h("div", { style: { display: "flex", justifyContent: "space-between", fontSize: 11, marginBottom: 3 } },
@@ -371,7 +371,7 @@ function ReportView({ theCase, onBack, updateCase }) {
           if (!sel) return null;
           const chartDrugs = sel.rows, maxB = sel.maxB;
           return h("div", { style: cardStyle },
-            h("div", { style: { fontSize: 13, fontWeight: 700, marginBottom: 10, textTransform: "uppercase", letterSpacing: "0.05em", color: rpt.ink2 } }, "Peak Sales — Where This Case Sits Among Real Comps"),
+            h("div", { style: { fontSize: 13, fontWeight: 700, marginBottom: 10, color: rpt.ink2 } }, "Peak Sales — Where This Case Sits Among Real Comps"),
             h("div", { style: { display: "flex", flexDirection: "column", gap: 3 } },
               chartDrugs.map((d, i) => h("div", { key: i, style: { display: "flex", alignItems: "center", gap: 8 } },
                 h("div", { style: { width: 100, fontSize: 10, color: d._own ? rpt.amber : rpt.ink3, fontWeight: d._own ? 700 : 400, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flexShrink: 0 } }, d.drug),
@@ -393,7 +393,7 @@ function ReportView({ theCase, onBack, updateCase }) {
           const imgs = pins.filter(p => p.kind !== "html");
           const mism = imgs.filter(p => p.theme && p.theme !== (reportDark ? "dark" : "light"));
           return h("div", { id: "report-added", style: { marginBottom: 16 } },
-            h("div", { style: { fontSize: 13, fontWeight: 700, marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.05em", color: rpt.ink2, breakAfter: "avoid", pageBreakAfter: "avoid" } }, "Added Sections"),
+            h("div", { style: { fontSize: 13, fontWeight: 700, marginBottom: 4, color: rpt.ink2, breakAfter: "avoid", pageBreakAfter: "avoid" } }, "Added Sections"),
             h("div", { style: { fontSize: 11, color: rpt.ink3, marginBottom: 12, breakAfter: "avoid", pageBreakAfter: "avoid" } },
               pins.length + " section" + (pins.length === 1 ? "" : "s") + " added from across the app.",
               updateCase && h("span", { className: "no-print" }, " Choose which appear, and their order, under Sections ▼.")),
@@ -423,7 +423,7 @@ function ReportView({ theCase, onBack, updateCase }) {
           try { fr = computeForwardRunway(theCase); } catch (e) { return null; }
           if (!fr) return null;
           return h("div", { style: cardStyle },
-            h("div", { style: { fontSize: 13, fontWeight: 700, marginBottom: 10, textTransform: "uppercase", letterSpacing: "0.05em", color: rpt.ink2 } }, "Forward-Looking Cash Runway"),
+            h("div", { style: { fontSize: 13, fontWeight: 700, marginBottom: 10, color: rpt.ink2 } }, "Forward-Looking Cash Runway"),
             h("div", { style: { fontSize: 11, marginBottom: 10, color: rpt.ink2 } },
               "Starting cash " + fmtMoney(fr.startingCash) + " — modeled runway " + (fr.runwayMonths != null ? fr.runwayMonths.toFixed(0) + " months" : "25yr+")),
             h(RevenueChart, { series: [{ name: "Projected cash balance", color: rpt.teal, points: fr.path.map(p => ({ v: p.balanceEnd, label: p.year })) }], height: 160, label: "Projected cash balance by year" })
@@ -487,8 +487,8 @@ function BundleView({ onBack }) {
   const [busy, setBusy] = React.useState(null);
   const [msg, setMsg] = React.useState(null);
   const rpt = dark
-    ? { bg: "#181B20", ink1: "#E5E2DA", ink2: "#A19C8E", ink3: "#979388", rule: "#2C3038", teal: "#6FAF9A", onTeal: "#101414", surface2: "#20242B" }
-    : { bg: "#FFFFFF", ink1: "#26241F", ink2: "#5C574A", ink3: "#6B6557", rule: "#DDD7C9", teal: "#387762", onTeal: "#FFFFFF", surface2: "#F5F3EC" };
+    ? { bg: "#15181D", ink1: "#E6EAF0", ink2: "#A7B0BD", ink3: "#939DAB", rule: "#2A313B", teal: "#8D9BFF", onTeal: "#0B0D10", surface2: "#1D2229" }
+    : { bg: "#FFFFFF", ink1: "#15181D", ink2: "#4D5663", ink3: "#5E6776", rule: "#DADEE4", teal: "#4353E0", onTeal: "#FFFFFF", surface2: "#F1F3F5" };
   usePrintBackground(rpt.bg);
   const included = items.filter(it => it.included !== false);
   const save = (next) => { if (!saveBundle(next)) setMsg({ tone: "err", text: "Couldn't save the bundle — storage is full." }); };
@@ -517,7 +517,7 @@ function BundleView({ onBack }) {
   const primary = { padding: "6px 14px", borderRadius: 6, border: "1px solid " + rpt.teal, background: rpt.teal, color: rpt.onTeal, fontFamily: "monospace", fontSize: 12, fontWeight: 700, cursor: "pointer" };
   const none = !included.length;
 
-  return h("div", { style: { minHeight: "100vh", background: rpt.bg, color: rpt.ink1, fontFamily: "'IBM Plex Sans', sans-serif" } },
+  return h("div", { style: { minHeight: "100vh", background: rpt.bg, color: rpt.ink1, fontFamily: "'Geist', sans-serif" } },
     h("div", { className: "no-print", style: { position: "sticky", top: 0, zIndex: 10, background: rpt.surface2, borderBottom: "1px solid " + rpt.rule, padding: "10px 20px", display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" } },
       tbtn("← Back", onBack),
       tbtn(dark ? "☀ Light" : "☾ Dark", () => setDark(!dark)),
@@ -532,7 +532,7 @@ function BundleView({ onBack }) {
     h("div", { className: "no-print", style: { background: rpt.surface2, borderBottom: "1px solid " + rpt.rule, padding: "14px 20px" } },
       h("div", { style: { maxWidth: 800, margin: "0 auto" } },
         h("div", { style: { display: "flex", alignItems: "baseline", gap: 10, marginBottom: 8 } },
-          h("span", { style: { fontSize: 11, fontFamily: "monospace", color: rpt.ink3, textTransform: "uppercase", letterSpacing: "0.05em" } },
+          h("span", { style: { fontSize: 11, fontFamily: "monospace", color: rpt.ink3, } },
             "In the bundle (" + included.length + " of " + items.length + " included · up to " + BUNDLE_MAX_ITEMS + ")"),
           h("div", { style: { flex: 1 } }),
           items.length > 0 && h(ConfirmXButton, { onConfirm: () => save([]), title: "Empty the bundle", label: "Clear all", style: { padding: "2px 10px", fontSize: 10 } })),

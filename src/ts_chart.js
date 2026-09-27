@@ -241,7 +241,7 @@ function renderLineChart(series, opts = {}) {
 // Tornado chart — horizontal bars from a zero baseline, one per driver,
 // ranking each driver's influence on one output (e.g. Peak Sales' per-
 // assumption correlation with the final peak-sales distribution). Bar color
-// signals direction (teal = pushes the output up, red = pushes it down)
+// signals direction (green = pushes the output up, red = pushes it down)
 // since sign is exactly the information a tornado chart exists to surface
 // at a glance — magnitude alone would lose which drivers you'd actually want
 // to tighten vs. which ones you'd want to stress in the other direction.
@@ -250,7 +250,7 @@ function renderLineChart(series, opts = {}) {
 function renderTornadoChart(rows, opts = {}) {
   const {
     width = 640, title = '', xLabel = '', labelWidth = 150,
-    positiveColor = 'var(--teal)', negativeColor = 'var(--red)'
+    positiveColor = 'var(--green)', negativeColor = 'var(--red)'
   } = opts;
 
   const rowHeight = 32;

@@ -139,25 +139,25 @@ function ValuationPanel({ theCase, onChange }) {
       const upsidePct = (price > 0 && baseShare != null) ? (baseShare / price - 1) * 100 : null;
       const showImplied = impliedSolved && impliedSolved.ok && !impliedSolved.degenerate;
       return h("div", { style: { marginBottom: 16, padding: "14px 16px", borderRadius: 10, background: "var(--surface-2)", border: "1.5px solid var(--rule)" } },
-        h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase", marginBottom: 10 } }, "Price vs. model"),
+        h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-3)", marginBottom: 10 } }, "Price vs. model"),
         h("div", { style: { display: "flex", gap: 20, flexWrap: "wrap", alignItems: "baseline" } },
           h("div", null,
-            h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase" } }, "Current price"),
+            h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", } }, "Current price"),
             h("div", { style: { fontSize: 22, fontFamily: "var(--mono)", fontWeight: 800, color: "var(--ink-1)" } }, price != null ? fmtShare(price) : "—")),
           scenarioResults.map(s => h("div", { key: s.key },
-            h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: s.preset.color, textTransform: "uppercase" } }, s.preset.label + " fair value"),
+            h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: s.preset.color, } }, s.preset.label + " fair value"),
             h("div", { style: { fontSize: 22, fontFamily: "var(--mono)", fontWeight: 800, color: s.preset.color } },
               fmtShare(s.result.equity.perShare)))),
           upsidePct != null && h("div", null,
-            h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase" } }, "Base upside/downside"),
-            h("div", { style: { fontSize: 22, fontFamily: "var(--mono)", fontWeight: 800, color: upsidePct >= 0 ? "var(--teal)" : "var(--red)" } },
+            h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", } }, "Base upside/downside"),
+            h("div", { style: { fontSize: 22, fontFamily: "var(--mono)", fontWeight: 800, color: upsidePct >= 0 ? "var(--green)" : "var(--red)" } },
               (upsidePct >= 0 ? "+" : "") + upsidePct.toFixed(0) + "%")),
           showImplied && theCase.programs.length === 1 && impliedSolved.baseAbsolutePct != null && h("div", null,
-            h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase" } }, "Your PoS"),
+            h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", } }, "Your PoS"),
             h("div", { style: { fontSize: 22, fontFamily: "var(--mono)", fontWeight: 800, color: "var(--ink-1)" } }, impliedSolved.baseAbsolutePct.toFixed(0) + "%")),
           showImplied && theCase.programs.length === 1 && impliedSolved.impliedAbsolutePct != null && h("div", null,
-            h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase" } }, "Price implies"),
-            h("div", { style: { fontSize: 22, fontFamily: "var(--mono)", fontWeight: 800, color: impliedSolved.impliedAbsolutePct >= impliedSolved.baseAbsolutePct ? "var(--teal)" : "var(--red)" } },
+            h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", } }, "Price implies"),
+            h("div", { style: { fontSize: 22, fontFamily: "var(--mono)", fontWeight: 800, color: impliedSolved.impliedAbsolutePct >= impliedSolved.baseAbsolutePct ? "var(--green)" : "var(--red)" } },
               impliedSolved.impliedAbsolutePct.toFixed(0) + "%"))
         ),
         valMethod === "multiple" && h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginTop: 8 } }, "Implied PoS is DCF-only — switch off Simple Multiple to see what the price requires."),
@@ -204,7 +204,7 @@ function ValuationPanel({ theCase, onChange }) {
         h("div", { style: { fontFamily: "var(--mono)", fontSize: 12, fontWeight: 700, color: active === id ? "var(--teal)" : "var(--ink-1)" } }, label),
         h("div", { style: { fontFamily: "var(--mono)", fontSize: 10, color: "var(--ink-3)", marginTop: 3, lineHeight: 1.45 } }, sub));
       return h("div", { style: { marginBottom: 14 } },
-        h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 } }, "Valuation depth"),
+        h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginBottom: 6 } }, "Valuation depth"),
         h("div", { style: { display: "flex", gap: 8, flexWrap: "wrap" } },
           btn("napkin", "Napkin", "Type a peak revenue, value it off a comp multiple. Fastest sanity check."),
           btn("full", "Full model", "Build peak from epidemiology, then a bottoms-up DCF with costs and timing."),
@@ -343,7 +343,7 @@ function ValuationPanel({ theCase, onChange }) {
 
       // EDGAR auto-fill — desktop app only, no proxy/CORS workaround needed here
       isDesktop && h("div", { style: { padding: "10px 12px", borderRadius: 8, background: "var(--surface-2)", marginBottom: 14 } },
-        h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginBottom: 6, textTransform: "uppercase" } }, "Pull financials from SEC EDGAR"),
+        h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginBottom: 6, } }, "Pull financials from SEC EDGAR"),
         h("div", { style: { display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" } },
           h("input", { type: "text", "aria-label": "Company name or ticker to pull from EDGAR", value: edgarQuery, placeholder: "Company name or ticker", onChange: e => setEdgarQuery(e.target.value),
             style: { flex: "1 1 200px", padding: "6px 10px", borderRadius: 6, border: "1.5px solid var(--rule)", background: "var(--surface)", color: "var(--ink-1)", fontFamily: "var(--mono)", fontSize: 12 } }),
@@ -531,7 +531,7 @@ function ValuationPanel({ theCase, onChange }) {
               flex: "1 1 200px", padding: "12px 14px", borderRadius: 8, background: "var(--surface-2)",
               border: "1.5px solid " + s.preset.color
             } },
-            h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", fontWeight: 700, color: s.preset.color, textTransform: "uppercase", marginBottom: 8 } }, s.preset.label),
+            h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", fontWeight: 700, color: s.preset.color, marginBottom: 8 } }, s.preset.label),
             // "70% PoS" reads as "70% probability of success," which it
             // never is — it's a MULTIPLIER on the modeled PoS (Oncology
             // Phase 2 might model 8.7%; Bear's "70%" means 6.1%, not 70%).
@@ -587,14 +587,14 @@ function ValuationPanel({ theCase, onChange }) {
               ? h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-2)" } }, solved.note)
               : h("div", { style: { display: "flex", gap: 24, flexWrap: "wrap" } },
                   theCase.programs.length === 1 && solved.baseAbsolutePct != null && h("div", null,
-                    h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase" } }, "Your PoS assumption"),
+                    h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", } }, "Your PoS assumption"),
                     h("div", { style: { fontSize: 20, fontFamily: "var(--mono)", fontWeight: 800, color: "var(--ink-1)" } }, solved.baseAbsolutePct.toFixed(1) + "%")),
                   theCase.programs.length === 1 && solved.impliedAbsolutePct != null && h("div", null,
-                    h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase" } }, "Market implies"),
-                    h("div", { style: { fontSize: 20, fontFamily: "var(--mono)", fontWeight: 800, color: solved.impliedAbsolutePct >= solved.baseAbsolutePct ? "var(--teal)" : "var(--red)" } }, solved.impliedAbsolutePct.toFixed(1) + "%")),
+                    h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", } }, "Market implies"),
+                    h("div", { style: { fontSize: 20, fontFamily: "var(--mono)", fontWeight: 800, color: solved.impliedAbsolutePct >= solved.baseAbsolutePct ? "var(--green)" : "var(--red)" } }, solved.impliedAbsolutePct.toFixed(1) + "%")),
                   h("div", null,
-                    h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase" } }, theCase.programs.length > 1 ? "As a multiple of your PoS" : "As a multiple"),
-                    h("div", { style: { fontSize: 20, fontFamily: "var(--mono)", fontWeight: 800, color: solved.multiplierPct >= 100 ? "var(--teal)" : "var(--red)" } }, solved.multiplierPct.toFixed(0) + "%"))
+                    h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", } }, theCase.programs.length > 1 ? "As a multiple of your PoS" : "As a multiple"),
+                    h("div", { style: { fontSize: 20, fontFamily: "var(--mono)", fontWeight: 800, color: solved.multiplierPct >= 100 ? "var(--green)" : "var(--red)" } }, solved.multiplierPct.toFixed(0) + "%"))
                 )
           );
         })(),
@@ -632,16 +632,16 @@ function ValuationPanel({ theCase, onChange }) {
               steps.map((s, i) => h(React.Fragment, { key: i },
                 i > 0 && h("span", { style: { fontSize: 16, fontFamily: "var(--mono)", color: "var(--ink-3)" } }, s.op),
                 h("div", { style: { padding: "8px 12px", borderRadius: 8, background: "var(--surface-2)", border: s.op === "=" ? "1.5px solid var(--teal)" : "1px solid var(--rule)", textAlign: "center" } },
-                  h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase" } }, s.label),
+                  h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", } }, s.label),
                   h("div", { style: { fontSize: 13, fontFamily: "var(--mono)", fontWeight: 700, color: s.op === "=" ? "var(--teal)" : "var(--ink-1)" } }, fmtMoney(s.value)))
               )),
               h("span", { style: { fontSize: 16, fontFamily: "var(--mono)", color: "var(--ink-3)" } }, "÷"),
               h("div", { style: { padding: "8px 12px", borderRadius: 8, background: "var(--surface-2)", border: "1px solid var(--rule)", textAlign: "center" } },
-                h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase" } }, "Diluted shares"),
+                h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", } }, "Diluted shares"),
                 h("div", { style: { fontSize: 13, fontFamily: "var(--mono)", fontWeight: 700, color: "var(--ink-1)" } }, fmtNum(baseR.equity.dilutedShares))),
               h("span", { style: { fontSize: 16, fontFamily: "var(--mono)", color: "var(--ink-3)" } }, "="),
               h("div", { style: { padding: "8px 14px", borderRadius: 8, background: "var(--teal-bg)", border: "1.5px solid var(--teal)", textAlign: "center" } },
-                h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase" } }, "Per share"),
+                h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", } }, "Per share"),
                 h("div", { style: { fontSize: 16, fontFamily: "var(--mono)", fontWeight: 800, color: "var(--teal)" } }, fmtShare(baseR.equity.perShare)))
             )
           );
@@ -669,7 +669,7 @@ function ValuationPanel({ theCase, onChange }) {
             h("div", { style: { fontSize: 13, fontFamily: "var(--display)", fontWeight: 600, color: "var(--ink-1)", marginBottom: 4 } }, "Sum-of-the-Parts (Base case)"),
             h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginBottom: 12 } }, "Which program actually drives total value — each run standalone, G&A shown separately. Bar width is proportional to size."),
             h("div", null,
-              sotp.programBreakdown.map(p => barRow(p.id, p.name, p.npv, p.npv >= 0 ? "var(--teal)" : "var(--red)")),
+              sotp.programBreakdown.map(p => barRow(p.id, p.name, p.npv, p.npv >= 0 ? "var(--green)" : "var(--red)")),
               barRow("__ga_drag__", "Corporate G&A (shared)", sotp.gaDrag, "var(--red)")
             ),
             h("div", { style: { display: "flex", justifyContent: "space-between", fontSize: 13, fontFamily: "var(--mono)", padding: "8px 10px", marginTop: 8, borderTop: "1px solid var(--rule)", fontWeight: 700 } },
@@ -740,7 +740,7 @@ function ValuationPanel({ theCase, onChange }) {
         theCase.currentPrice !== "" && theCase.currentPrice != null && h("div", { style: { marginTop: 16, padding: "12px 14px", borderRadius: 8, background: "var(--surface-2)", border: "1px solid var(--rule)" } },
           h("div", { style: { display: "flex", gap: 24, flexWrap: "wrap", alignItems: "center" } },
             h("div", null,
-              h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase" } }, "Current price"),
+              h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", } }, "Current price"),
               h("div", { style: { fontSize: 18, fontFamily: "var(--mono)", fontWeight: 700, color: "var(--ink-1)" } }, fmtShare(Number(theCase.currentPrice)))),
             scenarioResults.map(s => {
               const fv = s.result.equity.perShare;
@@ -749,8 +749,8 @@ function ValuationPanel({ theCase, onChange }) {
               const cp = Number(theCase.currentPrice);
               const upside = (fv != null && cp > 0) ? ((fv / cp) - 1) * 100 : null;
               return h("div", { key: s.key }, 
-                h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase" } }, s.preset.label + " upside/downside"),
-                h("div", { style: { fontSize: 18, fontFamily: "var(--mono)", fontWeight: 700, color: upside == null ? "var(--ink-3)" : upside >= 0 ? "var(--teal)" : "var(--red)" } },
+                h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", } }, s.preset.label + " upside/downside"),
+                h("div", { style: { fontSize: 18, fontFamily: "var(--mono)", fontWeight: 700, color: upside == null ? "var(--ink-3)" : upside >= 0 ? "var(--green)" : "var(--red)" } },
                   upside != null ? (upside >= 0 ? "+" : "") + upside.toFixed(0) + "%" : "—")
               );
             })

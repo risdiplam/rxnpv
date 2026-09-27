@@ -355,7 +355,7 @@ function ExportBar({ scope, title, heading, reportSection, source }) {
     ref, "data-no-export": "", className: (isChart ? "chart-export-bar" : "section-export-bar") + (msg || busy ? " is-active" : ""),
     style: { display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 6, flexWrap: "wrap", marginTop: isChart ? 6 : 12 }
   },
-    msg && h("span", { role: "status", style: { fontSize: 10, fontFamily: "var(--mono)", color: msg.tone === "ok" ? "var(--teal)" : "var(--red)", marginRight: 4 } },
+    msg && h("span", { role: "status", style: { fontSize: 10, fontFamily: "var(--mono)", color: msg.tone === "ok" ? "var(--green)" : "var(--red)", marginRight: 4 } },
       msg.text,
       msg.caseId && ctx && ctx.openReport && h("button", { type: "button", onClick: () => { const src = liveSource(); if (src && src.openReport) src.openReport(msg.caseId); },
         style: { marginLeft: 8, background: "none", border: "none", padding: 0, color: "var(--teal)", textDecoration: "underline", fontFamily: "var(--mono)", fontSize: 10, cursor: "pointer" } },
@@ -363,7 +363,7 @@ function ExportBar({ scope, title, heading, reportSection, source }) {
       msg.bundle && h("button", { type: "button", onClick: () => { const src = liveSource(); if (src && src.openBundle) src.openBundle(); },
         style: { marginLeft: 8, background: "none", border: "none", padding: 0, color: "var(--teal)", textDecoration: "underline", fontFamily: "var(--mono)", fontSize: 10, cursor: "pointer" } },
         "Open bundle →")),
-    h("span", { title: label, style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.05em", maxWidth: 360, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } },
+    h("span", { title: label, style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", maxWidth: 360, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } },
       (isChart ? "Export chart" : "Export section") + (shortLabel ? " · " : ""),
       shortLabel && h("span", { style: { textTransform: "none", letterSpacing: 0 } }, shortLabel)),
     btn("PNG", "png", () => doExport("png"), isChart
@@ -746,7 +746,7 @@ function CustomCompForm({ fields, onSave, onCancel, initialValues, saveLabel }) 
   return h("div", { style: { padding: "12px 14px", borderRadius: 8, background: "var(--surface-2)", marginTop: 8 } },
     h("div", { style: { display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, marginBottom: 10 } },
       fields.map(f => h("div", { key: f.key },
-        h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 3 } },
+        h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginBottom: 3 } },
           f.label + (f.key === requiredKey ? " *" : "")),
         h("input", {
           type: f.numeric ? "number" : "text", value: vals[f.key], placeholder: f.placeholder,
@@ -762,7 +762,7 @@ function CustomCompForm({ fields, onSave, onCancel, initialValues, saveLabel }) 
     h("div", { style: { display: "flex", gap: 8 } },
       h("button", {
         onClick: () => { if (!canSave) return; onSave(vals); },
-        style: { padding: "6px 16px", borderRadius: 6, border: "none", background: canSave ? "var(--teal-fill)" : "var(--rule)", color: "#101414", fontFamily: "var(--mono)", fontSize: 11, fontWeight: 700, cursor: canSave ? "pointer" : "default" }
+        style: { padding: "6px 16px", borderRadius: 6, border: "none", background: canSave ? "var(--teal-fill)" : "var(--rule)", color: "var(--on-teal)", fontFamily: "var(--mono)", fontSize: 11, fontWeight: 700, cursor: canSave ? "pointer" : "default" }
       }, saveLabel || "Add"),
       h("button", { onClick: onCancel, style: { padding: "6px 14px", borderRadius: 6, border: "1px solid var(--rule)", background: "transparent", color: "var(--ink-2)", fontFamily: "var(--mono)", fontSize: 11, cursor: "pointer" } }, "Cancel")
     )
@@ -790,7 +790,7 @@ function MilestoneEntryForm({ onSave, onCancel, initialValues, saveLabel }) {
   const [gate, setGate] = React.useState(iv.gate || "phase3");
   const [valueM, setValueM] = React.useState(iv.valueM != null ? String(iv.valueM) : "");
   const inputStyle = { width: "100%", padding: "5px 8px", borderRadius: 5, border: "1px solid var(--rule)", background: "var(--surface)", color: "var(--ink-1)", fontFamily: "var(--mono)", fontSize: 11 };
-  const fieldLabelStyle = { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 3 };
+  const fieldLabelStyle = { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginBottom: 3 };
   const canSave = label.trim().length > 0 && valueM !== "" && Number(valueM) > 0;
 
   return h("div", { style: { padding: "10px 12px", borderRadius: 7, background: "var(--surface)", marginTop: 6, border: "1px solid var(--rule)" } },
@@ -810,7 +810,7 @@ function MilestoneEntryForm({ onSave, onCancel, initialValues, saveLabel }) {
     h("div", { style: { display: "flex", gap: 8 } },
       h("button", {
         onClick: () => { if (!canSave) return; onSave({ label: label.trim(), gate, valueM: Number(valueM) }); },
-        style: { padding: "5px 14px", borderRadius: 6, border: "none", background: canSave ? "var(--teal-fill)" : "var(--rule)", color: "#101414", fontFamily: "var(--mono)", fontSize: 10, fontWeight: 700, cursor: "pointer" }
+        style: { padding: "5px 14px", borderRadius: 6, border: "none", background: canSave ? "var(--teal-fill)" : "var(--rule)", color: "var(--on-teal)", fontFamily: "var(--mono)", fontSize: 10, fontWeight: 700, cursor: "pointer" }
       }, saveLabel || "Add"),
       h("button", { onClick: onCancel, style: { padding: "5px 12px", borderRadius: 6, border: "1px solid var(--rule)", background: "transparent", color: "var(--ink-2)", fontFamily: "var(--mono)", fontSize: 10, cursor: "pointer" } }, "Cancel")
     )
@@ -827,7 +827,7 @@ function CalibrationEntryForm({ onSave, onCancel, initialValues, saveLabel }) {
   const [outcome, setOutcome] = React.useState(iv.outcome || "pending");
   const [notes, setNotes] = React.useState(iv.notes || "");
   const inputStyle = { width: "100%", padding: "5px 8px", borderRadius: 5, border: "1px solid var(--rule)", background: "var(--surface)", color: "var(--ink-1)", fontFamily: "var(--mono)", fontSize: 11 };
-  const fieldLabelStyle = { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 3 };
+  const fieldLabelStyle = { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginBottom: 3 };
   const canSave = catalystLabel.trim().length > 0;
 
   return h("div", { style: { padding: "12px 14px", borderRadius: 8, background: "var(--surface-2)", marginTop: 8 } },
@@ -853,7 +853,7 @@ function CalibrationEntryForm({ onSave, onCancel, initialValues, saveLabel }) {
     h("div", { style: { display: "flex", gap: 8 } },
       h("button", {
         onClick: () => { if (!canSave) return; onSave({ catalystLabel: catalystLabel.trim(), catalystDate: catalystDate.trim(), yourPoS: yourPoS === "" ? null : Number(yourPoS), marketImpliedPoS: marketImpliedPoS === "" ? null : Number(marketImpliedPoS), outcome, notes: notes.trim() }); },
-        style: { padding: "6px 16px", borderRadius: 6, border: "none", background: canSave ? "var(--teal-fill)" : "var(--rule)", color: "#101414", fontFamily: "var(--mono)", fontSize: 11, fontWeight: 700, cursor: "pointer" }
+        style: { padding: "6px 16px", borderRadius: 6, border: "none", background: canSave ? "var(--teal-fill)" : "var(--rule)", color: "var(--on-teal)", fontFamily: "var(--mono)", fontSize: 11, fontWeight: 700, cursor: "pointer" }
       }, saveLabel || "Add"),
       h("button", { onClick: onCancel, style: { padding: "6px 14px", borderRadius: 6, border: "1px solid var(--rule)", background: "transparent", color: "var(--ink-2)", fontFamily: "var(--mono)", fontSize: 11, cursor: "pointer" } }, "Cancel")
     )
@@ -881,7 +881,7 @@ function EvidenceEntryForm({ onSave, onCancel, initialValues, saveLabel }) {
   const [date, setDate] = React.useState(iv.date || "");
   const [thesis, setThesis] = React.useState(iv.thesis || "");
   const inputStyle = { width: "100%", padding: "5px 8px", borderRadius: 5, border: "1px solid var(--rule)", background: "var(--surface)", color: "var(--ink-1)", fontFamily: "var(--mono)", fontSize: 11 };
-  const fieldLabelStyle = { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 3 };
+  const fieldLabelStyle = { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginBottom: 3 };
   const canSave = label.trim().length > 0;
 
   return h("div", { style: { padding: "12px 14px", borderRadius: 8, background: "var(--surface-2)", marginTop: 8 } },
@@ -910,7 +910,7 @@ function EvidenceEntryForm({ onSave, onCancel, initialValues, saveLabel }) {
     h("div", { style: { display: "flex", gap: 8 } },
       h("button", {
         onClick: () => { if (!canSave) return; onSave({ label: label.trim(), classification, confidence, source: source.trim(), date: date.trim(), thesis: thesis.trim() }); },
-        style: { padding: "6px 16px", borderRadius: 6, border: "none", background: canSave ? "var(--teal-fill)" : "var(--rule)", color: "#101414", fontFamily: "var(--mono)", fontSize: 11, fontWeight: 700, cursor: "pointer" }
+        style: { padding: "6px 16px", borderRadius: 6, border: "none", background: canSave ? "var(--teal-fill)" : "var(--rule)", color: "var(--on-teal)", fontFamily: "var(--mono)", fontSize: 11, fontWeight: 700, cursor: "pointer" }
       }, saveLabel || "Add"),
       h("button", { onClick: onCancel, style: { padding: "6px 14px", borderRadius: 6, border: "1px solid var(--rule)", background: "transparent", color: "var(--ink-2)", fontFamily: "var(--mono)", fontSize: 11, cursor: "pointer" } }, "Cancel")
     )
@@ -988,14 +988,14 @@ function MonteCarloBox({ theCase, discountRatePct, tv }) {
     h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-2)", marginBottom: 10, lineHeight: 1.6 } },
       "3,000 trials, sampling PoS, peak share, and discount rate continuously between your Bear and Bull bounds (Base as the most likely value) instead of only the three fixed points — a full fair-value distribution, not just three scenarios."),
     h("button", { onClick: run, disabled: running,
-      style: { padding: "6px 16px", borderRadius: 6, border: "none", background: running ? "var(--rule)" : "var(--teal-fill)", color: "#101414", fontFamily: "var(--mono)", fontSize: 11, fontWeight: 700, cursor: running ? "default" : "pointer" }
+      style: { padding: "6px 16px", borderRadius: 6, border: "none", background: running ? "var(--rule)" : "var(--teal-fill)", color: "var(--on-teal)", fontFamily: "var(--mono)", fontSize: 11, fontWeight: 700, cursor: running ? "default" : "pointer" }
     }, running ? "Running…" : result ? "Re-run" : "Run 3,000 trials"),
     error && h("div", { style: { marginTop: 10, fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-2)" } }, error),
     result && h("div", { style: { marginTop: 14 } },
       h(ExportableBlock, { title: (theCase.name || "Case") + " — Monte Carlo fair-value distribution" },
       h("div", { style: { display: "flex", gap: 20, flexWrap: "wrap", marginBottom: 14 } },
         [["P10", result.percentiles.p10], ["P25", result.percentiles.p25], ["P50 (median)", result.percentiles.p50], ["P75", result.percentiles.p75], ["P90", result.percentiles.p90]].map(([label, v]) =>
-          h("div", { key: label }, h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase" } }, label),
+          h("div", { key: label }, h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", } }, label),
             h("div", { style: { fontSize: 15, fontFamily: "var(--mono)", fontWeight: 700, color: label.startsWith("P50") ? "var(--teal)" : "var(--ink-1)" } }, fmt(v))))
       ),
       [["P10", result.percentiles.p10, "var(--ink-3)"], ["P25", result.percentiles.p25, "var(--amber)"], ["P50", result.percentiles.p50, "var(--teal)"], ["P75", result.percentiles.p75, "var(--amber)"], ["P90", result.percentiles.p90, "var(--ink-3)"]].map(([label, v, color]) =>
@@ -1419,7 +1419,7 @@ function WorkspaceNav({ sections }) {
       background: "var(--bg)", borderBottom: "1px solid var(--rule)",
       padding: "9px 0", display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center"
     } },
-    h("span", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.05em", marginRight: 2 } }, "Jump to"),
+    h("span", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginRight: 2 } }, "Jump to"),
     visible.map(s => h("button", {
       key: s.id, onClick: () => jump(s.id),
       style: {
@@ -1476,7 +1476,7 @@ function ReverseSolveBox({ theCase, discountRatePct, tv, options }) {
     options.length > 1 && h("div", { style: { display: "flex", gap: 6, marginBottom: 10 } },
       options.map(o => h("button", {
         key: o.key, onClick: () => setVariable(o.key),
-        style: { padding: "4px 10px", borderRadius: 6, border: "1px solid " + (variable === o.key ? "var(--amber)" : "var(--rule)"), background: variable === o.key ? "var(--amber)" : "transparent", color: variable === o.key ? "#101414" : "var(--ink-2)", fontFamily: "var(--mono)", fontSize: 10, fontWeight: 600, cursor: "pointer" }
+        style: { padding: "4px 10px", borderRadius: 6, border: "1px solid " + (variable === o.key ? "var(--amber)" : "var(--rule)"), background: variable === o.key ? "var(--amber)" : "transparent", color: variable === o.key ? "var(--on-teal)" : "var(--ink-2)", fontFamily: "var(--mono)", fontSize: 10, fontWeight: 600, cursor: "pointer" }
       }, o.label))
     ),
     solveError || !solved ? h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-2)" } }, "Couldn't solve: " + (solveError || "unknown error"))
@@ -1484,10 +1484,10 @@ function ReverseSolveBox({ theCase, discountRatePct, tv, options }) {
     : h("div", null,
         h("div", { style: { display: "flex", gap: 24, flexWrap: "wrap" } },
           h("div", null,
-            h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase" } }, "Your assumption"),
+            h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", } }, "Your assumption"),
             h("div", { style: { fontSize: 20, fontFamily: "var(--mono)", fontWeight: 800, color: "var(--ink-1)" } }, fmtVal(solved.currentValue, solved.suffix))),
           h("div", null,
-            h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase" } }, "Market implies"),
+            h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", } }, "Market implies"),
             h("div", { style: { fontSize: 20, fontFamily: "var(--mono)", fontWeight: 800, color: "var(--ink-1)" } }, fmtVal(solved.impliedValue, solved.suffix)))
         ),
         solved.degenerate && h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginTop: 8, lineHeight: 1.5 } }, solved.note)

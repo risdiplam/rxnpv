@@ -35,14 +35,14 @@ function PortfolioView({ cases }) {
       h("table", { style: { width: "100%", borderCollapse: "collapse", fontSize: 12, fontFamily: "var(--mono)" } },
         h("thead", null, h("tr", { style: { borderBottom: "1px solid var(--rule)" } },
           ["Case", "Program", "Price", "Fair value", "Upside", "Runway", "Modeled PoS", "Implied PoS"].map(col =>
-            h("th", { key: col, style: { textAlign: "left", padding: "6px 10px", color: "var(--ink-3)", fontSize: 10, textTransform: "uppercase", letterSpacing: "0.04em" } }, col))
+            h("th", { key: col, style: { textAlign: "left", padding: "6px 10px", color: "var(--ink-3)", fontSize: 10, } }, col))
         )),
         h("tbody", null, valid.map(s => h("tr", { key: s.id, style: { borderBottom: "1px solid var(--rule)" } },
           h("td", { style: { padding: "8px 10px", color: "var(--ink-1)", fontWeight: 600 } }, s.name),
           h("td", { style: { padding: "8px 10px", color: "var(--ink-2)" } }, s.programName || "—"),
           h("td", { style: { padding: "8px 10px", color: "var(--ink-2)" } }, fmtPrice(s.price)),
           h("td", { style: { padding: "8px 10px", color: "var(--ink-2)" } }, fmtPrice(s.fairValue)),
-          h("td", { style: { padding: "8px 10px", color: s.upsidePct == null ? "var(--ink-3)" : s.upsidePct >= 0 ? "var(--teal)" : "var(--red)", fontWeight: 600 } }, fmtPct(s.upsidePct)),
+          h("td", { style: { padding: "8px 10px", color: s.upsidePct == null ? "var(--ink-3)" : s.upsidePct >= 0 ? "var(--green)" : "var(--red)", fontWeight: 600 } }, fmtPct(s.upsidePct)),
           h("td", { style: { padding: "8px 10px", color: s.runwayYears != null && s.runwayYears < 1 ? "var(--red)" : "var(--ink-2)" } }, fmtYears(s.runwayYears)),
           h("td", { style: { padding: "8px 10px", color: "var(--ink-2)" } }, s.modeledPoSPct != null ? s.modeledPoSPct.toFixed(0) + "%" : "—"),
           h("td", { style: { padding: "8px 10px", color: "var(--ink-2)" } }, s.impliedPoSPct != null ? s.impliedPoSPct.toFixed(0) + "%" : "—")

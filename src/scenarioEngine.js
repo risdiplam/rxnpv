@@ -8,7 +8,7 @@
 const SCENARIO_PRESETS = {
   bear: { label: "Bear", shareMultiplierPct: 70, posMultiplierPct: 70, discountRateAddPct: 5, color: "var(--red)" },
   base: { label: "Base", shareMultiplierPct: 100, posMultiplierPct: 100, discountRateAddPct: 0, color: "var(--slate)" },
-  bull: { label: "Bull", shareMultiplierPct: 130, posMultiplierPct: 130, discountRateAddPct: -2, color: "var(--teal)" }
+  bull: { label: "Bull", shareMultiplierPct: 130, posMultiplierPct: 130, discountRateAddPct: -2, color: "var(--green)" }
 };
 
 // Case-level Base-PoS control: a multiplier on top of whatever posMultiplierPct

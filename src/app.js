@@ -89,7 +89,15 @@ function App() {
   const [cases, setCases] = React.useState(loadCases);
   const [activeCaseId, setActiveCaseId] = React.useState(() => { const c = loadCases(); return c[0] && c[0].id; });
   const [view, setView] = React.useState("workspace"); // 'workspace' | 'reference' | 'tools' | 'simulation' | 'portfolio' | 'report'
-  const [dark, setDark] = React.useState(() => { try { return localStorage.getItem("rxnpv_theme") !== "light"; } catch(e) { return true; } });
+  // Light is the default. The September 2026 redesign resets a saved theme to
+  // light ONCE (marker key below), because every saved preference predates
+  // the new palettes — after that, whatever the user picks sticks.
+  const [dark, setDark] = React.useState(() => {
+    try {
+      if (!localStorage.getItem("rxnpv_design_v2")) { localStorage.setItem("rxnpv_design_v2", "1"); localStorage.setItem("rxnpv_theme", "light"); return false; }
+      return localStorage.getItem("rxnpv_theme") === "dark";
+    } catch(e) { return false; }
+  });
   const [saveFailed, setSaveFailed] = React.useState(false);
   // Cross-view navigation request — set by a "see also" link elsewhere (e.g.
   // Partnership Economics -> Licensing Comps) and consumed once by ToolsView.
@@ -196,7 +204,7 @@ function App() {
       // scroll off and switching cases would need the same round trip the
       // nav bar just stopped needing.
       h("div", { style: { width: 220, borderRight: "1px solid var(--rule)", padding: "18px 14px", flexShrink: 0, display: "flex", flexDirection: "column", position: "sticky", top: 54, height: "calc(100vh - 54px)" } },
-        h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 10, flexShrink: 0 } }, "Cases"),
+        h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginBottom: 10, flexShrink: 0 } }, "Cases"),
         h("div", { style: { flex: 1, overflowY: "auto", minHeight: 0 } },
           cases.length === 0 && h("div", { style: { fontSize: 12, fontFamily: "var(--mono)", color: "var(--ink-3)", marginBottom: 14, lineHeight: 1.6 } }, "No cases yet. Create one to start building a revenue model."),
           cases.map(c => h("div", { key: c.id, style: { marginBottom: 4 } },
