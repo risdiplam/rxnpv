@@ -134,7 +134,7 @@
   .section-export-bar, .chart-export-bar { opacity: 1; }
   /* Hover darkens the text and tints the border. Teal text measured 4.3:1 on
      the light theme's tinted cards, just under AA. */
-  .section-export-bar button:hover:not(:disabled), .chart-export-bar button:hover:not(:disabled) { border-color: var(--teal) !important; color: var(--ink-1) !important; }
+
   .export-section:hover > .section-export-bar,
   .export-section:hover > * > .section-export-bar,
   [data-export-chart]:hover > .chart-export-bar, [data-export-chart]:hover > * > .chart-export-bar,
@@ -155,6 +155,25 @@
   .app-rail-badge { position: absolute; top: -6px; right: -10px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px;
     background: var(--teal-fill); color: var(--on-teal); font: 700 10px/16px var(--sans); }
   @media print { .app-rail { display: none !important; } }
+  /* ── Export menu (one per section / chart) ────────────────────────── */
+  .xm-trigger { display: inline-flex; align-items: center; gap: 6px; min-height: 28px; padding: 4px 11px 4px 9px; border-radius: 8px;
+    border: 1px solid var(--rule); background: var(--surface); color: var(--ink-2); font: 500 12px/1 var(--sans); cursor: pointer; }
+  .xm-trigger:hover, .xm-trigger.on { border-color: var(--teal); color: var(--ink-1); }
+  .xm-status { font: 500 11.5px/1 var(--sans); color: var(--teal); background: var(--teal-bg); padding: 6px 9px; border-radius: 999px; }
+  .xm-menu { position: absolute; right: 0; top: calc(100% + 6px); z-index: 30; width: 280px; padding: 10px; border-radius: 12px;
+    background: var(--surface); border: 1px solid var(--rule); box-shadow: 0 10px 30px rgba(15,18,24,0.16), 0 2px 6px rgba(15,18,24,0.08); text-align: left; }
+  .xm-menu.up { top: auto; bottom: calc(100% + 6px); }
+  .xm-head { font: 600 12.5px/1.35 var(--sans); color: var(--ink-1); padding: 2px 4px 8px; border-bottom: 1px solid var(--rule); margin-bottom: 8px; }
+  .xm-name { display: block; font-weight: 400; color: var(--ink-3); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .xm-group { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 3px 4px; }
+  .xm-label { width: 100%; font: 500 11px/1.2 var(--sans); color: var(--ink-3); margin: 2px 0 1px; }
+  .xm-item { min-height: 30px; padding: 5px 12px; border-radius: 7px; border: 1px solid var(--rule); background: var(--surface-2);
+    color: var(--ink-1); font: 500 12px/1 var(--sans); cursor: pointer; white-space: nowrap; }
+  .xm-item:hover:not(:disabled) { border-color: var(--teal); }
+  .xm-item.is-on { border-color: var(--teal); background: var(--teal-bg); color: var(--teal); }
+  .xm-item.is-off, .xm-item:disabled { color: var(--ink-3); border-style: dashed; cursor: not-allowed; }
+  .xm-case { display: flex; align-items: center; gap: 8px; font: 500 11px var(--sans); color: var(--ink-3); padding: 8px 4px 2px; }
+  .xm-case select { flex: 1; min-height: 28px; padding: 3px 6px; border-radius: 6px; border: 1px solid var(--rule); background: var(--surface-2); color: var(--ink-1); font: 12px var(--sans); }
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; background: var(--bg); }
   body { font-family: var(--sans); }

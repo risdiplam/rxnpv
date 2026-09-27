@@ -343,49 +343,85 @@ function ExportBar({ scope, title, heading, reportSection, source }) {
   };
 
   const btn = (text, kind, onClick, tip, extra) => h("button", Object.assign({
-    key: kind, type: "button", title: tip, disabled: busy != null, onClick,
-    style: { padding: "4px 10px", minHeight: 26, borderRadius: 5, border: "1px solid var(--rule)", background: "transparent",
-      color: busy === kind ? "var(--ink-1)" : "var(--ink-2)", fontFamily: "var(--mono)", fontSize: 10,
-      cursor: busy ? "default" : "pointer", whiteSpace: "nowrap" }
+    key: kind, type: "button", title: tip, disabled: busy != null, onClick
   }, extra || {}), busy === kind ? "…" : text);
 
   const noCase = !cases.length;
-  const shortLabel = label && label.length > 48 ? label.slice(0, 46) + "…" : label;
+  // One compact "Export" button per section / chart that opens a menu holding
+  // EVERY option the old always-visible row had — PNG, PDF, SVG, + Report /
+  // ✓ In report, + Bundle, the case picker — so nothing is lost; only the
+  // repeated rows (10-20 per Workspace screen) are gone. The menu stays in the
+  // DOM while closed (display: none) so tests and harnesses that press these
+  // buttons directly keep working unchanged.
+  const [open, setOpen] = React.useState(false);
+  const [openUp, setOpenUp] = React.useState(false);
+  const menuId = React.useRef("xm-" + Math.random().toString(36).slice(2, 9)).current;
+  const trigRef = React.useRef(null), menuRef = React.useRef(null);
+  React.useEffect(() => {
+    if (!open) return;
+    const first = menuRef.current && menuRef.current.querySelector("button:not([disabled])");
+    if (first) first.focus();
+    const onDown = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    const onKey = (e) => { if (e.key === "Escape") { setOpen(false); if (trigRef.current) trigRef.current.focus(); } };
+    document.addEventListener("mousedown", onDown); window.addEventListener("keydown", onKey);
+    return () => { document.removeEventListener("mousedown", onDown); window.removeEventListener("keydown", onKey); };
+  }, [open]);
+  const toggle = () => {
+    if (!open && trigRef.current) {
+      const r = trigRef.current.getBoundingClientRect();
+      setOpenUp((window.innerHeight - r.bottom) < 240 && r.top > 240);
+    }
+    setOpen(!open);
+  };
+  // Every action closes the menu so its result message shows by the button.
+  const act = (fn) => fn && (() => { setOpen(false); fn(); });
+  const menuBtn = (text, kind, onClick, tip, extra) => btn(text, kind, act(onClick), tip,
+    Object.assign({ className: "xm-item" }, extra || {}));
+  const icon = h("svg", { width: 14, height: 14, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true" },
+    h("path", { d: "M12 4v11M7 10l5 5 5-5" }), h("path", { d: "M5 20h14" }));
   return h("div", {
     ref, "data-no-export": "", className: (isChart ? "chart-export-bar" : "section-export-bar") + (msg || busy ? " is-active" : ""),
-    style: { display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 6, flexWrap: "wrap", marginTop: isChart ? 6 : 12 }
+    style: { position: "relative", display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 8, flexWrap: "wrap", marginTop: isChart ? 4 : 10 }
   },
-    msg && h("span", { role: "status", style: { fontSize: 10, fontFamily: "var(--mono)", color: msg.tone === "ok" ? "var(--green)" : "var(--red)", marginRight: 4 } },
+    msg && h("span", { role: "status", style: { fontSize: 11, fontFamily: "var(--sans)", color: msg.tone === "ok" ? "var(--green)" : "var(--red)" } },
       msg.text,
       msg.caseId && ctx && ctx.openReport && h("button", { type: "button", onClick: () => { const src = liveSource(); if (src && src.openReport) src.openReport(msg.caseId); },
-        style: { marginLeft: 8, background: "none", border: "none", padding: 0, color: "var(--teal)", textDecoration: "underline", fontFamily: "var(--mono)", fontSize: 10, cursor: "pointer" } },
+        style: { marginLeft: 8, background: "none", border: "none", padding: 0, color: "var(--teal)", textDecoration: "underline", fontFamily: "var(--sans)", fontSize: 11, cursor: "pointer" } },
         "Open report →"),
       msg.bundle && h("button", { type: "button", onClick: () => { const src = liveSource(); if (src && src.openBundle) src.openBundle(); },
-        style: { marginLeft: 8, background: "none", border: "none", padding: 0, color: "var(--teal)", textDecoration: "underline", fontFamily: "var(--mono)", fontSize: 10, cursor: "pointer" } },
+        style: { marginLeft: 8, background: "none", border: "none", padding: 0, color: "var(--teal)", textDecoration: "underline", fontFamily: "var(--sans)", fontSize: 11, cursor: "pointer" } },
         "Open bundle →")),
-    h("span", { title: label, style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", maxWidth: 360, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } },
-      (isChart ? "Export chart" : "Export section") + (shortLabel ? " · " : ""),
-      shortLabel && h("span", { style: { textTransform: "none", letterSpacing: 0 } }, shortLabel)),
-    btn("PNG", "png", () => doExport("png"), isChart
-      ? "Just this chart, with its title, as a high-resolution PNG"
-      : "This whole section as a PNG — title, inputs, results, every chart, tables and open notes, at full height"),
-    btn("PDF", "pdf", () => doExport("pdf"), isChart
-      ? "Just this chart, with its title, as a vector PDF"
-      : "This whole section as a vector PDF, with selectable text"),
-    isChart && hasSvg && btn("SVG", "svg", () => doExport("svg"), "Just this chart as an editable vector SVG"),
-    h("span", { style: { width: 1, height: 14, background: "var(--rule)", margin: "0 2px" } }),
-    btn(reportSection ? (inReport ? "✓ In report" : "+ Report") : "+ Report", "report",
-      noCase ? undefined : doReport,
-      noCase ? "Reports belong to a case — create one in Workspace first, then sections and charts can be added to its report"
-        : reportSection
-          ? (inReport ? "This section is in " + (target && target.name) + "'s report — click to take it out" : "Include this section in " + (target && target.name) + "'s report (it renders live from the model there)")
-          : "Add " + (isChart ? "just this chart" : "this whole section") + " to " + (target && target.name) + "'s report, to build a PDF of only what you choose",
-      noCase ? { disabled: true, style: { padding: "4px 10px", minHeight: 26, borderRadius: 5, border: "1px dashed var(--rule)", background: "transparent", color: "var(--ink-3)", fontFamily: "var(--mono)", fontSize: 10, opacity: 0.6, cursor: "not-allowed" } }
-        : (inReport ? { style: { padding: "4px 10px", minHeight: 26, borderRadius: 5, border: "1px solid var(--teal)", background: "var(--teal-bg)", color: "var(--teal)", fontFamily: "var(--mono)", fontSize: 10, cursor: busy ? "default" : "pointer", whiteSpace: "nowrap" } } : null)),
-    btn("+ Bundle", "bundle", doBundle, "Collect " + (isChart ? "just this chart" : "this whole section") + " into your PDF bundle — then export everything you collected as one PDF, or each as its own PDF, from Bundle in the top bar. No case needed."),
-    cases.length > 1 && h("select", { "aria-label": "Case whose report this goes to", value: targetId || "", onChange: e => setPickedCaseId(e.target.value),
-      style: { padding: "2px 6px", borderRadius: 5, border: "1px solid var(--rule)", background: "var(--surface)", color: "var(--ink-3)", fontFamily: "var(--mono)", fontSize: 10, maxWidth: 150 } },
-      cases.map(c => h("option", { key: c.id, value: c.id }, c.name || "Untitled")))
+    // At-a-glance status the old row showed: this live section is in the report.
+    inReport && h("span", { className: "xm-status", title: "Included in " + (target && target.name) + "'s report — open Export to take it out" }, "✓ In report"),
+    h("button", { ref: trigRef, type: "button", className: "xm-trigger" + (open ? " on" : ""), onClick: toggle,
+      "aria-haspopup": "true", "aria-expanded": open, "aria-controls": menuId,
+      title: (isChart ? "Export this chart" : "Export this section") + (label ? " — " + label : "") + ": PNG, PDF" + (isChart && hasSvg ? ", SVG" : "") + ", add to a report or to your PDF bundle" },
+      icon, busy ? "Working…" : (isChart ? "Export chart" : "Export")),
+    h("div", { id: menuId, ref: menuRef, role: "group", "aria-label": (isChart ? "Export chart" : "Export section") + (label ? ": " + label : ""),
+      className: "xm-menu" + (openUp ? " up" : ""), style: { display: open ? "block" : "none" } },
+      h("div", { className: "xm-head" }, isChart ? "This chart" : "This whole section", label && h("span", { className: "xm-name", title: label }, label)),
+      h("div", { className: "xm-group" },
+        h("div", { className: "xm-label" }, "Save as"),
+        menuBtn("PNG", "png", () => doExport("png"), isChart
+          ? "Just this chart, with its title, as a high-resolution PNG"
+          : "This whole section as a PNG — title, inputs, results, every chart, tables and open notes, at full height"),
+        menuBtn("PDF", "pdf", () => doExport("pdf"), isChart
+          ? "Just this chart, with its title, as a vector PDF"
+          : "This whole section as a vector PDF, with selectable text"),
+        isChart && hasSvg && menuBtn("SVG", "svg", () => doExport("svg"), "Just this chart as an editable vector SVG")),
+      h("div", { className: "xm-group" },
+        h("div", { className: "xm-label" }, "Collect"),
+        menuBtn(reportSection ? (inReport ? "✓ In report" : "+ Report") : "+ Report", "report",
+          noCase ? undefined : doReport,
+          noCase ? "Reports belong to a case — create one in Workspace first, then sections and charts can be added to its report"
+            : reportSection
+              ? (inReport ? "This section is in " + (target && target.name) + "'s report — click to take it out" : "Include this section in " + (target && target.name) + "'s report (it renders live from the model there)")
+              : "Add " + (isChart ? "just this chart" : "this whole section") + " to " + (target && target.name) + "'s report, to build a PDF of only what you choose",
+          noCase ? { disabled: true, className: "xm-item is-off" } : (inReport ? { className: "xm-item is-on" } : null)),
+        menuBtn("+ Bundle", "bundle", doBundle, "Collect " + (isChart ? "just this chart" : "this whole section") + " into your PDF bundle — then export everything you collected as one PDF, or each as its own PDF, from Bundle in the rail. No case needed.")),
+      cases.length > 1 && h("label", { className: "xm-case" }, "Report for",
+        h("select", { "aria-label": "Case whose report this goes to", value: targetId || "", onChange: e => setPickedCaseId(e.target.value) },
+          cases.map(c => h("option", { key: c.id, value: c.id }, c.name || "Untitled")))))
   );
 }
 function SectionExportBar(props) { return React.createElement(ExportBar, Object.assign({}, props, { scope: "section" })); }
