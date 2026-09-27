@@ -137,7 +137,7 @@ function BenchField({ label, value, onChange, bench, suffix, placeholder, step, 
         // without changing where the text sits on the line — this is an
         // inline chip inside a sentence, so it can't just be made bigger,
         // but at 18x13 it was a genuinely fiddly target.
-        style: { background: "none", border: "none", color: "var(--amber)", fontFamily: "var(--mono)", fontSize: 10, cursor: "pointer", padding: "6px 3px", margin: "-6px -3px", fontWeight: 700, textDecoration: "underline" }
+        style: { background: "none", border: "none", color: "var(--amber)", fontFamily: "var(--mono)", fontSize: 10, cursor: "pointer", padding: "6px 3px", margin: "-6px -3px", minWidth: 24, display: "inline-block", textAlign: "center", fontWeight: 700, textDecoration: "underline" }
       }, (typeof bench.value === "number" ? bench.value : bench.value) + (suffix || "")),
       h("span", { style: { color: "var(--ink-3)" } }, " · " + bench.source)
     ),

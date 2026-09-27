@@ -201,7 +201,13 @@ app.whenReady().then(async () => {
   await click("+ Add program", 700);
   await js(`__t.setVal(__t.byLabel("Peak worldwide revenue")[1], "600")`); await sleep(300);
   await click("Run 3,000 trials", 6000);
-  await sweep("Workspace");
+  // Every Workspace sub-tab is swept; hidden tabs have no size on screen, so
+  // each is opened before its sections are exported and compared.
+  for (const t of ["overview", "assumptions", "scenarios", "evidence", "calibration"]) {
+    await js(`document.getElementById("casetab-${t}").click()`); await sleep(600);
+    await sweep("Workspace · " + t);
+  }
+  await js(`document.getElementById("casetab-overview").click()`);
 
   // ── Tools ──
   await click("Tools", 700);

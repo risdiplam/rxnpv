@@ -31,10 +31,33 @@ function newCase() {
   };
 }
 
+function caseMissingInputs(theCase) {
+  const missing = [];
+  if (!theCase.currentPrice) missing.push("current price");
+  const cap = theCase.capitalStructure || { mode: "simple" };
+  if ((cap.mode || "simple") === "simple" && !cap.dilutedSharesSimple) missing.push("diluted shares");
+  if (cap.mode === "detailed" && !cap.basicShares) missing.push("basic shares");
+  theCase.programs.forEach((p, i) => {
+    const label = p.drugName || p.name || ("Program " + (i + 1));
+    if ((p.revenueMode || "quick") === "quick") {
+      if (!p.quickRevenue || !p.quickRevenue.peakRevenue) missing.push(label + " peak revenue");
+    } else {
+      const pop = (p.revenueBuild || {}).population || {};
+      if (pop.mode === "prevalence" && !pop.prevalence) missing.push(label + " prevalence");
+      if (pop.mode === "incidence" && !pop.incidence) missing.push(label + " incidence");
+      if (!(p.revenueBuild || {}).pricing || !p.revenueBuild.pricing.usAnnualPrice) missing.push(label + " price");
+    }
+  });
+  return missing;
+}
+
+const CASE_TABS = [["overview", "Overview"], ["assumptions", "Assumptions"], ["scenarios", "Scenarios"], ["evidence", "Evidence"], ["calibration", "Calibration"]];
+
 function CaseView({ theCase, onChange, onDelete, onNavigateToTools }) {
   const h = React.createElement;
   const [activeProgId, setActiveProgId] = React.useState(theCase.programs[0] && theCase.programs[0].id);
   const [confirmingDelete, setConfirmingDelete] = React.useState(false);
+  const [tab, setTab] = React.useState(() => caseMissingInputs(theCase).length > 0 ? "assumptions" : "overview");
 
   React.useEffect(() => {
     if (!theCase.programs.find(p => p.id === activeProgId)) {
@@ -115,6 +138,47 @@ function CaseView({ theCase, onChange, onDelete, onNavigateToTools }) {
   const activeProg = theCase.programs.find(p => p.id === activeProgId) || theCase.programs[0];
 
   // Names the case in the footer of anything exported from this page.
+  // ── Sub-tab plumbing ──
+  const vs = useValuationSections({ theCase, onChange: update, goToTab: (t) => setTab(t) });
+  const openPredictions = (() => { const pc = pendingCalibrationEntries(theCase); return pc.overdue.length + pc.open.length; })();
+  const panel = (id, ...kids) => h.apply(null, ["div", { key: id, role: "tabpanel", id: "casepanel-" + id, "aria-labelledby": "casetab-" + id, hidden: tab !== id, className: "case-panel" }].concat(kids));
+  const programPicker = (withId) => h("div", { id: withId ? "ws-programs" : undefined, style: { display: "flex", gap: 6, marginBottom: 16, flexWrap: "wrap", alignItems: "center" } },
+      // Each tab carries its program's phase and peak revenue, not just a
+      // name. Only one program renders at a time, so without this the only
+      // way to compare a pipeline was to click through every tab and hold the
+      // numbers in your head. Suppressed for a single-program case, where
+      // there's nothing to compare against and it would just be noise.
+      theCase.programs.map(p => {
+        const isActive = activeProgId === p.id;
+        const multi = theCase.programs.length > 1;
+        const pr = programResults.find(r => r.id === p.id);
+        const peak = pr && pr.revenueResult ? pr.revenueResult.peakTotalRevenue : null;
+        const phaseLabel = (p.currentPhase || "").replace("phase", "Ph");
+        return h("button", {
+          key: p.id, onClick: () => setActiveProgId(p.id),
+          title: multi ? "Show " + (p.drugName || p.name) : undefined,
+          style: { padding: multi ? "6px 14px" : "7px 16px", borderRadius: 7, border: "1px solid " + (isActive ? "var(--teal)" : "var(--rule)"),
+            background: isActive ? "var(--teal-bg)" : "var(--surface)", color: isActive ? "var(--teal)" : "var(--ink-2)",
+            fontFamily: "var(--mono)", fontSize: 12, fontWeight: isActive ? 700 : 400, cursor: "pointer",
+            textAlign: "left", lineHeight: 1.35 }
+        },
+          h("div", null, p.drugName || p.name),
+          multi && h("div", { style: { fontSize: 10, color: isActive ? "var(--teal)" : "var(--ink-3)", fontWeight: 400 } },
+            [phaseLabel, peak ? fmtMoney(peak) + " peak" : null].filter(Boolean).join(" · "))
+        );
+      }),
+      h("button", { onClick: addProgram, style: { padding: "7px 14px", borderRadius: 7, border: "1px dashed var(--ink-3)", background: "transparent", color: "var(--ink-2)", fontFamily: "var(--mono)", fontSize: 12, cursor: "pointer" } }, "+ Add program")
+    );
+  const editorFor = (part) => activeProg && h(ProgramEditor, {
+      key: part + "-" + activeProg.id, part, program: activeProg,
+      onChange: next => updateProgram(activeProg.id, next),
+      onDelete: () => removeProgram(activeProg.id),
+      discountRatePct: theCase.discountRatePct, terminalValue: theCase.terminalValue,
+      valuationMethod: theCase.valuationMethod || "dcf",
+      basePosAdjustmentPct: theCase.basePosAdjustmentPct,
+      onNavigateToTools
+    });
+
   return h("div", { "data-export-context": "Workspace · " + (theCase.name || "Untitled case") },
     // Case header
     h("div", { style: { display: "flex", alignItems: "center", gap: 12, marginBottom: 6, flexWrap: "wrap" } },
@@ -147,27 +211,13 @@ function CaseView({ theCase, onChange, onDelete, onNavigateToTools }) {
     // incomplete values quietly showing as "$0" or "—" scattered across
     // different sections with no single place to check.
     (() => {
-      const missing = [];
-      if (!theCase.currentPrice) missing.push("current price");
-      const cap = theCase.capitalStructure || { mode: "simple" };
-      if ((cap.mode || "simple") === "simple" && !cap.dilutedSharesSimple) missing.push("diluted shares");
-      if (cap.mode === "detailed" && !cap.basicShares) missing.push("basic shares");
-      theCase.programs.forEach((p, i) => {
-        const label = p.drugName || p.name || ("Program " + (i + 1));
-        if ((p.revenueMode || "quick") === "quick") {
-          if (!p.quickRevenue || !p.quickRevenue.peakRevenue) missing.push(label + " peak revenue");
-        } else {
-          const pop = (p.revenueBuild || {}).population || {};
-          if (pop.mode === "prevalence" && !pop.prevalence) missing.push(label + " prevalence");
-          if (pop.mode === "incidence" && !pop.incidence) missing.push(label + " incidence");
-          if (!(p.revenueBuild || {}).pricing || !p.revenueBuild.pricing.usAnnualPrice) missing.push(label + " price");
-        }
-      });
+      const missing = caseMissingInputs(theCase);
       if (missing.length === 0) return null;
       const shown = missing.slice(0, 4).join(", ") + (missing.length > 4 ? ", +" + (missing.length - 4) + " more" : "");
       return h("div", { style: { padding: "7px 14px", marginBottom: 16, background: "var(--surface)", borderLeft: "2px solid var(--warn)", borderRadius: 4, fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-2)", display: "flex", alignItems: "center", gap: 8 } },
         h("span", { style: { color: "var(--warn)", fontSize: 10 } }, "●"),
-        h("span", null, "Add to complete the model: " + shown)
+        h("span", null, "Add to complete the model: " + shown),
+        tab !== "assumptions" && h("button", { type: "button", className: "link-btn", style: { marginLeft: "auto" }, onClick: () => setTab("assumptions") }, "Go to Assumptions →")
       );
     })(),
 
@@ -186,13 +236,79 @@ function CaseView({ theCase, onChange, onDelete, onNavigateToTools }) {
         overdue.length > 0
           ? h("div", null,
               h("span", { style: { color: "var(--teal)", fontWeight: 700 } }, overdue.length + " calibration prediction" + (overdue.length > 1 ? "s" : "") + " past its catalyst date"),
-              " — score " + (overdue.length > 1 ? "them" : "it") + " against what actually happened, in the program's Calibration Log.",
+              " — score " + (overdue.length > 1 ? "them" : "it") + " against what actually happened, in the program's Calibration Log. ",
+              tab !== "calibration" && h("button", { type: "button", className: "link-btn", onClick: () => setTab("calibration") }, "Open Calibration →"),
               h("div", { style: { fontSize: 10, color: "var(--ink-3)", marginTop: 3 } }, detail + (overdue.length > 3 ? " · +" + (overdue.length - 3) + " more" : "")))
           : h("div", { style: { color: "var(--ink-3)" } },
               open.length + " calibration prediction" + (open.length > 1 ? "s" : "") + " still open — score " + (open.length > 1 ? "them" : "it") + " once the catalyst reads out.")
       );
     })(),
 
+    // ── Case sub-tabs (September 2026) ────────────────────────────────────
+    // One long page became five tabs. Every tab stays mounted and the
+    // inactive ones are hidden, so results (a Monte Carlo run, an open card)
+    // survive switching, and every section and export control still exists.
+    h("div", { className: "case-tabs", role: "tablist", "aria-label": "Case sections" },
+      CASE_TABS.map(([id, label]) => h("button", { key: id, type: "button", role: "tab", id: "casetab-" + id, "aria-selected": tab === id,
+          "aria-controls": "casepanel-" + id, className: "case-tab" + (tab === id ? " on" : ""), onClick: () => setTab(id) },
+        label,
+        id === "evidence" && vs.flagCount > 0 && h("span", { className: "case-tab-count warn", title: vs.flagCount + " input" + (vs.flagCount > 1 ? "s" : "") + " worth a second look" }, String(vs.flagCount)),
+        id === "calibration" && openPredictions > 0 && h("span", { className: "case-tab-count", title: openPredictions + " open prediction" + (openPredictions > 1 ? "s" : "") }, String(openPredictions))))),
+
+    panel("overview",
+      theCase.programs.length === 0 && h("div", { className: "empty-note" }, "This case has no programs yet. ",
+        h("button", { type: "button", className: "link-btn", onClick: () => setTab("assumptions") }, "Add one on Assumptions →")),
+      vs.overview,
+    // Company-level aggregate
+    theCase.programs.length > 0 && h(ExportSection, { id: "ws-revenue", title: "Company revenue rollup — all programs", reportSection: "revenueChart", style: { background: "var(--surface)", border: "1px solid var(--rule)", borderRadius: 10, padding: "16px 18px", marginBottom: 22, marginTop: 16 } },
+      h("div", { style: { display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 10, flexWrap: "wrap", gap: 8 } },
+        h("div", { style: { fontFamily: "var(--display)", fontSize: 16, fontWeight: 600, color: "var(--ink-1)" } }, "Company revenue rollup — all programs"),
+        peakCalendarYear && h("div", { style: { fontSize: 12, fontFamily: "var(--mono)", color: "var(--ink-2)" } },
+          "Peak: ", h("b", { style: { color: "var(--ink-1)" } }, fmtMoney(peakCalendarYear.totalRevenue)), " in year ", peakCalendarYear.calendarYear)
+      ),
+      excludedPrograms.length > 0 && h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--warn)", background: "var(--warn-bg)", border: "1px solid var(--warn)", borderRadius: 6, padding: "8px 10px", marginBottom: 10, lineHeight: 1.6 } },
+        (excludedPrograms.length === 1 ? "“" + excludedPrograms[0] + "” is" : excludedPrograms.length + " programs are")
+        + " not included in this rollup or in any valuation below — their revenue build couldn't be computed, usually because a required field is still blank. "
+        + "Every total on this page excludes " + (excludedPrograms.length === 1 ? "it" : "them") + "."),
+      h(ExportableBlock, { title: (theCase.name || "Case") + " — company revenue rollup" },
+        h(RevenueChart, { series: totalSeries.concat(aggChartSeries.length > 1 ? aggChartSeries : []), showLegend: theCase.programs.length > 1, height: 200 }))
+    ),
+
+    // Company-level P&L / EBIT panel
+    companyPnL.length > 0 && h(ExportSection, { id: "ws-pnl", title: "Company P&L — costs applied", style: { background: "var(--surface)", border: "1px solid var(--rule)", borderRadius: 10, padding: "16px 18px", marginBottom: 22 } },
+      h("div", { style: { display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 12, flexWrap: "wrap", gap: 8 } },
+        h("div", { style: { fontFamily: "var(--display)", fontSize: 16, fontWeight: 600, color: "var(--ink-1)" } }, "Company P&L — costs applied"),
+        peakEbitYear && h("div", { style: { fontSize: 12, fontFamily: "var(--mono)", color: "var(--ink-2)" } },
+          "Peak EBIT: ", h("b", { style: { color: "var(--ink-1)" } }, fmtMoney(peakEbitYear.ebit)), " in year ", peakEbitYear.calendarYear)
+      ),
+      h("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap", fontSize: 12, color: "var(--ink-2)", marginBottom: 12 } },
+        h("span", null, "Corporate G&A: ", h("b", { style: { color: "var(--ink-1)" } }, "$" + (corpGA.preCommercialAnnualM || SGA_BENCHMARKS.preCommercialGA.medianM) + "M/yr"), " before launch · ",
+          h("b", { style: { color: "var(--ink-1)" } }, (corpGA.gaShareOfMatureSgaPct || 50) + "%"), " of mature SG&A after"),
+        h("button", { type: "button", className: "link-btn", onClick: () => setTab("assumptions") }, "Edit on Assumptions →")),
+      h("div", { style: { display: "flex", gap: 6, marginBottom: 12 } },
+        [["revenue","Revenue"],["ebit","P&L waterfall"]].map(([id,lbl]) => h("button", { key: id, onClick: () => setRollupView(id),
+          style: { padding: "5px 12px", borderRadius: 7, border: "1px solid var(--rule)", cursor: "pointer", fontFamily: "var(--mono)", fontSize: 11,
+            background: rollupView === id ? "var(--teal-bg)" : "transparent", color: rollupView === id ? "var(--teal)" : "var(--ink-2)", fontWeight: rollupView === id ? 700 : 400 } }, lbl))
+      ),
+      rollupView === "ebit" && h(ExportableBlock, { title: (theCase.name || "Case") + " — P&L by year" },
+        h(RevenueChart, { series: ebitSeries, showLegend: true, height: 200 })),
+      rollupView === "ebit" && (() => {
+        const troughYear = companyPnL.reduce((worst, c) => c.ebit < worst.ebit ? c : worst, companyPnL[0]);
+        return h("div", { style: { display: "flex", gap: 24, marginTop: 12, flexWrap: "wrap" } },
+          h("div", null,
+            h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", } }, troughYear.ebit < 0 ? "Deepest annual loss (burn)" : "Lowest annual EBIT (still profitable)"),
+            h("div", { style: { fontSize: 18, fontFamily: "var(--mono)", fontWeight: 700, color: troughYear.ebit < 0 ? "var(--red)" : "var(--ink-1)" } },
+              fmtMoney(troughYear.ebit), " (yr " + troughYear.calendarYear + ")")),
+          h("div", null,
+            h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", } }, "Peak EBIT"),
+            h("div", { style: { fontSize: 18, fontFamily: "var(--mono)", fontWeight: 700, color: "var(--ink-1)" } }, fmtMoney(peakEbitYear.ebit), " (yr " + peakEbitYear.calendarYear + ")"))
+        );
+      })()
+    ),
+
+    ),
+
+    panel("assumptions",
     // Case-level master mode — one click sets every program's revenue mode AND
     // the capital structure mode at once. Per-section toggles still work
     // afterward if you want to mix modes within the case. Highlighted state is
@@ -227,40 +343,9 @@ function CaseView({ theCase, onChange, onDelete, onNavigateToTools }) {
       );
     })(),
 
-    // Section jump bar — only meaningful once there's something to jump
-    // between, so it hides itself on an empty case (WorkspaceNav returns null
-    // below two sections).
-    theCase.programs.length > 0 && h(WorkspaceNav, { sections: [
-      { id: "ws-revenue", label: "Revenue" },
-      companyPnL.length > 0 ? { id: "ws-pnl", label: "P&L" } : null,
-      { id: "ws-valuation", label: "Valuation" },
-      { id: "ws-scenarios", label: "Scenarios" },
-      { id: "ws-bridge", label: "Bridge" },
-      { id: "ws-programs", label: theCase.programs.length > 1 ? "Programs" : "Program" }
-    ].filter(Boolean) }),
-
-    // Company-level aggregate
-    theCase.programs.length > 0 && h(ExportSection, { id: "ws-revenue", title: "Company revenue rollup — all programs", reportSection: "revenueChart", style: { background: "var(--surface)", border: "1px solid var(--rule)", borderRadius: 10, padding: "16px 18px", marginBottom: 22, marginTop: 16 } },
-      h("div", { style: { display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 10, flexWrap: "wrap", gap: 8 } },
-        h("div", { style: { fontFamily: "var(--display)", fontSize: 16, fontWeight: 600, color: "var(--ink-1)" } }, "Company revenue rollup — all programs"),
-        peakCalendarYear && h("div", { style: { fontSize: 12, fontFamily: "var(--mono)", color: "var(--ink-2)" } },
-          "Peak: ", h("b", { style: { color: "var(--ink-1)" } }, fmtMoney(peakCalendarYear.totalRevenue)), " in year ", peakCalendarYear.calendarYear)
-      ),
-      excludedPrograms.length > 0 && h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--warn)", background: "var(--warn-bg)", border: "1px solid var(--warn)", borderRadius: 6, padding: "8px 10px", marginBottom: 10, lineHeight: 1.6 } },
-        (excludedPrograms.length === 1 ? "“" + excludedPrograms[0] + "” is" : excludedPrograms.length + " programs are")
-        + " not included in this rollup or in any valuation below — their revenue build couldn't be computed, usually because a required field is still blank. "
-        + "Every total on this page excludes " + (excludedPrograms.length === 1 ? "it" : "them") + "."),
-      h(ExportableBlock, { title: (theCase.name || "Case") + " — company revenue rollup" },
-        h(RevenueChart, { series: totalSeries.concat(aggChartSeries.length > 1 ? aggChartSeries : []), showLegend: theCase.programs.length > 1, height: 200 }))
-    ),
-
-    // Company-level P&L / EBIT panel
-    companyPnL.length > 0 && h(ExportSection, { id: "ws-pnl", title: "Company P&L — costs applied", style: { background: "var(--surface)", border: "1px solid var(--rule)", borderRadius: 10, padding: "16px 18px", marginBottom: 22 } },
-      h("div", { style: { display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 12, flexWrap: "wrap", gap: 8 } },
-        h("div", { style: { fontFamily: "var(--display)", fontSize: 16, fontWeight: 600, color: "var(--ink-1)" } }, "Company P&L — costs applied"),
-        peakEbitYear && h("div", { style: { fontSize: 12, fontFamily: "var(--mono)", color: "var(--ink-2)" } },
-          "Peak EBIT: ", h("b", { style: { color: "var(--ink-1)" } }, fmtMoney(peakEbitYear.ebit)), " in year ", peakEbitYear.calendarYear)
-      ),
+      vs.inputs,
+      theCase.programs.length > 0 && h(ExportSection, { title: "Corporate G&A", style: { background: "var(--surface)", border: "1px solid var(--rule)", borderRadius: 10, padding: "16px 18px", marginBottom: 22 } },
+        h("div", { style: { fontFamily: "var(--display)", fontSize: 16, fontWeight: 600, color: "var(--ink-1)", marginBottom: 12 } }, "Corporate G&A"),
       h("div", { style: { display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 14, padding: "10px 14px", background: "var(--surface-2)", borderRadius: 8 } },
         h("div", { style: { flex: "1 1 200px" } },
           h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-2)", marginBottom: 5 } }, "Pre-commercial corporate G&A"),
@@ -281,68 +366,22 @@ function CaseView({ theCase, onChange, onDelete, onNavigateToTools }) {
         h("div", { style: { flex: "1 1 100%" } },
           h(Note, { summary: "Why this split exists" },
             "The " + SGA_BENCHMARKS.matureSgaPctOfRevenue + "% mature SG&A/revenue figure bundles G&A + Sales + Marketing. Sales & Marketing are already modeled per-program above, so this slider carves out the G&A-only share to avoid double-counting. 50% is a reasonable starting split, not a sourced number."))
-      ),
-      h("div", { style: { display: "flex", gap: 6, marginBottom: 12 } },
-        [["revenue","Revenue"],["ebit","P&L waterfall"]].map(([id,lbl]) => h("button", { key: id, onClick: () => setRollupView(id),
-          style: { padding: "5px 12px", borderRadius: 7, border: "1px solid var(--rule)", cursor: "pointer", fontFamily: "var(--mono)", fontSize: 11,
-            background: rollupView === id ? "var(--teal-bg)" : "transparent", color: rollupView === id ? "var(--teal)" : "var(--ink-2)", fontWeight: rollupView === id ? 700 : 400 } }, lbl))
-      ),
-      rollupView === "ebit" && h(ExportableBlock, { title: (theCase.name || "Case") + " — P&L by year" },
-        h(RevenueChart, { series: ebitSeries, showLegend: true, height: 200 })),
-      rollupView === "ebit" && (() => {
-        const troughYear = companyPnL.reduce((worst, c) => c.ebit < worst.ebit ? c : worst, companyPnL[0]);
-        return h("div", { style: { display: "flex", gap: 24, marginTop: 12, flexWrap: "wrap" } },
-          h("div", null,
-            h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", } }, troughYear.ebit < 0 ? "Deepest annual loss (burn)" : "Lowest annual EBIT (still profitable)"),
-            h("div", { style: { fontSize: 18, fontFamily: "var(--mono)", fontWeight: 700, color: troughYear.ebit < 0 ? "var(--red)" : "var(--ink-1)" } },
-              fmtMoney(troughYear.ebit), " (yr " + troughYear.calendarYear + ")")),
-          h("div", null,
-            h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", } }, "Peak EBIT"),
-            h("div", { style: { fontSize: 18, fontFamily: "var(--mono)", fontWeight: 700, color: "var(--ink-1)" } }, fmtMoney(peakEbitYear.ebit), " (yr " + peakEbitYear.calendarYear + ")"))
-        );
-      })()
+      )),
+      programPicker(true),
+      editorFor("inputs")
     ),
 
-    // Valuation panel — discount rate, terminal value, capital structure, scenarios
-    theCase.programs.length > 0 && h(ValuationPanel, { theCase, onChange: update }),
+    panel("scenarios", vs.scenarios),
 
-    // Program tabs
-    h("div", { id: "ws-programs", style: { display: "flex", gap: 6, marginBottom: 16, flexWrap: "wrap", alignItems: "center" } },
-      // Each tab carries its program's phase and peak revenue, not just a
-      // name. Only one program renders at a time, so without this the only
-      // way to compare a pipeline was to click through every tab and hold the
-      // numbers in your head. Suppressed for a single-program case, where
-      // there's nothing to compare against and it would just be noise.
-      theCase.programs.map(p => {
-        const isActive = activeProgId === p.id;
-        const multi = theCase.programs.length > 1;
-        const pr = programResults.find(r => r.id === p.id);
-        const peak = pr && pr.revenueResult ? pr.revenueResult.peakTotalRevenue : null;
-        const phaseLabel = (p.currentPhase || "").replace("phase", "Ph");
-        return h("button", {
-          key: p.id, onClick: () => setActiveProgId(p.id),
-          title: multi ? "Show " + (p.drugName || p.name) : undefined,
-          style: { padding: multi ? "6px 14px" : "7px 16px", borderRadius: 7, border: "1px solid " + (isActive ? "var(--teal)" : "var(--rule)"),
-            background: isActive ? "var(--teal-bg)" : "var(--surface)", color: isActive ? "var(--teal)" : "var(--ink-2)",
-            fontFamily: "var(--mono)", fontSize: 12, fontWeight: isActive ? 700 : 400, cursor: "pointer",
-            textAlign: "left", lineHeight: 1.35 }
-        },
-          h("div", null, p.drugName || p.name),
-          multi && h("div", { style: { fontSize: 10, color: isActive ? "var(--teal)" : "var(--ink-3)", fontWeight: 400 } },
-            [phaseLabel, peak ? fmtMoney(peak) + " peak" : null].filter(Boolean).join(" · "))
-        );
-      }),
-      h("button", { onClick: addProgram, style: { padding: "7px 14px", borderRadius: 7, border: "1px dashed var(--ink-3)", background: "transparent", color: "var(--ink-2)", fontFamily: "var(--mono)", fontSize: 12, cursor: "pointer" } }, "+ Add program")
+    panel("evidence",
+      vs.evidence,
+      theCase.programs.length > 0 && programPicker(false),
+      editorFor("evidence")
     ),
 
-    activeProg && h(ProgramEditor, {
-      key: activeProg.id, program: activeProg,
-      onChange: next => updateProgram(activeProg.id, next),
-      onDelete: () => removeProgram(activeProg.id),
-      discountRatePct: theCase.discountRatePct, terminalValue: theCase.terminalValue,
-      valuationMethod: theCase.valuationMethod || "dcf",
-      basePosAdjustmentPct: theCase.basePosAdjustmentPct,
-      onNavigateToTools
-    })
+    panel("calibration",
+      theCase.programs.length > 0 && programPicker(false),
+      editorFor("calibration")
+    )
   );
 }

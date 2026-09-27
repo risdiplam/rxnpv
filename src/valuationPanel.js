@@ -2,7 +2,11 @@
 // ValuationPanel — discount rate, terminal value, capital structure, and the
 // Bear/Base/Bull scenario comparison. Lives inside CaseView.
 // ════════════════════════════════════════════════════════════════════════════
-function ValuationPanel({ theCase, onChange }) {
+// Computes the case valuation ONCE and returns each Workspace tab's piece of
+// it: { overview, inputs, scenarios, evidence, flagCount }. A hook rather than
+// a component, so the heavy work (three scenario valuations, the implied-PoS
+// solve) runs once per render instead of once per tab it appears in.
+function useValuationSections({ theCase, onChange, goToTab }) {
   const h = React.createElement;
   const update = (patch) => onChange({ ...theCase, ...patch, updatedAt: Date.now() });
 
@@ -31,6 +35,8 @@ function ValuationPanel({ theCase, onChange }) {
   const [edgarLoading, setEdgarLoading] = React.useState(false);
   const [edgarResult, setEdgarResult] = React.useState(null);
   const [edgarError, setEdgarError] = React.useState(null);
+  // After every hook call, so the hook order never changes.
+  if (!theCase.programs || theCase.programs.length === 0) return { overview: null, inputs: null, scenarios: null, evidence: null, flagCount: 0 };
   const isDesktop = typeof window !== "undefined" && window.electronAPI && window.electronAPI.isDesktop;
 
   const pullFromEdgar = async (force) => {
@@ -105,14 +111,28 @@ function ValuationPanel({ theCase, onChange }) {
   // just the scenarios. Where the report already renders the same analysis live
   // from the model, "+ Report" switches that section on rather than storing a
   // snapshot of it.
-  return h(ExportSection, { id: "ws-valuation", title: "Valuation", style: { background: "var(--surface)", border: "1px solid var(--rule)", borderRadius: 10, padding: "16px 18px", marginBottom: 22 } },
-    h("div", { style: { fontFamily: "var(--display)", fontSize: 16, fontWeight: 600, color: "var(--ink-1)", marginBottom: 14 } }, "Valuation"),
+  const PART_TITLES = { overview: "Valuation", inputs: "Company-level assumptions", scenarios: "Scenarios", evidence: "Inputs worth a second look" };
+  const flags = computeRedFlags(theCase);
+  const renderPart = (part) => {
+    const show = (p) => p.split("|").includes(part);
+    // The Scenarios tab holds exactly one section (the scenario comparison,
+    // which exports itself), so its wrapper is a plain card — a second Export
+    // around it would only duplicate it.
+    return h(part === "scenarios" ? "div" : ExportSection, { id: part === "overview" ? "ws-valuation" : undefined, title: part === "scenarios" ? undefined : PART_TITLES[part], style: { background: "var(--surface)", border: "1px solid var(--rule)", borderRadius: 10, padding: "16px 18px", marginBottom: 22 } },
+    part !== "scenarios" && h("div", { style: { fontFamily: "var(--display)", fontSize: 16, fontWeight: 600, color: "var(--ink-1)", marginBottom: 14 } }, PART_TITLES[part]),
+
+    // A one-line pointer to the red-flag checks, which live on Evidence.
+    (show("overview") || show("inputs")) && flags.length > 0 && h("button", { type: "button", onClick: () => goToTab && goToTab("evidence"), className: "flag-pointer" },
+      h("span", { "aria-hidden": "true" }, "●"),
+      flags.length + " input" + (flags.length > 1 ? "s" : "") + " worth a second look", h("span", { className: "flag-pointer-go" }, "Review on Evidence →")),
+    show("evidence") && flags.length === 0 && h("div", { style: { fontSize: 13, color: "var(--ink-2)", lineHeight: 1.6 } },
+      "Nothing stands out: every input this app checks sits within its benchmark range."),
 
     // Red flags — cross-checks this case's own inputs against the same
     // benchmarks and formulas used elsewhere in the app, before presenting
     // what those inputs produce. Purely descriptive, never a verdict — see
     // computeRedFlags in scenarioEngine.js for exactly what's checked and why.
-    (() => {
+    show("evidence") && ((() => {
       const flags = computeRedFlags(theCase);
       if (flags.length === 0) return null;
       const highCount = flags.filter(f => f.severity === "high").length;
@@ -124,7 +144,7 @@ function ValuationPanel({ theCase, onChange }) {
           f.message
         ))
       );
-    })(),
+    })()),
 
     // Price vs. model — a prominent, glanceable summary placed ahead of every
     // input section rather than buried after them, so "what does this case
@@ -133,7 +153,7 @@ function ValuationPanel({ theCase, onChange }) {
     // (scenarioResults for the Bear/Base/Bull targets, impliedSolved for the
     // PoS the price requires) rather than a separate calculation — this is a
     // presentation change, not a new number.
-    !error && scenarioResults && (() => {
+    show("overview") && (!error && scenarioResults && (() => {
       const price = theCase.currentPrice !== "" && theCase.currentPrice != null ? Number(theCase.currentPrice) : null;
       const baseShare = baseResult && baseResult.equity.perShare;
       const upsidePct = (price > 0 && baseShare != null) ? (baseShare / price - 1) * 100 : null;
@@ -164,7 +184,7 @@ function ValuationPanel({ theCase, onChange }) {
         price == null && h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginTop: 8 } }, "Set a current price above to see upside/downside and implied PoS."),
         valMethod === "dcf" && price != null && theCase.programs.length > 1 && h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginTop: 8 } }, "Implied PoS as a single absolute number needs one program — see \"as a multiple\" further down for the multi-program version.")
       );
-    })(),
+    })()),
 
     // Valuation method toggle — DCF is the full bottoms-up build everything
     // else on this panel assumes; Simple Multiple is the RxNPV-style
@@ -187,7 +207,7 @@ function ValuationPanel({ theCase, onChange }) {
     // DCF), and a bottoms-up epidemiology build valued off comps rather than
     // modelled costs (Full + Multiple). Collapsing to a strict either/or would
     // delete those, so the presets lead without forbidding.
-    (() => {
+    show("inputs") && ((() => {
       const modes = theCase.programs.map(p => p.revenueMode || "quick");
       const allQuick = modes.length > 0 && modes.every(m => m !== "full");
       const allFull = modes.length > 0 && modes.every(m => m === "full");
@@ -215,9 +235,9 @@ function ValuationPanel({ theCase, onChange }) {
                 : valMethod === "dcf" && allQuick ? "Typed peak run through the full cost and timing model."
                 : "Programs are mixed between Quick and Full revenue builds."))
         ));
-    })(),
+    })()),
 
-    h("div", { style: { marginBottom: 16 } },
+    show("inputs") && (h("div", { style: { marginBottom: 16 } },
       h("div", { style: { display: "flex", gap: 6, marginBottom: 8 } },
         [["dcf","DCF (bottoms-up)"],["multiple","Simple Multiple"]].map(([id,lbl]) => h("button", { key: id, onClick: () => update({ valuationMethod: id }),
           style: { padding: "6px 14px", borderRadius: 7, border: "1px solid " + (valMethod === id ? "var(--teal)" : "var(--rule)"), cursor: "pointer", fontFamily: "var(--mono)", fontSize: 12,
@@ -261,12 +281,12 @@ function ValuationPanel({ theCase, onChange }) {
           )
         )
       )
-    ),
+    )),
 
     // Cash tax + NOL carryforward. Not read by Simple Multiple: a comp multiple
     // is derived from real deal values, which already reflect after-tax
     // economics — taxing on top of it would double-count.
-    (() => {
+    show("inputs") && ((() => {
       if (methodIgnores(valMethod, "taxation")) return null;
       const tax = theCase.taxation || { enabled: false, effectiveRatePct: "21", startingNOLM: "" };
       const setTax = (patch) => update({ taxation: { ...tax, ...patch } });
@@ -290,13 +310,13 @@ function ValuationPanel({ theCase, onChange }) {
                 "Projected loss years add to the shield; profits draw it down before any tax is charged. Ignores the 80%-of-income annual cap on post-2017 federal NOL use and any expiry of older losses — both would pull tax slightly forward, so this errs mildly optimistic.")))
         )
       );
-    })(),
+    })()),
 
     // Discount rate + terminal value. Terminal value is a DCF concept — Simple
     // Multiple's peak x multiple IS its own terminal-style value, so showing a
     // second one there would invite adding value twice.
-    methodIgnores(valMethod, "terminalValue") && h(NotUsedInThisMode, { what: "Terminal value", compact: true }),
-    h("div", { style: { display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 16 } },
+    show("inputs") && (methodIgnores(valMethod, "terminalValue") && h(NotUsedInThisMode, { what: "Terminal value", compact: true })),
+    show("inputs") && (h("div", { style: { display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 16 } },
       h(BenchField, { label: "Discount rate", value: discountRatePct, onChange: v => update({ discountRatePct: v }), suffix: "%",
         // Blank means the benchmark is used — say so in the box itself.
         placeholder: DISCOUNT_RATE_GUIDANCE.earlyBiotechSelfView[0] + " (benchmark, used while blank)",
@@ -335,10 +355,10 @@ function ValuationPanel({ theCase, onChange }) {
               )
         )
       )
-    ),
+    )),
 
     // Capital structure
-    h("div", { style: { borderTop: "1px dashed var(--rule)", paddingTop: 14, marginBottom: 16 } },
+    show("inputs") && (h("div", { style: { borderTop: "1px dashed var(--rule)", paddingTop: 14, marginBottom: 16 } },
       h("div", { style: { fontSize: 13, fontFamily: "var(--display)", fontWeight: 600, color: "var(--ink-1)", marginBottom: 10 } }, "Capital structure"),
 
       // EDGAR auto-fill — desktop app only, no proxy/CORS workaround needed here
@@ -404,14 +424,14 @@ function ValuationPanel({ theCase, onChange }) {
             h(MillionsField, { label: "Convertible face value", value: cap.convFace, onChange: v => setCap({ convFace: v }) }),
             h(BenchField, { label: "Conversion price", value: cap.convPrice, onChange: v => setCap({ convPrice: v }), suffix: "$" })
           )
-    ),
+    )),
 
     // Future dilution scenario — an optional overlay, applied identically
     // across Bear/Base/Bull so dilution risk shows up consistently, not just
     // in one scenario. Excluded from the Implied PoS solver on purpose (see
     // scenarioEngine.js) since that question is about today's actual share
     // count, not a hypothetical future one.
-    (() => {
+    show("inputs") && ((() => {
       const fr = theCase.futureRaise || { enabled: false, amountM: "", priceOverride: "" };
       const setFR = (patch) => update({ futureRaise: { ...fr, ...patch } });
       const fallbackPrice = theCase.currentPrice;
@@ -433,7 +453,7 @@ function ValuationPanel({ theCase, onChange }) {
             "≈ ", h("b", { style: { color: "var(--ink-2)" } }, Math.round(newShares).toLocaleString()), " new shares at $" + impliedPrice.toFixed(2) + "/share.")
         )
       );
-    })(),
+    })()),
 
     // Dilution-path financing — connects cash runway and R&D-to-launch cost
     // (both already computed elsewhere) into a projected sequence of future
@@ -442,7 +462,7 @@ function ValuationPanel({ theCase, onChange }) {
     // future-raise overlay above, not additive with it — enabling both at
     // once would double-model financing, so this is deliberately its own
     // separate toggle rather than a refinement of that one.
-    (() => {
+    show("inputs") && ((() => {
       const dpInput = theCase.dilutionPath || { enabled: false, minCashBufferM: "", targetRunwayMonths: "18", discountToMarketPct: "15", sbcAnnualGrowthPct: "" };
       const setDP = (patch) => update({ dilutionPath: { ...dpInput, ...patch } });
       let preview = null;
@@ -473,23 +493,23 @@ function ValuationPanel({ theCase, onChange }) {
             h("b", { style: { color: "var(--ink-2)" } }, Math.round(preview.finalDilutedShares).toLocaleString()), " by then.")
         )
       );
-    })(),
+    })()),
 
-    !error && h(MonteCarloBox, { theCase, discountRatePct, tv }),
+    show("overview") && (!error && h(MonteCarloBox, { theCase, discountRatePct, tv })),
 
     // Scenario comparison
-    error ? h("div", { style: { padding: 14, borderRadius: 8, background: "var(--red-bg)", border: "1px solid var(--red)", color: "var(--red)", fontFamily: "var(--mono)", fontSize: 12 } }, "Calculation error: " + error)
+    show("overview|scenarios") && (error ? h("div", { style: { padding: 14, borderRadius: 8, background: "var(--red-bg)", border: "1px solid var(--red)", color: "var(--red)", fontFamily: "var(--mono)", fontSize: 12 } }, "Calculation error: " + error)
     : h("div", null,
         h(ExportSection, { title: "Scenario comparison", reportSection: "summary" },
-        h("div", { id: "ws-scenarios", style: { fontSize: 13, fontFamily: "var(--display)", fontWeight: 600, color: "var(--ink-1)", marginBottom: 10, borderTop: "1px dashed var(--rule)", paddingTop: 14 } }, "Scenario comparison"),
+        h("div", { id: part === "scenarios" ? "ws-scenarios" : undefined, style: { fontSize: 13, fontFamily: "var(--display)", fontWeight: 600, color: "var(--ink-1)", marginBottom: 10, borderTop: part === "scenarios" ? "none" : "1px dashed var(--rule)", paddingTop: part === "scenarios" ? 0 : 14 } }, "Scenario comparison"),
 
-        h(SectionCard, { title: "Case-level Base-PoS adjustment", subtitle: "An overarching view on this whole case's odds, distinct from any single program's PoS override or the Bear/Bull scenario multipliers below", defaultOpen: false },
+        show("scenarios") && (h(SectionCard, { title: "Case-level Base-PoS adjustment", subtitle: "An overarching view on this whole case's odds, distinct from any single program's PoS override or the Bear/Bull scenario multipliers below", defaultOpen: false },
           h(BenchField, { label: "Base PoS adjustment", value: basePosAdjustmentPct, onChange: v => update({ basePosAdjustmentPct: v }), suffix: "%",
             bench: { value: 100, source: "100% = no adjustment (the default). Applies as a multiplier on top of every program's own modeled or overridden PoS, across Bear/Base/Bull alike — so their existing 70%/100%/130% relationship still holds relative to your adjusted Base, not the un-adjusted preset." },
             help: "Use this for a company-wide view (management track record, a specific therapeutic-area headwind or tailwind) that should shift every program's odds together — not a substitute for a per-program override when you have a drug-specific reason instead." })
-        ),
+        )),
 
-        h(SectionCard, { title: "Edit Bear / Bull assumptions", subtitle: "Benchmarks shown by default — override per case when a scenario should look different than the standard multiplier", defaultOpen: false },
+        show("scenarios") && (h(SectionCard, { title: "Edit Bear / Bull assumptions", subtitle: "Benchmarks shown by default — override per case when a scenario should look different than the standard multiplier", defaultOpen: false },
           [["bear","Bear"],["bull","Bull"]].map(([key, label]) => h("div", { key, style: { flex: "1 1 100%", marginBottom: 10 } },
             h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-2)", fontWeight: 700, marginBottom: 6 } }, label + " case"),
             h("div", { style: { display: "flex", gap: 12, flexWrap: "wrap" } },
@@ -524,7 +544,7 @@ function ValuationPanel({ theCase, onChange }) {
               }))
             )
           ))
-        ),
+        )),
 
         h("div", { style: { display: "flex", gap: 12, flexWrap: "wrap" } },
           scenarioResults.map(s => h("div", { key: s.key, style: {
@@ -557,12 +577,12 @@ function ValuationPanel({ theCase, onChange }) {
               fmtShare(s.result.equity.perShare))
           ))
         )),
-        h(ExportSection, { title: "Base-case risk-adjusted cash flow by year", reportSection: "cashFlow", style: { marginTop: 16 } },
+        show("overview") && (h(ExportSection, { title: "Base-case risk-adjusted cash flow by year", reportSection: "cashFlow", style: { marginTop: 16 } },
           h("div", { style: { fontSize: 12, fontFamily: "var(--mono)", color: "var(--ink-2)", marginBottom: 6 } }, "Base-case risk-adjusted cash flow by year"),
           h(ExportableBlock, { title: (theCase.name || "Case") + " — base-case risk-adjusted cash flow" },
             h(RevenueChart, { series: cfSeries, showLegend: false, height: 180 })),
           h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginTop: 4 } }, "Each year's free cash flow weighted by the odds of reaching it. Years below the solid zero line are burn; hover for any year's value.")
-        ),
+        )),
 
         // Implied PoS — the reverse direction from everything else on this
         // panel: solve backwards from the current price to find what PoS the
@@ -572,7 +592,7 @@ function ValuationPanel({ theCase, onChange }) {
         // case-specific insights this tool produces, not just another line
         // item. Title names the actual case so it reads as "this company,"
         // not a generic label.
-        theCase.currentPrice !== "" && theCase.currentPrice != null && valMethod === "dcf" && (() => {
+        show("overview") && (theCase.currentPrice !== "" && theCase.currentPrice != null && valMethod === "dcf" && (() => {
           // Reuses the solve hoisted near the top of this component (see
           // impliedSolved above) — the prominent summary card and this
           // detailed box now show the exact same computation, never two.
@@ -597,14 +617,14 @@ function ValuationPanel({ theCase, onChange }) {
                     h("div", { style: { fontSize: 20, fontFamily: "var(--mono)", fontWeight: 800, color: solved.multiplierPct >= 100 ? "var(--green)" : "var(--red)" } }, solved.multiplierPct.toFixed(0) + "%"))
                 )
           );
-        })(),
+        })()),
 
         // Reverse-solve beyond PoS — same "what does the price imply" idea
         // as the Implied PoS box above, generalized to a different dial via
         // solveImpliedVariable in scenarioEngine.js. Single-program, DCF-only,
         // matching Implied PoS's own scope for the same reason: with more
         // than one program there's no single unambiguous value to solve for.
-        theCase.currentPrice !== "" && theCase.currentPrice != null && valMethod === "dcf" && theCase.programs.length === 1 && (() => {
+        show("overview") && (theCase.currentPrice !== "" && theCase.currentPrice != null && valMethod === "dcf" && theCase.programs.length === 1 && (() => {
           const mode = theCase.programs[0].revenueMode;
           const options = [
             mode === "quick" && { key: "peakRevenue", label: "Peak revenue" },
@@ -612,14 +632,14 @@ function ValuationPanel({ theCase, onChange }) {
             { key: "launchYear", label: "Launch timing" }
           ].filter(Boolean);
           return h(ReverseSolveBox, { theCase, discountRatePct, tv, options });
-        })(),
+        })()),
 
         // Enterprise Value -> Equity Value -> Per-Share bridge, Base case. A
         // simple connected flow rather than a proportional waterfall bar —
         // renders correctly regardless of sign (EV, cash, debt can all be
         // negative or positive) without the complexity a true waterfall needs
         // to handle that safely.
-        (() => {
+        show("overview") && ((() => {
           const baseR = scenarioResults.find(s => s.key === "base").result;
           // Line items come from the result itself, so they always sum to the
           // equity value shown (see computeEquityBridgeSteps).
@@ -645,13 +665,13 @@ function ValuationPanel({ theCase, onChange }) {
                 h("div", { style: { fontSize: 16, fontFamily: "var(--mono)", fontWeight: 800, color: "var(--teal)" } }, fmtShare(baseR.equity.perShare)))
             )
           );
-        })(),
+        })()),
 
         // Sum-of-the-Parts breakdown — only meaningful with more than one program.
         // Reuses the exact same pipeline as the main valuation (each program run
         // standalone through it), so this always reconciles exactly with the
         // combined Base-case Enterprise Value shown above.
-        theCase.programs.length > 1 && valMethod === "dcf" && (() => {
+        show("overview") && (theCase.programs.length > 1 && valMethod === "dcf" && (() => {
           let sotp = null, sotpError = null;
           try {
             const drBase = discountRatePct !== "" ? Number(discountRatePct) : DISCOUNT_RATE_GUIDANCE.earlyBiotechSelfView[0];
@@ -676,7 +696,7 @@ function ValuationPanel({ theCase, onChange }) {
               h("span", { style: { color: "var(--ink-1)" } }, "Total Enterprise Value"),
               h("span", { style: { color: "var(--ink-1)" } }, fmtMoney(sotp.sumOfParts)))
           );
-        })(),
+        })()),
 
         // Pipeline-level risk waterfall — the per-program version lives in
         // each program's own editor; this is its case-wide counterpart, so a
@@ -687,7 +707,7 @@ function ValuationPanel({ theCase, onChange }) {
         // rather than summing per-program standalone figures, so shared
         // corporate G&A is included correctly the same way it is in the
         // case's actual number, not approximated separately.
-        theCase.programs.length > 1 && valMethod === "dcf" && (() => {
+        show("overview") && (theCase.programs.length > 1 && valMethod === "dcf" && (() => {
           let unriskedNPV = null, riskedNPV = null, rwError = null;
           try {
             const drBase = discountRatePct !== "" ? Number(discountRatePct) : DISCOUNT_RATE_GUIDANCE.earlyBiotechSelfView[0];
@@ -706,7 +726,7 @@ function ValuationPanel({ theCase, onChange }) {
             h(ExportableBlock, { title: (theCase.name || "Case") + " — pipeline risk waterfall" },
               h(RiskWaterfallChart, { unriskedNPV, riskedNPV, posToLaunchPct: null, height: 190 }))
           );
-        })(),
+        })()),
 
         // Simple Multiple's own version of a value-drivers breakdown — fills
         // the same visual space DCF mode uses for Implied PoS/SOTP, rather
@@ -714,7 +734,7 @@ function ValuationPanel({ theCase, onChange }) {
         // EV gets cut down by PoS risk and by time discounting, across all
         // programs — the equivalent of the risk waterfall's story, but at
         // the case level and using this method's own mechanics.
-        valMethod === "multiple" && baseResult && baseResult.programVals && baseResult.programVals.length > 0 && (() => {
+        show("overview") && (valMethod === "multiple" && baseResult && baseResult.programVals && baseResult.programVals.length > 0 && (() => {
           const totalPeakEV = baseResult.programVals.reduce((s, p) => s + (p.peakEV || 0), 0);
           const totalRiskedEV = baseResult.programVals.reduce((s, p) => s + (p.riskedEV || 0), 0);
           const totalPV = baseResult.programVals.reduce((s, p) => s + (p.pv || 0), 0);
@@ -733,11 +753,11 @@ function ValuationPanel({ theCase, onChange }) {
             row("Risked EV (× PoS)", totalRiskedEV, "var(--ink-1)"),
             row("Present Value (discounted to today)", totalPV, "var(--teal)")
           );
-        })(),
+        })()),
 
         // Current price vs. fair value — the standard write-up headline. Uses
         // the case-level Current Price field (top of the case, near the name).
-        theCase.currentPrice !== "" && theCase.currentPrice != null && h("div", { style: { marginTop: 16, padding: "12px 14px", borderRadius: 8, background: "var(--surface-2)", border: "1px solid var(--rule)" } },
+        show("overview") && (theCase.currentPrice !== "" && theCase.currentPrice != null && h("div", { style: { marginTop: 16, padding: "12px 14px", borderRadius: 8, background: "var(--surface-2)", border: "1px solid var(--rule)" } },
           h("div", { style: { display: "flex", gap: 24, flexWrap: "wrap", alignItems: "center" } },
             h("div", null,
               h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", } }, "Current price"),
@@ -755,7 +775,9 @@ function ValuationPanel({ theCase, onChange }) {
               );
             })
           )
-        )
-      )
+        ))
+      ))
   );
+  };
+  return { overview: renderPart("overview"), inputs: renderPart("inputs"), scenarios: renderPart("scenarios"), evidence: renderPart("evidence"), flagCount: flags.length };
 }

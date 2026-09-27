@@ -144,6 +144,8 @@ async function offline(win, js, click, text) {
   ok(ov.shown === "1000" && ov.stored === "1000000000", "B-011/FIN-001: override shows 1000 ($M) and stores $1e9", JSON.stringify(ov));
 
   // B-002 — whole-section export, PNG and PDF, through the real render-section IPC.
+  // The Valuation card lives on the Overview sub-tab.
+  await js(`(() => { const t = document.getElementById("casetab-overview"); if (t) t.click(); return true; })()`); await sleep(600);
   const png = await js(`(async () => { const s = document.getElementById('ws-valuation'); const h = s.getBoundingClientRect().height;
     const r = await exportSectionAs(s, 'png', { title: sectionTitleOf(s), context: exportContextOf(s), returnData: true }); return { h, vh: innerHeight, ok: r.ok, data: r.data, err: r.error }; })()`);
   if (png.ok) {

@@ -143,7 +143,7 @@ app.whenReady().then(async () => {
       // collapsed toggle (aria-expanded="false") — then keep all visible text
       // for a spelling pass. Collected text lands in text/<stop>.txt.
       await js(`(() => { document.querySelectorAll("details:not([open])").forEach(d => d.open = true);
-        document.querySelectorAll('[aria-expanded="false"]').forEach(b => { try { b.click(); } catch (e) {} }); return true; })()`);
+        document.querySelectorAll('[aria-expanded="false"]:not(.xm-trigger)').forEach(b => { try { b.click(); } catch (e) {} }); return true; })()`);
       await sleep(500);
       await js(`document.querySelectorAll("details:not([open])").forEach(d => d.open = true)`);
       const text = await js("document.body.innerText");
@@ -203,7 +203,14 @@ app.whenReady().then(async () => {
 
   const run = async () => { await js(`(() => { document.querySelectorAll("#ts-root .runbtn").forEach(b => b.click()); return true; })()`); await sleep(2200); };
   const visitAll = async () => {
-    await click("Workspace", 700); await stop("Workspace");
+    // The Workspace is five sub-tabs; each is its own stop. Tabs are clicked by
+    // id because a tab's text can carry a count badge ("Evidence 3").
+    await click("Workspace", 700);
+    for (const t of ["overview", "assumptions", "scenarios", "evidence", "calibration"]) {
+      await js(`document.getElementById("casetab-${t}").click()`); await sleep(500);
+      await stop("Workspace " + t);
+    }
+    await js(`document.getElementById("casetab-overview").click()`);
     await click("Tools", 700);
     const tools = [["Trial", ["Trial Decoder", "Asset Program", "Trial Explorer", "FDA Lookup"]], ["Science", ["Target Dossier", "Literature"]],
       ["Company", ["Company Lookup", "Catalyst Calendar", "Cash Runway", "Runway vs. Catalyst"]], ["Commercial", ["Launch & Actuals", "Exclusivity / LOE"]],

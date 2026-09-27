@@ -65,8 +65,13 @@ function newProgram() {
   };
 }
 
-function ProgramEditor({ program, onChange, onDelete, discountRatePct, terminalValue, valuationMethod, basePosAdjustmentPct, onNavigateToTools }) {
+function ProgramEditor({ program, onChange, onDelete, discountRatePct, terminalValue, valuationMethod, basePosAdjustmentPct, onNavigateToTools, part }) {
   const h = React.createElement;
+  // Which Workspace tab this instance draws: "inputs" (Assumptions),
+  // "evidence" or "calibration" — or everything, when no part is given. Each
+  // tab mounts its own instance with a fixed part, so the hooks inside the
+  // gated blocks below are called in the same order for that instance's life.
+  const show = (p) => !part || part === "all" || part === p;
   // Read through the shared normalizer rather than dereferencing directly:
   // a program missing (or partially missing) revenueBuild would otherwise
   // throw during render and take down the whole React tree, not just this
@@ -136,27 +141,27 @@ function ProgramEditor({ program, onChange, onDelete, discountRatePct, terminalV
 
   return h("div", { style: { marginBottom: 30 } },
     // Header
-    h("div", { style: { display: "flex", alignItems: "center", gap: 10, marginBottom: 14, flexWrap: "wrap" } },
+    show("inputs") && (h("div", { style: { display: "flex", alignItems: "center", gap: 10, marginBottom: 14, flexWrap: "wrap" } },
       h("input", {
         value: program.name, onChange: e => set("name", e.target.value), "aria-label": "Program name",
         style: { fontFamily: "var(--display)", fontSize: 20, fontWeight: 700, color: "var(--ink-1)", background: "transparent", border: "none", borderBottom: "2px solid var(--rule)", padding: "2px 0", flex: "1 1 240px", minWidth: 180 }
       }),
       h("button", { onClick: () => setConfirmingDelete(true), style: { padding: "6px 12px", borderRadius: 6, border: "1px solid var(--red)", background: "transparent", color: "var(--red)", fontFamily: "var(--mono)", fontSize: 11, cursor: "pointer" } }, "Remove program")
-    ),
+    )),
 
     // Same one-click-and-it's-gone problem as Delete case, at the program
     // level — a program carries its own revenue build, Evidence Log and
     // Calibration Log, all lost with no confirmation before this existed.
-    confirmingDelete && h(ConfirmDialog, {
+    show("inputs") && (confirmingDelete && h(ConfirmDialog, {
       title: "Remove " + (program.drugName || program.name || "this program") + "?",
       message: "This removes its revenue build, cost structure, Evidence Log and Calibration Log entries. This can't be undone.",
       confirmLabel: "Remove program",
       onCancel: () => setConfirmingDelete(false),
       onConfirm: () => { setConfirmingDelete(false); onDelete(); }
-    }),
+    })),
 
     // Identity row
-    h("div", { style: { display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 14 } },
+    show("inputs") && (h("div", { style: { display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 14 } },
       h("div", { style: { flex: "1 1 180px" } },
         h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-2)", marginBottom: 5 } }, "Drug name"),
         h("input", { "aria-label": "Drug name", value: program.drugName, onChange: e => set("drugName", e.target.value), placeholder: "e.g. XYZ-101",
@@ -186,10 +191,10 @@ function ProgramEditor({ program, onChange, onDelete, discountRatePct, terminalV
         h("input", { type: "number", "aria-label": "Launch in year (from today)", value: program.launchYearOffset, onChange: e => set("launchYearOffset", e.target.value),
           placeholder: "e.g. " + Math.round(rndYearsUsed),
           style: { width: "100%", padding: "7px 10px", borderRadius: 6, border: "1.5px solid var(--rule)", background: "var(--surface)", color: "var(--ink-1)", fontFamily: "var(--mono)", fontSize: 13 } }))
-    ),
+    )),
 
     // ── 0. R&D to Launch ──
-    h(SectionCard, { title: "R&D to Launch", subtitle: "Remaining time and cost to launch, area-specific — benchmarks apply below, expand to customize", defaultOpen: false },
+    show("inputs") && (h(SectionCard, { title: "R&D to Launch", subtitle: "Remaining time and cost to launch, area-specific — benchmarks apply below, expand to customize", defaultOpen: false },
       // Deliberately NOT hidden wholesale in Simple Multiple mode. The stage
       // TIMELINE still matters there — it sets how many years the value is
       // discounted back across — while the per-stage costs are read by nothing.
@@ -228,10 +233,10 @@ function ProgramEditor({ program, onChange, onDelete, discountRatePct, terminalV
             h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginTop: 8, lineHeight: 1.6 } },
               "Assumes \"current phase\" means the program is at the start of that phase — full remaining cost/time for it and everything after. Phase 2/3 durations are area-specific; costs use the weighted-average \"typical asset\" benchmark (area-specific patient counts aren't available to scale per-patient cost).")
           )
-    ),
+    )),
 
     // ── Revenue mode toggle ──
-    h("div", { style: { display: "flex", alignItems: "center", gap: 10, marginBottom: 14 } },
+    show("inputs") && (h("div", { style: { display: "flex", alignItems: "center", gap: 10, marginBottom: 14 } },
       h("span", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-3)" } }, "Revenue build:"),
       h("div", { style: { display: "flex", gap: 6 } },
         [["quick","Quick — enter peak revenue directly"],["full","Full — build up from population & pricing"]].map(([id,lbl]) => h("button", {
@@ -241,10 +246,10 @@ function ProgramEditor({ program, onChange, onDelete, discountRatePct, terminalV
             fontFamily: "var(--mono)", fontSize: 11, fontWeight: revenueMode === id ? 700 : 400, cursor: "pointer" }
         }, lbl))
       )
-    ),
+    )),
 
     // ── Quick Revenue (quick mode only) ──
-    revenueMode === "quick" && h(SectionCard, { title: "Quick Revenue", subtitle: "Enter your own peak revenue estimate — skips the population/pricing build-up below", defaultOpen: true },
+    show("inputs") && (revenueMode === "quick" && h(SectionCard, { title: "Quick Revenue", subtitle: "Enter your own peak revenue estimate — skips the population/pricing build-up below", defaultOpen: true },
       h(MillionsField, { label: "Peak worldwide revenue estimate", value: quick.peakRevenue, onChange: v => set("quickRevenue.peakRevenue", v),
         help: "Enter in millions (e.g. 800 for $800M). Anchor to a comparable marketed drug's peak sales, or a quick TAM × penetration guess." }),
       h(BenchField, { label: "Years to peak", value: quick.yearsToPeak, onChange: v => set("quickRevenue.yearsToPeak", v), suffix: "yrs",
@@ -256,10 +261,10 @@ function ProgramEditor({ program, onChange, onDelete, discountRatePct, terminalV
           h("option", { value: "p25" }, "Slow (25th pctile)"), h("option", { value: "median" }, "Median"), h("option", { value: "p75" }, "Fast (75th pctile)"))),
       h("div", { style: { flex: "1 1 100%", fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginTop: 8 } },
         "LOE timing and erosion still apply below. Switch to Full for a bottoms-up build instead of a direct peak-revenue guess.")
-    ),
+    )),
 
     // ── 1. Population ── (full mode only)
-    revenueMode === "full" && h(SectionCard, { title: "Step 1 of 5 · Addressable Population", subtitle: "Prevalence/incidence → diagnosed → treated → eligible for this drug" },
+    show("inputs") && (revenueMode === "full" && h(SectionCard, { title: "Step 1 of 5 · Addressable Population", subtitle: "Prevalence/incidence → diagnosed → treated → eligible for this drug" },
       h("div", { style: { flex: "1 1 100%", display: "flex", gap: 10, marginBottom: 10 } },
         ["prevalence", "incidence"].map(m => h("button", {
           key: m, onClick: () => set("revenueBuild.population.mode", m),
@@ -306,10 +311,10 @@ function ProgramEditor({ program, onChange, onDelete, discountRatePct, terminalV
               style: { padding: "5px 10px", borderRadius: 5, border: "1px solid var(--amber)", background: "transparent", color: "var(--amber)", fontFamily: "var(--mono)", fontSize: 10, cursor: "pointer" }
             }, "Use as eligible % →")));
       })()
-    ),
+    )),
 
     // ── 2-5. Adherence, Market Share, Launch Curve, Pricing (full mode only) ──
-    revenueMode === "full" && h(React.Fragment, null,
+    show("inputs") && (revenueMode === "full" && h(React.Fragment, null,
     h(SectionCard, { title: "Step 2 of 5 · Adherence", subtitle: "Discounts treated patients for real-world persistence/compliance" },
       h(BenchField, { label: "Adherence / persistence rate", value: rb.adherencePct, onChange: v => set("revenueBuild.adherencePct", v), suffix: "%", bench: adherenceBench,
         help: "Asymptomatic/chronic conditions run 50-70% MPR; high-severity (leukemia, MS) can exceed 80%." })
@@ -394,21 +399,21 @@ function ProgramEditor({ program, onChange, onDelete, discountRatePct, terminalV
       )
     ),
 
-    ), // close Fragment wrapping sections 2-5
+    )), // close Fragment wrapping sections 2-5
 
     // ── 6. Exclusivity / LOE ──
-    h(SectionCard, { key: "exclusivity-" + revenueMode, title: "Exclusivity & Loss of Exclusivity", subtitle: "When generic/biosimilar competition arrives, and how much it costs you" + (revenueMode === "quick" ? " — using benchmarks below, expand to customize" : ""), defaultOpen: revenueMode === "full" },
+    show("inputs") && (h(SectionCard, { key: "exclusivity-" + revenueMode, title: "Exclusivity & Loss of Exclusivity", subtitle: "When generic/biosimilar competition arrives, and how much it costs you" + (revenueMode === "quick" ? " — using benchmarks below, expand to customize" : ""), defaultOpen: revenueMode === "full" },
       h(BenchField, { label: "Years from launch to LOE", value: rb.exclusivity.yearsToLOE, onChange: v => set("revenueBuild.exclusivity.yearsToLOE", v), suffix: "yrs",
         bench: { value: 13, source: EXCLUSIVITY_BENCHMARKS.source + " — average launch-to-competition. 20yr patent from filing, +5yr Hatch-Waxman, +7yr if orphan, +6mo pediatric." } }),
       h(BenchField, { label: "Volume retained after LOE", value: rb.exclusivity.volumeRetainedPct, onChange: v => set("revenueBuild.exclusivity.volumeRetainedPct", v), suffix: "%",
         bench: getExclusivityBenchText(program.modality).volRetained }),
       h(BenchField, { label: "Price decline after LOE", value: rb.exclusivity.priceDeclinePct, onChange: v => set("revenueBuild.exclusivity.priceDeclinePct", v), suffix: "%",
         bench: getExclusivityBenchText(program.modality).priceDecline })
-    ),
+    )),
 
     // ── 7. Cost Structure ──
-    methodIgnores(valuationMethod, "costStructure") && h(NotUsedInThisMode, { what: "Cost Structure (COGS, sales force, marketing)" }),
-    !methodIgnores(valuationMethod, "costStructure") && h(SectionCard, { key: "coststructure-" + revenueMode, title: "Cost Structure", subtitle: "COGS, sales force, marketing — produces per-year product contribution (before corporate G&A)" + (revenueMode === "quick" ? " — using benchmarks below, expand to customize" : ""), defaultOpen: revenueMode === "full" },
+    show("inputs") && (methodIgnores(valuationMethod, "costStructure") && h(NotUsedInThisMode, { what: "Cost Structure (COGS, sales force, marketing)" })),
+    show("inputs") && (!methodIgnores(valuationMethod, "costStructure") && h(SectionCard, { key: "coststructure-" + revenueMode, title: "Cost Structure", subtitle: "COGS, sales force, marketing — produces per-year product contribution (before corporate G&A)" + (revenueMode === "quick" ? " — using benchmarks below, expand to customize" : ""), defaultOpen: revenueMode === "full" },
       h(BenchField, { label: "COGS (% of revenue)", value: cs.cogsPct, onChange: v => set("costStructure.cogsPct", v), suffix: "%", bench: cogsBench,
         help: cogsBench.value + "% keys off modality above — price is the bigger driver in reality, but this is the best generic anchor." }),
       h("div", { style: { flex: "1 1 100%", fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-2)", margin: "6px 0 2px", fontWeight: 700 } }, "Sales force (active reps at peak)"),
@@ -422,10 +427,10 @@ function ProgramEditor({ program, onChange, onDelete, discountRatePct, terminalV
         bench: { value: MARKETING_BENCHMARKS.baseCasePctOfPeakRevenue, source: MARKETING_BENCHMARKS.source + " — base case; " + MARKETING_BENCHMARKS.competitiveScenarioRange.join("-") + "% if highly competitive" } }),
       h("div", { style: { flex: "1 1 100%", fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginTop: 6, lineHeight: 1.6 } },
         "Sales force ramps to " + SALES_FORCE_PRELAUNCH_RAMP_PCT + "% one year before launch, grows " + SALES_FORCE_COMP_GROWTH_PCT + "%/yr, fully eliminated the year after LOE. Typical team size: ~" + SALES_FORCE_SIZE_BENCHMARKS.hospitalOrSpecialty + " reps (specialty/hospital) or ~" + SALES_FORCE_SIZE_BENCHMARKS.primaryCareNoPartner + " (primary care, unpartnered).")
-    ),
+    )),
 
     // ── Output readout ──
-    error ? h("div", { style: { padding: 14, borderRadius: 8, background: "var(--red-bg)", border: "1px solid var(--red)", color: "var(--red)", fontFamily: "var(--mono)", fontSize: 12 } }, "Calculation error: " + error)
+    show("inputs") && (error ? h("div", { style: { padding: 14, borderRadius: 8, background: "var(--red-bg)", border: "1px solid var(--red)", color: "var(--red)", fontFamily: "var(--mono)", fontSize: 12 } }, "Calculation error: " + error)
     : h(ExportSection, { title: (program.drugName || program.name || "Program") + " — revenue build output", style: { background: "var(--surface)", border: "1px solid var(--rule)", borderRadius: 10, padding: "16px 18px" } },
         h("div", { style: { display: "flex", gap: 24, flexWrap: "wrap", marginBottom: 14 } },
           h("div", null,
@@ -447,10 +452,10 @@ function ProgramEditor({ program, onChange, onDelete, discountRatePct, terminalV
         ),
         h(ExportableBlock, { title: (program.drugName || program.name || "Program") + " — revenue by year" },
           h(RevenueChart, { series: chartSeries, showLegend: true }))
-      ),
+      )),
 
     // ── R&D & PoS context strip ──
-    (() => {
+    show("inputs") && ((() => {
       const posWeighting = computePoSWeighting(program);
       const cumulativePoS = posWeighting.posToLaunch * 100;
       const overridePct = program.posOverridePct;
@@ -536,12 +541,12 @@ function ProgramEditor({ program, onChange, onDelete, discountRatePct, terminalV
           bench: { value: Math.round(cumulativePoS * 10) / 10, source: "Computed from " + program.therapeuticArea + " phase-by-phase benchmarks through to launch" + (mods.applied.length ? ", adjusted for " + mods.applied.map(a => a.label.toLowerCase()).join(" + ") + " (" + mods.source + ")" : "") },
           help: "Override when you have a specific reason beyond the attributes above. Fixes the CUMULATIVE odds to launch — not how attrition spreads across phases, which still comes from the benchmarks. So two programs with the same override but different modality can still differ modestly in value, since they spend different amounts on late-stage trials getting there. Bear/Bull scale off whatever you set." })
       );
-    })(),
+    })()),
 
     // ── Risk waterfall: this asset's value if success were certain vs its
     // actual risk-adjusted rNPV. Uses Base scenario + the case's own discount
     // rate/terminal value settings for consistency with the rest of the app.
-    (() => {
+    show("inputs") && ((() => {
       let wf = null, wfError = null;
       try {
         const tv = terminalValue || { enabled: false };
@@ -558,13 +563,13 @@ function ProgramEditor({ program, onChange, onDelete, discountRatePct, terminalV
         h(ExportableBlock, { title: (program.drugName || program.name || "Program") + " — risk waterfall" },
           h(RiskWaterfallChart, { unriskedNPV: wf.unriskedNPV, riskedNPV: wf.riskedNPV, posToLaunchPct: wf.posToLaunch * 100 }))
       );
-    })(),
+    })()),
 
     // ── Priority Review Voucher — tied to THIS program's own approval, since
     // that's literally how PRVs work (granted only upon qualifying approval).
     // Risk-adjusted by this program's PoS and discounted from its launch year,
     // not a flat certain amount — matches the actual mechanics of the asset.
-    (() => {
+    show("inputs") && ((() => {
       const prv = program.prv || { enabled: false, valueM: "150" };
       const setPrv = (patch) => set("prv", { ...prv, ...patch });
       // Gentle nudge only — NOT an eligibility determination. PRV programs (rare
@@ -585,13 +590,13 @@ function ProgramEditor({ program, onChange, onDelete, discountRatePct, terminalV
           bench: { value: 150, source: "Representative PRV market value — actual trading value has ranged $100-350M" },
           help: "Weighted by this program's PoS and discounted back from its launch year — a PRV is only granted on approval, so it isn't a certain, undiscounted amount." })
       );
-    })(),
+    })()),
 
     // ── Partnership economics — an optional overlay on top of whichever
     // revenue mode is active (Quick or Detailed), not a third mode. See the
     // factory default above and computeCaseValuation/getProgramRevenueResult
     // for the actual math this feeds.
-    (() => {
+    show("inputs") && ((() => {
       const partnership = program.partnership || { enabled: false, territory: "exUS", royaltyPct: "", upfrontM: "", costSharingPct: "", milestones: [] };
       const setPartnership = (patch) => set("partnership", { ...partnership, ...patch });
       const [showMilestoneForm, setShowMilestoneForm] = React.useState(false);
@@ -654,14 +659,14 @@ function ProgramEditor({ program, onChange, onDelete, discountRatePct, terminalV
           )
         )
       );
-    })(),
+    })()),
 
     // ── Evidence Log — the "why" behind judgment-call inputs, living inside
     // the case itself rather than a separate document that drifts out of
     // sync. Deliberately general-purpose: entries aren't tied to a specific
     // internal field, so this holds per-field justifications (PoS override,
     // peak share) and general program-level thesis notes equally well.
-    (() => {
+    show("evidence") && ((() => {
       const [showForm, setShowForm] = React.useState(false);
       const [editingIdx, setEditingIdx] = React.useState(null);
       const log = program.evidenceLog || [];
@@ -712,7 +717,7 @@ function ProgramEditor({ program, onChange, onDelete, discountRatePct, terminalV
           ? h(EvidenceEntryForm, { saveLabel: "Add", onSave: addEntry, onCancel: () => setShowForm(false) })
           : h("button", { onClick: () => setShowForm(true), style: { padding: "6px 14px", borderRadius: 6, border: "1px solid var(--rule)", background: "transparent", color: "var(--ink-2)", fontFamily: "var(--mono)", fontSize: 11, cursor: "pointer", marginTop: log.length > 0 ? 4 : 0 } }, "+ Add evidence")
       );
-    })(),
+    })()),
 
     // ── Calibration Log — record a PoS prediction (yours and the market's)
     // before a catalyst resolves, the actual outcome after. Brier score
@@ -721,7 +726,7 @@ function ProgramEditor({ program, onChange, onDelete, discountRatePct, terminalV
     // Implied PoS box above (that would need theCase threaded down into
     // this component, which nothing else here currently needs) — the
     // number is already visible elsewhere on this same screen to copy over.
-    (() => {
+    show("calibration") && ((() => {
       const [showForm, setShowForm] = React.useState(false);
       const [editingIdx, setEditingIdx] = React.useState(null);
       const log = program.calibrationLog || [];
@@ -779,6 +784,6 @@ function ProgramEditor({ program, onChange, onDelete, discountRatePct, terminalV
           ? h(CalibrationEntryForm, { saveLabel: "Add", onSave: addEntry, onCancel: () => setShowForm(false) })
           : h("button", { onClick: () => setShowForm(true), style: { padding: "6px 14px", borderRadius: 6, border: "1px solid var(--rule)", background: "transparent", color: "var(--ink-2)", fontFamily: "var(--mono)", fontSize: 11, cursor: "pointer", marginTop: log.length > 0 ? 4 : 0 } }, "+ Add prediction")
       );
-    })(),
+    })()),
   );
 }
