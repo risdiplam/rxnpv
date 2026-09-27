@@ -168,7 +168,7 @@ function hypergeomPointProb(a, rowA, rowB, colEvent) {
 // margins whose probability is no greater than the observed table's
 // (not just the more-extreme-in-one-direction tables a one-sided test uses).
 function fisherExactTwoSided(a, b, c, d) {
-  const rowA = a + b, rowB = c + d, colEvent = a + c, total = rowA + rowB;
+  const rowA = a + b, rowB = c + d, colEvent = a + c;
   const pObserved = hypergeomPointProb(a, rowA, rowB, colEvent);
   const aMin = Math.max(0, colEvent - rowB), aMax = Math.min(rowA, colEvent);
   let pValue = 0;

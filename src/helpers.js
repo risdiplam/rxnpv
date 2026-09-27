@@ -4,6 +4,18 @@
 let _idCounter = 1;
 function newId(prefix) { return (prefix || "id") + "_" + (Date.now().toString(36)) + "_" + (_idCounter++); }
 
+// Style objects repeated across the React views. Identical to the inline
+// objects they replaced; extend with a spread ({ ...UI.caption, marginTop: 8 }).
+const UI = {
+  caption: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)" },
+  captionMd: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-3)" },
+  intro: { fontSize: 11, fontFamily: "var(--sans)", color: "var(--ink-2)", marginBottom: 12, lineHeight: 1.6 },
+  fieldLabel: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-2)", marginBottom: 5 },
+  input: { width: "100%", padding: "7px 10px", borderRadius: 6, border: "1.5px solid var(--rule)", background: "var(--surface)", color: "var(--ink-1)", fontFamily: "var(--mono)", fontSize: 13 },
+  warnNote: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--warn)", lineHeight: 1.6 },
+  stat: { fontSize: 18, fontFamily: "var(--mono)", fontWeight: 700, color: "var(--ink-1)" },
+};
+
 function fmtMoney(v, decimals) {
   if (v == null || isNaN(v)) return "—";
   const a = Math.abs(v);
@@ -978,7 +990,7 @@ function appendEdgarEvidenceToPrograms(programs, edgarResult, contextLabel) {
   });
 }
 
-// Reverse-solve box — companion to the Implied PoS box in ValuationPanel,
+// Reverse-solve box — companion to the Implied PoS box on the Overview tab,
 // same visual language (amber accent), but lets the user pick which variable
 // to solve for via solveImpliedVariable in scenarioEngine.js. Its own small
 // component (not inlined like Implied PoS) because it needs local state for
@@ -1032,7 +1044,7 @@ function MonteCarloBox({ theCase, discountRatePct, tv }) {
       h(ExportableBlock, { title: (theCase.name || "Case") + " — Monte Carlo fair-value distribution" },
       h("div", { style: { display: "flex", gap: 20, flexWrap: "wrap", marginBottom: 14 } },
         [["P10", result.percentiles.p10], ["P25", result.percentiles.p25], ["P50 (median)", result.percentiles.p50], ["P75", result.percentiles.p75], ["P90", result.percentiles.p90]].map(([label, v]) =>
-          h("div", { key: label }, h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", } }, label),
+          h("div", { key: label }, h("div", { style: UI.caption }, label),
             h("div", { style: { fontSize: 15, fontFamily: "var(--mono)", fontWeight: 700, color: label.startsWith("P50") ? "var(--teal)" : "var(--ink-1)" } }, fmt(v))))
       ),
       [["P10", result.percentiles.p10, "var(--ink-3)"], ["P25", result.percentiles.p25, "var(--amber)"], ["P50", result.percentiles.p50, "var(--teal)"], ["P75", result.percentiles.p75, "var(--amber)"], ["P90", result.percentiles.p90, "var(--ink-3)"]].map(([label, v, color]) =>
@@ -1115,7 +1127,7 @@ function CompetitorScanBox({ indication, drugName, currentNumDrugs, onApplyNumDr
       h("button", { onClick: scan, disabled: loading,
         style: { padding: "6px 14px", borderRadius: 6, border: "1px solid var(--teal)", background: "var(--teal-bg)", color: "var(--teal)", fontFamily: "var(--mono)", fontSize: 11, fontWeight: 700, cursor: loading ? "default" : "pointer" }
       }, loading ? "Scanning…" : "Scan competitors on ClinicalTrials.gov"),
-      h("span", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)" } },
+      h("span", { style: UI.caption },
         indication && indication.trim() ? "Searches: " + indication.trim() : "Set an indication above first")),
     error && h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--red)", marginTop: 8 } }, error),
     result && h("div", { style: { marginTop: 10, fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-2)", lineHeight: 1.7 } },
@@ -1369,109 +1381,6 @@ function NotUsedInThisMode({ what, compact }) {
     h("span", null, what || "This section", " is not used while Simple Multiple is the valuation method — that method values peak revenue directly and never builds a year-by-year cash flow. Switch to DCF to make it count."));
 }
 
-// ── Workspace section navigation ───────────────────────────────────────────
-// A populated two-program case runs about six screens of continuous scroll in
-// Quick mode, and considerably more in Detailed — measured, not estimated.
-// Nothing was wrong with that layout (it has no overflow at any supported
-// width), but there was no way to get from the revenue rollup to the EV bridge
-// except by scrolling past everything in between, and no way to tell where you
-// were once you had.
-//
-// This is a jump bar rather than a restructure on purpose: the single-document
-// flow is right for a valuation model — you want to scroll through the whole
-// thing while iterating — so the fix is making that document navigable, not
-// chopping it into tabs that hide half the model from you.
-//
-// Uses the same chip visual language as the Tools and Simulation tab rows, so
-// it reads as an existing pattern rather than a new one to learn.
-const WORKSPACE_NAV_OFFSET = 54 + 44; // app header (54) + this bar's own height
-
-function WorkspaceNav({ sections }) {
-  const h = React.createElement;
-  const [activeId, setActiveId] = React.useState(sections.length ? sections[0].id : null);
-  const visible = sections.filter(s => s && s.id);
-
-  // Scroll-spy: which section "owns" the highlight. Previously an
-  // IntersectionObserver with a rootMargin band covering roughly the top 45%
-  // of the viewport — that had two real bugs, both reported as "buggy and
-  // hit or miss":
-  //   1. A short section (ws-programs is a ~32px tab strip) can pass through
-  //      that band without ever registering, or exit it once you've scrolled
-  //      past it — at which point NOTHING is intersecting, the observer stops
-  //      firing, and the highlight goes stale on whatever was active before.
-  //      This is exactly why the last button in the bar tended to "not work."
-  //   2. jump() below sets activeId immediately, then starts a smooth scroll —
-  //      but the observer keeps firing DURING that animation and overwrites
-  //      the click with whatever section happens to be passing by mid-flight.
-  // Replaced with a direct position check instead of intersection bands: the
-  // active section is simply the last one whose top has scrolled above the
-  // offset line, computed on scroll (rAF-throttled). No band to fall out of,
-  // and it's suppressed entirely while a programmatic jump is in flight (see
-  // jumpingRef below), which removes the race at its source rather than
-  // trying to win it.
-  const jumpingRef = React.useRef(false);
-  React.useEffect(() => {
-    const els = visible.map(s => ({ id: s.id, el: document.getElementById(s.id) })).filter(s => s.el);
-    if (!els.length) return;
-    const line = WORKSPACE_NAV_OFFSET + 1;
-    let ticking = false;
-    const update = () => {
-      ticking = false;
-      if (jumpingRef.current) return;
-      let current = els[0].id;
-      for (const s of els) { if (s.el.getBoundingClientRect().top <= line) current = s.id; }
-      setActiveId(current);
-    };
-    const onScroll = () => { if (!ticking) { ticking = true; requestAnimationFrame(update); } };
-    update();
-    window.addEventListener("scroll", onScroll, { passive: true });
-    window.addEventListener("resize", onScroll);
-    return () => { window.removeEventListener("scroll", onScroll); window.removeEventListener("resize", onScroll); };
-  }, [visible.map(s => s.id).join(",")]);
-
-  const jump = (id) => {
-    const el = document.getElementById(id);
-    if (!el) return;
-    jumpingRef.current = true;
-    setActiveId(id);
-    const y = el.getBoundingClientRect().top + window.scrollY - WORKSPACE_NAV_OFFSET;
-    window.scrollTo({ top: Math.max(0, y), behavior: "smooth" });
-    // Re-enable the scroll-spy once the smooth scroll has actually settled,
-    // rather than guessing a fixed delay — a jump of 200px and one of 4000px
-    // take very different amounts of time. Polls scrollY via rAF and treats
-    // a few consecutive unchanged frames as "done"; a hard cap guards against
-    // never re-enabling if something (a resize, another scroll) interrupts it.
-    let lastY = window.scrollY, stableFrames = 0, elapsed = 0;
-    const checkSettled = () => {
-      elapsed++;
-      if (window.scrollY === lastY) { stableFrames++; } else { stableFrames = 0; lastY = window.scrollY; }
-      if (stableFrames > 4 || elapsed > 120) { jumpingRef.current = false; return; }
-      requestAnimationFrame(checkSettled);
-    };
-    requestAnimationFrame(checkSettled);
-  };
-
-  if (visible.length < 2) return null;
-  return h("div", { className: "no-print", style: {
-      position: "sticky", top: 0, zIndex: 9, marginBottom: 16,
-      background: "var(--bg)", borderBottom: "1px solid var(--rule)",
-      padding: "9px 0", display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center"
-    } },
-    h("span", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginRight: 2 } }, "Jump to"),
-    visible.map(s => h("button", {
-      key: s.id, onClick: () => jump(s.id),
-      style: {
-        padding: "4px 11px", borderRadius: 6,
-        border: "1px solid " + (activeId === s.id ? "var(--teal)" : "var(--rule)"),
-        background: activeId === s.id ? "var(--teal-bg)" : "transparent",
-        color: activeId === s.id ? "var(--teal)" : "var(--ink-2)",
-        fontFamily: "var(--mono)", fontSize: 11, fontWeight: activeId === s.id ? 700 : 400,
-        cursor: "pointer", transition: "color 120ms, border-color 120ms, background 120ms"
-      }
-    }, s.label))
-  );
-}
-
 // Wraps a chart. Its row exports the chart alone (titled); the enclosing
 // section's row exports the whole card, chart included — either or both.
 function ExportableBlock({ title, style, children }) {
@@ -1522,10 +1431,10 @@ function ReverseSolveBox({ theCase, discountRatePct, tv, options }) {
     : h("div", null,
         h("div", { style: { display: "flex", gap: 24, flexWrap: "wrap" } },
           h("div", null,
-            h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", } }, "Your assumption"),
+            h("div", { style: UI.caption }, "Your assumption"),
             h("div", { style: { fontSize: 20, fontFamily: "var(--mono)", fontWeight: 800, color: "var(--ink-1)" } }, fmtVal(solved.currentValue, solved.suffix))),
           h("div", null,
-            h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", } }, "Market implies"),
+            h("div", { style: UI.caption }, "Market implies"),
             h("div", { style: { fontSize: 20, fontFamily: "var(--mono)", fontWeight: 800, color: "var(--ink-1)" } }, fmtVal(solved.impliedValue, solved.suffix)))
         ),
         solved.degenerate && h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginTop: 8, lineHeight: 1.5 } }, solved.note)

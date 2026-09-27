@@ -11,7 +11,6 @@ function ReferenceSheet({ activeCase }) {
   // Each card is its own exportable section, like the tool cards.
   const card = (children, key) => h.apply(null, ["div", { key, className: "export-section", "data-export-section": "", style: { background: "var(--surface)", border: "1px solid var(--rule)", borderRadius: 10, padding: "18px 20px", marginBottom: 16 } }].concat(Array.isArray(children) ? children : [children]).concat([h(SectionExportBar, { key: "__export" })]));
   const label = (t) => h("div", { "data-section-title": "", style: { fontSize: 14, fontWeight: 600, fontFamily: "var(--sans)", color: "var(--ink-1)", letterSpacing: "-0.005em", marginBottom: 12 } }, t);
-  const src = (t) => h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginTop: 10, fontStyle: "italic", lineHeight: 1.5 } }, t);
   // Numbers in a column share one precision: the source tables drop trailing
   // zeros (65 beside 62.2, 76 beside 50.6), which reads as a different kind
   // of number rather than the same measure. Capped at 880px so a label and
@@ -353,13 +352,13 @@ function ReferenceSheet({ activeCase }) {
     card([ label("⚠ Overall vs. regulatory-stage probability of success — read this first"),
       h("div", { style: { display: "flex", gap: 24, flexWrap: "wrap", marginBottom: 12 } },
         h("div", null,
-          h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)" } }, "CUMULATIVE (Phase 1 → Launch)"),
+          h("div", { style: UI.caption }, "CUMULATIVE (Phase 1 → Launch)"),
           h("div", { style: { fontSize: 28, fontFamily: "var(--mono)", fontWeight: 700, color: "var(--teal)" } },
             (POS_BY_AREA.allIndications.phase1/100 * POS_BY_AREA.allIndications.phase2/100 * POS_BY_AREA.allIndications.phase3/100 * POS_REGULATORY.median/100 * 100).toFixed(1) + "%"),
           h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-2)" } }, "This is the real answer to \"what's the chance this Phase 1 drug reaches market?\"")
         ),
         h("div", null,
-          h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)" } }, "REGULATORY-ONLY (Phase 3 done → Launch)"),
+          h("div", { style: UI.caption }, "REGULATORY-ONLY (Phase 3 done → Launch)"),
           h("div", { style: { fontSize: 28, fontFamily: "var(--mono)", fontWeight: 700, color: "var(--amber)" } }, POS_REGULATORY.median + "%"),
           h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-2)" } }, "This is CONDITIONAL on already succeeding through Phase 3 — not an overall figure")
         )
@@ -650,10 +649,10 @@ function ReferenceSheet({ activeCase }) {
           h("div", { style: { fontFamily: "var(--mono)", fontSize: 12, fontWeight: 700, color: "var(--teal)", marginBottom: 6 } }, p.phase),
           h("div", { style: { display: "flex", gap: 18, flexWrap: "wrap" } },
             h("div", { style: { flex: "1 1 260px" } },
-              h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginBottom: 4 } }, "Can establish"),
+              h("div", { style: { ...UI.caption, marginBottom: 4 } }, "Can establish"),
               h("ul", { style: { margin: 0, paddingLeft: 16 } }, p.canShow.map((t, i) => h("li", { key: i, style: { fontSize: 11.5, fontFamily: "var(--sans)", color: "var(--ink-2)", lineHeight: 1.6, marginBottom: 3 } }, t)))),
             h("div", { style: { flex: "1 1 260px" } },
-              h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginBottom: 4 } }, "Cannot"),
+              h("div", { style: { ...UI.caption, marginBottom: 4 } }, "Cannot"),
               h("ul", { style: { margin: 0, paddingLeft: 16 } }, p.cannotShow.map((t, i) => h("li", { key: i, style: { fontSize: 11.5, fontFamily: "var(--sans)", color: "var(--ink-2)", lineHeight: 1.6, marginBottom: 3 } }, t))))
           )
         )))

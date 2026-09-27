@@ -33,7 +33,7 @@ function applyBasePosAdjustment(scenario, basePosAdjustmentPct) {
 // theCase.scenarioOverrides for whichever fields are actually set (Bear/Bull
 // only — those are relative-to-Base multipliers by design), then applies the
 // case-level Base-PoS adjustment above to all three. Extracted here as the
-// single source both ValuationPanel's UI and the Monte Carlo engine call,
+// single source both the Workspace valuation and the Monte Carlo engine call,
 // rather than each having its own copy that could drift.
 function getEffectiveScenarioPreset(theCase, key) {
   const base = SCENARIO_PRESETS[key];

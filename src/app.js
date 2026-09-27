@@ -184,24 +184,19 @@ function App() {
     view === "tools" ? h(ErrorBoundary, { key: "tools" }, h(ToolsView, { cases, updateCase, activeCase, navRequest: toolsNavRequest })) :
     view === "simulation" ? h(ErrorBoundary, { key: "simulation" }, h(SimulationView, { cases, updateCase })) :
     view === "portfolio" ? h(ErrorBoundary, { key: "portfolio" }, h(PortfolioView, { cases })) :
-    // minHeight, not height. A fixed height here capped this row's parent at
-    // 100vh, which silently broke the sticky top bar above: a sticky element
-    // can only stick WITHIN its containing block, so once you scrolled past
-    // the first screen the containing block ended and the whole nav scrolled
-    // away with it. On a workspace that runs six-plus screens that meant
-    // losing the view switcher and theme toggle until you scrolled all the
-    // way back up. minHeight lets the container grow with its content so the
-    // bar stays pinned for the whole page.
+    // minHeight, not height. A fixed height here capped this row at 100vh,
+    // and a sticky element only sticks WITHIN its containing block: once you
+    // scrolled past the first screen the case list scrolled away with it.
+    // minHeight lets the row grow with its content so the list stays pinned.
     h("div", { style: { display: "flex", minHeight: "100vh", alignItems: "flex-start" } },
       // Sidebar: case list. Deliberately OUTSIDE any error boundary — if the
       // active case's own content crashes, this is the recovery path (click
       // a different case), so it must never be taken down by the same
       // crash it exists to let you escape.
       //
-      // Sticky in its own right, directly under the top bar: the row is now
-      // as tall as the case content, so without this the case list would
-      // scroll off and switching cases would need the same round trip the
-      // nav bar just stopped needing.
+      // Sticky in its own right: the row is as tall as the case content, so
+      // without this the case list would scroll off and switching cases would
+      // mean scrolling all the way back up.
       h("div", { style: { width: 220, borderRight: "1px solid var(--rule)", padding: "18px 14px", flexShrink: 0, display: "flex", flexDirection: "column", position: "sticky", top: 0, height: "100vh" } },
         h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginBottom: 10, flexShrink: 0 } }, "Cases"),
         h("div", { style: { flex: 1, overflowY: "auto", minHeight: 0 } },
@@ -215,7 +210,7 @@ function App() {
             }),
               h("div", { style: { minWidth: 0 } },
                 h("div", { style: { fontSize: 13, fontFamily: "var(--sans)", fontWeight: 600, color: activeCaseId === c.id ? "var(--teal)" : "var(--ink-1)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" } }, c.name),
-                h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)" } }, (c.programs || []).length + " program" + ((c.programs || []).length === 1 ? "" : "s"))
+                h("div", { style: UI.caption }, (c.programs || []).length + " program" + ((c.programs || []).length === 1 ? "" : "s"))
               )
             )
           ))
@@ -284,9 +279,6 @@ function RailIcon({ name }) {
   };
   return h("svg", { width: 20, height: 20, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 1.8, strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true" },
     (P[name] || []).map(([tag, attrs], i) => h(tag, Object.assign({ key: i }, attrs))));
-}
-function navBtnStyle(active) {
-  return { padding: "7px 14px", borderRadius: 7, border: "none", background: active ? "var(--surface-2)" : "transparent", color: active ? "var(--ink-1)" : "var(--ink-3)", fontFamily: "var(--mono)", fontSize: 12, fontWeight: active ? 700 : 400, cursor: "pointer" };
 }
 function smallBtnStyle() {
   return { padding: "7px 10px", borderRadius: 6, border: "1px solid var(--rule)", background: "transparent", color: "var(--ink-2)", fontFamily: "var(--mono)", fontSize: 11, cursor: "pointer", textAlign: "left" };

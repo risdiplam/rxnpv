@@ -227,10 +227,6 @@ function humanizeExportName(slug) {
     .replace(/\bNnt\b/g, "NNT").replace(/\b2X2\b/i, "2x2").replace(/\bP Value\b/i, "P-value");
 }
 
-// Results with no chart used to get their own "Capture result" row. The panel's
-// export bar covers them now; kept as a no-op so the call sites read the same.
-function appendResultCapture(resultsDiv, exportName) {}
-
 // Mounts one export bar into every .panel under root, after its results area
 // (so it sits next to what it exports) or at the end when there is none. Each
 // bar is a small React root: this half of the app has no React tree, so the bar
@@ -1474,7 +1470,6 @@ function runFragilityIndex() {
     }, perPatient ? { units: flipArmN, highlightCount: fi.fragilityIndex } : {}));
     appendChartWithExport(resultsDiv, iconArraySvg, 'fragility-index');
   } else {
-    appendResultCapture(resultsDiv, 'fragility-index');
   }
 }
 

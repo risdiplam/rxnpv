@@ -1,18 +1,16 @@
 // ════════════════════════════════════════════════════════════════════════════
 // RxNPV — EXPORT ENGINE
 //
-// Three ways to get a visual out of the app, each using the mechanism that's
-// actually right for it rather than forcing one approach everywhere:
+// Two ways to get a visual out of the app:
 //
 //   1. SVG  — every chart in this app is inline SVG, so serialising it gives a
 //             true vector file: infinitely scalable, tiny, editable in
-//             Illustrator/Figma. The best option when it applies.
-//   2. PNG  — the same SVG rasterised through a canvas at an arbitrary scale
-//             factor (default 3x), for slide decks and anywhere vector isn't
-//             accepted.
-//   3. Panel capture — Chromium's own compositor via the desktop bridge, for
-//             a whole tool panel including its text, tables and layout. Only
-//             this one can capture things that aren't SVG.
+//             Illustrator/Figma. Done entirely here, in the renderer.
+//   2. PNG / PDF of a section or chart — serializeSection() below clones the
+//             block into standalone HTML, and render-section in main.js lays
+//             it out offscreen with the app's own styles, then prints it
+//             (vector PDF) or captures it at full height (PNG). This covers
+//             text, tables and layout, not just the chart.
 //
 // ── The load-bearing detail: CSS custom properties ──────────────────────────
 // Every chart colour in this app is written as var(--teal) / var(--ink-1) etc.
@@ -125,36 +123,6 @@ function svgToStandaloneString(sourceSvg, opts) {
   return '<?xml version="1.0" encoding="UTF-8"?>\n' + new XMLSerializer().serializeToString(clone);
 }
 
-// Rasterise the same standalone SVG to a PNG data URL at `scale`x.
-function svgToPngDataUrl(sourceSvg, scale, opts) {
-  scale = scale || 3;
-  return new Promise((resolve, reject) => {
-    let svgString;
-    try { svgString = svgToStandaloneString(sourceSvg, opts); } catch (e) { reject(e); return; }
-    const vb = (sourceSvg.getAttribute("viewBox") || "").split(/[\s,]+/).map(Number);
-    const w = vb.length === 4 && vb[2] ? vb[2] : (sourceSvg.clientWidth || 800);
-    const h = vb.length === 4 && vb[3] ? vb[3] : (sourceSvg.clientHeight || 400);
-    // A blob URL rather than a data: URL — Safari/Chromium both refuse to load
-    // large data: URLs into an <img>, and these can exceed that limit.
-    const blob = new Blob([svgString], { type: "image/svg+xml;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const img = new Image();
-    img.onload = () => {
-      try {
-        const canvas = document.createElement("canvas");
-        canvas.width = Math.round(w * scale);
-        canvas.height = Math.round(h * scale);
-        const ctx = canvas.getContext("2d");
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        URL.revokeObjectURL(url);
-        resolve(canvas.toDataURL("image/png"));
-      } catch (e) { URL.revokeObjectURL(url); reject(e); }
-    };
-    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("Could not rasterize the chart.")); };
-    img.src = url;
-  });
-}
-
 // ── Saving ─────────────────────────────────────────────────────────────────
 // Desktop gets a real Save dialog through the IPC bridge; a plain browser open
 // of the built file falls back to an anchor download so the feature still
@@ -163,23 +131,13 @@ const isDesktopExport = () => typeof window !== "undefined" && window.electronAP
 
 async function saveTextAsset(text, suggestedName, filterName, extensions) {
   if (isDesktopExport() && window.electronAPI.saveAsset) {
-    return await window.electronAPI.saveAsset({ data: text, encoding: "utf8", suggestedName, filterName, extensions });
+    return await window.electronAPI.saveAsset({ data: text, suggestedName, filterName, extensions });
   }
   const blob = new Blob([text], { type: "image/svg+xml;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url; a.download = suggestedName; document.body.appendChild(a); a.click();
   document.body.removeChild(a); setTimeout(() => URL.revokeObjectURL(url), 1000);
-  return { ok: true, viaBrowser: true };
-}
-
-async function saveDataUrlAsset(dataUrl, suggestedName, filterName, extensions) {
-  if (isDesktopExport() && window.electronAPI.saveAsset) {
-    return await window.electronAPI.saveAsset({ data: dataUrl, encoding: "dataurl", suggestedName, filterName, extensions });
-  }
-  const a = document.createElement("a");
-  a.href = dataUrl; a.download = suggestedName; document.body.appendChild(a); a.click();
-  document.body.removeChild(a);
   return { ok: true, viaBrowser: true };
 }
 
@@ -201,35 +159,6 @@ async function exportChartAsSvg(container, name) {
   if (!svg) return { ok: false, error: "No chart found to export here." };
   const text = svgToStandaloneString(svg);
   return await saveTextAsset(text, slugifyExportName(name) + ".svg", "SVG image", ["svg"]);
-}
-
-// Vector PDF of one chart. Desktop only, and the button is hidden otherwise
-// rather than failing on click — a browser renderer genuinely cannot write a
-// PDF, so there is nothing to fall back to.
-async function exportChartAsPdf(container, name) {
-  const svg = findExportableSvg(container);
-  if (!svg) return { ok: false, error: "No chart found to export here." };
-  if (!isDesktopExport() || !window.electronAPI.exportChartPdf) {
-    return { ok: false, error: "PDF export needs the desktop app — it uses Chromium's print engine, which a browser page has no access to." };
-  }
-  const text = svgToStandaloneString(svg);
-  // Dimensions come from the same viewBox the serialiser just wrote, so the
-  // page matches the chart's aspect exactly.
-  const vb = (svg.getAttribute("viewBox") || "").split(/[\s,]+/).map(Number);
-  const widthPx = (vb.length === 4 && vb[2]) ? vb[2] : (svg.clientWidth || 800);
-  const heightPx = (vb.length === 4 && vb[3]) ? vb[3] : (svg.clientHeight || 400);
-  return await window.electronAPI.exportChartPdf({
-    svg: text, suggestedName: slugifyExportName(name) + ".pdf", widthPx, heightPx
-  });
-}
-
-async function exportChartAsPng(container, name, scale) {
-  const svg = findExportableSvg(container);
-  if (!svg) return { ok: false, error: "No chart found to export here." };
-  try {
-    const dataUrl = await svgToPngDataUrl(svg, scale || 3);
-    return await saveDataUrlAsset(dataUrl, slugifyExportName(name) + ".png", "PNG image", ["png"]);
-  } catch (e) { return { ok: false, error: e.message }; }
 }
 
 // ── Pin to report ──────────────────────────────────────────────────────────

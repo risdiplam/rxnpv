@@ -300,7 +300,7 @@
     .report-snapshot [data-export-chart], .report-snapshot svg, .report-snapshot tr { break-inside: avoid; }
     /* Export affordances are interactive chrome — never part of a printed
        page or an exported PDF, where they'd read as stray UI artefacts. */
-    .chart-export-row, .section-export-bar, .chart-export-bar { display: none !important; }
+    .section-export-bar, .chart-export-bar { display: none !important; }
     /* Chromium's print engine rasterises every box-shadow into a bitmap the
        size of the box (a pair of ~3400x2000 images for one Valuation card),
        so a "vector" PDF quietly carried full-page pictures. The shadows are
@@ -352,15 +352,6 @@
   details.note .note-body { font: 400 12.5px/1.65 var(--sans); color: var(--ink-2); background: var(--surface-2);
     border-radius: 10px; padding: 11px 14px; margin-top: 8px; }
 
-  .chart-export-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 6px; opacity: 0.45; transition: opacity 0.15s; }
-  .chart-export-row:hover { opacity: 1; }
-  .chart-export-label { font-size: 11px; font-family: var(--mono); color: var(--ink-3); }
-  .chart-export-btn { padding: 5px 10px; border-radius: 5px; border: 1px solid var(--rule); background: transparent; color: var(--ink-3); font-family: var(--mono); font-size: 10px; cursor: pointer; transition: color 0.12s, border-color 0.12s; }
-  .chart-export-btn:hover:not(:disabled) { color: var(--teal); border-color: var(--teal); }
-  .chart-export-btn:disabled { opacity: 0.5; cursor: default; }
-  .chart-export-status { font-size: 10px; font-family: var(--mono); color: var(--ink-3); }
-  .chart-export-status.ok { color: var(--teal); }
-  .chart-export-status.err { color: var(--red); }
 
   /* ── Simulation view (merged from TrialSim) ──────────────────────────
      Variable definitions and global resets deliberately excluded — this
@@ -369,8 +360,7 @@
      own copies of those had slightly different hex values for several
      tokens (confirmed by direct comparison during the merge); including
      them would have silently recolored the rest of the app, not just this
-     view, depending on CSS cascade order. .themebtn is omitted — this
-     view now uses RxNPV's own theme toggle, not a separate one. */
+     view, depending on CSS cascade order. */
   .header { display: flex; align-items: center; justify-content: space-between; padding: 14px 20px; border-bottom: 1px solid var(--rule); }
   .brand { font-size: 18px; font-weight: 700; letter-spacing: 0.02em; display: flex; align-items: center; gap: 8px; }
   .brand .logodot { width: 10px; height: 10px; border-radius: 3px; background: linear-gradient(135deg, var(--teal), var(--amber)); display: inline-block; }
@@ -427,13 +417,8 @@
   .desctable { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 13px; }
   .desctable td { padding: 6px 8px; border-bottom: 1px solid var(--rule); }
   .desctable td:first-child { color: var(--ink-2); }
-  .driverlist { font-size: 13px; padding-left: 18px; }
   .badge { padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: 600; }
-  .badge.pass { background: var(--teal-bg); color: var(--teal); }
-  .badge.fail { background: var(--red-bg); color: var(--red); }
   .badge.info { background: var(--slate-bg); color: var(--slate); font-size: 11px; margin-left: 10px; vertical-align: middle; }
-  .boxedwarning { background: var(--red-bg); border: 1px solid var(--red); border-radius: 8px; padding: 10px 12px; font-size: 12.5px; color: var(--ink-1); }
-  .molsvg svg { background: white; border-radius: 6px; }
   .error { color: var(--red); }
   /* Subscripts in scientific notation (Cmax, ka, K_D). Default <sub> styling
      pushes line-height around, which is visible in a dense form where every

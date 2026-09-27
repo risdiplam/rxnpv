@@ -60,7 +60,7 @@ function PortfolioView({ cases }) {
         h("div", { style: { fontSize: 13, fontFamily: "var(--display)", fontWeight: 600, color: "var(--ink-1)", marginBottom: 12 } }, "PoS across the portfolio"),
         (() => {
           const withPoS = valid.filter(s => s.modeledPoSPct != null).sort((a, b) => b.modeledPoSPct - a.modeledPoSPct);
-          if (!withPoS.length) return h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-3)" } }, "No programs with a computable PoS yet.");
+          if (!withPoS.length) return h("div", { style: UI.captionMd }, "No programs with a computable PoS yet.");
           // Drawn against 100%, not against the highest PoS in the list: a
           // probability has a natural full scale, and relative scaling drew a
           // lone 9% program as a full bar.
@@ -84,7 +84,7 @@ function PortfolioView({ cases }) {
           // cash never runs out inside the 25yr projection window — the same
           // null either way, so the empty-state message can't claim it's the
           // former without checking, or it's simply wrong for the latter case.
-          if (!withRunway.length) return h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-3)" } },
+          if (!withRunway.length) return h("div", { style: UI.captionMd },
             "No cases with a runway inside the 25-year projection window yet — either no cash entered, or the modeled runway runs past 25 years.");
           const maxRunway = Math.max(...withRunway.map(s => s.runwayYears), 1);
           return withRunway.map(s => h("div", { key: s.id, style: { marginBottom: 8 } },
@@ -102,12 +102,11 @@ function PortfolioView({ cases }) {
       const withBoth = valid.filter(s => s.modeledPoSPct != null && s.impliedPoSPct != null);
       if (!withBoth.length) return null;
       const points = withBoth.map(s => ({ x: s.modeledPoSPct, y: s.impliedPoSPct, label: s.name }));
-      const maxAxis = Math.max(...points.map(p => Math.max(p.x, p.y)), 10) * 1.15;
       return h(ExportSection, { title: "Your PoS vs. what the market implies", style: { marginTop: 18, background: "var(--surface)", border: "1px solid var(--rule)", borderRadius: 10, padding: "16px 18px" } },
         h("div", { style: { fontSize: 13, fontFamily: "var(--display)", fontWeight: 600, color: "var(--ink-1)", marginBottom: 4 } }, "Your PoS vs. what the market implies"),
         h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginBottom: 12 } }, "Single-program cases with a price set only. Below the diagonal: you're more bullish than the market. Above: less."),
         h(ExportableBlock, { title: "Your PoS vs. what the market implies" },
-          h(ScatterChart, { points, xLabel: "Your modeled PoS (%)", yLabel: "Market-implied PoS (%)", xFmt: v => v.toFixed(0), yFmt: v => v.toFixed(0) }))
+          h(ScatterChart, { points, diagonal: "same as the market", xLabel: "Your modeled PoS (%)", yLabel: "Market-implied PoS (%)", xFmt: v => v.toFixed(0), yFmt: v => v.toFixed(0) }))
       );
     })()
   );

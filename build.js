@@ -46,6 +46,8 @@ const MODULE_ORDER = [
   'valuationPanel.js', 'programEditor.js', 'caseShell.js',
   // Other top-level views
   'referenceSheet.js', 'reportView.js', 'toolsView.js',
+  // Tools, one file per workbench (split out of toolsView.js, September 2026)
+  'tools_trial.js', 'tools_science.js', 'tools_company.js', 'tools_commercial.js', 'tools_valuation.js', 'tools_benchmarks.js',
   // TrialSim — the Simulation section's own engine modules (originally a
   // separate app, merged in; keeps its own ts_ prefix for exactly this
   // reason, so it's traceable which functions came from where)

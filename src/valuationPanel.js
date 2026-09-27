@@ -1,6 +1,7 @@
 // ════════════════════════════════════════════════════════════════════════════
-// ValuationPanel — discount rate, terminal value, capital structure, and the
-// Bear/Base/Bull scenario comparison. Lives inside CaseView.
+// Valuation sections — discount rate, terminal value, capital structure, the
+// headline results and the Bear/Base/Bull comparison, spread across CaseView's
+// Overview, Assumptions, Scenarios and Evidence tabs.
 // ════════════════════════════════════════════════════════════════════════════
 // Computes the case valuation ONCE and returns each Workspace tab's piece of
 // it: { overview, inputs, scenarios, evidence, flagCount }. A hook rather than
@@ -162,30 +163,30 @@ function useValuationSections({ theCase, onChange, goToTab }) {
         h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-3)", marginBottom: 10 } }, "Price vs. model"),
         h("div", { style: { display: "flex", gap: 20, flexWrap: "wrap", alignItems: "baseline" } },
           h("div", null,
-            h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", } }, "Current price"),
+            h("div", { style: UI.caption }, "Current price"),
             h("div", { style: { fontSize: 22, fontFamily: "var(--mono)", fontWeight: 800, color: "var(--ink-1)" } }, price != null ? fmtShare(price) : "—")),
           scenarioResults.map(s => h("div", { key: s.key },
             h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: s.preset.color, } }, s.preset.label + " fair value"),
             h("div", { style: { fontSize: 22, fontFamily: "var(--mono)", fontWeight: 800, color: s.preset.color } },
               fmtShare(s.result.equity.perShare)))),
           upsidePct != null && h("div", null,
-            h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", } }, "Base upside/downside"),
+            h("div", { style: UI.caption }, "Base upside/downside"),
             h("div", { style: { fontSize: 22, fontFamily: "var(--mono)", fontWeight: 800, color: upsidePct >= 0 ? "var(--green)" : "var(--red)" } },
               (upsidePct >= 0 ? "+" : "") + upsidePct.toFixed(0) + "%")),
           showImplied && theCase.programs.length === 1 && impliedSolved.baseAbsolutePct != null && h("div", null,
-            h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", } }, "Your PoS"),
+            h("div", { style: UI.caption }, "Your PoS"),
             h("div", { style: { fontSize: 22, fontFamily: "var(--mono)", fontWeight: 800, color: "var(--ink-1)" } }, impliedSolved.baseAbsolutePct.toFixed(0) + "%")),
           showImplied && theCase.programs.length === 1 && impliedSolved.impliedAbsolutePct != null && h("div", null,
-            h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", } }, "Price implies"),
+            h("div", { style: UI.caption }, "Price implies"),
             h("div", { style: { fontSize: 22, fontFamily: "var(--mono)", fontWeight: 800, color: impliedSolved.impliedAbsolutePct >= impliedSolved.baseAbsolutePct ? "var(--green)" : "var(--red)" } },
               impliedSolved.impliedAbsolutePct.toFixed(0) + "%"))
         ),
         (() => { const by = k => (scenarioResults.find(s => s.key === k) || { result: { equity: {} } }).result.equity.perShare;
           const r = readPriceVsScenarios(price, by("bear"), by("base"), by("bull"));
           return r && h(Explain, Object.assign({ onTint: true }, r)); })(),
-        valMethod === "multiple" && h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginTop: 8 } }, "Implied PoS is DCF-only — switch off Simple Multiple to see what the price requires."),
-        price == null && h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginTop: 8 } }, "Set a current price above to see upside/downside and implied PoS."),
-        valMethod === "dcf" && price != null && theCase.programs.length > 1 && h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginTop: 8 } }, "Implied PoS as a single absolute number needs one program — see \"as a multiple\" further down for the multi-program version.")
+        valMethod === "multiple" && h("div", { style: { ...UI.caption, marginTop: 8 } }, "Implied PoS is DCF-only — switch off Simple Multiple to see what the price requires."),
+        price == null && h("div", { style: { ...UI.caption, marginTop: 8 } }, "Set a current price above to see upside/downside and implied PoS."),
+        valMethod === "dcf" && price != null && theCase.programs.length > 1 && h("div", { style: { ...UI.caption, marginTop: 8 } }, "Implied PoS as a single absolute number needs one program — see \"as a multiple\" further down for the multi-program version.")
       );
     })()),
 
@@ -445,7 +446,7 @@ function useValuationSections({ theCase, onChange, goToTab }) {
           h("input", { type: "checkbox", checked: fr.enabled, onChange: e => setFR({ enabled: e.target.checked }) }),
           "Model a future capital raise"),
         fr.enabled && h("div", null,
-          h("div", { style: { fontSize: 11, fontFamily: "var(--sans)", color: "var(--ink-2)", marginBottom: 12, lineHeight: 1.6 } },
+          h("div", { style: UI.intro },
             "Applied to every scenario — new shares dilute the count, raised cash adds to net cash dollar for dollar. No underwriting fee, no explicit timing — answers \"what happens at $X raised at $Y,\" not when."),
           h("div", { style: { display: "flex", gap: 16, flexWrap: "wrap" } },
             h(MillionsField, { label: "Amount to raise", value: fr.amountM, onChange: v => setFR({ amountM: v }) }),
@@ -479,7 +480,7 @@ function useValuationSections({ theCase, onChange, goToTab }) {
           h("input", { type: "checkbox", checked: dpInput.enabled, onChange: e => setDP({ enabled: e.target.checked }) }),
           "Model dilution path to launch"),
         dpInput.enabled && h("div", null,
-          h("div", { style: { fontSize: 11, fontFamily: "var(--sans)", color: "var(--ink-2)", marginBottom: 12, lineHeight: 1.6 } },
+          h("div", { style: UI.intro },
             "Projects when cash would run out and models a raise there, at current price less the assumed discount — repeated as needed through to launch. Fixes the single most common retail valuation error: fair value per share on today's share count, without the dilution getting there usually costs."),
           h("div", { style: { display: "flex", gap: 16, flexWrap: "wrap" } },
             h(MillionsField, { label: "Minimum cash buffer", value: dpInput.minCashBufferM, onChange: v => setDP({ minCashBufferM: v }) }),
@@ -526,7 +527,7 @@ function useValuationSections({ theCase, onChange, goToTab }) {
                 help: "Optional — overrides the case's exit multiple just for " + label + ", instead of using the same multiple across all three scenarios." })
             ),
             h("div", { style: { marginTop: 10, paddingTop: 10, borderTop: "1px dashed var(--rule)" } },
-              h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginBottom: 8 } }, "Optional: give each program an independent peak revenue for " + label + ", instead of scaling Base by the multiplier above"),
+              h("div", { style: { ...UI.caption, marginBottom: 8 } }, "Optional: give each program an independent peak revenue for " + label + ", instead of scaling Base by the multiplier above"),
               // Stored in raw dollars, exactly like quickRevenue.peakRevenue,
               // because that is what computeProgramValuation and the Simple
               // Multiple path read. MillionsField shows and accepts $M and
@@ -571,11 +572,11 @@ function useValuationSections({ theCase, onChange, goToTab }) {
                 : s.preset.posMultiplierPct + "% of modeled PoS")
               + " · " + (s.preset.discountRateAddPct >= 0 ? "+" : "") + s.preset.discountRateAddPct + "pp disc."
               + (valMethod === "multiple" ? " · " + numOr(multipleAssumptions[s.key], 3).toFixed(1) + "x" : "")),
-            h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)" } }, "Enterprise value (rNPV)"),
+            h("div", { style: UI.caption }, "Enterprise value (rNPV)"),
             h("div", { style: { fontSize: 15, fontFamily: "var(--mono)", fontWeight: 700, color: "var(--ink-1)", marginBottom: 6 } }, fmtMoney(s.result.npvResult.npv)),
-            h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)" } }, "Equity value"),
+            h("div", { style: UI.caption }, "Equity value"),
             h("div", { style: { fontSize: 15, fontFamily: "var(--mono)", fontWeight: 700, color: "var(--ink-1)", marginBottom: 6 } }, fmtMoney(s.result.equity.equityValue)),
-            h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)" } }, "Value per share"),
+            h("div", { style: UI.caption }, "Value per share"),
             h("div", { style: { fontSize: 20, fontFamily: "var(--mono)", fontWeight: 800, color: s.preset.color } },
               fmtShare(s.result.equity.perShare))
           ))
@@ -611,13 +612,13 @@ function useValuationSections({ theCase, onChange, goToTab }) {
               ? h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-2)" } }, solved.note)
               : h("div", { style: { display: "flex", gap: 24, flexWrap: "wrap" } },
                   theCase.programs.length === 1 && solved.baseAbsolutePct != null && h("div", null,
-                    h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", } }, "Your PoS assumption"),
+                    h("div", { style: UI.caption }, "Your PoS assumption"),
                     h("div", { style: { fontSize: 20, fontFamily: "var(--mono)", fontWeight: 800, color: "var(--ink-1)" } }, solved.baseAbsolutePct.toFixed(1) + "%")),
                   theCase.programs.length === 1 && solved.impliedAbsolutePct != null && h("div", null,
-                    h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", } }, "Market implies"),
+                    h("div", { style: UI.caption }, "Market implies"),
                     h("div", { style: { fontSize: 20, fontFamily: "var(--mono)", fontWeight: 800, color: solved.impliedAbsolutePct >= solved.baseAbsolutePct ? "var(--green)" : "var(--red)" } }, solved.impliedAbsolutePct.toFixed(1) + "%")),
                   h("div", null,
-                    h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", } }, theCase.programs.length > 1 ? "As a multiple of your PoS" : "As a multiple"),
+                    h("div", { style: UI.caption }, theCase.programs.length > 1 ? "As a multiple of your PoS" : "As a multiple"),
                     h("div", { style: { fontSize: 20, fontFamily: "var(--mono)", fontWeight: 800, color: solved.multiplierPct >= 100 ? "var(--green)" : "var(--red)" } }, solved.multiplierPct.toFixed(0) + "%"))
                 )
           );
@@ -656,16 +657,16 @@ function useValuationSections({ theCase, onChange, goToTab }) {
               steps.map((s, i) => h(React.Fragment, { key: i },
                 i > 0 && h("span", { style: { fontSize: 16, fontFamily: "var(--mono)", color: "var(--ink-3)" } }, s.op),
                 h("div", { style: { padding: "8px 12px", borderRadius: 8, background: "var(--surface-2)", border: s.op === "=" ? "1.5px solid var(--teal)" : "1px solid var(--rule)", textAlign: "center" } },
-                  h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", } }, s.label),
+                  h("div", { style: UI.caption }, s.label),
                   h("div", { style: { fontSize: 13, fontFamily: "var(--mono)", fontWeight: 700, color: s.op === "=" ? "var(--teal)" : "var(--ink-1)" } }, fmtMoney(s.value)))
               )),
               h("span", { style: { fontSize: 16, fontFamily: "var(--mono)", color: "var(--ink-3)" } }, "÷"),
               h("div", { style: { padding: "8px 12px", borderRadius: 8, background: "var(--surface-2)", border: "1px solid var(--rule)", textAlign: "center" } },
-                h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", } }, "Diluted shares"),
+                h("div", { style: UI.caption }, "Diluted shares"),
                 h("div", { style: { fontSize: 13, fontFamily: "var(--mono)", fontWeight: 700, color: "var(--ink-1)" } }, fmtNum(baseR.equity.dilutedShares))),
               h("span", { style: { fontSize: 16, fontFamily: "var(--mono)", color: "var(--ink-3)" } }, "="),
               h("div", { style: { padding: "8px 14px", borderRadius: 8, background: "var(--teal-bg)", border: "1.5px solid var(--teal)", textAlign: "center" } },
-                h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", } }, "Per share"),
+                h("div", { style: UI.caption }, "Per share"),
                 h("div", { style: { fontSize: 16, fontFamily: "var(--mono)", fontWeight: 800, color: "var(--teal)" } }, fmtShare(baseR.equity.perShare)))
             )
           );
@@ -766,8 +767,8 @@ function useValuationSections({ theCase, onChange, goToTab }) {
         show("overview") && (theCase.currentPrice !== "" && theCase.currentPrice != null && h("div", { style: { marginTop: 16, padding: "12px 14px", borderRadius: 8, background: "var(--surface-2)", border: "1px solid var(--rule)" } },
           h("div", { style: { display: "flex", gap: 24, flexWrap: "wrap", alignItems: "center" } },
             h("div", null,
-              h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", } }, "Current price"),
-              h("div", { style: { fontSize: 18, fontFamily: "var(--mono)", fontWeight: 700, color: "var(--ink-1)" } }, fmtShare(Number(theCase.currentPrice)))),
+              h("div", { style: UI.caption }, "Current price"),
+              h("div", { style: UI.stat }, fmtShare(Number(theCase.currentPrice)))),
             scenarioResults.map(s => {
               const fv = s.result.equity.perShare;
               // Guard against a zero (or non-numeric) current price — dividing by
@@ -775,7 +776,7 @@ function useValuationSections({ theCase, onChange, goToTab }) {
               const cp = Number(theCase.currentPrice);
               const upside = (fv != null && cp > 0) ? ((fv / cp) - 1) * 100 : null;
               return h("div", { key: s.key }, 
-                h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", } }, s.preset.label + " upside/downside"),
+                h("div", { style: UI.caption }, s.preset.label + " upside/downside"),
                 h("div", { style: { fontSize: 18, fontFamily: "var(--mono)", fontWeight: 700, color: upside == null ? "var(--ink-3)" : upside >= 0 ? "var(--green)" : "var(--red)" } },
                   upside != null ? (upside >= 0 ? "+" : "") + upside.toFixed(0) + "%" : "—")
               );

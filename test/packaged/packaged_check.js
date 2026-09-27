@@ -159,8 +159,14 @@ async function offline(win, js, click, text) {
     const p = pdfFacts(f);
     ok(p.header && p.fonts && !p.images, "B-002: Valuation card PDF is vector with embedded fonts", JSON.stringify(p));
   } else ok(false, "B-002: Valuation card PDF", pdf.err);
-  const chart = await js(`(async () => { const svg = [...document.querySelectorAll('#ws-revenue svg')].find(n => n.getBoundingClientRect().width > 120); return await exportChartAsPdf(svg, 'revenue-chart'); })()`);
-  ok(chart && chart.ok && fs.existsSync(chart.filePath) && pdfFacts(chart.filePath).header, "B-002: chart-only PDF via export-chart-pdf", chart && (chart.filePath || chart.error));
+  // Chart-only PDF: the path "Export chart → PDF" takes — the chart block
+  // alone, titled, through render-section — must stay vector.
+  const chart = await js(`(async () => { const b = document.querySelector('#ws-revenue [data-export-chart]'); if (!b) return { ok: false, err: 'no chart block' }; const t = sectionTitleOf(b); const r = await exportSectionAs(b, 'pdf', { title: t, context: exportContextOf(b), heading: t, returnData: true }); return { ok: r.ok, data: r.data, err: r.error }; })()`);
+  if (chart.ok) {
+    const f = path.join(OUT, "offline-chart.pdf"); fs.writeFileSync(f, Buffer.from(chart.data, "base64"));
+    const p = pdfFacts(f);
+    ok(p.header && p.fonts && !p.images, "B-002: chart-only PDF is vector with embedded fonts", JSON.stringify(p));
+  } else ok(false, "B-002: chart-only PDF", chart.err);
   const svgSave = await js(`(async () => { const svg = [...document.querySelectorAll('#ws-revenue svg')].find(n => n.getBoundingClientRect().width > 120); return await exportChartAsSvg(svg, 'revenue-chart'); })()`);
   ok(svgSave && svgSave.ok && /<svg/.test(fs.readFileSync(saved[saved.length - 1], "utf8")), "B-002: SVG via save-asset", svgSave && svgSave.error);
 

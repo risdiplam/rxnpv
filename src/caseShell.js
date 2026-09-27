@@ -261,7 +261,7 @@ function CaseView({ theCase, onChange, onDelete, onNavigateToTools }) {
       h("input", { value: theCase.ticker, onChange: e => update({ ticker: e.target.value }), placeholder: "TICKER", "aria-label": "Ticker symbol",
         style: { width: 100, fontFamily: "var(--mono)", fontSize: 14, color: "var(--ink-2)", background: "var(--surface)", border: "1px solid var(--rule)", borderRadius: 6, padding: "6px 10px" } }),
       h("div", { style: { display: "flex", alignItems: "center", gap: 6 } },
-        h("span", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-3)" } }, "Current price"),
+        h("span", { style: UI.captionMd }, "Current price"),
         h("span", { style: { fontSize: 13, fontFamily: "var(--mono)", color: "var(--ink-3)" } }, "$"),
         h("input", { type: "number", value: theCase.currentPrice, onChange: e => update({ currentPrice: e.target.value }), placeholder: "0.00", "aria-label": "Current share price in dollars",
           style: { width: 80, fontFamily: "var(--mono)", fontSize: 14, color: "var(--ink-1)", background: "var(--surface)", border: "1px solid var(--rule)", borderRadius: 6, padding: "6px 10px" } })
@@ -370,12 +370,12 @@ function CaseView({ theCase, onChange, onDelete, onNavigateToTools }) {
         const troughYear = companyPnL.reduce((worst, c) => c.ebit < worst.ebit ? c : worst, companyPnL[0]);
         return h("div", { style: { display: "flex", gap: 24, marginTop: 12, flexWrap: "wrap" } },
           h("div", null,
-            h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", } }, troughYear.ebit < 0 ? "Deepest annual loss (burn)" : "Lowest annual EBIT (still profitable)"),
+            h("div", { style: UI.caption }, troughYear.ebit < 0 ? "Deepest annual loss (burn)" : "Lowest annual EBIT (still profitable)"),
             h("div", { style: { fontSize: 18, fontFamily: "var(--mono)", fontWeight: 700, color: troughYear.ebit < 0 ? "var(--red)" : "var(--ink-1)" } },
               fmtMoney(troughYear.ebit), " (yr " + troughYear.calendarYear + ")")),
           h("div", null,
-            h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", } }, "Peak EBIT"),
-            h("div", { style: { fontSize: 18, fontFamily: "var(--mono)", fontWeight: 700, color: "var(--ink-1)" } }, fmtMoney(peakEbitYear.ebit), " (yr " + peakEbitYear.calendarYear + ")"))
+            h("div", { style: UI.caption }, "Peak EBIT"),
+            h("div", { style: UI.stat }, fmtMoney(peakEbitYear.ebit), " (yr " + peakEbitYear.calendarYear + ")"))
         );
       })()
     ),
@@ -401,7 +401,7 @@ function CaseView({ theCase, onChange, onDelete, onNavigateToTools }) {
         capitalStructure: { ...(theCase.capitalStructure || {}), mode: mode === "quick" ? "simple" : "detailed" }
       });
       return h("div", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 16, flexWrap: "wrap" } },
-        h("span", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-3)" } }, "Set entire case:"),
+        h("span", { style: UI.captionMd }, "Set entire case:"),
         h("button", {
           onClick: () => setAll("quick"),
           style: { padding: "5px 14px", borderRadius: 7, border: "1px solid " + (allQuick ? "var(--teal)" : "var(--rule)"),
@@ -414,7 +414,7 @@ function CaseView({ theCase, onChange, onDelete, onNavigateToTools }) {
             background: allDetailed ? "var(--amber-bg)" : "transparent", color: allDetailed ? "var(--amber)" : "var(--ink-2)",
             fontFamily: "var(--mono)", fontSize: 11, fontWeight: allDetailed ? 700 : 400, cursor: "pointer" }
         }, "All Detailed"),
-        h("span", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)" } },
+        h("span", { style: UI.caption },
           allQuick ? "— case is fully in Quick mode" : allDetailed ? "— case is fully in Detailed mode" : "— mixed: click to set every program + capital structure at once"),
         navHidden && theCase.programs.length > 0 && h("button", { type: "button", className: "link-btn", style: { marginLeft: "auto" }, onClick: () => setNavHiddenSaved(false) }, "Show section list")
       );

@@ -171,7 +171,7 @@ function RevenueChart({ series, height, showLegend, xPrefix, xAxisPrefix, label 
 // optional single "your case" point rendered distinctly so you can see where
 // your own assumption sits among real comps.
 // ════════════════════════════════════════════════════════════════════════════
-function ScatterChart({ points, highlightPoint, xLabel, yLabel, xFmt, yFmt, height, label }) {
+function ScatterChart({ points, highlightPoint, xLabel, yLabel, xFmt, yFmt, height, label, diagonal }) {
   const h = React.createElement;
   height = height || 280;
   const W = 560, H = height, padL = 60, padR = 20, padT = 16, padB = 40;
@@ -195,26 +195,33 @@ function ScatterChart({ points, highlightPoint, xLabel, yLabel, xFmt, yFmt, heig
     const span = hi - lo;
     return { lo, hi: hi + (span > 0 ? span * 0.15 : Math.max(Math.abs(hi) * 0.15, 1)) };
   };
-  const xAxis = padAxis(xVals), yAxis = padAxis(yVals);
-  const maxX = xAxis.hi, minX = xAxis.lo;
-  const maxY = yAxis.hi, minY = yAxis.lo;
+  // Round-number gridlines (niceAxisTicks), like every other chart here. With
+  // `diagonal` (true, or the line's label), both axes share one scale and the
+  // x = y line is drawn, so "above / below the diagonal" means what it says.
+  let xAxis = padAxis(xVals), yAxis = padAxis(yVals);
+  if (diagonal) { const lo = Math.min(xAxis.lo, yAxis.lo), hi = Math.max(xAxis.hi, yAxis.hi); xAxis = yAxis = { lo, hi }; }
+  const xT = niceAxisTicks(xAxis.lo, xAxis.hi, 4), yT = diagonal ? xT : niceAxisTicks(yAxis.lo, yAxis.hi, 4);
+  const maxX = xT.hi, minX = xT.lo;
+  const maxY = yT.hi, minY = yT.lo;
   const toX = v => padL + ((v - minX) / (maxX - minX || 1)) * plotW;
   const toY = v => padT + plotH - ((v - minY) / (maxY - minY || 1)) * plotH;
 
   const fmtX = xFmt || (v => v.toFixed(0));
   const fmtY = yFmt || (v => v.toFixed(0));
-  const gridFracs = [0, 0.25, 0.5, 0.75, 1];
 
   const hoveredPoint = hover ? (hover.kind === "highlight" ? highlightPoint : points[hover.idx]) : null;
   const tooltipOnRight = hoveredPoint && toX(hoveredPoint.x) > padL + plotW * 0.6;
 
   return h("div", { style: { position: "relative" } },
     h("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": label || ((yLabel || "") + " against " + (xLabel || "")), style: { width: "100%", maxWidth: 560, height: "auto", display: "block" } },
-      gridFracs.map((f, i) => h("g", { key: "y" + i },
-        h("line", { x1: padL, x2: W - padR, y1: toY(minY + f * (maxY - minY)), y2: toY(minY + f * (maxY - minY)), stroke: "var(--rule)", strokeWidth: 1, strokeDasharray: "3,3" }),
-        h("text", { x: padL - 8, y: toY(minY + f * (maxY - minY)) + 3, textAnchor: "end", fontSize: 10, fontFamily: "var(--mono)", fill: "var(--ink-3)" }, fmtY(minY + f * (maxY - minY)))
+      yT.ticks.map((v, i) => h("g", { key: "y" + i },
+        h("line", { x1: padL, x2: W - padR, y1: toY(v), y2: toY(v), stroke: "var(--rule)", strokeWidth: 1, strokeDasharray: "3,3" }),
+        h("text", { x: padL - 8, y: toY(v) + 3, textAnchor: "end", fontSize: 10, fontFamily: "var(--mono)", fill: "var(--ink-3)" }, fmtY(v))
       )),
-      gridFracs.map((f, i) => h("text", { key: "x" + i, x: toX(minX + f * (maxX - minX)), y: H - padB + 16, textAnchor: "middle", fontSize: 10, fontFamily: "var(--mono)", fill: "var(--ink-3)" }, fmtX(minX + f * (maxX - minX)))),
+      diagonal && h("line", { x1: toX(minX), y1: toY(minX), x2: toX(maxX), y2: toY(maxX), stroke: "var(--ink-3)", strokeWidth: 1.2, strokeDasharray: "6,4" }),
+      // Label sits below the line near its top end, clear of the dash.
+      diagonal && h("text", { x: toX(maxX) - 4, y: toY(minX + 0.7 * (maxX - minX)) + 4, textAnchor: "end", fontSize: 10, fontFamily: "var(--mono)", fill: "var(--ink-2)" }, typeof diagonal === "string" ? diagonal : "x = y"),
+      xT.ticks.map((v, i) => h("text", { key: "x" + i, x: toX(v), y: H - padB + 16, textAnchor: "middle", fontSize: 10, fontFamily: "var(--mono)", fill: "var(--ink-3)" }, fmtX(v))),
       h("text", { x: padL + plotW / 2, y: H - 4, textAnchor: "middle", fontSize: 10, fontFamily: "var(--mono)", fill: "var(--ink-2)" }, xLabel || ""),
       h("text", { x: 14, y: padT + plotH / 2, textAnchor: "middle", fontSize: 10, fontFamily: "var(--mono)", fill: "var(--ink-2)", transform: `rotate(-90, 14, ${padT + plotH / 2})` }, yLabel || ""),
       points.map((p, i) => h("circle", {
