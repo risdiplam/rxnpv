@@ -308,7 +308,7 @@ async function fetchDrugSpending(brandName, opts) {
     if (!annualRows.length && !quarterlyRows.length) {
       return {
         ok: true, found: false, brand: name, programme: annualSet.programme,
-        error: "No Medicare " + annualSet.programme + " record for “" + name + "”. CMS indexes by BRAND name, so try the trade name rather than the molecule. A drug with no record here is not necessarily unsold — it may be administered under the other programme (Part B covers what is given in a clinic, Part D what is dispensed by a pharmacy), used mostly outside Medicare, or below the reporting threshold."
+        error: "No Medicare " + annualSet.programme + " record for “" + name + "”. CMS indexes by BRAND name, so try the trade name rather than the molecule. A drug with no record here is not necessarily unsold — it may be administered under the other program (Part B covers what is given in a clinic, Part D what is dispensed by a pharmacy), used mostly outside Medicare, or below the reporting threshold."
       };
     }
     const annual = annualRows.length ? parseCmsAnnualRow(annualRows[0]) : { brand: name, generic: "", manufacturer: "", periods: [], dataStartYear: null };

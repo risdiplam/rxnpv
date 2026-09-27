@@ -473,7 +473,7 @@ function resultsRedFlags(parsed, study) {
           label: "Primary interval includes no effect",
           detail: "On “" + o.title + "”, the registered " + (a.paramType || "estimate") + " of " + a.value
             + " has a " + (a.ciPct || "95") + "% interval of " + a.lower + " to " + a.upper
-            + ", which spans " + a.nullValue + " — the value meaning no difference. The point estimate may still favour one arm, but this interval is consistent with no effect."
+            + ", which spans " + a.nullValue + " — the value meaning no difference. The point estimate may still favor one arm, but this interval is consistent with no effect."
         });
       }
       if (a.comparisonType && /NON_INFERIORITY|EQUIVALENCE/.test(a.comparisonType)) {
@@ -500,7 +500,7 @@ function resultsRedFlags(parsed, study) {
           severity: "high",
           label: "Differential dropout between arms (" + trPct1(hi - lo) + " gap)",
           detail: "Excluding deaths, " + trPct1(hi) + " left “" + hiRow.title + "” against " + trPct1(lo) + " in “" + loRow.title
-            + "”. When the arms lose different kinds of people at different rates, the groups being compared at the end are no longer the groups that were randomised, and randomisation stops guaranteeing what it is there to guarantee."
+            + "”. When the arms lose different kinds of people at different rates, the groups being compared at the end are no longer the groups that were randomized, and randomization stops guaranteeing what it is there to guarantee."
         });
       }
       const worst = usable.reduce((a, r) => (r.nonDeathDiscontinuationRate > a.nonDeathDiscontinuationRate ? r : a), usable[0]);
@@ -508,7 +508,7 @@ function resultsRedFlags(parsed, study) {
         flags.push({
           severity: "medium",
           label: "High overall attrition (" + trPct1(worst.nonDeathDiscontinuationRate) + " in one arm)",
-          detail: trPct1(worst.nonDeathDiscontinuationRate) + " of “" + worst.title + "” left the study for reasons other than death. At that level the analysed population depends heavily on how missing data was handled, which is a modelling choice made after the fact."
+          detail: trPct1(worst.nonDeathDiscontinuationRate) + " of “" + worst.title + "” left the study for reasons other than death. At that level the analyzed population depends heavily on how missing data was handled, which is a modeling choice made after the fact."
         });
       }
       const aeRates = usable.filter(r => r.aeWithdrawalRate != null).map(r => r.aeWithdrawalRate);

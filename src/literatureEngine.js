@@ -75,7 +75,7 @@ function epmcClean(text) {
 // report is tagged "Clinical Trial, Phase III", "Randomized Controlled Trial",
 // "Multicenter Study" and "Journal Article" simultaneously.
 const EPMC_KINDS = [
-  { re: /randomized controlled trial|randomised controlled trial/i, kind: "rct", label: "Randomised trial report", evidence: "primary" },
+  { re: /randomized controlled trial|randomised controlled trial/i, kind: "rct", label: "Randomized trial report", evidence: "primary" },
   { re: /meta-analysis/i, kind: "meta", label: "Meta-analysis", evidence: "synthesis" },
   { re: /systematic review/i, kind: "systematic", label: "Systematic review", evidence: "synthesis" },
   { re: /clinical trial/i, kind: "trial", label: "Clinical trial report", evidence: "primary" },

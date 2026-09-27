@@ -150,7 +150,7 @@ function svgToPngDataUrl(sourceSvg, scale, opts) {
         resolve(canvas.toDataURL("image/png"));
       } catch (e) { URL.revokeObjectURL(url); reject(e); }
     };
-    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("Could not rasterise the chart.")); };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("Could not rasterize the chart.")); };
     img.src = url;
   });
 }

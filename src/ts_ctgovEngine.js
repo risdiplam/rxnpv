@@ -234,7 +234,7 @@ function extractAnalogEffects(data, queryMeta) {
           lower: isFinite(lower) ? lower : null,
           upper: isFinite(upper) ? upper : null,
           pValue: a.pValue != null ? String(a.pValue) : null,
-          // "Favourable" is direction only, decided by which side of the null
+          // "Favorable" is direction only, decided by which side of the null
           // the estimate sits on. It is NOT a judgement that the trial won —
           // a ratio below 1 can still be a miss if the interval crosses it.
           favoursTreatment: spec.scale === "ratio" ? value < spec.nullValue : value > spec.nullValue,
@@ -282,7 +282,7 @@ function extractAnalogEffects(data, queryMeta) {
     rows,
     byScale,
     summaryByScale: Object.keys(byScale).reduce((acc, k) => { acc[k] = summarize(byScale[k]); return acc; }, {}),
-    caveat: "Effect sizes are read only from CT.gov's structured analysis fields, where a sponsor registered a recognised parameter type with a numeric value. Trials that posted results in narrative form, used an unrecognised parameter, or reported nothing are counted in the denominators above but cannot appear on the board. This is a floor on what exists, not a census."
+    caveat: "Effect sizes are read only from CT.gov's structured analysis fields, where a sponsor registered a recognized parameter type with a numeric value. Trials that posted results in narrative form, used an unrecognized parameter, or reported nothing are counted in the denominators above but cannot appear on the board. This is a floor on what exists, not a census."
   };
 }
 
@@ -303,7 +303,7 @@ function positionInAnalogs(rows, value) {
   if (!vals.length || typeof value !== "number" || !isFinite(value)) return null;
   const scale = vals[0].scale;
   const nullValue = vals[0].nullValue;
-  // "More favourable" is direction only, decided by which way the scale runs:
+  // "More favorable" is direction only, decided by which way the scale runs:
   // below 1 for a ratio, above 0 for a difference. It is not a claim that the
   // trial won — an interval can still span the null.
   const better = (a, b) => scale === "ratio" ? a < b : a > b;

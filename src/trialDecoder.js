@@ -112,12 +112,12 @@ function whatItCanProve(study) {
   const can = [], cannot = [];
 
   if (alloc.randomized && comp.controlled) {
-    can.push("A causal comparison against its control arm — randomisation is what lets a difference be attributed to the drug rather than to who happened to receive it.");
+    can.push("A causal comparison against its control arm — randomization is what lets a difference be attributed to the drug rather than to who happened to receive it.");
   } else if (alloc.value === "single-arm") {
     can.push("Whether patients on this drug reached the endpoint, and how safe it looked.");
     cannot.push("Any causal claim about the drug versus an alternative. A single-arm trial has nothing to compare against except an external expectation, which is not the same as a control group.");
   } else if (alloc.stated && !alloc.randomized) {
-    cannot.push("A clean causal comparison — without randomisation, differences between arms can reflect who was assigned to each one.");
+    cannot.push("A clean causal comparison — without randomization, differences between arms can reflect who was assigned to each one.");
   }
 
   if (comp.controlled === false) {
@@ -125,14 +125,14 @@ function whatItCanProve(study) {
   }
 
   if (ep.stated && ep.timeToEvent) {
-    can.push("A time-to-event estimate (the primary endpoint is a survival-type measure), subject to having enough events rather than enough patients — event count, not enrolment, drives precision here.");
+    can.push("A time-to-event estimate (the primary endpoint is a survival-type measure), subject to having enough events rather than enough patients — event count, not enrollment, drives precision here.");
   }
 
   if (mask.blinded === false && ep.subjective) {
-    cannot.push("An assessment free of expectation bias: the primary endpoint involves judgement and nobody is blinded, so both patients and assessors know who got the drug.");
+    cannot.push("An assessment free of expectation bias: the primary endpoint involves judgment and nobody is blinded, so both patients and assessors know who got the drug.");
   }
   if (mask.blinded && ep.subjective) {
-    can.push("A reasonably protected read on a judgement-based endpoint, since assessors were masked.");
+    can.push("A reasonably protected read on a judgment-based endpoint, since assessors were masked.");
   }
 
   cannot.push("Regulatory approval, commercial uptake, or a usable label. A trial can hit its endpoint and still not deliver any of those.");
@@ -154,18 +154,18 @@ function decodeTrialRedFlags(study, opts) {
   const ep = classifyPrimaryEndpoint(study);
 
   if (mask.blinded === false && ep.subjective) {
-    flags.push({ severity: "high", label: "Open label with a judgement-based primary endpoint",
+    flags.push({ severity: "high", label: "Open label with a judgment-based primary endpoint",
       detail: "Nobody is masked and the primary endpoint is assessed rather than measured. This is the most common way an effect gets overstated without anyone doing anything improper — expectation shifts how symptoms are reported and how responses are scored. An independent blinded review (BICR) would mitigate it; check whether one is specified." });
   }
 
   if (alloc.value === "single-arm" && ep.stated) {
     flags.push({ severity: "medium", label: "Single-arm trial",
-      detail: "There is no control group, so the result has to be read against an external expectation of how untreated patients behave. That can be legitimate in a setting with no effective therapy, and misleading in one where randomised trials already exist. Worth checking what the standard of care in this indication is now." });
+      detail: "There is no control group, so the result has to be read against an external expectation of how untreated patients behave. That can be legitimate in a setting with no effective therapy, and misleading in one where randomized trials already exist. Worth checking what the standard of care in this indication is now." });
   }
 
   if (comp.controlled === false && alloc.randomized) {
-    flags.push({ severity: "medium", label: "Randomised but no comparator arm registered",
-      detail: "The allocation is randomised but every registered arm is experimental — often dose-ranging. A dose comparison does not establish benefit over standard of care." });
+    flags.push({ severity: "medium", label: "Randomized but no comparator arm registered",
+      detail: "The allocation is randomized but every registered arm is experimental — often dose-ranging. A dose comparison does not establish benefit over standard of care." });
   }
 
   // Above roughly half a dozen, "co-primary" stops describing the situation: a
@@ -188,7 +188,7 @@ function decodeTrialRedFlags(study, opts) {
 
   if (study.whyStopped) {
     flags.push({ severity: "high", label: "Trial stopped early",
-      detail: "CT.gov records a reason: “" + study.whyStopped + "”. Early termination can be for futility, safety, enrolment, or business reasons — they are not remotely equivalent, and the registered wording is often the only public account." });
+      detail: "CT.gov records a reason: “" + study.whyStopped + "”. Early termination can be for futility, safety, enrollment, or business reasons — they are not remotely equivalent, and the registered wording is often the only public account." });
   }
 
   // Completed long enough ago that results were due. FDAAA requires posting
@@ -208,7 +208,7 @@ function decodeTrialRedFlags(study, opts) {
 
   if (study.healthyVolunteers === true && /PHASE2|PHASE3/i.test(String(study.phase || "").replace(/[^A-Z0-9]/gi, ""))) {
     flags.push({ severity: "medium", label: "Accepts healthy volunteers at a therapeutic phase",
-      detail: "Healthy-volunteer enrolment is normal in Phase 1 and unusual once a trial is meant to demonstrate benefit in patients. Worth confirming the registered phase is right." });
+      detail: "Healthy-volunteer enrollment is normal in Phase 1 and unusual once a trial is meant to demonstrate benefit in patients. Worth confirming the registered phase is right." });
   }
 
   return flags;

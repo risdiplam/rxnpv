@@ -77,7 +77,7 @@ function halfLife(ke) {
 // reintroduced by a future caller doing its own .toFixed().
 function formatHalfLife(ke) {
   const t = halfLife(ke);
-  if (!isFinite(t)) return 'none (Ke = 0, no elimination modelled)';
+  if (!isFinite(t)) return 'none (Ke = 0, no elimination modeled)';
   return t.toFixed(2) + 'hr';
 }
 

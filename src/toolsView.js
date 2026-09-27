@@ -738,7 +738,7 @@ function RunwayTool({ cases, updateCase, activeCase }) {
       toolLabel(h, "Cash runway — pull from EDGAR"),
       h("div", { style: { marginBottom: 10 } },
         h(Note, { summary: 'New here? Trailing vs. forward runway' },
-          h("div", { style: { lineHeight: 1.6 } }, 'Two different numbers, both useful. Trailing runway divides the last reported cash balance by recent actual burn from EDGAR filings — it answers "at the rate they have really been spending, how long does the money last?" Forward runway instead uses this case\'s own modelled R&D and G&A costs, which is the right basis when you expect spending to change: a company about to start a Phase 3 will burn far more than its trailing rate implies. Neither knows about an ATM facility, an undrawn credit line, or partnership milestone cash, all of which extend the line.'))),
+          h("div", { style: { lineHeight: 1.6 } }, 'Two different numbers, both useful. Trailing runway divides the last reported cash balance by recent actual burn from EDGAR filings — it answers "at the rate they have really been spending, how long does the money last?" Forward runway instead uses this case\'s own modeled R&D and G&A costs, which is the right basis when you expect spending to change: a company about to start a Phase 3 will burn far more than its trailing rate implies. Neither knows about an ATM facility, an undrawn credit line, or partnership milestone cash, all of which extend the line.'))),
       h("div", { style: { fontSize: 11, fontFamily: "var(--sans)", color: "var(--ink-2)", marginBottom: 12 } }, "Latest reported cash + quarterly operating burn from the most recent 10-Q, converted to a runway estimate."),
       h("div", { style: { display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10 } },
         h("input", { type: "text", value: companyName, placeholder: "Company name or ticker", "aria-label": "Company name or ticker", onChange: e => setCompanyName(e.target.value),
@@ -1012,7 +1012,7 @@ function ExclusivityTool({ cases, updateCase }) {
       toolLabel(h, "Exclusivity / loss of exclusivity"),
       h("div", { style: { marginBottom: 10 } },
         h(Note, { summary: 'New here? What to look up and why' },
-          h("div", { style: { lineHeight: 1.6 } }, 'Search an already-approved drug that resembles the one you are modelling — same modality, similar class. What you are after is how long its protection actually ran, which is the sourced basis for the loss-of-exclusivity year in your revenue build instead of a guess. Use the brand name (Eliquis, not apixaban) since that is how the Orange Book indexes products. Two dates come back and they can be many years apart: the substance-patent floor is the compound patent, the hardest barrier for a generic to design around, and the last-expiry date includes formulation and method-of-use patents that are far easier to challenge. The substance floor is usually the more defensible read. Biologics are not in the Orange Book at all — the tool says so rather than returning an empty result.'))),
+          h("div", { style: { lineHeight: 1.6 } }, 'Search an already-approved drug that resembles the one you are modeling — same modality, similar class. What you are after is how long its protection actually ran, which is the sourced basis for the loss-of-exclusivity year in your revenue build instead of a guess. Use the brand name (Eliquis, not apixaban) since that is how the Orange Book indexes products. Two dates come back and they can be many years apart: the substance-patent floor is the compound patent, the hardest barrier for a generic to design around, and the last-expiry date includes formulation and method-of-use patents that are far easier to challenge. The substance floor is usually the more defensible read. Biologics are not in the Orange Book at all — the tool says so rather than returning an empty result.'))),
       h("div", { style: { fontSize: 11, fontFamily: "var(--sans)", color: "var(--ink-2)", marginBottom: 12, lineHeight: 1.6 } },
         "Live patent expiry from FDA's Orange Book — where the LOE year comes from instead of a guess. Look up an approved comparable in the same class."),
       h("div", { style: { display: "flex", gap: 8, flexWrap: "wrap" } },
@@ -2108,7 +2108,7 @@ function TargetDossierTool() {
       dossier.drugs.length > 0 && toolCard(h, [
         toolLabel(h, "Drugs already aimed at this target (" + dossier.drugs.length + " shown)"),
         h("div", { style: { fontSize: 10.5, fontFamily: "var(--sans)", color: "var(--ink-3)", marginBottom: 10, lineHeight: 1.6 } },
-          "What has been tried and how far it got. A target with approved drugs is validated but crowded; one where several programmes stalled in Phase 2 is a different kind of warning than one nobody has attempted."),
+          "What has been tried and how far it got. A target with approved drugs is validated but crowded; one where several programs stalled in Phase 2 is a different kind of warning than one nobody has attempted."),
         h("div", { style: { display: "flex", flexDirection: "column", gap: 4, maxHeight: 340, overflowY: "auto" } },
           dossier.drugs.map((d, i) => h("div", { key: i, style: { padding: "6px 0", borderBottom: "1px solid var(--rule)" } },
             h("div", { style: { display: "flex", justifyContent: "space-between", gap: 10, fontSize: 11, fontFamily: "var(--mono)" } },
@@ -2157,7 +2157,7 @@ function CommercialTool({ cases, updateCase, activeCase }) {
   return h("div", null,
     h("div", { style: { display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" } },
       subTab("launch", "Launch tracker"),
-      subTab("actual", "Actual vs modelled")),
+      subTab("actual", "Actual vs modeled")),
     sub === "launch" ? h(LaunchTrackerTool, null) : h(ActualVsModelTool, { cases, updateCase, activeCase })
   );
 }
@@ -2202,7 +2202,7 @@ function LaunchTrackerTool() {
         h("input", { type: "text", value: brand, placeholder: "brand name — e.g. Winrevair",
           "aria-label": "Brand name", onChange: e => setBrand(e.target.value), onKeyDown: e => { if (e.key === "Enter") run(); },
           style: { flex: "1 1 200px", padding: "9px 12px", borderRadius: 7, border: "1.5px solid var(--rule)", background: "var(--surface)", color: "var(--ink-1)", fontFamily: "var(--mono)", fontSize: 13 } }),
-        h("select", { value: programme, onChange: e => setProgramme(e.target.value), "aria-label": "Medicare programme",
+        h("select", { value: programme, onChange: e => setProgramme(e.target.value), "aria-label": "Medicare program",
           style: { padding: "9px 10px", borderRadius: 7, border: "1.5px solid var(--rule)", background: "var(--surface)", color: "var(--ink-1)", fontFamily: "var(--mono)", fontSize: 12 } },
           h("option", { value: "Part D" }, "Part D — pharmacy dispensed"),
           h("option", { value: "Part B" }, "Part B — clinic administered")),
@@ -2275,7 +2275,7 @@ function LaunchTrackerTool() {
         rows.length > 1 && h("div", { className: "prose", style: { fontSize: 10, fontFamily: "var(--sans)", color: "var(--ink-3)", lineHeight: 1.6, marginTop: 6 } },
           "Indexed to each drug's first year of Medicare spending, so launches from different years sit on the same axis. Year 1 is almost never a full commercial year — a drug approved in March shows nine months of it — so the first point understates every curve by a different amount depending on approval date. A mature analog's later years are its plateau, not its ramp."),
         rows.some(r => r.found && r.series.some(p => !p.isFullYear)) && h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--amber)", marginTop: 4 } },
-          "One or more points is a partial period plotted at its reported value, not annualised — the line dips there for a reporting reason, not a commercial one.")
+          "One or more points is a partial period plotted at its reported value, not annualized — the line dips there for a reporting reason, not a commercial one.")
       ])
     )
   );
@@ -2325,7 +2325,7 @@ function ActualVsModelTool({ cases, updateCase, activeCase }) {
       toolLabel(h, "Reported revenue against your own model"),
       h(Note, { summary: "Why a partial year needs saying so" },
         h("div", { style: { lineHeight: 1.6 } },
-          "Three quarters of reported revenue against a full modelled year shows a 25% miss on a drug that is exactly on plan. That mistake is easy to make by hand and impossible to spot afterwards, so this only computes a direct comparison once four quarters are in — a partial year is compared on an explicitly-labelled run rate instead. ",
+          "Three quarters of reported revenue against a full modeled year shows a 25% miss on a drug that is exactly on plan. That mistake is easy to make by hand and impossible to spot afterwards, so this only computes a direct comparison once four quarters are in — a partial year is compared on an explicitly-labeled run rate instead. ",
           "And the gap is a statement about your model as much as about the drug: a launch beating a conservative model and a launch beating a realistic one look identical from here.")),
       h("div", { style: { display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", marginTop: 10 } },
         h(CasePicker, { cases, selectedId: caseId, onChange: setCaseId, placeholder: "Pick a case…" }),
@@ -2364,7 +2364,7 @@ function ActualVsModelTool({ cases, updateCase, activeCase }) {
                 h("tbody", null, cmp.rows.map((r, i) => h("tr", { key: i },
                   h("td", { style: { padding: "6px 10px", borderBottom: "1px solid var(--rule)", fontSize: 11, color: "var(--ink-1)" } }, r.year),
                   h("td", { style: { padding: "6px 10px", borderBottom: "1px solid var(--rule)", fontSize: 11, textAlign: "right", color: "var(--ink-1)" } },
-                    fmtMoney(r.actualUsd), r.impliedAnnualUsd != null && h("div", { style: { fontSize: 10, color: "var(--ink-3)" } }, "→ " + fmtMoney(r.impliedAnnualUsd) + " annualised")),
+                    fmtMoney(r.actualUsd), r.impliedAnnualUsd != null && h("div", { style: { fontSize: 10, color: "var(--ink-3)" } }, "→ " + fmtMoney(r.impliedAnnualUsd) + " annualized")),
                   h("td", { style: { padding: "6px 10px", borderBottom: "1px solid var(--rule)", fontSize: 10, color: "var(--ink-3)" } }, r.comparisonBasis),
                   h("td", { style: { padding: "6px 10px", borderBottom: "1px solid var(--rule)", fontSize: 11, textAlign: "right", color: "var(--ink-2)" } },
                     r.outsideModel ? "outside the model" : r.modelPreLaunch ? "pre-launch" : fmtMoney(r.modelledUsd)),
@@ -2380,13 +2380,13 @@ function ActualVsModelTool({ cases, updateCase, activeCase }) {
         "At least one reported year falls outside the model's projection window. That almost always means Model Year 0 is set to the wrong calendar year rather than that the model is wildly off — check that first.")),
 
       toolCard(h, [
-        toolLabel(h, "Modelled against reported"),
-        h(ExportableBlock, { title: (theCase.name || "Case") + " — actual vs. modelled revenue" },
+        toolLabel(h, "Modeled against reported"),
+        h(ExportableBlock, { title: (theCase.name || "Case") + " — actual vs. modeled revenue" },
           h(RevenueChart, {
             xPrefix: "", xAxisPrefix: "",
             series: [
               { name: "Your model", color: "var(--teal)", points: series.modelled },
-              { name: "Reported (partial years annualised)", color: "var(--amber)", points: series.actual.map(p => ({ v: p.v == null ? 0 : p.v, label: p.label })) }
+              { name: "Reported (partial years annualized)", color: "var(--amber)", points: series.actual.map(p => ({ v: p.v == null ? 0 : p.v, label: p.label })) }
             ],
             height: 220, showLegend: true
           })),
@@ -2428,9 +2428,9 @@ function AssetProgramTool({ onDecodeTrial, onWatchTrial }) {
   return h("div", null,
     toolCard(h, [
       toolLabel(h, "One asset, every trial"),
-      h(Note, { summary: "Why look at a programme rather than a trial" },
+      h(Note, { summary: "Why look at a program rather than a trial" },
         h("div", { style: { lineHeight: 1.6 } },
-          "Nobody holds a thesis about a trial; they hold one about an asset, and an asset is usually eight to forty trials across different sponsors, phases, indications and fates. Three things are invisible when you read them one at a time: how much of the programme is randomised rather than single-arm, whether this is one focused indication or a platform being tried everywhere, and which trials were quietly stopped. ",
+          "Nobody holds a thesis about a trial; they hold one about an asset, and an asset is usually eight to forty trials across different sponsors, phases, indications and fates. Three things are invisible when you read them one at a time: how much of the program is randomized rather than single-arm, whether this is one focused indication or a platform being tried everywhere, and which trials were quietly stopped. ",
           "The checklist at the top is deliberately a set of counts with their own denominators and not a score. A single “evidence strength” number would need invented weights, and you would anchor on it instead of on the four facts underneath it.")),
       h("div", { style: { display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 } },
         h("input", { type: "text", value: drug, placeholder: "drug or intervention name — e.g. sotatercept",
@@ -2439,7 +2439,7 @@ function AssetProgramTool({ onDecodeTrial, onWatchTrial }) {
           style: { flex: "1 1 260px", padding: "9px 12px", borderRadius: 7, border: "1.5px solid var(--rule)", background: "var(--surface)", color: "var(--ink-1)", fontFamily: "var(--mono)", fontSize: 13 } }),
         h("button", { onClick: run, disabled: loading || !drug.trim(),
           style: { padding: "9px 18px", borderRadius: 7, border: "1px solid var(--teal)", background: "var(--teal-bg)", color: "var(--teal)", fontFamily: "var(--mono)", fontSize: 12, fontWeight: 700, cursor: loading ? "default" : "pointer", opacity: drug.trim() ? 1 : 0.5 } },
-          loading ? "Reading the registry…" : "Build the programme"))
+          loading ? "Reading the registry…" : "Build the program"))
     ]),
 
     error && toolCard(h, h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--amber)", lineHeight: 1.6 } },
@@ -2476,7 +2476,7 @@ function AssetProgramTool({ onDecodeTrial, onWatchTrial }) {
             h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: s.whyStopped ? "var(--amber)" : "var(--ink-3)", marginTop: 3 } },
               s.whyStopped ? "Reason given: " + s.whyStopped : "No reason registered.")))),
         h("div", { className: "prose", style: { fontSize: 10, fontFamily: "var(--sans)", color: "var(--ink-3)", lineHeight: 1.6, marginTop: 10 } },
-          "A sponsor stops a trial for business reasons — reprioritisation, funding, a partner walking — about as often as for scientific ones, and the registered reason is frequently a single vague sentence or absent entirely. Read the reason, not the fact.")
+          "A sponsor stops a trial for business reasons — reprioritization, funding, a partner walking — about as often as for scientific ones, and the registered reason is frequently a single vague sentence or absent entirely. Read the reason, not the fact.")
       ]),
 
       toolCard(h, [
@@ -2495,7 +2495,7 @@ function AssetProgramTool({ onDecodeTrial, onWatchTrial }) {
                   h("span", { style: { color: statusColor(s.status) } }, s.status),
                   s.enrollment != null && h("span", { style: { color: "var(--ink-3)" } }, "n=" + s.enrollment.toLocaleString()),
                   s.hasResults && h("span", { style: { color: "var(--teal)", fontSize: 10, fontWeight: 700 } }, "RESULTS POSTED"),
-                  s.allocation === "RANDOMIZED" && h("span", { style: { color: "var(--ink-3)", fontSize: 10 } }, "randomised"),
+                  s.allocation === "RANDOMIZED" && h("span", { style: { color: "var(--ink-3)", fontSize: 10 } }, "randomized"),
                   s.masking && s.masking !== "NONE" && h("span", { style: { color: "var(--ink-3)", fontSize: 10 } }, "blinded")),
                 h("div", { style: { fontSize: 11, fontFamily: "var(--sans)", color: "var(--ink-2)", lineHeight: 1.5, marginTop: 2 } }, truncatedSpan(h, s.title || "", 110)),
                 h("div", { style: { fontSize: 10, color: "var(--ink-3)", marginTop: 2 } },
@@ -2521,7 +2521,7 @@ function AssetProgramTool({ onDecodeTrial, onWatchTrial }) {
         summary.indications.length > 30 && h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginTop: 6 } },
           "…and " + (summary.indications.length - 30) + " more."),
         h("div", { className: "prose", style: { fontSize: 10, fontFamily: "var(--sans)", color: "var(--ink-3)", lineHeight: 1.6, marginTop: 8 } },
-          "These are the sponsor's own registered condition strings, not a normalised vocabulary — the same disease often appears two or three ways, which inflates the count. Read the spread, not the number.")
+          "These are the sponsor's own registered condition strings, not a normalized vocabulary — the same disease often appears two or three ways, which inflates the count. Read the spread, not the number.")
       ])
     )
   );
@@ -2620,7 +2620,7 @@ function LiteratureTool({ initialQuery }) {
       h(Note, { summary: "What this is, and what the name gets wrong" },
         h("div", { style: { lineHeight: 1.6 } },
           "This searches Europe PMC, and the name misleads: it is not a European database. Its main index is MEDLINE — the same records PubMed searches, in full — plus open-access full text, plus preprints from bioRxiv, medRxiv and Research Square. So this is a superset of PubMed rather than a regional slice of it, which is why there is one literature source here and not three; a second general index would return the same MEDLINE records again under a different name. ",
-          "What it adds over a plain web search is the one thing a search engine cannot tell you: what kind of paper each result is. A primary randomised trial report, a meta-analysis, a narrative review and an unreviewed preprint arrive already separated, because the difference between “three trials support this” and “three reviews of the same trial support this” is most of what you are trying to establish.")),
+          "What it adds over a plain web search is the one thing a search engine cannot tell you: what kind of paper each result is. A primary randomized trial report, a meta-analysis, a narrative review and an unreviewed preprint arrive already separated, because the difference between “three trials support this” and “three reviews of the same trial support this” is most of what you are trying to establish.")),
       h("div", { style: { display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10, alignItems: "center" } },
         h("input", { type: "text", value: q, placeholder: "drug, target, indication, or an NCT number",
           "aria-label": "Literature search",
@@ -2824,9 +2824,9 @@ function TrialResultsPanels({ results, study }) {
           h("td", { style: tdS }, pct(g.serious.rate) + (g.serious.atRisk ? "  (" + num(g.serious.affected) + "/" + num(g.serious.atRisk) + ")" : "")),
           h("td", { style: tdS }, pct(g.other.rate) + (g.other.atRisk ? "  (" + num(g.other.affected) + "/" + num(g.other.atRisk) + ")" : "")),
           h("td", { style: tdS }, pct(g.deaths.rate) + (g.deaths.atRisk ? "  (" + num(g.deaths.affected) + "/" + num(g.deaths.atRisk) + ")" : ""))))))),
-      caveat("For a drug that is not approved, this is the only real safety data that exists — FAERS has no denominator and a label does not exist yet. Denominators are the safety population, which is not the randomised population. Deaths are every death recorded in the safety window, not deaths attributed to the drug."
+      caveat("For a drug that is not approved, this is the only real safety data that exists — FAERS has no denominator and a label does not exist yet. Denominators are the safety population, which is not the randomized population. Deaths are every death recorded in the safety window, not deaths attributed to the drug."
         + (safety.timeFrame ? "  Collected over: " + safety.timeFrame + "." : "")
-        + (safety.comparable ? "" : "  This record registers " + safety.groups.length + " event groups, which usually means crossover or extension cohorts are included alongside the randomised arms — so these rows are not a clean two-arm comparison.")),
+        + (safety.comparable ? "" : "  This record registers " + safety.groups.length + " event groups, which usually means crossover or extension cohorts are included alongside the randomized arms — so these rows are not a clean two-arm comparison.")),
 
       h("div", { style: { display: "flex", gap: 8, marginTop: 16, marginBottom: 8, flexWrap: "wrap" } },
         ["serious", "other"].map(v => h("button", { key: v, onClick: () => setAeView(v),
@@ -2875,7 +2875,7 @@ function TrialResultsPanels({ results, study }) {
             flagList.map((f, i) => h("div", { key: i, style: { borderLeft: "3px solid " + sevColor(f.severity), paddingLeft: 10 } },
               h("div", { style: { fontSize: 12, fontFamily: "var(--mono)", fontWeight: 700, color: sevColor(f.severity), marginBottom: 3 } }, f.label),
               h("div", { className: "prose", style: { fontSize: 11.5, fontFamily: "var(--sans)", color: "var(--ink-2)", lineHeight: 1.6 } }, f.detail)))),
-      caveat("These check the posted results. They are separate from the design flags above, which check the registered protocol, and from the red-flag checks on the Workspace, which check your own modelling inputs.")
+      caveat("These check the posted results. They are separate from the design flags above, which check the registered protocol, and from the red-flag checks on the Workspace, which check your own modeling inputs.")
     ]),
 
     (results.limitations || results.agreementRestriction) && toolCard(h, [
@@ -2986,7 +2986,7 @@ function TrialDecoderTool({ initialNctId, onConsumedInitialNctId }) {
               + (decoded.armLabels.length > 4 ? "  … +" + (decoded.armLabels.length - 4) + " more" : "") : "")
           : "—",
           decoded.armCount > 6 ? "A trial with this many arms is usually a master protocol spanning several sub-studies rather than one comparison — read the registered arms directly before treating any single result as “the” outcome." : null),
-        factRow("Enrolment", decoded.enrollment != null ? decoded.enrollment.toLocaleString() : "—"),
+        factRow("Enrollment", decoded.enrollment != null ? decoded.enrollment.toLocaleString() : "—"),
         decoded.endpoint.stated && factRow("Primary endpoint" + (decoded.endpoint.count > 1 ? "s (" + decoded.endpoint.count + ")" : ""),
           decoded.endpoint.items.slice(0, 5).map(o => o.measure + (o.timeFrame ? " @ " + o.timeFrame : "")).join("  •  ")
             + (decoded.endpoint.items.length > 5 ? "  … and " + (decoded.endpoint.items.length - 5) + " more" : ""),
@@ -3251,7 +3251,7 @@ function TrialWatchTool({ initialNctId, onConsumedInitialNctId }) {
               (() => {
                 const v = parseFloat(myEffect);
                 if (!isFinite(v)) return h("div", { className: "prose", style: { fontSize: 10, fontFamily: "var(--sans)", color: "var(--ink-3)", lineHeight: 1.6, marginTop: 6 } },
-                  "Your modelled effect before a readout, or the one a trial just posted. It is compared only against results on the same scale — a hazard ratio against hazard ratios, never against a mean difference.");
+                  "Your modeled effect before a readout, or the one a trial just posted. It is compared only against results on the same scale — a hazard ratio against hazard ratios, never against a mean difference.");
                 return h("div", { style: { marginTop: 8, display: "flex", flexDirection: "column", gap: 8 } },
                   Object.keys(effects.byScale).map(scale => {
                     const pos = positionInAnalogs(effects.byScale[scale], v);
@@ -3260,13 +3260,13 @@ function TrialWatchTool({ initialNctId, onConsumedInitialNctId }) {
                     // Deliberately not a verdict. Rank, denominator, and the
                     // one thing a percentile cannot tell you.
                     const read = pct >= 80
-                      ? "More favourable than almost everything posted in this indication. That is a real claim about being better than the field, and it wants a specific reason — a mechanism, a biomarker-selected population, a genuinely different comparator."
+                      ? "More favorable than almost everything posted in this indication. That is a real claim about being better than the field, and it wants a specific reason — a mechanism, a biomarker-selected population, a genuinely different comparator."
                       : pct <= 20
                         ? "Towards the thin end of what has been posted here. It can still clear a p-value and still be a modest result, which is exactly the gap between statistically real and commercially interesting."
                         : "Squarely inside the range this indication has actually produced.";
                     return h("div", { key: scale, style: { borderLeft: "3px solid " + (pct >= 80 ? "var(--amber)" : "var(--teal)"), paddingLeft: 10 } },
                       h("div", { style: { fontSize: 11.5, fontFamily: "var(--mono)", color: "var(--ink-1)" } },
-                        v + " is more favourable than " + pos.beats + " of " + pos.n + " posted "
+                        v + " is more favorable than " + pos.beats + " of " + pos.n + " posted "
                           + (scale === "ratio" ? "ratio-scale" : "difference-scale") + " results (" + pct + "th percentile)"
                           + (pos.ties ? ", and ties " + pos.ties : "")),
                       h("div", { style: { fontSize: 10.5, fontFamily: "var(--mono)", color: "var(--ink-3)", marginTop: 2 } },

@@ -139,6 +139,16 @@ app.whenReady().then(async () => {
     // that something visibly marks focus. Keyboard modality matters —
     // :focus-visible only fires for real key events, not element.focus().
     if (pass === "dark-1470") {
+      // Text sweep: open every expander on the view — <details> notes and any
+      // collapsed toggle (aria-expanded="false") — then keep all visible text
+      // for a spelling pass. Collected text lands in text/<stop>.txt.
+      await js(`(() => { document.querySelectorAll("details:not([open])").forEach(d => d.open = true);
+        document.querySelectorAll('[aria-expanded="false"]').forEach(b => { try { b.click(); } catch (e) {} }); return true; })()`);
+      await sleep(500);
+      await js(`document.querySelectorAll("details:not([open])").forEach(d => d.open = true)`);
+      const text = await js("document.body.innerText");
+      fs.mkdirSync(path.join(OUT, "text"), { recursive: true });
+      fs.writeFileSync(path.join(OUT, "text", name.replace(/[^a-z0-9]+/gi, "-").toLowerCase() + ".txt"), text);
       await js("document.activeElement && document.activeElement.blur && document.activeElement.blur()");
       const seen = new Set();
       for (let i = 0; i < 40; i++) {

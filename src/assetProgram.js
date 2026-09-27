@@ -149,7 +149,7 @@ function summarizeAssetProgram(studies, drugName) {
     sponsors: Object.keys(sponsors).map(k => ({ sponsor: k, trials: sponsors[k] })).sort((a, b) => b.trials - a.trials),
     evidence,
     // Read from the registry only, so the caveat travels with the data.
-    caveat: "Registered trials only. A programme can have work that was never registered, registered under a code name this search does not match, or run outside the US registry entirely — so this is a floor on what exists, not a census of it."
+    caveat: "Registered trials only. A program can have work that was never registered, registered under a code name this search does not match, or run outside the US registry entirely — so this is a floor on what exists, not a census of it."
   };
 }
 
@@ -163,24 +163,24 @@ function describeEvidenceBase(summary) {
   const lines = [];
 
   if (e.withStatedAllocation === 0) {
-    lines.push({ key: "randomised", text: "No trial in this programme registered an allocation, so whether any of it is randomised cannot be read from the registry." });
+    lines.push({ key: "randomised", text: "No trial in this program registered an allocation, so whether any of it is randomized cannot be read from the registry." });
   } else if (e.randomised === 0) {
-    lines.push({ key: "randomised", tone: "thin", text: "None of the " + e.withStatedAllocation + " trials that registered an allocation is randomised. Every result here is a single-arm or non-randomised comparison, which can show what happened to patients on the drug but not that the drug caused it." });
+    lines.push({ key: "randomised", tone: "thin", text: "None of the " + e.withStatedAllocation + " trials that registered an allocation is randomized. Every result here is a single-arm or non-randomized comparison, which can show what happened to patients on the drug but not that the drug caused it." });
   } else {
     lines.push({ key: "randomised", tone: e.randomised >= 2 ? "solid" : "thin",
-      text: e.randomised + " of " + e.withStatedAllocation + " trials with a registered allocation " + (e.randomised === 1 ? "is" : "are") + " randomised." });
+      text: e.randomised + " of " + e.withStatedAllocation + " trials with a registered allocation " + (e.randomised === 1 ? "is" : "are") + " randomized." });
   }
 
   if (e.withStatedMasking > 0) {
     lines.push({ key: "blinded", tone: e.blinded === 0 ? "thin" : "solid",
       text: e.blinded === 0
-        ? "Every trial that registered a masking arrangement is open label. That matters most where the endpoint involves judgement rather than a hard event."
+        ? "Every trial that registered a masking arrangement is open label. That matters most where the endpoint involves judgment rather than a hard event."
         : e.blinded + " of " + e.withStatedMasking + " trials with registered masking " + (e.blinded === 1 ? "is" : "are") + " blinded." });
   }
 
   lines.push({ key: "controlled", tone: e.controlled === 0 ? "thin" : "solid",
     text: e.controlled === 0
-      ? "No trial registers a placebo, active or sham comparator arm — there is nothing in this programme to measure the drug against except external expectation."
+      ? "No trial registers a placebo, active or sham comparator arm — there is nothing in this program to measure the drug against except external expectation."
       : e.controlled + " of " + e.trials + " trials register a comparator arm." });
 
   lines.push({ key: "results", tone: e.withPostedResults === 0 ? "thin" : "solid",
@@ -190,12 +190,12 @@ function describeEvidenceBase(summary) {
 
   if (e.largestEnrolment != null) {
     lines.push({ key: "size", tone: e.largestEnrolment < 100 ? "thin" : "solid",
-      text: "Largest single trial: " + e.largestEnrolment.toLocaleString() + " participants; " + e.totalEnrolment.toLocaleString() + " across the programme as registered."
+      text: "Largest single trial: " + e.largestEnrolment.toLocaleString() + " participants; " + e.totalEnrolment.toLocaleString() + " across the program as registered."
         + (e.largestEnrolment < 100 ? " Nothing here is large enough to detect a modest effect reliably." : "") });
   }
 
   lines.push({ key: "phase", tone: assetPhaseRank(e.highestPhase) >= assetPhaseRank("PHASE3") ? "solid" : "thin",
-    text: "Furthest the programme has reached: " + e.highestPhaseLabel + "." });
+    text: "Furthest the program has reached: " + e.highestPhaseLabel + "." });
 
   if (e.stopped > 0) {
     lines.push({ key: "stopped", tone: "watch",
@@ -204,7 +204,7 @@ function describeEvidenceBase(summary) {
 
   if (e.indicationCount > 1) {
     lines.push({ key: "breadth", tone: "neutral",
-      text: e.indicationCount + " distinct registered conditions across " + e.sponsorCount + " sponsor" + (e.sponsorCount === 1 ? "" : "s") + ". A broad spread can mean a platform with real optionality or a programme with no clear lead indication, and the registry cannot tell you which." });
+      text: e.indicationCount + " distinct registered conditions across " + e.sponsorCount + " sponsor" + (e.sponsorCount === 1 ? "" : "s") + ". A broad spread can mean a platform with real optionality or a program with no clear lead indication, and the registry cannot tell you which." });
   }
 
   return lines;

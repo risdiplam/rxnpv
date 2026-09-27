@@ -357,7 +357,7 @@ function renderTrialOutcomeTab(content) {
       field('Alpha', numberInput('alpha', 0.05, { step: '0.01' })),
       field('Sided', selectInput('sided', [{ value: 'two', label: 'Two-sided' }, { value: 'one', label: 'One-sided' }], 'two'))
     ]),
-    note('What "two-sided" means for this number', 'A two-sided p-value carries no direction, so a replicate landing significantly WORSE than control counts toward the assurance figure exactly like one landing better. That’s standard statistical convention and the right default for a regulatory-style test, but it means the headline is "probability of a statistically significant result," not strictly "probability of a good one." At realistic effect sizes the wrong-direction share is tiny; for a marginal or unfavourable prior it isn’t. Switch to one-sided for directional success only.'),
+    note('What "two-sided" means for this number', 'A two-sided p-value carries no direction, so a replicate landing significantly WORSE than control counts toward the assurance figure exactly like one landing better. That’s standard statistical convention and the right default for a regulatory-style test, but it means the headline is "probability of a statistically significant result," not strictly "probability of a good one." At realistic effect sizes the wrong-direction share is tiny; for a marginal or unfavorable prior it isn’t. Switch to one-sided for directional success only.'),
     el('h3', {}, 'Effect-size prior'),
     fieldGrid([
       field('Prior type', selectInput('priorType', [{ value: 'point', label: 'Fixed value (no uncertainty)' }, { value: 'normal', label: 'Normal (mean + SD)' }], 'normal')),
@@ -1259,12 +1259,12 @@ function renderAssumptionStress(resultsDiv, ctx) {
       ...rows
     ]));
     wrap.appendChild(note('Why there are two answers here, and why you have to pick one',
-      'If the control arm responds better or worse than planned, what does the treatment arm do? Two projections are coherent and they disagree materially. "Same points" holds the absolute benefit fixed — the drug adds the same number of percentage points whatever the baseline. "Same ratio" holds the relative benefit fixed — the drug multiplies the control rate by the same factor, so a higher control rate produces a larger absolute gap and more power. Which is right is a judgement about the mechanism, not a statistical one, and neither is a safe default. A cell marked * had its projection clamped at 0% or 100%, where the projection has stopped being meaningful.'));
+      'If the control arm responds better or worse than planned, what does the treatment arm do? Two projections are coherent and they disagree materially. "Same points" holds the absolute benefit fixed — the drug adds the same number of percentage points whatever the baseline. "Same ratio" holds the relative benefit fixed — the drug multiplies the control rate by the same factor, so a higher control rate produces a larger absolute gap and more power. Which is right is a judgment about the mechanism, not a statistical one, and neither is a safe default. A cell marked * had its projection clamped at 0% or 100%, where the projection has stopped being meaningful.'));
   } else if (ctx.type === 'continuous' && ctx.sd != null && ctx.delta != null) {
     const sds = stressRange(ctx.sd).filter(x => x > 0);
     wrap.appendChild(el('h4', { style: 'margin-top:14px' }, 'If the outcome is more variable than assumed'));
     wrap.appendChild(el('table', { class: 'desctable' }, [
-      el('tr', {}, ['Common SD', 'Standardised effect', 'Power'].map(t => el('td', { style: 'font-weight:700' }, t))),
+      el('tr', {}, ['Common SD', 'Standardized effect', 'Power'].map(t => el('td', { style: 'font-weight:700' }, t))),
       ...sds.map(sd => {
         const isPlan = Math.abs(sd - ctx.sd) < 1e-9;
         return el('tr', {}, [
@@ -1275,7 +1275,7 @@ function renderAssumptionStress(resultsDiv, ctx) {
       })
     ]));
     wrap.appendChild(note('Why variance, not the control mean',
-      'For a continuous endpoint the control arm’s mean cancels out of the comparison — what does not cancel is the spread. An SD a third larger than the pilot suggested is one of the most common reasons a well-designed trial misses, and pilot studies systematically understate it because they are small and selected. The standardised effect column is the effect in SD units, which is what the power actually depends on.'));
+      'For a continuous endpoint the control arm’s mean cancels out of the comparison — what does not cancel is the spread. An SD a third larger than the pilot suggested is one of the most common reasons a well-designed trial misses, and pilot studies systematically understate it because they are small and selected. The standardized effect column is the effect in SD units, which is what the power actually depends on.'));
   } else if (ctx.type === 'timeToEvent') {
     wrap.appendChild(el('p', { class: 'subtle', style: 'margin-top:12px' },
       'A time-to-event calculation is driven by the number of EVENTS, not the number of patients, so there is no control-rate axis to stress here — a slower-than-expected control event rate does not weaken the trial, it delays it. What it does change is whether the events arrive before the readout date, which is a timeline question rather than a power one.'));
@@ -1294,7 +1294,7 @@ function renderAssumptionStress(resultsDiv, ctx) {
       ctx.type === 'timeToEvent' ? 'If events fall short of plan' : 'If patients drop out'));
     wrap.appendChild(el('table', { class: 'desctable' }, [
       el('tr', {}, [ctx.type === 'timeToEvent' ? 'Shortfall' : 'Dropout',
-        'Analysable ' + unitLabel, 'Power', 'Needed to preserve the plan'].map(t => el('td', { style: 'font-weight:700' }, t))),
+        'Analyzable ' + unitLabel, 'Power', 'Needed to preserve the plan'].map(t => el('td', { style: 'font-weight:700' }, t))),
       ...STRESS_DROPOUTS.map(d => {
         const nEff = effectiveNAfterDropout(baseN, d);
         return el('tr', {}, [
@@ -1306,7 +1306,7 @@ function renderAssumptionStress(resultsDiv, ctx) {
       })
     ]));
     wrap.appendChild(note('The inflation is N/(1−d), not N×(1+d)',
-      'The last column is how many you would have to randomise so that the planned number survives. It is the planned N divided by (1 − dropout), which is not the same as adding the dropout percentage back on: at 20% dropout you need 25% more patients, not 20%. Getting that backwards is a standard way a trial ends up slightly underpowered by design. Note also that this treats dropout as random. It usually is not — if the arms lose different kinds of people at different rates, the problem is bias in what remains, which no amount of extra enrolment fixes, and which the Trial Decoder’s results reader checks for once results exist.'));
+      'The last column is how many you would have to randomize so that the planned number survives. It is the planned N divided by (1 − dropout), which is not the same as adding the dropout percentage back on: at 20% dropout you need 25% more patients, not 20%. Getting that backwards is a standard way a trial ends up slightly underpowered by design. Note also that this treats dropout as random. It usually is not — if the arms lose different kinds of people at different rates, the problem is bias in what remains, which no amount of extra enrollment fixes, and which the Trial Decoder’s results reader checks for once results exist.'));
   }
 
   resultsDiv.appendChild(wrap);

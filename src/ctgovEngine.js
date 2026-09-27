@@ -255,7 +255,7 @@ const CTGOV_DIFF_FIELDS = [
   { key: "status", label: "Status", severity: (from, to) =>
       /TERMINATED|SUSPENDED|WITHDRAWN/.test(String(to || "")) ? "high" : "routine" },
   { key: "phase", label: "Phase", severity: () => "medium" },
-  { key: "enrollment", label: "Enrolment", severity: (from, to) =>
+  { key: "enrollment", label: "Enrollment", severity: (from, to) =>
       // A cut of a fifth or more is usually a recruitment problem or a
       // re-powering; an increase is more often an adaptive expansion.
       (typeof from === "number" && typeof to === "number" && from > 0 && to < from * 0.8) ? "high" : "medium" },
@@ -312,7 +312,7 @@ function diffTrialSnapshots(oldStudy, newStudy) {
     changes.push({
       field: "eligibilityCriteria", label: "Eligibility criteria", severity: "medium",
       note: "The criteria text changed (" + (delta === 0 ? "same length, different wording"
-        : (delta > 0 ? "+" : "") + delta + " characters") + "). Whether that widened or narrowed who can enrol is not something a text diff can tell you — read both versions on CT.gov's own history."
+        : (delta > 0 ? "+" : "") + delta + " characters") + "). Whether that widened or narrowed who can enroll is not something a text diff can tell you — read both versions on CT.gov's own history."
     });
   }
 

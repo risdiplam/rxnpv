@@ -2658,7 +2658,7 @@ section("PK/PD half-life formats a zero elimination rate");
   // Ke = 0 is a legitimate input; ln(2)/0 = Infinity is correct maths, but
   // "Infinityhr" is not a readable answer.
   ok("Ke = 0 does not print 'Infinityhr'", api.formatHalfLife(0).indexOf("Infinity") === -1);
-  ok("Ke = 0 says what actually happened", api.formatHalfLife(0) === "none (Ke = 0, no elimination modelled)");
+  ok("Ke = 0 says what actually happened", api.formatHalfLife(0) === "none (Ke = 0, no elimination modeled)");
 }
 report();
 
@@ -3363,7 +3363,7 @@ section("Asset programme — the shape of an evidence base, never a score");
   ok("a programme with no randomised trial says exactly that",
     thinLines.some(l => l.key === "randomised" && /None of the/.test(l.text) && l.tone === "thin"));
   ok("no comparator anywhere is stated plainly",
-    thinLines.some(l => l.key === "controlled" && /nothing in this programme to measure the drug against/.test(l.text)));
+    thinLines.some(l => l.key === "controlled" && /nothing in this program to measure the drug against/.test(l.text)));
   ok("nothing posted is stated plainly",
     thinLines.some(l => l.key === "results" && /No trial has posted results/.test(l.text)));
   ok("a 40-patient largest trial is flagged as too small to detect a modest effect",

@@ -359,9 +359,9 @@ function ProgramEditor({ program, onChange, onDelete, discountRatePct, terminalV
         h("select", { "aria-label": "Price basis", value: rb.pricing.priceBasis || "ASP", onChange: e => set("revenueBuild.pricing.priceBasis", e.target.value),
           style: { width: "100%", padding: "7px 10px", borderRadius: 6, border: "1.5px solid var(--rule)", background: "var(--surface)", color: "var(--ink-1)", fontFamily: "var(--mono)", fontSize: 13 } },
           PRICE_BASIS_OPTIONS.map(o => h("option", { key: o.value, value: o.value }, o.label)))),
-      h(BenchField, { label: "Net price realisation", value: rb.pricing.netPriceRealizationPct, onChange: v => set("revenueBuild.pricing.netPriceRealizationPct", v), suffix: "%",
+      h(BenchField, { label: "Net price realization", value: rb.pricing.netPriceRealizationPct, onChange: v => set("revenueBuild.pricing.netPriceRealizationPct", v), suffix: "%",
         placeholder: String(aspPctOfBasis(rb.pricing.priceBasis || "ASP")),
-        help: "What share of the entered price the manufacturer actually keeps — the other side of gross-to-net (45% gross-to-net = 55% realisation). Leave blank to use Table 4-1's average for the basis above. Override it if you have a real figure: that table averages across all drugs and understates gross-to-net badly for a modern specialty brand, where 40-50% deductions are ordinary." }),
+        help: "What share of the entered price the manufacturer actually keeps — the other side of gross-to-net (45% gross-to-net = 55% realization). Leave blank to use Table 4-1's average for the basis above. Override it if you have a real figure: that table averages across all drugs and understates gross-to-net badly for a modern specialty brand, where 40-50% deductions are ordinary." }),
       (() => {
         // Show the conversion as it will actually be applied. A price basis
         // control that silently changes the valuation would be worse than not
@@ -573,7 +573,7 @@ function ProgramEditor({ program, onChange, onDelete, discountRatePct, terminalV
       // reliably confirm or rule out eligibility, so this only prompts a check
       // rather than asserting anything.
       const indicationText = ((program.indication || "") + " " + (program.therapeuticArea || "")).toLowerCase();
-      const nudgeKeywords = ["pediatric", "paediatric", "rare", "orphan", "tropical", "neglected"];
+      const nudgeKeywords = ["pediatric", "pediatric", "rare", "orphan", "tropical", "neglected"];
       const showNudge = !prv.enabled && nudgeKeywords.some(k => indicationText.includes(k));
       return h("div", { style: { marginTop: 14, padding: "10px 14px", borderRadius: 8, background: "var(--surface-2)", border: "1px dashed var(--rule)" } },
         h("label", { style: { display: "flex", alignItems: "center", gap: 8, fontSize: 12, fontFamily: "var(--mono)", color: "var(--ink-2)", cursor: "pointer", marginBottom: prv.enabled ? 10 : 0 } },
@@ -609,7 +609,7 @@ function ProgramEditor({ program, onChange, onDelete, discountRatePct, terminalV
           "Partnered asset (licensed rights, royalty/milestone deal)"),
         partnership.enabled && h("div", null,
           h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginBottom: 10, lineHeight: 1.6 } },
-            "Royalty replaces the partnered territory's revenue rather than adding to it — Detailed mode's own ex-US pricing above should be turned off for a territory that's actually licensed out, or its revenue and the royalty on it would both be counted. Royalty income is treated as near-pure margin: no COGS and no marketing are charged against it, because the partner is the one manufacturing and selling there. Sales reps are the exception — they're an explicit headcount you enter, so set them to zero yourself for a programme you've fully licensed out."),
+            "Royalty replaces the partnered territory's revenue rather than adding to it — Detailed mode's own ex-US pricing above should be turned off for a territory that's actually licensed out, or its revenue and the royalty on it would both be counted. Royalty income is treated as near-pure margin: no COGS and no marketing are charged against it, because the partner is the one manufacturing and selling there. Sales reps are the exception — they're an explicit headcount you enter, so set them to zero yourself for a program you've fully licensed out."),
           h("div", { style: { display: "flex", flexWrap: "wrap", gap: "0 16px" } },
             h(BenchField, { label: "Royalty rate", value: partnership.royaltyPct, onChange: v => setPartnership({ royaltyPct: v }), suffix: "%",
               help: "Applied to what the partnered territory's revenue would otherwise have been." }),

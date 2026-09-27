@@ -61,7 +61,7 @@ function findByLabel(d,t){return [...d.querySelectorAll("input")].find(i=>{const
   const commBench = [...d.querySelectorAll("button")].find(b => b.textContent.trim() === "Commercial");
   if (commBench) {
     click(commBench); await wait(350);
-    for (const name of ["Launch tracker", "Actual vs modelled"]) {
+    for (const name of ["Launch tracker", "Actual vs modeled"]) {
       const tb = [...d.querySelectorAll("button")].find(b => b.textContent.trim() === name);
       if (!tb) { console.log("MISSING COMMERCIAL SUBTOOL:", name); errors.push("ERROR: missing Commercial sub-tool " + name); continue; }
       click(tb); await wait(300);

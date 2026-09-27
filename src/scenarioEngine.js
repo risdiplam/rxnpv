@@ -296,7 +296,7 @@ function computeEquityBridgeSteps(theCase, result) {
   ];
   const convFace = cap.mode === "simple" ? 0 : numOr(cap.convFace, 0);
   if (convFace > 0 && !capR.convertsInTheMoney) steps.push({ key: "convertible", label: "Convertible notes (not converting)", value: convFace, sign: -1 });
-  if (capR._futureRaiseAmount) steps.push({ key: "raise", label: "Modelled future raise", value: capR._futureRaiseAmount, sign: 1 });
+  if (capR._futureRaiseAmount) steps.push({ key: "raise", label: "Modeled future raise", value: capR._futureRaiseAmount, sign: 1 });
   const eq = result.equity || {};
   if (eq.prvValueAdded) steps.push({ key: "prv", label: "PRV (risk-adj.)", value: eq.prvValueAdded, sign: 1 });
   if (eq.partnershipValueAdded) steps.push({ key: "partnership", label: "Partnership (upfront + milestones)", value: eq.partnershipValueAdded, sign: 1 });
@@ -916,7 +916,7 @@ function computeRedFlags(theCase) {
         const pb = resolveNetPrice(pr);
         flags.push({
           programId: program.id, programName: progName, severity: "low",
-          message: `Price is entered on ${priceBasisArticle(basis)} ${basis} basis and converted to net using Table 4-1's ${pb.grossToNetPct.toFixed(0)}% average gross-to-net. That table averages across all drugs in the source; for a modern US specialty brand, deductions of 40-50% are ordinary, and the difference flows straight through peak revenue into the valuation. If you have a real gross-to-net for a close comparable, enter it as the net price realisation.`
+          message: `Price is entered on ${priceBasisArticle(basis)} ${basis} basis and converted to net using Table 4-1's ${pb.grossToNetPct.toFixed(0)}% average gross-to-net. That table averages across all drugs in the source; for a modern US specialty brand, deductions of 40-50% are ordinary, and the difference flows straight through peak revenue into the valuation. If you have a real gross-to-net for a close comparable, enter it as the net price realization.`
         });
       }
     }
