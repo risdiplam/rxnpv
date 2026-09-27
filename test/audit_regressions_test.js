@@ -270,6 +270,49 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
     });
   }
 
+  // ── Assumptions section list: states come from the data, links are live ──
+  {
+    const find = (groups, id) => { for (const g of groups) for (const i of g.items) if (i.id === id) return i; return null; };
+    const c0 = w.newCase(), p0 = c0.programs[0];
+    let g = w.assumptionNavSections(c0, p0);
+    ok(find(g, "capital").state === "todo", "Section list: a fresh case's capital structure should need an input");
+    ok(find(g, "revenue").state === "todo", "Section list: a fresh program's quick revenue should need an input");
+    ok(["company", "ga", "rnd", "loe", "cost", "pos", "prv", "partner"].every(id => find(g, id).state === ""), "Section list: a fresh case should show no changed sections");
+    ok(find(g, "output").state === "result" && find(g, "waterfall").state === "result", "Section list: outputs are marked as results");
+    // "13" and 13 are the same number; a blank never counts as a change.
+    const p1 = JSON.parse(JSON.stringify(p0));
+    p1.revenueBuild.exclusivity.yearsToLOE = 13; p1.revenueBuild.exclusivity.modality = "biologic"; p1.costStructure.cogsPct = "";
+    g = w.assumptionNavSections(c0, p1);
+    ok(find(g, "loe").state === "" && find(g, "cost").state === "", "Section list: an equal number, a synced modality or a blank must not count as a change");
+    p1.revenueBuild.exclusivity.yearsToLOE = "11"; p1.costStructure.reps.specialty = "80";
+    const c1 = Object.assign({}, c0, { corporateGA: { preCommercialAnnualM: "40", gaShareOfMatureSgaPct: "50" }, valuationMethod: "multiple" });
+    g = w.assumptionNavSections(c1, p1);
+    ok(find(g, "loe").state === "set" && find(g, "ga").state === "set" && find(g, "company").state === "set", "Section list: real changes mark their sections");
+    ok(find(g, "cost").state === "unused", "Section list: Simple Multiple marks Cost Structure as not used");
+    p1.revenueMode = "full";
+    g = w.assumptionNavSections(c0, p1);
+    ok(!find(g, "revenue") && find(g, "pop").state === "todo" && find(g, "price").state === "todo", "Section list: Detailed mode lists the five steps, with population and price required");
+    ok(w.differsFromDefault([], []) === false && w.differsFromDefault([{ a: 1 }], []) === true, "Section list: arrays compare by whether anything was added");
+
+    // In the UI: every listed section exists on the page, a click opens a
+    // collapsed card, and Hide is remembered.
+    click([...d.querySelectorAll(".case-tab")].find(b => b.textContent.startsWith("Assumptions"))); await wait(300);
+    const nav = d.querySelector(".secnav");
+    ok(!!nav, "Section list: rendered on the Assumptions tab");
+    const items = nav ? [...nav.querySelectorAll(".secnav-item")] : [];
+    ok(items.length >= 12, "Section list: expected at least 12 sections, found " + items.length);
+    const cost = items.find(b => b.textContent.startsWith("Cost structure"));
+    const card = d.querySelector('#casepanel-assumptions [data-nav="cost"]');
+    ok(card && card.querySelector('[aria-expanded="false"]'), "Section list: Cost Structure starts collapsed");
+    click(cost); await wait(200);
+    ok(card && card.querySelector('[aria-expanded="true"]'), "Section list: clicking a collapsed section opens it");
+    ok(cost.getAttribute("aria-current") === "location", "Section list: the clicked section is marked current");
+    click(nav.querySelector(".secnav-hide")); await wait(200);
+    ok(!d.querySelector(".secnav") && w.localStorage.getItem("rxnpv_secnav_hidden") === "1", "Section list: Hide removes it and remembers");
+    click(btn("Show section list")); await wait(200);
+    ok(!!d.querySelector(".secnav") && w.localStorage.getItem("rxnpv_secnav_hidden") === "0", "Section list: Show section list brings it back");
+  }
+
   if (errors.length) { console.log(errors.slice(0, 40).join("\n")); console.log("\n" + errors.length + " FAILURE(S) across " + checks + " checks"); process.exit(1); }
   console.log("ALL AUDIT REGRESSION CHECKS PASSED — " + checks + " checks");
   process.exit(0);

@@ -161,7 +161,7 @@ function ProgramEditor({ program, onChange, onDelete, discountRatePct, terminalV
     })),
 
     // Identity row
-    show("inputs") && (h("div", { style: { display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 14 } },
+    show("inputs") && (h("div", { "data-nav": "program", style: { display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 14 } },
       h("div", { style: { flex: "1 1 180px" } },
         h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-2)", marginBottom: 5 } }, "Drug name"),
         h("input", { "aria-label": "Drug name", value: program.drugName, onChange: e => set("drugName", e.target.value), placeholder: "e.g. XYZ-101",
@@ -194,7 +194,7 @@ function ProgramEditor({ program, onChange, onDelete, discountRatePct, terminalV
     )),
 
     // ── 0. R&D to Launch ──
-    show("inputs") && (h(SectionCard, { title: "R&D to Launch", subtitle: "Remaining time and cost to launch, area-specific — benchmarks apply below, expand to customize", defaultOpen: false },
+    show("inputs") && (h(SectionCard, { nav: "rnd", title: "R&D to Launch", subtitle: "Remaining time and cost to launch, area-specific — benchmarks apply below, expand to customize", defaultOpen: false },
       // Deliberately NOT hidden wholesale in Simple Multiple mode. The stage
       // TIMELINE still matters there — it sets how many years the value is
       // discounted back across — while the per-stage costs are read by nothing.
@@ -249,7 +249,7 @@ function ProgramEditor({ program, onChange, onDelete, discountRatePct, terminalV
     )),
 
     // ── Quick Revenue (quick mode only) ──
-    show("inputs") && (revenueMode === "quick" && h(SectionCard, { title: "Quick Revenue", subtitle: "Enter your own peak revenue estimate — skips the population/pricing build-up below", defaultOpen: true },
+    show("inputs") && (revenueMode === "quick" && h(SectionCard, { nav: "revenue", title: "Quick Revenue", subtitle: "Enter your own peak revenue estimate — skips the population/pricing build-up below", defaultOpen: true },
       h(MillionsField, { label: "Peak worldwide revenue estimate", value: quick.peakRevenue, onChange: v => set("quickRevenue.peakRevenue", v),
         help: "Enter in millions (e.g. 800 for $800M). Anchor to a comparable marketed drug's peak sales, or a quick TAM × penetration guess." }),
       h(BenchField, { label: "Years to peak", value: quick.yearsToPeak, onChange: v => set("quickRevenue.yearsToPeak", v), suffix: "yrs",
@@ -264,7 +264,7 @@ function ProgramEditor({ program, onChange, onDelete, discountRatePct, terminalV
     )),
 
     // ── 1. Population ── (full mode only)
-    show("inputs") && (revenueMode === "full" && h(SectionCard, { title: "Step 1 of 5 · Addressable Population", subtitle: "Prevalence/incidence → diagnosed → treated → eligible for this drug" },
+    show("inputs") && (revenueMode === "full" && h(SectionCard, { nav: "pop", title: "Step 1 of 5 · Addressable Population", subtitle: "Prevalence/incidence → diagnosed → treated → eligible for this drug" },
       h("div", { style: { flex: "1 1 100%", display: "flex", gap: 10, marginBottom: 10 } },
         ["prevalence", "incidence"].map(m => h("button", {
           key: m, onClick: () => set("revenueBuild.population.mode", m),
@@ -315,13 +315,13 @@ function ProgramEditor({ program, onChange, onDelete, discountRatePct, terminalV
 
     // ── 2-5. Adherence, Market Share, Launch Curve, Pricing (full mode only) ──
     show("inputs") && (revenueMode === "full" && h(React.Fragment, null,
-    h(SectionCard, { title: "Step 2 of 5 · Adherence", subtitle: "Discounts treated patients for real-world persistence/compliance" },
+    h(SectionCard, { nav: "adherence", title: "Step 2 of 5 · Adherence", subtitle: "Discounts treated patients for real-world persistence/compliance" },
       h(BenchField, { label: "Adherence / persistence rate", value: rb.adherencePct, onChange: v => set("revenueBuild.adherencePct", v), suffix: "%", bench: adherenceBench,
         help: "Asymptomatic/chronic conditions run 50-70% MPR; high-severity (leukemia, MS) can exceed 80%." })
     ),
 
     // ── 3. Market share ──
-    h(SectionCard, { title: "Step 3 of 5 · Peak Market Share", subtitle: "Order-of-entry model — first mover retains outsized share, decaying with more competitors" },
+    h(SectionCard, { nav: "share", title: "Step 3 of 5 · Peak Market Share", subtitle: "Order-of-entry model — first mover retains outsized share, decaying with more competitors" },
       h(CompetitorScanBox, {
         indication: program.indication,
         drugName: program.drugName,
@@ -344,7 +344,7 @@ function ProgramEditor({ program, onChange, onDelete, discountRatePct, terminalV
     ),
 
     // ── 4. Launch curve ──
-    h(SectionCard, { title: "Step 4 of 5 · Launch Curve", subtitle: "Time from launch to peak penetration" },
+    h(SectionCard, { nav: "curve", title: "Step 4 of 5 · Launch Curve", subtitle: "Time from launch to peak penetration" },
       h("div", { style: { flex: "1 1 200px" } },
         h(BenchField, { label: "Years to peak", value: rb.launchCurve.yearsToPeak, onChange: v => set("revenueBuild.launchCurve.yearsToPeak", v), suffix: "yrs",
           bench: { value: 6, source: LAUNCH_CURVE.source + " — 6yr median across biologics/small molecules, first movers/followers. Exact published curves used for any 3-10yr ramp." } })),
@@ -356,7 +356,7 @@ function ProgramEditor({ program, onChange, onDelete, discountRatePct, terminalV
     ),
 
     // ── 5. Pricing ──
-    h(SectionCard, { title: "Step 5 of 5 · Pricing", subtitle: "US annual price per patient — and which price basis that number is on" },
+    h(SectionCard, { nav: "price", title: "Step 5 of 5 · Pricing", subtitle: "US annual price per patient — and which price basis that number is on" },
       h(BenchField, { label: "US annual price per patient", value: rb.pricing.usAnnualPrice, onChange: v => set("revenueBuild.pricing.usAnnualPrice", v), suffix: "$/yr", placeholder: "e.g. 150000",
         help: "Whatever number you have — list or net. Tell the model which basis it's on below and it converts." }),
       h("div", { style: { flex: "1 1 220px" } },
@@ -402,7 +402,7 @@ function ProgramEditor({ program, onChange, onDelete, discountRatePct, terminalV
     )), // close Fragment wrapping sections 2-5
 
     // ── 6. Exclusivity / LOE ──
-    show("inputs") && (h(SectionCard, { key: "exclusivity-" + revenueMode, title: "Exclusivity & Loss of Exclusivity", subtitle: "When generic/biosimilar competition arrives, and how much it costs you" + (revenueMode === "quick" ? " — using benchmarks below, expand to customize" : ""), defaultOpen: revenueMode === "full" },
+    show("inputs") && (h(SectionCard, { nav: "loe", key: "exclusivity-" + revenueMode, title: "Exclusivity & Loss of Exclusivity", subtitle: "When generic/biosimilar competition arrives, and how much it costs you" + (revenueMode === "quick" ? " — using benchmarks below, expand to customize" : ""), defaultOpen: revenueMode === "full" },
       h(BenchField, { label: "Years from launch to LOE", value: rb.exclusivity.yearsToLOE, onChange: v => set("revenueBuild.exclusivity.yearsToLOE", v), suffix: "yrs",
         bench: { value: 13, source: EXCLUSIVITY_BENCHMARKS.source + " — average launch-to-competition. 20yr patent from filing, +5yr Hatch-Waxman, +7yr if orphan, +6mo pediatric." } }),
       h(BenchField, { label: "Volume retained after LOE", value: rb.exclusivity.volumeRetainedPct, onChange: v => set("revenueBuild.exclusivity.volumeRetainedPct", v), suffix: "%",
@@ -412,8 +412,8 @@ function ProgramEditor({ program, onChange, onDelete, discountRatePct, terminalV
     )),
 
     // ── 7. Cost Structure ──
-    show("inputs") && (methodIgnores(valuationMethod, "costStructure") && h(NotUsedInThisMode, { what: "Cost Structure (COGS, sales force, marketing)" })),
-    show("inputs") && (!methodIgnores(valuationMethod, "costStructure") && h(SectionCard, { key: "coststructure-" + revenueMode, title: "Cost Structure", subtitle: "COGS, sales force, marketing — produces per-year product contribution (before corporate G&A)" + (revenueMode === "quick" ? " — using benchmarks below, expand to customize" : ""), defaultOpen: revenueMode === "full" },
+    show("inputs") && (methodIgnores(valuationMethod, "costStructure") && h("div", { "data-nav": "cost" }, h(NotUsedInThisMode, { what: "Cost Structure (COGS, sales force, marketing)" }))),
+    show("inputs") && (!methodIgnores(valuationMethod, "costStructure") && h(SectionCard, { nav: "cost", key: "coststructure-" + revenueMode, title: "Cost Structure", subtitle: "COGS, sales force, marketing — produces per-year product contribution (before corporate G&A)" + (revenueMode === "quick" ? " — using benchmarks below, expand to customize" : ""), defaultOpen: revenueMode === "full" },
       h(BenchField, { label: "COGS (% of revenue)", value: cs.cogsPct, onChange: v => set("costStructure.cogsPct", v), suffix: "%", bench: cogsBench,
         help: cogsBench.value + "% keys off modality above — price is the bigger driver in reality, but this is the best generic anchor." }),
       h("div", { style: { flex: "1 1 100%", fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-2)", margin: "6px 0 2px", fontWeight: 700 } }, "Sales force (active reps at peak)"),
@@ -431,7 +431,7 @@ function ProgramEditor({ program, onChange, onDelete, discountRatePct, terminalV
 
     // ── Output readout ──
     show("inputs") && (error ? h("div", { style: { padding: 14, borderRadius: 8, background: "var(--red-bg)", border: "1px solid var(--red)", color: "var(--red)", fontFamily: "var(--mono)", fontSize: 12 } }, "Calculation error: " + error)
-    : h(ExportSection, { title: (program.drugName || program.name || "Program") + " — revenue build output", style: { background: "var(--surface)", border: "1px solid var(--rule)", borderRadius: 10, padding: "16px 18px" } },
+    : h(ExportSection, { nav: "output", title: (program.drugName || program.name || "Program") + " — revenue build output", style: { background: "var(--surface)", border: "1px solid var(--rule)", borderRadius: 10, padding: "16px 18px" } },
         h("div", { style: { display: "flex", gap: 24, flexWrap: "wrap", marginBottom: 14 } },
           h("div", null,
             h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", } }, "Peak patients on drug (US)"),
@@ -469,7 +469,7 @@ function ProgramEditor({ program, onChange, onDelete, discountRatePct, terminalV
         h("select", { "aria-label": label, value: program[field] || "", onChange: e => set(field, e.target.value), style: selectStyle },
           options.map(([v, lbl]) => h("option", { key: v, value: v }, lbl))));
 
-      return h("div", { style: { marginTop: 14, padding: "10px 14px", borderRadius: 8, background: "var(--surface-2)", border: "1px dashed var(--rule)" } },
+      return h("div", { "data-nav": "pos", style: { marginTop: 14, padding: "10px 14px", borderRadius: 8, background: "var(--surface-2)", border: "1px dashed var(--rule)" } },
         h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-3)", lineHeight: 1.7, marginBottom: 10 } },
           "For reference — ", program.therapeuticArea, ", ", phaseKey.replace("phase","Phase "), ": ",
           "PoS to next stage ", h("b", { style: { color: "var(--ink-2)" } }, posInfo.value + "%"),
@@ -555,7 +555,7 @@ function ProgramEditor({ program, onChange, onDelete, discountRatePct, terminalV
           { enabled: tv.enabled, method: tv.method, growthPct: tv.growthPct, exitMultiple: tv.exitMultiple });
       } catch (e) { wfError = e.message; }
       if (wfError) return null;
-      return h(ExportSection, { title: "Risk waterfall — " + (program.drugName || program.name || "this asset"), style: { marginTop: 14, padding: "12px 14px", borderRadius: 8, background: "var(--surface)", border: "1px solid var(--rule)" } },
+      return h(ExportSection, { nav: "waterfall", title: "Risk waterfall — " + (program.drugName || program.name || "this asset"), style: { marginTop: 14, padding: "12px 14px", borderRadius: 8, background: "var(--surface)", border: "1px solid var(--rule)" } },
         h("div", { style: { fontSize: 11, fontFamily: "var(--display)", fontWeight: 600, color: "var(--ink-1)", marginBottom: 4 } }, "Risk waterfall — this asset only"),
         h(Note, { summary: "What \"unrisked\" means, and why it can look worse" },
           "\"Unrisked\" means 100% PoS on both sides — the full peak revenue AND the full R&D cost paid with certainty, not just revenue scaled up. For early-stage assets this can come out more negative than the risk-adjusted number: paying the full R&D cost for certain can outweigh a distant, heavily time-discounted payoff — that's a real feature of rNPV, not an error.",
@@ -580,7 +580,7 @@ function ProgramEditor({ program, onChange, onDelete, discountRatePct, terminalV
       const indicationText = ((program.indication || "") + " " + (program.therapeuticArea || "")).toLowerCase();
       const nudgeKeywords = ["pediatric", "pediatric", "rare", "orphan", "tropical", "neglected"];
       const showNudge = !prv.enabled && nudgeKeywords.some(k => indicationText.includes(k));
-      return h("div", { style: { marginTop: 14, padding: "10px 14px", borderRadius: 8, background: "var(--surface-2)", border: "1px dashed var(--rule)" } },
+      return h("div", { "data-nav": "prv", style: { marginTop: 14, padding: "10px 14px", borderRadius: 8, background: "var(--surface-2)", border: "1px dashed var(--rule)" } },
         h("label", { style: { display: "flex", alignItems: "center", gap: 8, fontSize: 12, fontFamily: "var(--mono)", color: "var(--ink-2)", cursor: "pointer", marginBottom: prv.enabled ? 10 : 0 } },
           h("input", { type: "checkbox", checked: prv.enabled, onChange: e => setPrv({ enabled: e.target.checked }) }),
           "Priority Review Voucher-eligible (e.g. rare pediatric disease designation)"),
@@ -608,7 +608,7 @@ function ProgramEditor({ program, onChange, onDelete, discountRatePct, terminalV
       const updateMilestone = (idx, m) => { const next = milestones.slice(); next[idx] = { ...next[idx], ...m }; setPartnership({ milestones: next }); setEditingMilestoneIdx(null); };
       const deleteMilestone = (idx) => setPartnership({ milestones: milestones.filter((_, i) => i !== idx) });
 
-      return h("div", { style: { marginTop: 14, padding: "10px 14px", borderRadius: 8, background: "var(--surface-2)", border: "1px dashed var(--rule)" } },
+      return h("div", { "data-nav": "partner", style: { marginTop: 14, padding: "10px 14px", borderRadius: 8, background: "var(--surface-2)", border: "1px dashed var(--rule)" } },
         h("label", { style: { display: "flex", alignItems: "center", gap: 8, fontSize: 12, fontFamily: "var(--mono)", color: "var(--ink-2)", cursor: "pointer", marginBottom: partnership.enabled ? 10 : 0 } },
           h("input", { type: "checkbox", checked: partnership.enabled, onChange: e => setPartnership({ enabled: e.target.checked }) }),
           "Partnered asset (licensed rights, royalty/milestone deal)"),

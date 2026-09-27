@@ -430,10 +430,11 @@ function ChartExportBar(props) { return React.createElement(ExportBar, Object.as
 // Wraps any block as its own exportable section — used for the sub-sections
 // packed inside larger cards (the scenario comparison, the bridge, Monte
 // Carlo), which a reader should be able to take out on their own.
-function ExportSection({ title, reportSection, source, style, className, id, children }) {
+function ExportSection({ title, reportSection, source, style, className, id, nav, children }) {
   const h = React.createElement;
   return h.apply(null, ["div", {
     id: id || undefined,
+    "data-nav": nav || undefined,
     className: "export-section" + (className ? " " + className : ""),
     // Present even when empty: the attribute is what marks the boundary, and an
     // empty value means "take the title from the section's own heading".
@@ -686,13 +687,13 @@ function buttonLikeProps(onActivate, extra) {
   }, extra || {});
 }
 
-function SectionCard({ title, subtitle, children, defaultOpen }) {
+function SectionCard({ title, subtitle, children, defaultOpen, nav }) {
   const h = React.createElement;
   const [open, setOpen] = React.useState(defaultOpen !== false);
   // An exportable section like any other card — the inputs as set ARE the
   // relevant information for an assumptions card. The bar only shows while the
   // card is open, since a collapsed card has nothing in it to export.
-  return h("div", { className: open ? "export-section" : undefined, "data-export-section": open ? (typeof title === "string" ? title : "") : undefined, style: { background: "var(--surface)", border: "1px solid var(--rule)", borderRadius: 10, marginBottom: 14, overflow: "hidden", boxShadow: "0 1px 2px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.03)" } },
+  return h("div", { "data-nav": nav || undefined, className: open ? "export-section" : undefined, "data-export-section": open ? (typeof title === "string" ? title : "") : undefined, style: { background: "var(--surface)", border: "1px solid var(--rule)", borderRadius: 10, marginBottom: 14, overflow: "hidden", boxShadow: "0 1px 2px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.03)" } },
     // Was a bare onClick div: no Tab stop, so a keyboard user could not open
     // a single input card in the Workspace.
     h("div", buttonLikeProps(() => setOpen(!open), {
@@ -1661,4 +1662,85 @@ function LiveImpactPanel({ theCase, active }) {
       }),
       top && h("div", { className: "li-explain" },
         h("b", null, top.name.replace(" / revenue", "").replace(" (PoS)", "")), " swings fair value by " + fmtShare(top.swing) + " across its tested range — it's the input most worth getting right.")));
+}
+
+// ── Section list beside the Assumptions tab ─────────────────────────────────
+// A table of contents for a long page of inputs: click to jump (a collapsed
+// card opens on arrival), the section on screen is highlighted, and a dot
+// marks each section changed from its default, or still missing a required
+// input. The states come from assumptionNavSections() in caseShell.js, i.e.
+// from the case data, never from reading the page. Only sections actually on
+// the page are listed, so a card a mode hides never becomes a dead link.
+const SECNAV_STATE_TEXT = { set: "changed from default", todo: "needs an input", result: "a result", unused: "not used by this valuation method" };
+function SectionNav({ groups, rootId, active: tabActive, onHide }) {
+  const h = React.createElement;
+  const [current, setCurrent] = React.useState(null);
+  const [present, setPresent] = React.useState(null);
+  const ids = groups.flatMap(g => g.items.map(i => i.id));
+  const idKey = ids.join("|");
+  React.useLayoutEffect(() => {
+    const root = document.getElementById(rootId);
+    if (!root) return;
+    const onPage = ids.filter(id => root.querySelector('[data-nav="' + id + '"]'));
+    if (!present || onPage.join("|") !== present.join("|")) setPresent(onPage);
+  });
+  React.useEffect(() => {
+    if (!tabActive) return;
+    const root = document.getElementById(rootId);
+    if (!root) return;
+    let raf = 0;
+    const measure = () => {
+      raf = 0;
+      const els = Array.from(root.querySelectorAll("[data-nav]"));
+      if (!els.length) return;
+      let cur = els[0].getAttribute("data-nav");
+      for (const e of els) { if (e.getBoundingClientRect().top <= 140) cur = e.getAttribute("data-nav"); else break; }
+      // Scrolled to the bottom: the last section is the one being read, even
+      // if it is too short to ever reach the top of the window.
+      if (window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 4) cur = els[els.length - 1].getAttribute("data-nav");
+      setCurrent(cur);
+    };
+    const onScroll = () => { if (!raf) raf = requestAnimationFrame(measure); };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onScroll);
+    measure();
+    return () => { window.removeEventListener("scroll", onScroll); window.removeEventListener("resize", onScroll); if (raf) cancelAnimationFrame(raf); };
+  }, [rootId, idKey, tabActive]);
+  const go = (id) => {
+    const root = document.getElementById(rootId);
+    const el = root && root.querySelector('[data-nav="' + id + '"]');
+    if (!el) return;
+    const closed = el.querySelector(':scope > [aria-expanded="false"]');
+    if (closed) closed.click();
+    const reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (el.scrollIntoView) el.scrollIntoView({ block: "start", behavior: reduce ? "auto" : "smooth" });
+    // Move focus with the view, so a keyboard or screen-reader user lands in
+    // the section too rather than staying up in the list.
+    const target = el.querySelector(":scope > [aria-expanded]") || el;
+    if (!target.hasAttribute("tabindex")) target.setAttribute("tabindex", "-1");
+    target.focus({ preventScroll: true });
+    setCurrent(id);
+  };
+  const shown = groups.map(g => Object.assign({}, g, { items: g.items.filter(i => !present || present.includes(i.id)) })).filter(g => g.items.length);
+  const todo = shown.reduce((n, g) => n + g.items.filter(i => i.state === "todo").length, 0);
+  return h("nav", { className: "secnav", "aria-label": "Sections on this tab", "data-no-export": "" },
+    h("div", { className: "secnav-head" },
+      h("span", null, "On this tab"),
+      h("button", { type: "button", className: "secnav-hide", onClick: onHide, title: "Hide the section list (bring it back from the top of the tab)" }, "Hide")),
+    todo > 0 && h("div", { className: "secnav-todo" }, todo === 1 ? "1 input still needed" : todo + " inputs still needed"),
+    shown.map(g => h("div", { key: g.label, className: "secnav-group" },
+      h("div", { className: "secnav-grp", title: g.label }, g.label),
+      g.items.map(i => h("button", {
+        key: i.id, type: "button", onClick: () => go(i.id),
+        className: "secnav-item" + (current === i.id ? " on" : "") + (i.state ? " " + i.state : ""),
+        "aria-current": current === i.id ? "location" : undefined,
+        title: SECNAV_STATE_TEXT[i.state] ? i.label + ": " + SECNAV_STATE_TEXT[i.state] : undefined
+      },
+        h("span", { className: "secnav-label" }, i.label),
+        SECNAV_STATE_TEXT[i.state] && h("span", { className: "sr-only" }, ", " + SECNAV_STATE_TEXT[i.state]),
+        (i.state === "set" || i.state === "todo") && h("span", { className: "secnav-dot " + i.state, "aria-hidden": "true" }),
+        i.state === "unused" && h("span", { className: "secnav-tag", "aria-hidden": "true" }, "not used"))))),
+    h("div", { className: "secnav-legend", "aria-hidden": "true" },
+      h("span", null, h("i", { className: "secnav-dot set" }), "changed from default"),
+      h("span", null, h("i", { className: "secnav-dot todo" }), "needs an input")));
 }

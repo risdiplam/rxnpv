@@ -118,7 +118,7 @@ function useValuationSections({ theCase, onChange, goToTab }) {
     // The Scenarios tab holds exactly one section (the scenario comparison,
     // which exports itself), so its wrapper is a plain card — a second Export
     // around it would only duplicate it.
-    return h(part === "scenarios" ? "div" : ExportSection, { id: part === "overview" ? "ws-valuation" : undefined, title: part === "scenarios" ? undefined : PART_TITLES[part], style: { background: "var(--surface)", border: "1px solid var(--rule)", borderRadius: 10, padding: "16px 18px", marginBottom: 22 } },
+    return h(part === "scenarios" ? "div" : ExportSection, { id: part === "overview" ? "ws-valuation" : undefined, nav: part === "inputs" ? "company" : undefined, title: part === "scenarios" ? undefined : PART_TITLES[part], style: { background: "var(--surface)", border: "1px solid var(--rule)", borderRadius: 10, padding: "16px 18px", marginBottom: 22 } },
     part !== "scenarios" && h("div", { style: { fontFamily: "var(--display)", fontSize: 16, fontWeight: 600, color: "var(--ink-1)", marginBottom: 14 } }, PART_TITLES[part]),
 
     // A one-line pointer to the red-flag checks, which live on Evidence.
@@ -358,7 +358,7 @@ function useValuationSections({ theCase, onChange, goToTab }) {
     )),
 
     // Capital structure
-    show("inputs") && (h("div", { style: { borderTop: "1px dashed var(--rule)", paddingTop: 14, marginBottom: 16 } },
+    show("inputs") && (h("div", { "data-nav": "capital", style: { borderTop: "1px dashed var(--rule)", paddingTop: 14, marginBottom: 16 } },
       h("div", { style: { fontSize: 13, fontFamily: "var(--display)", fontWeight: 600, color: "var(--ink-1)", marginBottom: 10 } }, "Capital structure"),
 
       // EDGAR auto-fill — desktop app only, no proxy/CORS workaround needed here
@@ -437,7 +437,7 @@ function useValuationSections({ theCase, onChange, goToTab }) {
       const fallbackPrice = theCase.currentPrice;
       const impliedPrice = fr.priceOverride !== "" && fr.priceOverride != null ? Number(fr.priceOverride) : Number(fallbackPrice || 0);
       const newShares = (fr.enabled && impliedPrice > 0 && fr.amountM) ? Number(fr.amountM) / impliedPrice : 0;
-      return h("div", { style: { borderTop: "1px dashed var(--rule)", paddingTop: 14, marginBottom: 16 } },
+      return h("div", { "data-nav": "financing", style: { borderTop: "1px dashed var(--rule)", paddingTop: 14, marginBottom: 16 } },
         h("label", { style: { display: "flex", alignItems: "center", gap: 8, fontSize: 13, fontFamily: "var(--display)", fontWeight: 600, color: "var(--ink-1)", cursor: "pointer", marginBottom: fr.enabled ? 10 : 0 } },
           h("input", { type: "checkbox", checked: fr.enabled, onChange: e => setFR({ enabled: e.target.checked }) }),
           "Model a future capital raise"),

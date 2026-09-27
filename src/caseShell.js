@@ -51,6 +51,76 @@ function caseMissingInputs(theCase) {
   return missing;
 }
 
+// True when a user-entered value differs from a fresh case's or program's.
+// Blank means "use the benchmark" everywhere in this app, so a blank value is
+// never a change. Only the default's own keys are compared, so a field an
+// older saved case still carries cannot light up a section.
+function differsFromDefault(value, def) {
+  const blank = (x) => x === "" || x == null;
+  if (Array.isArray(def)) return Array.isArray(value) && value.length > 0;
+  if (def && typeof def === "object") {
+    if (!value || typeof value !== "object") return false;
+    return Object.keys(def).some(k => k !== "id" && differsFromDefault(value[k], def[k]));
+  }
+  if (blank(value)) return false;
+  if (blank(def)) return true;
+  if (typeof def === "boolean" || typeof value === "boolean") return Boolean(value) !== Boolean(def);
+  if (!isNaN(Number(value)) && !isNaN(Number(def))) return Number(value) !== Number(def);
+  return String(value) !== String(def);
+}
+
+// The Assumptions tab's section list: what is on the page, in page order, and
+// the state of each — "set" (changed from the default), "todo" (a required
+// input is still blank), "result" (an output, never marked), "unused" (the
+// valuation method does not read it) or "" (on its benchmark defaults). Each
+// id matches a data-nav attribute on the page.
+function assumptionNavSections(theCase, program) {
+  const dc = newCase(), dp = newProgram();
+  const pick = (obj, keys) => keys.reduce((o, k) => { o[k] = obj[k]; return o; }, {});
+  const changed = (v, d) => differsFromDefault(v, d) ? "set" : "";
+  const cap = theCase.capitalStructure || {};
+  const capMode = cap.mode || "simple";
+  const capTodo = capMode === "simple" ? !cap.dilutedSharesSimple : !cap.basicShares;
+  const groups = [{ label: "Company", items: [
+    { id: "company", label: "Valuation settings", state: changed(pick(theCase, ["discountRatePct", "taxation", "terminalValue"]), pick(dc, ["discountRatePct", "taxation", "terminalValue"])) || ((theCase.valuationMethod || "dcf") !== "dcf" ? "set" : "") },
+    { id: "capital", label: "Capital structure", state: capTodo ? "todo" : changed(cap, dc.capitalStructure) },
+    { id: "financing", label: "Future financing", state: ((theCase.futureRaise || {}).enabled || (theCase.dilutionPath || {}).enabled) ? "set" : "" },
+    { id: "ga", label: "Corporate G&A", state: changed(theCase.corporateGA, dc.corporateGA) }
+  ] }];
+  if (!program) return groups;
+  const rb = program.revenueBuild || {}, drb = dp.revenueBuild;
+  const pop = rb.population || {};
+  const quick = (program.revenueMode || "quick") === "quick";
+  const method = theCase.valuationMethod || "dcf";
+  const items = [
+    { id: "program", label: "Drug & indication", state: changed(pick(program, ["name", "drugName", "indication", "therapeuticArea", "modality", "currentPhase", "launchYearOffset"]), pick(dp, ["name", "drugName", "indication", "therapeuticArea", "modality", "currentPhase", "launchYearOffset"])) },
+    { id: "rnd", label: "R&D to launch", state: changed(program.rndOverride, dp.rndOverride) }
+  ];
+  if (quick) {
+    items.push({ id: "revenue", label: "Quick revenue", state: !(program.quickRevenue || {}).peakRevenue ? "todo" : "set" });
+  } else {
+    const popTodo = (pop.mode || "prevalence") === "prevalence" ? !pop.prevalence : !pop.incidence;
+    items.push(
+      { id: "pop", label: "Population", state: popTodo ? "todo" : "set" },
+      { id: "adherence", label: "Adherence", state: changed(rb.adherencePct, drb.adherencePct) },
+      { id: "share", label: "Market share", state: changed(rb.marketShare, drb.marketShare) },
+      { id: "curve", label: "Launch curve", state: changed(rb.launchCurve, drb.launchCurve) },
+      { id: "price", label: "Pricing", state: !(rb.pricing || {}).usAnnualPrice ? "todo" : "set" });
+  }
+  // Exclusivity's modality follows the program's own, so it is not a choice.
+  const exNoMod = (x) => { const o = Object.assign({}, x || {}); delete o.modality; return o; };
+  items.push(
+    { id: "loe", label: "Exclusivity & LOE", state: changed(exNoMod(rb.exclusivity), exNoMod(drb.exclusivity)) },
+    { id: "cost", label: "Cost structure", state: methodIgnores(method, "costStructure") ? "unused" : changed(program.costStructure, dp.costStructure) },
+    { id: "output", label: "Revenue by year", state: "result" },
+    { id: "pos", label: "Probability of success", state: changed(pick(program, ["posOverridePct", "posBiomarkerUse", "posDiseaseType"]), pick(dp, ["posOverridePct", "posBiomarkerUse", "posDiseaseType"])) },
+    { id: "waterfall", label: "Risk waterfall", state: "result" },
+    { id: "prv", label: "Priority review voucher", state: (program.prv || {}).enabled ? "set" : "" },
+    { id: "partner", label: "Partnership", state: (program.partnership || {}).enabled ? "set" : "" });
+  groups.push({ label: program.drugName || program.name || "Program", items });
+  return groups;
+}
+
 const CASE_TABS = [["overview", "Overview"], ["assumptions", "Assumptions"], ["scenarios", "Scenarios"], ["evidence", "Evidence"], ["calibration", "Calibration"]];
 
 function CaseView({ theCase, onChange, onDelete, onNavigateToTools }) {
@@ -58,6 +128,10 @@ function CaseView({ theCase, onChange, onDelete, onNavigateToTools }) {
   const [activeProgId, setActiveProgId] = React.useState(theCase.programs[0] && theCase.programs[0].id);
   const [confirmingDelete, setConfirmingDelete] = React.useState(false);
   const [tab, setTab] = React.useState(() => caseMissingInputs(theCase).length > 0 ? "assumptions" : "overview");
+  // The Assumptions section list can be hidden to give the inputs more width;
+  // the choice is remembered across cases and restarts.
+  const [navHidden, setNavHidden] = React.useState(() => { try { return localStorage.getItem("rxnpv_secnav_hidden") === "1"; } catch (e) { return false; } });
+  const setNavHiddenSaved = (v) => { setNavHidden(v); try { localStorage.setItem("rxnpv_secnav_hidden", v ? "1" : "0"); } catch (e) {} };
 
   React.useEffect(() => {
     if (!theCase.programs.find(p => p.id === activeProgId)) {
@@ -308,7 +382,9 @@ function CaseView({ theCase, onChange, onDelete, onNavigateToTools }) {
 
     ),
 
-    panel("assumptions", h("div", { className: "assume-grid" }, h("div", { className: "assume-main" },
+    panel("assumptions", h("div", { className: "assume-grid" + (theCase.programs.length > 0 && !navHidden ? " has-nav" : "") },
+      theCase.programs.length > 0 && !navHidden && h(SectionNav, { groups: assumptionNavSections(theCase, activeProg), rootId: "casepanel-assumptions", active: tab === "assumptions", onHide: () => setNavHiddenSaved(true) }),
+      h("div", { className: "assume-main" },
     // Case-level master mode — one click sets every program's revenue mode AND
     // the capital structure mode at once. Per-section toggles still work
     // afterward if you want to mix modes within the case. Highlighted state is
@@ -339,12 +415,13 @@ function CaseView({ theCase, onChange, onDelete, onNavigateToTools }) {
             fontFamily: "var(--mono)", fontSize: 11, fontWeight: allDetailed ? 700 : 400, cursor: "pointer" }
         }, "All Detailed"),
         h("span", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)" } },
-          allQuick ? "— case is fully in Quick mode" : allDetailed ? "— case is fully in Detailed mode" : "— mixed: click to set every program + capital structure at once")
+          allQuick ? "— case is fully in Quick mode" : allDetailed ? "— case is fully in Detailed mode" : "— mixed: click to set every program + capital structure at once"),
+        navHidden && theCase.programs.length > 0 && h("button", { type: "button", className: "link-btn", style: { marginLeft: "auto" }, onClick: () => setNavHiddenSaved(false) }, "Show section list")
       );
     })(),
 
       vs.inputs,
-      theCase.programs.length > 0 && h(ExportSection, { title: "Corporate G&A", style: { background: "var(--surface)", border: "1px solid var(--rule)", borderRadius: 10, padding: "16px 18px", marginBottom: 22 } },
+      theCase.programs.length > 0 && h(ExportSection, { nav: "ga", title: "Corporate G&A", style: { background: "var(--surface)", border: "1px solid var(--rule)", borderRadius: 10, padding: "16px 18px", marginBottom: 22 } },
         h("div", { style: { fontFamily: "var(--display)", fontSize: 16, fontWeight: 600, color: "var(--ink-1)", marginBottom: 12 } }, "Corporate G&A"),
       h("div", { style: { display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 14, padding: "10px 14px", background: "var(--surface-2)", borderRadius: 8 } },
         h("div", { style: { flex: "1 1 200px" } },

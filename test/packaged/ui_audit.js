@@ -67,7 +67,8 @@ window.__t = {
       // Sub/superscripts (the "max" in Cmax, the "d" in Kd) are small by
       // design — a fraction of the surrounding line — and are exempt.
       if (size < 10 && !el.closest("sub, sup")) out.push({ type: "text under 10px", text: el.textContent.trim().slice(0, 50), detail: size + "px", where: where(el) });
-      if ((cs.overflow === "hidden" || cs.overflowX === "hidden") && cs.textOverflow !== "ellipsis" && el.scrollWidth > el.clientWidth + 2 && cs.whiteSpace === "nowrap")
+      // .sr-only text is clipped to 1px on purpose: it is read aloud, never seen.
+      if (!el.closest(".sr-only") && (cs.overflow === "hidden" || cs.overflowX === "hidden") && cs.textOverflow !== "ellipsis" && el.scrollWidth > el.clientWidth + 2 && cs.whiteSpace === "nowrap")
         out.push({ type: "text clipped without ellipsis", text: el.textContent.trim().slice(0, 50), detail: el.scrollWidth + ">" + el.clientWidth, where: where(el) });
     });
     // Buttons and links.
