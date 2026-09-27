@@ -125,52 +125,52 @@ function ReportView({ theCase, onBack, updateCase }) {
   return h("div", { style: { minHeight: "100vh", background: rpt.bg, color: rpt.ink1, fontFamily: "'Geist', sans-serif", padding: "0" } },
     // Toolbar — hidden in the actual PDF via no-print class
     h("div", { className: "no-print", style: { position: "sticky", top: 0, background: rpt.surface2, borderBottom: "1px solid " + rpt.rule, padding: "10px 20px", display: "flex", gap: 10, alignItems: "center", zIndex: 10 } },
-      h("button", { onClick: onBack, style: { padding: "6px 14px", borderRadius: 6, border: "1px solid " + rpt.rule, background: "transparent", color: rpt.ink2, fontFamily: "monospace", fontSize: 12, cursor: "pointer" } }, "← Back to Workspace"),
-      h("button", { onClick: () => setReportDark(!reportDark), style: { padding: "6px 14px", borderRadius: 6, border: "1px solid " + rpt.rule, background: "transparent", color: rpt.ink2, fontFamily: "monospace", fontSize: 12, cursor: "pointer" } }, reportDark ? "☀ Light report" : "☾ Dark report"),
+      h("button", { onClick: onBack, style: { padding: "6px 14px", borderRadius: 6, border: "1px solid " + rpt.rule, background: "transparent", color: rpt.ink2, fontFamily: "var(--mono)", fontSize: 12, cursor: "pointer" } }, "← Back to Workspace"),
+      h("button", { onClick: () => setReportDark(!reportDark), style: { padding: "6px 14px", borderRadius: 6, border: "1px solid " + rpt.rule, background: "transparent", color: rpt.ink2, fontFamily: "var(--mono)", fontSize: 12, cursor: "pointer" } }, reportDark ? "☀ Light report" : "☾ Dark report"),
       h("button", { onClick: doExport, disabled: exporting,
-        style: { padding: "6px 14px", borderRadius: 6, border: "1px solid " + rpt.teal, background: rpt.teal, color: rpt.onTeal, fontFamily: "monospace", fontSize: 12, fontWeight: 700, cursor: exporting ? "default" : "pointer" }
+        style: { padding: "6px 14px", borderRadius: 6, border: "1px solid " + rpt.teal, background: rpt.teal, color: rpt.onTeal, fontFamily: "var(--mono)", fontSize: 12, fontWeight: 700, cursor: exporting ? "default" : "pointer" }
       }, exporting ? "Exporting…" : "Export as PDF"),
       h("button", { onClick: doExportCSV,
-        style: { padding: "6px 14px", borderRadius: 6, border: "1px solid " + rpt.rule, background: "transparent", color: rpt.ink2, fontFamily: "monospace", fontSize: 12, cursor: "pointer" }
+        style: { padding: "6px 14px", borderRadius: 6, border: "1px solid " + rpt.rule, background: "transparent", color: rpt.ink2, fontFamily: "var(--mono)", fontSize: 12, cursor: "pointer" }
       }, "Export CSV"),
       // Section picker — the report updates live as sections are toggled, so
       // what's on screen is exactly what the PDF will contain. No separate
       // preview step to drift out of sync with the export.
       updateCase && h("button", {
         onClick: () => setPickerOpen(!pickerOpen),
-        style: { padding: "6px 14px", borderRadius: 6, border: "1px solid " + (pickerOpen ? rpt.teal : rpt.rule), background: "transparent", color: pickerOpen ? rpt.teal : rpt.ink2, fontFamily: "monospace", fontSize: 12, cursor: "pointer" }
+        style: { padding: "6px 14px", borderRadius: 6, border: "1px solid " + (pickerOpen ? rpt.teal : rpt.rule), background: "transparent", color: pickerOpen ? rpt.teal : rpt.ink2, fontFamily: "var(--mono)", fontSize: 12, cursor: "pointer" }
       }, "Sections (" + includedCount + "/" + REPORT_SECTIONS.length + ") " + (pickerOpen ? "▲" : "▼")),
-      exportMsg && h("span", { style: { fontSize: 11, fontFamily: "monospace", color: rpt.ink2 } }, exportMsg)
+      exportMsg && h("span", { style: { fontSize: 11, fontFamily: "var(--mono)", color: rpt.ink2 } }, exportMsg)
     ),
 
     // Picker panel
     updateCase && pickerOpen && h("div", { className: "no-print", style: { position: "sticky", top: 47, zIndex: 9, background: rpt.surface2, borderBottom: "1px solid " + rpt.rule, padding: "14px 20px" } },
       h("div", { style: { maxWidth: 800, margin: "0 auto" } },
         h("div", { style: { display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 12 } },
-          h("span", { style: { fontSize: 11, fontFamily: "monospace", color: rpt.ink3, } }, "Include in report"),
+          h("span", { style: { fontSize: 11, fontFamily: "var(--mono)", color: rpt.ink3, } }, "Include in report"),
           h("div", { style: { flex: 1 } }),
           [["Everything", () => setAll(true)],
            ["Summary only", () => setPreset(["summary", "priceVsValue"])],
            ["Charts only", () => setPreset(["revenueChart", "cashFlow", "sensitivity", "cashRunway", "peakSalesComps", "pinned"])],
            ["Clear", () => setAll(false)]
           ].map(([label, fn]) => h("button", { key: label, onClick: fn,
-            style: { padding: "4px 10px", borderRadius: 5, border: "1px solid " + rpt.rule, background: "transparent", color: rpt.ink2, fontFamily: "monospace", fontSize: 10, cursor: "pointer" } }, label))
+            style: { padding: "4px 10px", borderRadius: 5, border: "1px solid " + rpt.rule, background: "transparent", color: rpt.ink2, fontFamily: "var(--mono)", fontSize: 10, cursor: "pointer" } }, label))
         ),
         ["Core", "Charts", "Appendices"].map(group => {
           const items = REPORT_SECTIONS.filter(s => s.group === group);
           if (!items.length) return null;
           return h("div", { key: group, style: { marginBottom: 10 } },
-            h("div", { style: { fontSize: 10, fontFamily: "monospace", color: rpt.ink3, marginBottom: 5 } }, group),
+            h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: rpt.ink3, marginBottom: 5 } }, group),
             h("div", { style: { display: "flex", gap: 14, flexWrap: "wrap" } },
               items.map(s => h("label", { key: s.id,
-                style: { display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontFamily: "monospace", color: inc(s.id) ? rpt.ink1 : rpt.ink3, cursor: "pointer" } },
+                style: { display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontFamily: "var(--mono)", color: inc(s.id) ? rpt.ink1 : rpt.ink3, cursor: "pointer" } },
                 h("input", { type: "checkbox", checked: inc(s.id), onChange: () => setSections({ [s.id]: !inc(s.id) }) }),
                 s.label))
             ));
         }),
-        includedCount === 0 && h("div", { style: { fontSize: 11, fontFamily: "monospace", color: rpt.amber, marginTop: 4 } },
+        includedCount === 0 && h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: rpt.amber, marginTop: 4 } },
           "Nothing selected — the report is empty. Pick at least one section, or use Everything."),
-        h("div", { style: { fontSize: 10, fontFamily: "monospace", color: rpt.ink3, marginTop: 8, lineHeight: 1.6 } },
+        h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: rpt.ink3, marginTop: 8, lineHeight: 1.6 } },
           "Sections that don't apply to this case stay hidden even when ticked — Sum-of-the-parts needs more than one program, and the year-by-year charts need DCF mode rather than Simple Multiple."),
         // Added-section management: include or leave out each one, put them
         // in order, remove them. Lives here rather than in the report body
@@ -180,14 +180,14 @@ function ReportView({ theCase, onBack, updateCase }) {
           const save = next => updateCase({ ...theCase, pinnedResults: next, updatedAt: Date.now() });
           const move = (i, by) => { const next = pins.slice(); const [x] = next.splice(i, 1); next.splice(i + by, 0, x); save(next); };
           const arrow = (label, tip, disabled, onClick) => h("button", { type: "button", title: tip, "aria-label": tip, disabled, onClick,
-            style: { padding: "1px 6px", minWidth: 26, minHeight: 26, borderRadius: 4, border: "1px solid " + rpt.rule, background: "transparent", color: disabled ? rpt.rule : rpt.ink2, fontFamily: "monospace", fontSize: 10, cursor: disabled ? "default" : "pointer" } }, label);
+            style: { padding: "1px 6px", minWidth: 26, minHeight: 26, borderRadius: 4, border: "1px solid " + rpt.rule, background: "transparent", color: disabled ? rpt.rule : rpt.ink2, fontFamily: "var(--mono)", fontSize: 10, cursor: disabled ? "default" : "pointer" } }, label);
           return h("div", { id: "report-added-picker", style: { marginTop: 12, paddingTop: 10, borderTop: "1px solid " + rpt.rule } },
-            h("div", { style: { fontSize: 10, fontFamily: "monospace", color: rpt.ink3, marginBottom: 6 } },
+            h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: rpt.ink3, marginBottom: 6 } },
               "Added sections (" + pins.filter(p => p.included !== false).length + " of " + pins.length + " included · up to " + PINNED_MAX_PER_CASE_V2 + ")"),
-            !pins.length && h("div", { style: { fontSize: 11, fontFamily: "monospace", color: rpt.ink3, lineHeight: 1.6 } },
+            !pins.length && h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: rpt.ink3, lineHeight: 1.6 } },
               "None yet. Every section in Tools, Simulation, the Reference Sheet, Portfolio and the Workspace has a “+ Report” button — each one you click lands here, and you choose and order them."),
             h("div", { style: { display: "flex", flexDirection: "column", gap: 4 } },
-              pins.map((pin, i) => h("div", { key: pin.id || i, style: { display: "flex", alignItems: "center", gap: 8, fontSize: 11, fontFamily: "monospace", color: pin.included === false ? rpt.ink3 : rpt.ink2 } },
+              pins.map((pin, i) => h("div", { key: pin.id || i, style: { display: "flex", alignItems: "center", gap: 8, fontSize: 11, fontFamily: "var(--mono)", color: pin.included === false ? rpt.ink3 : rpt.ink2 } },
                 h("input", { type: "checkbox", checked: pin.included !== false, "aria-label": "Include " + (pin.title || "this section"),
                   onChange: () => save(pins.map(x => x === pin ? { ...x, included: x.included === false } : x)) }),
                 h("span", { style: { flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textDecoration: pin.included === false ? "line-through" : "none" } },
@@ -205,8 +205,8 @@ function ReportView({ theCase, onBack, updateCase }) {
     h("div", { style: { maxWidth: 800, margin: "0 auto", padding: "32px 40px" } },
       // Header
       h("div", { style: { borderBottom: "2px solid " + rpt.ink1, paddingBottom: 14, marginBottom: 20 } },
-        h("div", { style: { fontSize: 26, fontWeight: 700, fontFamily: "Georgia, serif" } }, theCase.name || "Untitled Case", theCase.ticker ? h("span", { style: { color: rpt.ink3, fontWeight: 400, marginLeft: 10 } }, theCase.ticker) : null),
-        h("div", { style: { fontSize: 11, fontFamily: "monospace", color: rpt.ink3, marginTop: 4 } },
+        h("div", { style: { fontSize: 26, fontWeight: 700, fontFamily: "var(--sans)", letterSpacing: "-0.02em" } }, theCase.name || "Untitled Case", theCase.ticker ? h("span", { style: { color: rpt.ink3, fontWeight: 400, marginLeft: 10 } }, theCase.ticker) : null),
+        h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: rpt.ink3, marginTop: 4 } },
           "RxNPV valuation report — generated " + localDateStamp() + " — " + (valMethod === "multiple" ? "Simple Multiple method" : "DCF method"))
       ),
 
@@ -216,10 +216,10 @@ function ReportView({ theCase, onBack, updateCase }) {
           h("div", { style: { fontSize: 13, fontWeight: 700, marginBottom: 10, color: rpt.ink2 } }, "Valuation Summary"),
           h("div", { style: { display: "flex", gap: 24, flexWrap: "wrap" } },
             scenarioResults.map(s => h("div", { key: s.key, style: { flex: "1 1 150px" } },
-              h("div", { style: { fontSize: 10, fontFamily: "monospace", color: rpt.ink3, } }, s.preset.label),
-              h("div", { style: { fontSize: 24, fontFamily: "monospace", fontWeight: 700, color: s.key === "base" ? rpt.teal : rpt.ink2 } },
+              h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: rpt.ink3, } }, s.preset.label),
+              h("div", { style: { fontSize: 24, fontFamily: "var(--mono)", fontWeight: 700, color: s.key === "base" ? rpt.teal : rpt.ink2 } },
                 fmtShare(s.result.equity.perShare)),
-              h("div", { style: { fontSize: 10, fontFamily: "monospace", color: rpt.ink3 } }, (valMethod === "multiple" ? "NPV (Simple Multiple) " : "rNPV ") + fmtMoney(s.result.npvResult.npv))
+              h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: rpt.ink3 } }, (valMethod === "multiple" ? "NPV (Simple Multiple) " : "rNPV ") + fmtMoney(s.result.npvResult.npv))
             ))
           )
         ),
@@ -241,7 +241,7 @@ function ReportView({ theCase, onBack, updateCase }) {
               );
             }))
           ),
-          h("div", { style: { fontSize: 11, fontFamily: "monospace", color: rpt.ink3, marginTop: 10 } },
+          h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: rpt.ink3, marginTop: 10 } },
             "Discount rate: " + (theCase.discountRatePct || "15") + "% · Diluted shares: " + (theCase.capitalStructure ? fmtNum(computeCapitalStructure(theCase.capitalStructure).dilutedShares) : "—"))
         ),
 
@@ -278,13 +278,13 @@ function ReportView({ theCase, onBack, updateCase }) {
               h("tbody", null,
                 sotp.programBreakdown.map((p, i) => h("tr", { key: i, style: { borderBottom: "1px solid " + rpt.rule } },
                   h("td", { style: { padding: "5px 8px" } }, p.name),
-                  h("td", { style: { padding: "5px 8px", textAlign: "right", fontFamily: "monospace", color: p.npv >= 0 ? rpt.teal : rpt.red } }, fmtMoney(p.npv)))),
+                  h("td", { style: { padding: "5px 8px", textAlign: "right", fontFamily: "var(--mono)", color: p.npv >= 0 ? rpt.teal : rpt.red } }, fmtMoney(p.npv)))),
                 h("tr", { style: { borderBottom: "1px solid " + rpt.rule } },
                   h("td", { style: { padding: "5px 8px", color: rpt.ink3 } }, "Corporate G&A (shared)"),
-                  h("td", { style: { padding: "5px 8px", textAlign: "right", fontFamily: "monospace", color: rpt.red } }, fmtMoney(sotp.gaDrag))),
+                  h("td", { style: { padding: "5px 8px", textAlign: "right", fontFamily: "var(--mono)", color: rpt.red } }, fmtMoney(sotp.gaDrag))),
                 h("tr", null,
                   h("td", { style: { padding: "5px 8px", fontWeight: 700 } }, "Total Enterprise Value"),
-                  h("td", { style: { padding: "5px 8px", textAlign: "right", fontFamily: "monospace", fontWeight: 700 } }, fmtMoney(sotp.sumOfParts)))
+                  h("td", { style: { padding: "5px 8px", textAlign: "right", fontFamily: "var(--mono)", fontWeight: 700 } }, fmtMoney(sotp.sumOfParts)))
               )
             )
           );
@@ -308,7 +308,7 @@ function ReportView({ theCase, onBack, updateCase }) {
             h("table", { style: { width: "100%", borderCollapse: "collapse", fontSize: 12 } },
               h("tbody", null, rows.map((r, i) => h("tr", { key: i, style: { borderBottom: i < rows.length - 1 ? "1px solid " + rpt.rule : "none" } },
                 h("td", { style: { padding: "5px 8px", fontWeight: r[0].startsWith("=") ? 700 : 400 } }, r[0]),
-                h("td", { style: { padding: "5px 8px", textAlign: "right", fontFamily: "monospace", fontWeight: r[0].startsWith("=") ? 700 : 400 } }, r[1])
+                h("td", { style: { padding: "5px 8px", textAlign: "right", fontFamily: "var(--mono)", fontWeight: r[0].startsWith("=") ? 700 : 400 } }, r[1])
               )))
             )
           );
@@ -430,7 +430,7 @@ function ReportView({ theCase, onBack, updateCase }) {
           );
         })(),
 
-        h("div", { style: { fontSize: 10, fontFamily: "monospace", color: rpt.ink3, marginTop: 20, borderTop: "1px solid " + rpt.rule, paddingTop: 10, lineHeight: 1.6 } },
+        h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: rpt.ink3, marginTop: 20, borderTop: "1px solid " + rpt.rule, paddingTop: 10, lineHeight: 1.6 } },
           "Generated by RxNPV. This is a modeling exercise built on stated assumptions, benchmark data, and simplifications documented in the app's Reference Sheet — it is not investment advice and should not be relied on as the sole basis for any investment decision.")
       )
     )
@@ -459,14 +459,14 @@ function ReportSnapshot({ pin, dark }) {
       .catch(e => { if (live) setErr(e.message || "unreadable"); });
     return () => { live = false; };
   }, [pin.id, pin.html]);
-  if (err) return h("div", { style: { fontSize: 11, fontFamily: "monospace", color: "#b45309" } }, "This section could not be read back (" + err + "). Remove it and add it again.");
+  if (err) return h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "#b45309" } }, "This section could not be read back (" + err + "). Remove it and add it again.");
   // The section REFLOWS to the report's column rather than being shrunk from
   // the width it had in the app. Shrinking used a zoom factor measured on
   // screen, and a printed page is narrower than the screen, so the PDF cropped
   // the right-hand side of wide sections (Sample Size lost its last column).
   // See the .report-snapshot rules in shell.html.
   return html == null
-    ? h("div", { style: { fontSize: 11, fontFamily: "monospace", opacity: 0.6 } }, "Loading…")
+    ? h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", opacity: 0.6 } }, "Loading…")
     : h("div", { className: "report-snapshot " + (dark ? "theme-scope-dark" : "theme-scope-light"),
         style: { width: "100%", color: "var(--ink-1)", fontFamily: "var(--sans)" },
         dangerouslySetInnerHTML: { __html: html } });
@@ -513,8 +513,8 @@ function BundleView({ onBack }) {
   };
 
   const tbtn = (label, onClick, opts) => h("button", Object.assign({ type: "button", onClick,
-    style: { padding: "6px 14px", borderRadius: 6, border: "1px solid " + rpt.rule, background: "transparent", color: rpt.ink2, fontFamily: "monospace", fontSize: 12, cursor: "pointer" } }, opts || {}), label);
-  const primary = { padding: "6px 14px", borderRadius: 6, border: "1px solid " + rpt.teal, background: rpt.teal, color: rpt.onTeal, fontFamily: "monospace", fontSize: 12, fontWeight: 700, cursor: "pointer" };
+    style: { padding: "6px 14px", borderRadius: 6, border: "1px solid " + rpt.rule, background: "transparent", color: rpt.ink2, fontFamily: "var(--mono)", fontSize: 12, cursor: "pointer" } }, opts || {}), label);
+  const primary = { padding: "6px 14px", borderRadius: 6, border: "1px solid " + rpt.teal, background: rpt.teal, color: rpt.onTeal, fontFamily: "var(--mono)", fontSize: 12, fontWeight: 700, cursor: "pointer" };
   const none = !included.length;
 
   return h("div", { style: { minHeight: "100vh", background: rpt.bg, color: rpt.ink1, fontFamily: "'Geist', sans-serif" } },
@@ -525,36 +525,36 @@ function BundleView({ onBack }) {
         style: Object.assign({}, primary, (none || busy) ? { opacity: 0.5, cursor: "default" } : {}) }, busy === "merged" ? "Exporting…" : "Export as one PDF"),
       h("button", { type: "button", onClick: exportSeparate, disabled: none || busy != null, title: "One PDF per included item, all saved into a folder you choose once",
         style: Object.assign({}, primary, { background: "transparent", color: rpt.teal }, (none || busy) ? { opacity: 0.5, cursor: "default" } : {}) }, busy === "separate" ? "Exporting…" : "Export as separate PDFs"),
-      h("label", { style: { display: "flex", alignItems: "center", gap: 6, fontSize: 11, fontFamily: "monospace", color: rpt.ink2, cursor: "pointer" } },
+      h("label", { style: { display: "flex", alignItems: "center", gap: 6, fontSize: 11, fontFamily: "var(--mono)", color: rpt.ink2, cursor: "pointer" } },
         h("input", { type: "checkbox", checked: pageEach, onChange: () => setPageEach(!pageEach) }), "one PDF: each item on its own page"),
-      msg && h("span", { role: "status", style: { fontSize: 11, fontFamily: "monospace", color: msg.tone === "ok" ? rpt.teal : (dark ? "#C17A6B" : "#A14B3F") } }, msg.text)),
+      msg && h("span", { role: "status", style: { fontSize: 11, fontFamily: "var(--mono)", color: msg.tone === "ok" ? rpt.teal : (dark ? "#C17A6B" : "#A14B3F") } }, msg.text)),
 
     h("div", { className: "no-print", style: { background: rpt.surface2, borderBottom: "1px solid " + rpt.rule, padding: "14px 20px" } },
       h("div", { style: { maxWidth: 800, margin: "0 auto" } },
         h("div", { style: { display: "flex", alignItems: "baseline", gap: 10, marginBottom: 8 } },
-          h("span", { style: { fontSize: 11, fontFamily: "monospace", color: rpt.ink3, } },
+          h("span", { style: { fontSize: 11, fontFamily: "var(--mono)", color: rpt.ink3, } },
             "In the bundle (" + included.length + " of " + items.length + " included · up to " + BUNDLE_MAX_ITEMS + ")"),
           h("div", { style: { flex: 1 } }),
           items.length > 0 && h(ConfirmXButton, { onConfirm: () => save([]), title: "Empty the bundle", label: "Clear all", style: { padding: "2px 10px", fontSize: 10 } })),
-        !items.length && h("div", { style: { fontSize: 12, fontFamily: "monospace", color: rpt.ink3, lineHeight: 1.7 } },
+        !items.length && h("div", { style: { fontSize: 12, fontFamily: "var(--mono)", color: rpt.ink3, lineHeight: 1.7 } },
           "Nothing collected yet. Every section and every chart in the app has a “+ Bundle” button on its export row. Collect a Simulation panel with its inputs, just its chart, a Tools result, a Reference Sheet table — anything — then come back here to export them together as one PDF, or each as its own."),
         h("div", { style: { display: "flex", flexDirection: "column", gap: 4 } },
-          items.map((it, i) => h("div", { key: it.id || i, style: { display: "flex", alignItems: "center", gap: 8, fontSize: 11, fontFamily: "monospace", color: it.included === false ? rpt.ink3 : rpt.ink2 } },
+          items.map((it, i) => h("div", { key: it.id || i, style: { display: "flex", alignItems: "center", gap: 8, fontSize: 11, fontFamily: "var(--mono)", color: it.included === false ? rpt.ink3 : rpt.ink2 } },
             h("input", { type: "checkbox", checked: it.included !== false, "aria-label": "Include " + (it.title || "this item"),
               onChange: () => save(items.map(x => x === it ? { ...x, included: x.included === false } : x)) }),
             h("span", { style: { flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textDecoration: it.included === false ? "line-through" : "none" } },
               it.title, it.source ? h("span", { style: { color: rpt.ink3 } }, " · " + it.source) : null),
             h("button", { type: "button", "aria-label": "Move up", title: "Move up", disabled: i === 0, onClick: () => move(i, -1),
-              style: { padding: "1px 6px", minWidth: 26, minHeight: 26, borderRadius: 4, border: "1px solid " + rpt.rule, background: "transparent", color: i === 0 ? rpt.rule : rpt.ink2, fontFamily: "monospace", fontSize: 10, cursor: i === 0 ? "default" : "pointer" } }, "↑"),
+              style: { padding: "1px 6px", minWidth: 26, minHeight: 26, borderRadius: 4, border: "1px solid " + rpt.rule, background: "transparent", color: i === 0 ? rpt.rule : rpt.ink2, fontFamily: "var(--mono)", fontSize: 10, cursor: i === 0 ? "default" : "pointer" } }, "↑"),
             h("button", { type: "button", "aria-label": "Move down", title: "Move down", disabled: i === items.length - 1, onClick: () => move(i, 1),
-              style: { padding: "1px 6px", minWidth: 26, minHeight: 26, borderRadius: 4, border: "1px solid " + rpt.rule, background: "transparent", color: i === items.length - 1 ? rpt.rule : rpt.ink2, fontFamily: "monospace", fontSize: 10, cursor: i === items.length - 1 ? "default" : "pointer" } }, "↓"),
+              style: { padding: "1px 6px", minWidth: 26, minHeight: 26, borderRadius: 4, border: "1px solid " + rpt.rule, background: "transparent", color: i === items.length - 1 ? rpt.rule : rpt.ink2, fontFamily: "var(--mono)", fontSize: 10, cursor: i === items.length - 1 ? "default" : "pointer" } }, "↓"),
             h(ConfirmXButton, { onConfirm: () => save(items.filter(x => x !== it)), title: "Remove from the bundle", style: { padding: "2px 8px", minWidth: 26, minHeight: 26, fontSize: 10 } })))))),
 
     // The document — what "Export as one PDF" prints.
     h("div", { id: "bundle-document", style: { maxWidth: 800, margin: "0 auto", padding: "32px 40px" } },
       h("div", { style: { borderBottom: "2px solid " + rpt.ink1, paddingBottom: 12, marginBottom: 20 } },
-        h("div", { style: { fontSize: 24, fontWeight: 700, fontFamily: "Georgia, serif" } }, "RxNPV export"),
-        h("div", { style: { fontSize: 11, fontFamily: "monospace", color: rpt.ink3, marginTop: 4 } },
+        h("div", { style: { fontSize: 24, fontWeight: 700, fontFamily: "var(--sans)", letterSpacing: "-0.02em" } }, "RxNPV export"),
+        h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: rpt.ink3, marginTop: 4 } },
           included.length + " item" + (included.length === 1 ? "" : "s") + " — generated " + stamp)),
       included.map((it, i) => h("div", { key: it.id || i, className: "bundle-item",
         style: { border: "1px solid " + rpt.rule, borderRadius: 8, padding: "14px 16px", marginBottom: 16,

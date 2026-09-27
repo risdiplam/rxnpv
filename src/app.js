@@ -146,7 +146,30 @@ function App() {
     setActiveCaseId(copy.id);
   };
 
-  return h(ReportContext.Provider, { value: reportCtx }, h("div", { style: { minHeight: "100vh", background: "var(--bg)", color: "var(--ink-1)", fontFamily: "var(--sans)" } },
+  // Icon rail (September 2026 redesign) in place of the old top bar: the five
+  // views, then the PDF bundle and the theme toggle at the foot. Each item is
+  // an icon WITH its name under it — bare icons make people guess, and the
+  // names are also what every test and harness clicks by. no-print: app
+  // navigation is not part of a printed report.
+  const rail = h("nav", { className: "no-print app-rail", "aria-label": "Main" },
+    h("div", { className: "app-rail-logo", title: "RxNPV", "aria-hidden": "true" }, "Rx"),
+    [["workspace", "Workspace"], ["tools", "Tools"], ["simulation", "Simulation"], ["portfolio", "Portfolio"], ["reference", "Reference Sheet"]].map(([id, label]) =>
+      h("button", { key: id, onClick: () => setView(id), className: "app-rail-btn" + (view === id ? " on" : ""), "aria-current": view === id ? "page" : undefined },
+        h(RailIcon, { name: id }), h("span", null, label))),
+    h("div", { style: { flex: 1 } }),
+    // The PDF bundle: whatever was collected with "+ Bundle", from any view.
+    h("button", { onClick: openBundle, className: "app-rail-btn" + (view === "bundle" ? " on" : ""), "aria-current": view === "bundle" ? "page" : undefined,
+      title: "Your PDF bundle — sections and charts collected with “+ Bundle”, to export together as one PDF or each as its own" },
+      h("span", { className: "app-rail-ic" }, h(RailIcon, { name: "bundle" }),
+        bundleItems.length > 0 && h("b", { className: "app-rail-badge", "aria-label": bundleItems.length + " in bundle" }, String(bundleItems.length))),
+      h("span", null, "Bundle")),
+    h("button", { onClick: () => setDark(!dark), title: "Toggle theme", "aria-label": dark ? "Switch to light theme" : "Switch to dark theme", className: "app-rail-btn" },
+      h(RailIcon, { name: dark ? "sun" : "moon" }), h("span", null, dark ? "Light" : "Dark"))
+  );
+
+  return h(ReportContext.Provider, { value: reportCtx }, h("div", { style: { minHeight: "100vh", background: "var(--bg)", color: "var(--ink-1)", fontFamily: "var(--sans)", display: "flex", alignItems: "flex-start" } },
+    rail,
+    h("div", { className: "app-main", style: { flex: 1, minWidth: 0 } },
     // Save-failure banner — deliberately loud and persistent. Silently failing
     // to persist a user's work is the single worst failure mode this app has,
     // so it must never be swallowed quietly.
@@ -155,30 +178,6 @@ function App() {
     // Proactive counterpart to the banner above: warns while there is still
     // room to act, instead of only once a save has already failed.
     h(StorageWarningBanner, { onCleared: () => setSaveFailed(!saveCases(cases)) }),
-    // Top bar. no-print: app navigation is not part of a printed report — it
-    // used to appear across the top of page 1 of every exported report PDF.
-    h("div", { className: "no-print", style: { position: "sticky", top: 0, zIndex: 10, background: "var(--bg-2)", borderBottom: "1px solid var(--rule)", padding: "0 20px", display: "flex", alignItems: "center", height: 54, gap: 20 } },
-      h("div", { style: { fontFamily: "var(--display)", fontSize: 18, fontWeight: 700, color: "var(--ink-1)", letterSpacing: "-0.01em" } },
-        "Rx", h("span", { style: { color: "var(--amber)" } }, "NPV")),
-      h("div", { style: { display: "flex", gap: 4 } },
-        h("button", { onClick: () => setView("workspace"), style: navBtnStyle(view === "workspace") }, "Workspace"),
-        h("button", { onClick: () => setView("reference"), style: navBtnStyle(view === "reference") }, "Reference Sheet"),
-        h("button", { onClick: () => setView("tools"), style: navBtnStyle(view === "tools") }, "Tools"),
-        h("button", { onClick: () => setView("simulation"), style: navBtnStyle(view === "simulation") }, "Simulation"),
-        h("button", { onClick: () => setView("portfolio"), style: navBtnStyle(view === "portfolio") }, "Portfolio")
-      ),
-      h("div", { style: { flex: 1 } }),
-      // The PDF bundle: whatever was collected with "+ Bundle", from any view.
-      h("button", { onClick: openBundle, "aria-current": view === "bundle" ? "page" : undefined,
-        title: "Your PDF bundle — sections and charts collected with “+ Bundle”, to export together as one PDF or each as its own",
-        style: Object.assign({}, navBtnStyle(view === "bundle"), { marginRight: 8, display: "flex", alignItems: "center", gap: 6 }) },
-        "Bundle", h("span", { style: { padding: "1px 7px", borderRadius: 10, fontSize: 10,
-          background: bundleItems.length ? "var(--teal-bg)" : "transparent", color: bundleItems.length ? "var(--teal)" : "var(--ink-3)",
-          border: "1px solid " + (bundleItems.length ? "var(--teal)" : "var(--rule)") } }, String(bundleItems.length))),
-      h("button", { onClick: () => setDark(!dark), title: "Toggle theme",
-        style: { padding: "6px 10px", borderRadius: 6, border: "1px solid var(--rule)", background: "transparent", color: "var(--ink-2)", fontFamily: "var(--mono)", fontSize: 12, cursor: "pointer" } }, dark ? "☾" : "☀")
-    ),
-
     view === "report" ? h(ErrorBoundary, { key: "report" }, h(ReportView, { theCase: activeCase, onBack: () => setView("workspace"), updateCase })) :
     view === "bundle" ? h(ErrorBoundary, { key: "bundle" }, h(BundleView, { onBack: () => setView("workspace") })) :
     view === "reference" ? h(ErrorBoundary, { key: "reference" }, h(ReferenceSheet, { activeCase })) :
@@ -193,7 +192,7 @@ function App() {
     // losing the view switcher and theme toggle until you scrolled all the
     // way back up. minHeight lets the container grow with its content so the
     // bar stays pinned for the whole page.
-    h("div", { style: { display: "flex", minHeight: "calc(100vh - 54px)", alignItems: "flex-start" } },
+    h("div", { style: { display: "flex", minHeight: "100vh", alignItems: "flex-start" } },
       // Sidebar: case list. Deliberately OUTSIDE any error boundary — if the
       // active case's own content crashes, this is the recovery path (click
       // a different case), so it must never be taken down by the same
@@ -203,7 +202,7 @@ function App() {
       // as tall as the case content, so without this the case list would
       // scroll off and switching cases would need the same round trip the
       // nav bar just stopped needing.
-      h("div", { style: { width: 220, borderRight: "1px solid var(--rule)", padding: "18px 14px", flexShrink: 0, display: "flex", flexDirection: "column", position: "sticky", top: 54, height: "calc(100vh - 54px)" } },
+      h("div", { style: { width: 220, borderRight: "1px solid var(--rule)", padding: "18px 14px", flexShrink: 0, display: "flex", flexDirection: "column", position: "sticky", top: 0, height: "100vh" } },
         h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginBottom: 10, flexShrink: 0 } }, "Cases"),
         h("div", { style: { flex: 1, overflowY: "auto", minHeight: 0 } },
           cases.length === 0 && h("div", { style: { fontSize: 12, fontFamily: "var(--mono)", color: "var(--ink-3)", marginBottom: 14, lineHeight: 1.6 } }, "No cases yet. Create one to start building a revenue model."),
@@ -253,7 +252,23 @@ function App() {
         )
       )
     )
-  ));
+  )));
+}
+// Rail icons: 24px line icons drawn inline (no icon font to embed or load).
+function RailIcon({ name }) {
+  const h = React.createElement;
+  const P = {
+    workspace: [["rect", { x: 3, y: 3, width: 7, height: 9, rx: 1.5 }], ["rect", { x: 14, y: 3, width: 7, height: 5, rx: 1.5 }], ["rect", { x: 14, y: 12, width: 7, height: 9, rx: 1.5 }], ["rect", { x: 3, y: 16, width: 7, height: 5, rx: 1.5 }]],
+    tools: [["path", { d: "M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.5-.5-.5-2.5z" }]],
+    simulation: [["path", { d: "M9 3v6L4 19a1.5 1.5 0 0 0 1.3 2h13.4A1.5 1.5 0 0 0 20 19L15 9V3" }], ["path", { d: "M8 3h8M7 15h10" }]],
+    portfolio: [["path", { d: "M4 19V5M4 19h16" }], ["path", { d: "M8 15l3-4 3 2 5-6" }]],
+    reference: [["path", { d: "M5 4h10a4 4 0 0 1 4 4v12H9a4 4 0 0 1-4-4z" }], ["path", { d: "M9 9h6M9 13h6" }]],
+    bundle: [["path", { d: "M4 7l8-4 8 4-8 4z" }], ["path", { d: "M4 12l8 4 8-4M4 17l8 4 8-4" }]],
+    moon: [["path", { d: "M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z" }]],
+    sun: [["circle", { cx: 12, cy: 12, r: 4 }], ["path", { d: "M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" }]]
+  };
+  return h("svg", { width: 20, height: 20, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 1.8, strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true" },
+    (P[name] || []).map(([tag, attrs], i) => h(tag, Object.assign({ key: i }, attrs))));
 }
 function navBtnStyle(active) {
   return { padding: "7px 14px", borderRadius: 7, border: "none", background: active ? "var(--surface-2)" : "transparent", color: active ? "var(--ink-1)" : "var(--ink-3)", fontFamily: "var(--mono)", fontSize: 12, fontWeight: active ? 700 : 400, cursor: "pointer" };

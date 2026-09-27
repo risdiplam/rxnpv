@@ -244,12 +244,12 @@ async function offline(win, js, click, text) {
   // B-009 — captures of every view in both themes, for review by eye.
   for (const theme of ["light", "dark"]) {
     await js(`(() => { const want = ${JSON.stringify(theme)}; const cur = document.documentElement.getAttribute("data-theme");
-      if ((cur === "dark") !== (want === "dark")) [...document.querySelectorAll("button")].find(b => b.textContent.trim() === "☾" || b.textContent.trim() === "☀").click(); return true; })()`); await sleep(500);
+      if ((cur === "dark") !== (want === "dark")) document.querySelector('button[title="Toggle theme"]').click(); return true; })()`); await sleep(500);
     for (const v of views) { await click(v, 700); await js("window.scrollTo(0,0)"); await shot(win, "view-" + theme + "-" + v.replace(/\s+/g, "-").toLowerCase()); }
   }
   ok(true, "B-009: captured 5 views × 2 themes for review in " + OUT);
   // Leave light theme and the case saved for --mode=reopen.
-  await js(`(() => { if (document.documentElement.getAttribute("data-theme") === "dark") [...document.querySelectorAll("button")].find(b => b.textContent.trim() === "☾").click(); return true; })()`);
+  await js(`(() => { if (document.documentElement.getAttribute("data-theme") === "dark") document.querySelector('button[title="Toggle theme"]').click(); return true; })()`);
   await click("Workspace", 500);
 }
 

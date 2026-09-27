@@ -41,7 +41,7 @@ function SimulationView({ cases, updateCase }) {
     }
   }, []);
 
-  return h("div", { "data-export-context": "Simulation", style: { minHeight: "calc(100vh - 54px)" } },
+  return h("div", { "data-export-context": "Simulation", style: { minHeight: "100vh" } },
     h("div", { id: "ts-root", ref: containerRef })
   );
 }

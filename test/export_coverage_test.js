@@ -218,9 +218,12 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
     ok(b.length === 3, "Bundle: three items collected (" + b.length + ")");
     ok(b[0] && b[0].title === "Fragility Index" && b[0].kind === "html", "Bundle: the panel is stored as an HTML snapshot titled Fragility Index (" + (b[0] && b[0].title) + ")");
     ok(b[1] && /out of 50/.test(b[1].title), "Bundle: the chart is stored on its own, titled by its chart title (" + (b[1] && b[1].title) + ")");
-    ok(/Bundle\s*3/.test((btn("Bundle3") || [...d.querySelectorAll("button")].find(x => /^Bundle\s*\d+$/.test(x.textContent.trim())) || {}).textContent || ""), "Bundle: the top bar shows 3");
+    // The Bundle button lives in the icon rail; its count is a badge on the
+    // icon, so it is found by its title rather than by "Bundle 3" text.
+    const bundleBtn = () => [...d.querySelectorAll("button")].find(x => /^Your PDF bundle/.test(x.getAttribute("title") || ""));
+    ok(bundleBtn() && (bundleBtn().querySelector(".app-rail-badge") || {}).textContent === "3", "Bundle: the rail shows 3");
     // Needs no case: the bundle works regardless of which case is active.
-    click([...d.querySelectorAll("button")].find(x => /^Bundle\s*\d+$/.test(x.textContent.trim()))); await wait(800);
+    click(bundleBtn()); await wait(800);
     const doc = d.getElementById("bundle-document");
     ok(doc && doc.querySelectorAll(".report-snapshot").length === 3, "Bundle view: all three render as real content");
     ok(doc && /patients in Treatment would need to flip/.test(doc.textContent), "Bundle view: the panel carries its result, not just its inputs");

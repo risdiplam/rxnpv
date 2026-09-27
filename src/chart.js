@@ -81,7 +81,11 @@ function RevenueChart({ series, height, showLegend, xPrefix, xAxisPrefix, label 
   const scale = revenueChartYScale(allVals);
   // For an all-negative series the scale's maxV is floored at 1 (see its
   // tests); the axis itself only needs to reach 0.
-  const axis = niceAxisTicks(scale.minV, allVals.some(v => v > 0) ? scale.maxV : 0);
+  // An all-zero series (a fresh case) used to build a $0-$1 axis and print it
+  // in millions — "$0.00M" four times. Give it a real $0-$1M scale and say
+  // plainly that there is nothing to plot yet.
+  const allZero = allVals.every(v => v === 0);
+  const axis = niceAxisTicks(scale.minV, allZero ? 1e6 : allVals.some(v => v > 0) ? scale.maxV : 0);
   const minV = axis.lo, maxV = axis.hi, range = (maxV - minV) || 1;
   const nPoints = series[0].points.length;
   const x = i => padL + (i / Math.max(1, nPoints - 1)) * plotW;
@@ -121,6 +125,7 @@ function RevenueChart({ series, height, showLegend, xPrefix, xAxisPrefix, label 
         h("text", { x: padL - 8, y: g.yy + 3, textAnchor: "end", fontSize: 10, fontFamily: "var(--mono)", fill: "var(--ink-3)" }, fmtM(g.v))
       )),
       hasZeroLine && h("line", { x1: padL, x2: W - padR, y1: zeroY, y2: zeroY, stroke: "var(--ink-3)", strokeWidth: 1.25 }),
+      allZero && h("text", { x: padL + plotW / 2, y: padT + plotH / 2, textAnchor: "middle", fontSize: 12, fontFamily: "var(--sans)", fill: "var(--ink-3)" }, "Nothing to plot yet — every year is $0 so far"),
       series.map((s, si) => {
         const d = s.points.map((p, i) => (i === 0 ? "M" : "L") + x(i) + "," + y(p.v)).join(" ");
         const areaD = d + ` L${x(nPoints - 1)},${y(0)} L${x(0)},${y(0)} Z`;

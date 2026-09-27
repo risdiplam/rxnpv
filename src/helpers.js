@@ -1415,7 +1415,7 @@ function WorkspaceNav({ sections }) {
 
   if (visible.length < 2) return null;
   return h("div", { className: "no-print", style: {
-      position: "sticky", top: 54, zIndex: 9, marginBottom: 16,
+      position: "sticky", top: 0, zIndex: 9, marginBottom: 16,
       background: "var(--bg)", borderBottom: "1px solid var(--rule)",
       padding: "9px 0", display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center"
     } },

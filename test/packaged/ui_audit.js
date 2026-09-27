@@ -219,7 +219,7 @@ app.whenReady().then(async () => {
     await js(`[...document.querySelectorAll("button")].find(b => /PDF bundle/.test(b.title || "")).click()`); await sleep(800); await stop("Bundle");
     await click("← Back", 500);
   };
-  const setTheme = async (want) => js(`(() => { const cur = document.documentElement.getAttribute("data-theme"); if (cur !== ${JSON.stringify(want)}) [...document.querySelectorAll("button")].find(b => b.textContent.trim() === "☾" || b.textContent.trim() === "☀").click(); return true; })()`);
+  const setTheme = async (want) => js(`(() => { const cur = document.documentElement.getAttribute("data-theme"); if (cur !== ${JSON.stringify(want)}) document.querySelector('button[title="Toggle theme"]').click(); return true; })()`);
 
   for (const [theme, w] of [["dark", 1470], ["light", 1470], ["dark", 900]]) {
     pass = theme + "-" + w;
