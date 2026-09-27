@@ -24,7 +24,7 @@ Practical implication for how work should be sequenced: don't let more than one 
 
 ## Architecture — read this before touching the build
 
-**This is not built with a real bundler.** No webpack, no esbuild, no Vite, no ES module imports/exports anywhere. It's 44 plain JavaScript files, concatenated in a specific order into one giant inline `<script>` block inside `shell.html`, producing `electron/rxnpv.html` — the single file the Electron shell actually loads.
+**This is not built with a real bundler.** No webpack, no esbuild, no Vite, no ES module imports/exports anywhere. It's 46 plain JavaScript files, concatenated in a specific order into one giant inline `<script>` block inside `shell.html`, producing `electron/rxnpv.html` — the single file the Electron shell actually loads.
 
 This was a pragmatic choice made out of necessity: the app was originally built entirely inside a Claude chat conversation, in a sandboxed environment with no real bundler tooling available. It works, it's been thoroughly tested in that form, and **changing it is a legitimate future improvement but a real, deliberate architecture decision** — not something to fix in passing while doing something else. If you do it, do it as its own isolated change with full re-verification, not bundled into a feature or bug fix.
 
@@ -53,7 +53,7 @@ Quit the running app first if using `--install` — it overwrites the app bundle
 ### Project layout
 
 ```
-src/            44 source modules — see MODULE_ORDER in build.js for the authoritative list/order
+src/            46 source modules — see MODULE_ORDER in build.js for the authoritative list/order
 shell.html      HTML template with a __SCRIPT__ placeholder
 build.js        reassembles src/ into electron/rxnpv.html
 electron/       main.js, preload.js, package.json (electron-builder config), icon.icns/icon.svg, vendor/ (React UMD builds, committed)
@@ -105,6 +105,10 @@ docs/           design-decision history and feature documentation — see below
 **Cross-feature connections:** Partnership Economics → Licensing Comps, Company Lookup → Trial Watch, Peak Sales Monte Carlo → case export, any section anywhere → "+ Report" into a case's PDF report — all explicit, one-click, never automatic.
 
 **Resilience and data safety:** two-layer error boundary (a crash in one view degrades gracefully instead of white-screening the whole app — confirmed live, not just designed, when a real bug crashed one Tools view and the rest of the app kept working); every destructive action requires confirmation (a modal for deleting a whole case or program, an inline two-step "click again to confirm" for smaller removals like a custom comp or a log entry — nothing destructive fires on a single click); a proactive storage-headroom banner that warns before `localStorage` fills up, splitting usage into the user's own irreplaceable data versus disposable re-fetchable API caches, with a one-click way to clear just the caches; the EDGAR/CIK caches are byte-capped (not just entry-count-capped) so a single large API response can't crowd out the user's own saved cases.
+
+**Backup & restore (`backup.js`, September 2026).** Cases, custom comps, watched-trial baselines and the PDF bundle live only in localStorage, so the sidebar carries a **Backup & restore** link with a live status line. Export everything or one case to JSON; import either as ADD (fresh ids, nothing overwritten, comps de-duplicated, existing baselines kept) or REPLACE (two-step confirmation, and a stamped safety copy in the backup folder first when auto-backup is on — the replace is refused if that copy fails). Automatic backups: once a folder is chosen (native dialog, stored in `userData/backup-config.json` by the main process), the renderer checks once a minute and hands `backup:write` the JSON only when the data changed; the main process owns the folder and file names. **Only keys `backupKeyKind()` recognises are ever backed up or restored** — API caches are excluded, and unknown keys in an imported file are dropped and counted. A new kind of user data needs adding there, or it will silently not be backed up. `BackupDialog` and `ConfirmDialog` render through a portal to `<body>` — the sidebar is sticky, which is its own stacking context, and a dialog rendered inside it was painted over by the Workspace tab row.
+
+**Sample case (`sampleCase.js`).** "Load sample case" (sidebar, and the empty state) adds a complete, sourced Stoke Therapeutics / zorevunersen case as a new case with fresh ids. Every input is a disclosed figure or an Evidence Log judgment call with its source and confidence; it is dated (`SAMPLE_CASE_AS_OF`) and says so. Refresh the numbers from the latest 10-Q when it gets stale rather than letting the example drift.
 
 ## Conviction tools — the half of the app that is not valuation
 

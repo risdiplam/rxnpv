@@ -126,6 +126,15 @@ function App() {
     setActiveCaseId(c.id);
     setView("workspace");
   };
+  // A finished, sourced example (sampleCase.js), always added as a new case.
+  const loadSampleCase = () => {
+    const c = sampleCaseStoke();
+    setCases(prev => [...prev, c]);
+    setActiveCaseId(c.id);
+    setView("workspace");
+  };
+  const [showBackup, setShowBackup] = React.useState(false);
+  const autoBackup = useAutoBackup(true);
   const updateCase = (next) => setCases(prev => prev.map(c => c.id === next.id ? next : c));
   const deleteCase = (id) => {
     setCases(prev => {
@@ -216,9 +225,25 @@ function App() {
           ))
         ),
         h("button", { onClick: createCase, style: { width: "100%", marginTop: 10, padding: "8px 10px", borderRadius: 7, border: "1px dashed var(--ink-3)", background: "transparent", color: "var(--ink-2)", fontFamily: "var(--mono)", fontSize: 12, cursor: "pointer", flexShrink: 0 } }, "+ New case"),
-        activeCase && h("div", { style: { marginTop: 18, display: "flex", flexDirection: "column", gap: 6, flexShrink: 0 } },
-          h("button", { onClick: () => duplicateCase(activeCase.id), style: smallBtnStyle() }, "Duplicate case")
-        )
+        h("div", { style: { marginTop: 18, display: "flex", flexDirection: "column", gap: 6, flexShrink: 0 } },
+          activeCase && h("button", { onClick: () => duplicateCase(activeCase.id), style: smallBtnStyle() }, "Duplicate case"),
+          h("button", { onClick: loadSampleCase, style: smallBtnStyle(), title: "Adds a complete, sourced example case (Stoke Therapeutics) — your own cases are not touched" }, "Load sample case"),
+          // Backup status is always visible: the one place a user would
+          // notice that nothing is protecting their work.
+          h("button", { type: "button", className: "side-link", onClick: () => setShowBackup(true), style: { marginTop: 4 } },
+            h("span", { className: "side-dot", "aria-hidden": "true", style: { background: autoBackup.status && autoBackup.status.folder && autoBackup.status.folderExists && !autoBackup.status.lastError ? "var(--green)" : "var(--warn)" } }),
+            h("span", null, "Backup & restore",
+              h("span", { style: { display: "block", fontWeight: 400, fontSize: 11, color: "var(--ink-3)" } },
+                !hasDesktopBackup() ? "Export or import a file"
+                : !(autoBackup.status && autoBackup.status.folder) ? "Automatic backup is off"
+                : autoBackup.status.lastError || !autoBackup.status.folderExists ? "Needs attention"
+                : "Backed up " + describeBackupAge(autoBackup.status.lastAt))))
+        ),
+        showBackup && h(BackupDialog, {
+          cases, activeCase, onClose: () => setShowBackup(false),
+          onCasesChange: (next, focusId) => { setCases(next); if (focusId) { setActiveCaseId(focusId); setView("workspace"); } },
+          autoStatus: autoBackup.status, refreshAutoStatus: autoBackup.refresh
+        })
       ),
       // Main content — keyed on activeCaseId (not just view) so switching to
       // a different, working case resets a tripped boundary immediately,
@@ -242,6 +267,7 @@ function App() {
             : h("div", { style: { textAlign: "center", padding: "80px 20px", color: "var(--ink-3)" } },
                 h("div", { style: { fontFamily: "var(--display)", fontSize: 20, marginBottom: 8, color: "var(--ink-2)" } }, "No case open"),
                 h("div", { style: { fontFamily: "var(--mono)", fontSize: 13, marginBottom: 20 } }, "Create a case to start building a bottoms-up revenue model."),
+                h("button", { onClick: loadSampleCase, style: { padding: "10px 22px", marginRight: 10, borderRadius: 8, border: "1px solid var(--rule)", background: "var(--surface)", color: "var(--ink-1)", fontFamily: "var(--mono)", fontSize: 13, cursor: "pointer" } }, "Open the sample case"),
                 h("button", { onClick: createCase, style: { padding: "10px 22px", borderRadius: 8, border: "1px solid var(--teal)", background: "var(--teal-bg)", color: "var(--teal)", fontFamily: "var(--mono)", fontSize: 13, fontWeight: 700, cursor: "pointer" } }, "+ New case")
               )
         )

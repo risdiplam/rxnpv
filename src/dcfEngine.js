@@ -125,7 +125,12 @@ function applyTaxToCalendar(calendar, taxation) {
   if (!taxation || !taxation.enabled) return calendar;
   const rate = (numOr(taxation.effectiveRatePct, 21)) / 100;
   if (!(rate > 0)) return calendar;
-  let nolPool = Math.max(0, numOr(taxation.startingNOLM, 0)) * 1e6;
+  // startingNOLM is entered through a MillionsField, which stores the raw
+  // DOLLAR value despite the field's name (the same convention as cash and
+  // futureRaise.amountM). This once multiplied by 1e6 again, so an NOL typed
+  // as 300 ($300M) became a $300 trillion shield and the model never charged
+  // tax — the engine test passed millions directly and never saw the field.
+  let nolPool = Math.max(0, numOr(taxation.startingNOLM, 0));
   return calendar.map(c => {
     const preTax = c.riskAdjFCF;
     if (!(preTax > 0)) {

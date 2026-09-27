@@ -1381,10 +1381,11 @@ report();
 // ════════════════════════════════════════════════════════════════════════════
 section("Cash tax with NOL carryforward");
 {
-  // riskAdjFCF is in DOLLARS on the real calendar (startingNOLM is the one
-  // field in millions, matching the app's MillionsField convention). Writing
-  // bare numbers here and expecting millions was a test-side units error on
-  // the first run — the engine was right.
+  // riskAdjFCF is in DOLLARS on the real calendar, and so is startingNOLM:
+  // it is entered through a MillionsField, which stores dollars. (This check
+  // once passed 200 meaning $200M, matching an engine that multiplied by 1e6
+  // — both were wrong together, which is how a typed NOL became a shield a
+  // million times too large without any test noticing.)
   const cal = f => f.map((v, i) => ({ calendarYear: i, riskAdjFCF: v * 1e6 }));
   const off = api.applyTaxToCalendar(cal([-100, -50, 300]), { enabled: false, effectiveRatePct: 21 });
   ok("disabled taxation returns the calendar untouched", off[2].riskAdjFCF === 300e6 && off[2].tax === undefined);
@@ -1414,7 +1415,7 @@ section("Cash tax with NOL carryforward");
   near("and still covers the next year", t3[2].tax, 0, 1e-12);
 
   // Pre-existing NOLs from prior years are honoured.
-  const t4 = api.applyTaxToCalendar(cal([300]), { enabled: true, effectiveRatePct: 21, startingNOLM: 200 });
+  const t4 = api.applyTaxToCalendar(cal([300]), { enabled: true, effectiveRatePct: 21, startingNOLM: 200e6 });
   near("a starting NOL balance shields the first profit", t4[0].tax, 100e6 * 0.21, 1e-6);
 
   // Tax can never turn a profit into a loss, or create a refund.

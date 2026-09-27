@@ -340,3 +340,91 @@ ipcMain.handle('open-external', async (event, url) => {
     return { ok: true };
   } catch (e) { return { ok: false, error: e.message }; }
 });
+
+// ── Automatic backups ───────────────────────────────────────────────────────
+// Every case lives in this app's localStorage and nowhere else, so losing the
+// Mac (or the app's data) would lose them. These handlers write the backup the
+// renderer builds into ONE folder the user chose through a native dialog.
+// The renderer supplies only the JSON text; the folder, the file names and the
+// pruning are decided here, so nothing in the page can direct a write
+// anywhere else. Files: "RxNPV backup (latest).json", one dated file per day
+// (the newest 30 kept), and a stamped copy taken before any restore.
+const BACKUP_KEEP_DAILY = 30;
+const backupConfigPath = () => path.join(app.getPath('userData'), 'backup-config.json');
+function readBackupConfig() {
+  try { return JSON.parse(fs.readFileSync(backupConfigPath(), 'utf8')) || {}; } catch (e) { return {}; }
+}
+function writeBackupConfig(c) {
+  try { fs.writeFileSync(backupConfigPath(), JSON.stringify(c)); } catch (e) {}
+}
+function localStamp(d) {
+  const p = n => String(n).padStart(2, '0');
+  return { day: d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()), time: p(d.getHours()) + p(d.getMinutes()) + p(d.getSeconds()) };
+}
+// Write to a temp file in the same folder, then rename over the target, so a
+// crash or a full disk mid-write never leaves a half-written backup in place
+// of a good one.
+function writeFileAtomic(file, text) {
+  const tmp = file + '.tmp';
+  fs.writeFileSync(tmp, text, 'utf8');
+  fs.renameSync(tmp, file);
+}
+
+ipcMain.handle('backup:status', async () => {
+  const c = readBackupConfig();
+  return { folder: c.folder || null, folderExists: !!(c.folder && fs.existsSync(c.folder)), lastAt: c.lastAt || null, lastFile: c.lastFile || null, lastError: c.lastError || null };
+});
+
+ipcMain.handle('backup:choose-folder', async () => {
+  if (!mainWindow) return { ok: false, error: 'No window available' };
+  const r = await dialog.showOpenDialog(mainWindow, {
+    title: 'Choose a folder for automatic backups',
+    buttonLabel: 'Back up here',
+    properties: ['openDirectory', 'createDirectory']
+  });
+  if (r.canceled || !r.filePaths || !r.filePaths[0]) return { ok: false, canceled: true };
+  const c = readBackupConfig();
+  c.folder = r.filePaths[0]; delete c.lastError;
+  writeBackupConfig(c);
+  return { ok: true, folder: c.folder };
+});
+
+ipcMain.handle('backup:turn-off', async () => {
+  const c = readBackupConfig();
+  delete c.folder; delete c.lastError;
+  writeBackupConfig(c);
+  return { ok: true };
+});
+
+ipcMain.handle('backup:open-folder', async () => {
+  const c = readBackupConfig();
+  if (!c.folder || !fs.existsSync(c.folder)) return { ok: false, error: 'The backup folder is not available.' };
+  await shell.openPath(c.folder);
+  return { ok: true };
+});
+
+ipcMain.handle('backup:write', async (event, text, opts) => {
+  const c = readBackupConfig();
+  if (!c.folder) return { ok: false, error: 'No backup folder is set.' };
+  if (typeof text !== 'string' || text.length > 100e6) return { ok: false, error: 'The backup was empty or too large.' };
+  let parsed;
+  try { parsed = JSON.parse(text); } catch (e) { return { ok: false, error: 'The backup was not valid JSON.' }; }
+  if (!parsed || parsed.format !== 'rxnpv-backup') return { ok: false, error: 'That is not an RxNPV backup.' };
+  const fail = (msg) => { c.lastError = msg; writeBackupConfig(c); return { ok: false, error: msg }; };
+  if (!fs.existsSync(c.folder)) return fail('The backup folder is missing — it may have been moved, renamed, or on a drive that is not connected.');
+  try {
+    const now = new Date(), s = localStamp(now);
+    const preRestore = opts && opts.reason === 'pre-restore';
+    const dated = path.join(c.folder, preRestore ? 'RxNPV backup before restore ' + s.day + ' ' + s.time + '.json' : 'RxNPV backup ' + s.day + '.json');
+    writeFileAtomic(dated, text);
+    if (!preRestore) writeFileAtomic(path.join(c.folder, 'RxNPV backup (latest).json'), text);
+    // Keep the newest daily files; never touches anything the app did not name.
+    const daily = fs.readdirSync(c.folder).filter(f => /^RxNPV backup \d{4}-\d{2}-\d{2}\.json$/.test(f)).sort().reverse();
+    daily.slice(BACKUP_KEEP_DAILY).forEach(f => { try { fs.unlinkSync(path.join(c.folder, f)); } catch (e) {} });
+    c.lastAt = now.getTime(); c.lastFile = dated; delete c.lastError;
+    writeBackupConfig(c);
+    return { ok: true, at: c.lastAt, file: dated };
+  } catch (e) {
+    return fail('Could not write the backup: ' + e.message);
+  }
+});

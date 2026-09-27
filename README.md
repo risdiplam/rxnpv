@@ -228,7 +228,7 @@ Re-run `node setup.js` after every `node build.js`. `npm test` does this for you
 ### Architecture: unusual on purpose
 
 - **No bundler, no modules.**
-  - `build.js` concatenates 44 plain JS files from `src/`, in the order set by `MODULE_ORDER`, into one inline `<script>` inside `shell.html`. The result is `electron/rxnpv.html`.
+  - `build.js` concatenates 46 plain JS files from `src/`, in the order set by `MODULE_ORDER`, into one inline `<script>` inside `shell.html`. The result is `electron/rxnpv.html`.
   - Everything shares global scope. Function declarations hoist across files, but `const`, `let` and `class` do not, so the order matters.
   - This dates from the app being built in a chat sandbox with no tooling. Moving to a real bundler is a legitimate improvement, but it should be its own change, with full re-verification.
 - **Syntax checks.** `build.js` checks every file's syntax before concatenating.
@@ -244,13 +244,15 @@ Re-run `node setup.js` after every `node build.js`. `npm test` does this for you
   - scripts only by sha256 hash, plus `'self'`/`file:` for the vendored React
   - `connect-src` limited to the six data hosts
   - `object-src 'none'`, `base-uri 'none'`, `form-action 'none'`
-- **IPC surface**, five handlers in `electron/main.js`:
+- **IPC surface**, ten handlers in `electron/main.js`:
 
   | Handler | What it does |
   |---|---|
   | `export-pdf` | prints the report |
   | `render-section` | offscreen section render (below) |
-  | `save-asset` | saves an SVG the renderer produced |
+  | `save-asset` | saves text the renderer produced (an SVG, a JSON backup) |
+  | `backup:status` / `backup:choose-folder` / `backup:turn-off` / `backup:open-folder` | automatic-backup settings; the folder is chosen in a native dialog and stored by the main process |
+  | `backup:write` | writes a backup the renderer built into that folder — fixed file names, format-checked, 100 MB cap, atomic rename, newest 30 dailies kept |
   | `edgar:fetch` | hostname must match `sec.gov`, 20-second timeout |
   | `open-external` | `http:` and `https:` only |
 
@@ -298,7 +300,7 @@ export PATH="$HOME/.local/nodejs/current/bin:$PATH"
 ## Project structure and where the docs are
 
 ```
-src/        44 source modules — MODULE_ORDER in build.js is the authoritative list and order
+src/        46 source modules — MODULE_ORDER in build.js is the authoritative list and order
 shell.html  HTML template: styles, CSP (with __SCRIPT_HASH__), __SCRIPT__ placeholder
 build.js    assembles src/ into electron/rxnpv.html; --package / --install
 electron/   main.js, preload.js, package.json (electron-builder config), vendor/ (React), icons

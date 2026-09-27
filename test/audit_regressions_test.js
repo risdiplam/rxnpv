@@ -270,6 +270,25 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
     });
   }
 
+  // ── NOL field → engine: an NOL typed as $M is a $M shield, not $M x 1e6 ──
+  {
+    click([...d.querySelectorAll(".case-tab")].find(b => b.textContent.startsWith("Assumptions"))); await wait(200);
+    const taxBox = [...d.querySelectorAll("input[type=checkbox]")].find(i => /cash tax/i.test((i.parentElement || {}).textContent || ""));
+    if (taxBox && !taxBox.checked) { click(taxBox); await wait(200); }
+    const nolInput = [...d.querySelectorAll("input")].find(i => (i.getAttribute("aria-label") || "").startsWith("Existing NOL carryforward"))
+      || inputsByLabel("Existing NOL carryforward")[0];
+    ok(!!nolInput, "NOL: the Existing NOL carryforward field is on the page");
+    if (nolInput) {
+      setVal(nolInput, "300"); await wait(200);
+      const tax = stored().taxation;
+      ok(Number(tax.startingNOLM) === 300e6, "NOL: typing 300 in the $M field stores $300M in dollars (got " + tax.startingNOLM + ")");
+      const cal = [{ calendarYear: 0, riskAdjFCF: 500e6 }];
+      const out = w.applyTaxToCalendar(cal, tax);
+      ok(Math.abs(out[0].tax - 200e6 * 0.21) < 1, "NOL: a $300M shield against $500M profit leaves $200M taxed at 21% = $42M (got " + (out[0].tax / 1e6).toFixed(2) + "M)");
+      setVal(nolInput, ""); await wait(100);
+    }
+  }
+
   // ── Assumptions section list: states come from the data, links are live ──
   {
     const find = (groups, id) => { for (const g of groups) for (const i of g.items) if (i.id === id) return i; return null; };

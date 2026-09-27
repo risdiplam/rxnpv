@@ -566,16 +566,16 @@ function ConfirmXButton({ onConfirm, title, label, armedLabel, style }) {
   }, armed ? (armedLabel || "Sure?") : (label || "×"));
 }
 
-function ConfirmDialog({ title, message, confirmLabel, onConfirm, onCancel }) {
-  const h = React.createElement;
-  const panelRef = React.useRef(null);
+// Keyboard behaviour every modal here shares: Escape closes, Tab stays inside
+// the panel, and focus goes back to whatever opened it.
+function useDialogKeys(panelRef, onClose) {
   React.useEffect(() => {
     // Remember where focus came from so it can go back — otherwise closing the
     // dialog drops focus onto <body> and a keyboard user has to tab in from
     // the top of the page to get back to where they were.
     const opener = typeof document !== "undefined" ? document.activeElement : null;
     const onKey = (e) => {
-      if (e.key === "Escape") { onCancel(); return; }
+      if (e.key === "Escape") { onClose(); return; }
       // Without containment, Tab walks straight out of the dialog and into the
       // editor behind the dimmed overlay — a keyboard user can start editing
       // fields they can't see while a delete confirmation is still open.
@@ -592,9 +592,16 @@ function ConfirmDialog({ title, message, confirmLabel, onConfirm, onCancel }) {
       window.removeEventListener("keydown", onKey);
       if (opener && typeof opener.focus === "function") { try { opener.focus(); } catch (e) {} }
     };
-  }, [onCancel]);
+  }, [onClose]);
+}
 
-  return h("div", {
+function ConfirmDialog({ title, message, confirmLabel, onConfirm, onCancel }) {
+  const h = React.createElement;
+  const panelRef = React.useRef(null);
+  useDialogKeys(panelRef, onCancel);
+
+  // Portalled to <body> so no sticky ancestor can paint over it (see BackupDialog).
+  return ReactDOM.createPortal(h("div", {
     style: { position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 },
     onClick: onCancel
   },
@@ -619,7 +626,7 @@ function ConfirmDialog({ title, message, confirmLabel, onConfirm, onCancel }) {
           style: { padding: "7px 16px", borderRadius: 6, border: "1px solid var(--red)", background: "var(--red-bg)", color: "var(--red)", fontFamily: "var(--mono)", fontSize: 12, fontWeight: 700, cursor: "pointer" } }, confirmLabel || "Delete")
       )
     )
-  );
+  ), document.body);
 }
 
 // ── Note: collapsed-by-default explanatory copy ────────────────────────────
