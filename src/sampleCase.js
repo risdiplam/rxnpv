@@ -31,7 +31,12 @@ function sampleCaseStoke() {
     posBiomarkerUse: "selection",   // genetically confirmed SCN1A patients only
     posDiseaseType: "rare",
     posOverridePct: "65",
-    launchYearOffset: "1.5",        // company guides a US launch in early 2028
+    // Company guides a US launch in early 2028, ~1.4 years out. The model works
+    // in whole years (a typed 1.5 is used as 2), and year 1 puts the first
+    // sales year's cash at ~Sep 2028 under end-of-year discounting — close to
+    // the real Feb 2028–Feb 2029 first year. Year 2 would push every
+    // revenue year back a full year.
+    launchYearOffset: "1",
     revenueMode: "full",
     prv: { enabled: true, valueM: "190" },
     rndOverride: { totalYears: "1.4", totalCostM: "200" },
@@ -43,11 +48,11 @@ function sampleCaseStoke() {
       pricing: { usAnnualPrice: "375000", priceBasis: "WAC", netPriceRealizationPct: "80", usAnnualGrowthPct: "3", includeExUS: true, exUSPriceFactorPct: "50", exUSAnnualGrowthPct: "0", exUSPatientMultiplierPct: "140" },
       exclusivity: { yearsToLOE: "12", modality: "smallMolecule", volumeRetainedPct: "45", priceDeclinePct: "35" }
     },
-    costStructure: { cogsPct: "10", reps: { primaryCare: "", specialty: "50", hospital: "" }, marketingPctOfPeak: "3" },
+    costStructure: { cogsPct: "10", reps: { primaryCare: "0", specialty: "50", hospital: "0" }, marketingPctOfPeak: "3" },
     partnership: {
-      enabled: true, territory: "exUS", royaltyPct: "15", upfrontM: "", costSharingPct: "30",
+      enabled: true, territory: "exUS", royaltyPct: "15", upfrontM: "0", costSharingPct: "30",
       milestones: [
-        { id: newId("ms"), label: "Ex-US regulatory milestones — assumed part of the undisclosed $385M", gate: "regulatory", valueM: 100 }
+        { id: newId("ms"), label: "Ex-US regulatory milestones — assumed part of the undisclosed $385M", gate: "launch", valueM: 100 }
       ]
     },
     evidenceLog: [
@@ -72,11 +77,15 @@ function sampleCaseStoke() {
       ev("Remaining R&D: $200M over 1.4 yrs, Biogen pays 30%", "inference", "moderate", "Q2 2026 10-Q (R&D $49.5M in Q2); Biogen agreement",
         "R&D ran $89.2M in H1 2026 across all programs; most is zorevunersen. ~$140M/yr for the ~1.4 years to launch ≈ $200M. Biogen funds 30% of external clinical costs; applying it to the whole figure slightly overstates the sharing."),
       ev("Biogen deal: ex-North America", "fact", "high", "Biogen / Stoke press release (Feb 2025); Q2 2026 10-Q",
-        "$165M upfront (received, already in cash — so not entered again here), up to $385M in development and commercial milestones, tiered royalties from low double digits to high teens. Stoke keeps the US, Canada and Mexico. Modelled at a 15% royalty on ex-US sales and $100M of approval milestones; the split of the $385M is not disclosed, so that entry is an assumption."),
+        "$165M upfront (received, already in cash — so not entered again here), up to $385M in development and commercial milestones, tiered royalties from low double digits to high teens. Stoke keeps the US, Canada and Mexico. Modelled at a 15% royalty on ex-US sales and $100M of milestones paid on approval (the model's launch gate, so they carry the approval odds and timing); the split of the $385M is not disclosed, so that entry is an assumption."),
       ev("Exclusivity: ~12 years from launch", "inference", "moderate", "10-K FY2025, Intellectual property",
         "Licensed mechanism patents run to 2035–36; Stoke's own zorevunersen patents run 2038–2046 before extensions, and orphan exclusivity adds 7 years from approval. LOE around 2040 is a middle reading. Erosion is set halfway between the app's two benchmarks — 45% of volume kept and a 35% price decline, so ~29% of revenue survives — because no oligonucleotide has yet faced generic competition, so neither the small-molecule cliff (90% of volume gone in a year) nor the biologic curve (80% kept) has a precedent. Spinraza still has no generic about a decade after approval. This input moves fair value by several dollars: see the note in the snapshot entry."),
       ev("Competition: two disease-modifying entrants", "inference", "moderate", "Encoded Therapeutics releases (BTD Jan 2026, RMAT meeting Mar 2026)",
         "Encoded's ETX101 (one-time AAV9 gene therapy) has Breakthrough and RMAT designations and an agreed pivotal design, so a second disease-modifying option around 2029–30 is plausible. Symptomatic drugs (Fintepla, Epidiolex, Diacomit, and bexicaserin in development) are used alongside rather than instead, so they are not counted as share rivals."),
+      ev("Launch timing: year 1", "inference", "moderate", "Company guidance (10-K FY2025; Q2 2026 10-Q): US launch early 2028",
+        "Early 2028 is ~1.4 years from this snapshot. The model counts whole years from today and discounts each year's cash at its end, so year 1 places the first year of sales at ~Sep 2028 — close to the real first sales year of roughly Feb 2028 to Feb 2029. An earlier version of this case typed 1.5, which the model rounds to 2: every revenue year moved back a full year, and fair value fell about $3.50 for a timing error, not a judgment."),
+      ev("Bear and Bull: what each one assumes", "inference", "moderate", "Judgment; Goldman Sachs PoS 75% (Sep 2026)",
+        "Bull: EMPEROR reads out cleanly and Encoded's ETX101 arrives late or is used after zorevunersen, so peak share is 130% of Base (78% of treated patients), the odds of launch are 120% of Base (78%, just above Goldman's 75%), and the discount rate is a point lower. Bear: share 70% of Base, odds 75% of Base (49%), discount rate 3 points higher. Both are still probability-weighted — Bull keeps a 22% chance of failure in it. The value if the drug is approved, with no failure weighting at all, is ~$43 a share at Base share and ~$59 at Bull share."),
       ev("Priority review voucher: $190M", "fact", "moderate", "10-K FY2025; 2026 voucher sales (Jazz $200M, Cyprium/Fortress $205M, Rocket $180M)",
         "Rare Pediatric Disease designation (Oct 2022) makes an approval before the program's Sept 30, 2029 sunset eligible for a voucher. Recent sales cluster at $180–205M."),
       ev("Balance sheet", "fact", "high", "Q2 2026 10-Q (filed 2026-08-03)",
@@ -84,14 +93,14 @@ function sampleCaseStoke() {
       ev("Remaining ATM capacity modelled as a future raise", "inference", "moderate", "8-K and 424B5, 2026-08-03 ($200M ATM)",
         "The $200M facility had ~$134M left after the July sales. Launch spending after early 2028 is not funded by current cash, so the case assumes the rest is used at today's price. Turn the future raise off to see the value with no further dilution."),
       ev("What the model says (snapshot)", "inference", "moderate", "This case, 2026-09-27",
-        "At $24.80: Base fair value ~$25.73 (about 4% above the price), Bear ~$12, Bull ~$39; peak worldwide revenue ~$1.3B in Base. The price implies ~62% odds of reaching launch against this case's 65% — the market and this model roughly agree. The single judgment that moves it most after peak share and PoS is what happens at loss of exclusivity: a small-molecule generic cliff gives ~$23, a biologic-style decline ~$28, and this case sits between them."),
+        "At $24.80: Base fair value ~$29.05 (about 17% above the price), Bear ~$13.78, Bull ~$46.84; peak revenue ~$1.3B in Base (US sales plus the ex-US royalty). The price implies ~55% odds of reaching launch against this case's 65%, so this case is somewhat more confident than the market. The single judgment that moves it most after peak share and PoS is what happens at loss of exclusivity: a small-molecule generic cliff gives ~$26, a biologic-style decline ~$33, and this case sits between them."),
       ev("Share price $24.80", "fact", "high", "Close on 2026-09-25 (stockanalysis.com)",
         "Down from $29.20 on Sep 22; the week included a board change (former CEO Edward Kaye resigned as a director, Bo Cumbo appointed). No clinical news. Update the price before relying on the upside figure.")
     ],
     calibrationLog: [
       { id: newId("cal"), catalystLabel: "EMPEROR Phase 3 topline, through to approval (PoS to launch)", catalystDate: "2027-Q3",
-        yourPoS: 65, marketImpliedPoS: 62, outcome: "pending",
-        notes: "Both figures are the probability of reaching launch. Market-implied 62% is this case's own reverse-solve at $24.80 on 2026-09-27 (Overview → What the price implies). Score it as success on approval, failure on a failed readout or a rejection." }
+        yourPoS: 65, marketImpliedPoS: 55, outcome: "pending",
+        notes: "Both figures are the probability of reaching launch. Market-implied 55% is this case's own reverse-solve at $24.80 on 2026-09-27 (Overview → What the price implies). Score it as success on approval, failure on a failed readout or a rejection." }
     ]
   });
 
@@ -116,7 +125,7 @@ function sampleCaseStoke() {
     multipleAssumptions: { bear: "3", base: "4", bull: "5" },
     scenarioOverrides: {
       bear: { shareMultiplierPct: "70", posMultiplierPct: "75", discountRateAddPct: "3", exitMultiple: "" },
-      bull: { shareMultiplierPct: "125", posMultiplierPct: "115", discountRateAddPct: "-1", exitMultiple: "" }
+      bull: { shareMultiplierPct: "130", posMultiplierPct: "120", discountRateAddPct: "-1", exitMultiple: "" }
     },
     programs: [program]
   });

@@ -668,7 +668,7 @@ function ExternalLink({ href, children, style }) {
   return h("a", { href, onClick: openLink, style: { color: "var(--teal)", textDecoration: "underline", cursor: "pointer", ...style } }, children);
 }
 
-function MillionsField({ label, value, onChange, bench, help, wide }) {
+function MillionsField({ label, value, onChange, bench, help, wide, placeholder }) {
   const h = React.createElement;
   const toMillions = (raw) => {
     if (raw === "" || raw == null) return "";
@@ -686,7 +686,7 @@ function MillionsField({ label, value, onChange, bench, help, wide }) {
   const displayValue = toMillions(value);
   const displayBench = bench ? { ...bench, value: typeof bench.value === "number" ? Math.round((bench.value / 1e6) * 100) / 100 : bench.value } : null;
   return h(BenchField, {
-    label, wide, help,
+    label, wide, help, placeholder,
     value: displayValue,
     onChange: (v) => onChange(fromMillions(v)),
     bench: displayBench,

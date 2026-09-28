@@ -425,8 +425,8 @@ function useValuationSections({ theCase, onChange, goToTab }) {
             h(BenchField, { label: "Warrants outstanding", value: cap.war, onChange: v => setCap({ war: v }) }),
             h(BenchField, { label: "Warrants strike", value: cap.warK, onChange: v => setCap({ warK: v }), suffix: "$" }),
             h("div", { style: { flex: "1 1 100%", fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", margin: "4px 0" } }, "Convertible notes (if-converted method — converts to shares only if in the money, else stays as debt)"),
-            h(MillionsField, { label: "Convertible face value", value: cap.convFace, onChange: v => setCap({ convFace: v }) }),
-            h(BenchField, { label: "Conversion price", value: cap.convPrice, onChange: v => setCap({ convPrice: v }), suffix: "$" })
+            h(MillionsField, { label: "Convertible face value", value: cap.convFace, onChange: v => setCap({ convFace: v }), placeholder: "none" }),
+            h(BenchField, { label: "Conversion price", value: cap.convPrice, onChange: v => setCap({ convPrice: v }), suffix: "$", placeholder: "none" })
           )
     )),
 
@@ -450,7 +450,7 @@ function useValuationSections({ theCase, onChange, goToTab }) {
             "Applied to every scenario — new shares dilute the count, raised cash adds to net cash dollar for dollar. No underwriting fee, no explicit timing — answers \"what happens at $X raised at $Y,\" not when."),
           h("div", { style: { display: "flex", gap: 16, flexWrap: "wrap" } },
             h(MillionsField, { label: "Amount to raise", value: fr.amountM, onChange: v => setFR({ amountM: v }) }),
-            h(BenchField, { label: "Assumed raise price", value: fr.priceOverride, onChange: v => setFR({ priceOverride: v }), suffix: "$",
+            h(BenchField, { label: "Assumed raise price", value: fr.priceOverride, onChange: v => setFR({ priceOverride: v }), suffix: "$", placeholder: "today's price",
               bench: { value: Number(fallbackPrice || 0), source: "Defaults to the case's current price — override for a raise at a discount (or premium)" } })
           ),
           newShares > 0 && h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-3)", marginTop: 8 } },

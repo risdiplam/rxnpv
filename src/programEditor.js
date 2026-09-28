@@ -188,9 +188,18 @@ function ProgramEditor({ program, onChange, onDelete, discountRatePct, terminalV
           ["phase1","phase2","phase3","filed","approved"].map(p => h("option", { key: p, value: p }, p.replace("phase","Phase "))))),
       h("div", { style: { flex: "1 1 140px" } },
         h("div", { style: UI.fieldLabel }, "Launch in year (from today)"),
-        h("input", { type: "number", "aria-label": "Launch in year (from today)", value: program.launchYearOffset, onChange: e => set("launchYearOffset", e.target.value),
+        h("input", { type: "number", step: 1, min: 0, "aria-label": "Launch in year (from today)", value: program.launchYearOffset, onChange: e => set("launchYearOffset", e.target.value),
           placeholder: "e.g. " + Math.round(rndYearsUsed),
-          style: UI.input }))
+          style: UI.input }),
+        // The cash-flow calendar counts whole years (resolveLaunchYearOffset
+        // rounds), so a typed 1.5 is valued as year 2 — a full year later than
+        // 1. That rounding used to be silent; say which year is actually used.
+        (() => {
+          const typed = program.launchYearOffset;
+          if (typed === "" || typed == null || isNaN(Number(typed)) || Number.isInteger(Number(typed))) return null;
+          return h("div", { role: "note", style: { ...UI.warnNote, marginTop: 5 } },
+            "The model counts whole years, so this is valued as a launch in year " + Math.round(Number(typed)) + ".");
+        })())
     )),
 
     // ── 0. R&D to Launch ──
@@ -299,11 +308,11 @@ function ProgramEditor({ program, onChange, onDelete, discountRatePct, terminalV
             "This program uses a selection biomarker — optional helper to build the eligible % from its two parts:"),
           h("div", { style: { display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap" } },
             h("div", null, h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginBottom: 3 } }, "Biomarker prevalence %"),
-              h("input", { type: "number", value: bp, placeholder: "e.g. 30", style: fieldStyle,
+              h("input", { type: "number", value: bp, placeholder: "e.g. 30", style: fieldStyle, "aria-label": "Biomarker prevalence (%)",
                 onChange: e => setEligibleHelper({ ...eligibleHelper, biomarkerPrevalence: e.target.value }) })),
             h("span", { style: { fontSize: 12, color: "var(--ink-3)", paddingBottom: 6 } }, "×"),
             h("div", null, h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginBottom: 3 } }, "Tested in practice %"),
-              h("input", { type: "number", value: tr, placeholder: "e.g. 70", style: fieldStyle,
+              h("input", { type: "number", value: tr, placeholder: "e.g. 70", style: fieldStyle, "aria-label": "Tested in practice (%)",
                 onChange: e => setEligibleHelper({ ...eligibleHelper, testingRate: e.target.value }) })),
             computed != null && h("span", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-2)", paddingBottom: 6 } },
               "= ", h("b", { style: { color: "var(--ink-1)" } }, computed.toFixed(1) + "%")),
@@ -339,6 +348,7 @@ function ProgramEditor({ program, onChange, onDelete, discountRatePct, terminalV
           style: UI.input },
           Array.from({length: rb.marketShare.numDrugs}, (_,i)=>i+1).map(n => h("option", { key: n, value: n }, n + (n===1?"st":n===2?"nd":n===3?"rd":"th") + " to market")))),
       h(BenchField, { label: "Override peak share (optional)", value: rb.marketShare.peakShareOverridePct, onChange: v => set("revenueBuild.marketShare.peakShareOverridePct", v), suffix: "%",
+        placeholder: "blank = " + peakShareForEntry(rb.marketShare.numDrugs, rb.marketShare.orderOfEntry) + " from the model",
         bench: { value: peakShareForEntry(rb.marketShare.numDrugs, rb.marketShare.orderOfEntry), source: MARKET_SHARE_TABLE.source },
         help: "Leave blank to use the order-of-entry model above; override if efficacy/dosing differentiation justifies it." })
     ),
@@ -406,8 +416,10 @@ function ProgramEditor({ program, onChange, onDelete, discountRatePct, terminalV
       h(BenchField, { label: "Years from launch to LOE", value: rb.exclusivity.yearsToLOE, onChange: v => set("revenueBuild.exclusivity.yearsToLOE", v), suffix: "yrs",
         bench: { value: 13, source: EXCLUSIVITY_BENCHMARKS.source + " — average launch-to-competition. 20yr patent from filing, +5yr Hatch-Waxman, +7yr if orphan, +6mo pediatric." } }),
       h(BenchField, { label: "Volume retained after LOE", value: rb.exclusivity.volumeRetainedPct, onChange: v => set("revenueBuild.exclusivity.volumeRetainedPct", v), suffix: "%",
+        placeholder: "blank = " + getErosionDefaults(rb.exclusivity.modality || "smallMolecule").volRetainedPct + " (benchmark)",
         bench: getExclusivityBenchText(program.modality).volRetained }),
       h(BenchField, { label: "Price decline after LOE", value: rb.exclusivity.priceDeclinePct, onChange: v => set("revenueBuild.exclusivity.priceDeclinePct", v), suffix: "%",
+        placeholder: "blank = " + getErosionDefaults(rb.exclusivity.modality || "smallMolecule").priceDeclinePct + " (benchmark)",
         bench: getExclusivityBenchText(program.modality).priceDecline })
     )),
 
@@ -417,11 +429,11 @@ function ProgramEditor({ program, onChange, onDelete, discountRatePct, terminalV
       h(BenchField, { label: "COGS (% of revenue)", value: cs.cogsPct, onChange: v => set("costStructure.cogsPct", v), suffix: "%", bench: cogsBench,
         help: cogsBench.value + "% keys off modality above — price is the bigger driver in reality, but this is the best generic anchor." }),
       h("div", { style: { flex: "1 1 100%", fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-2)", margin: "6px 0 2px", fontWeight: 700 } }, "Sales force (active reps at peak)"),
-      h(BenchField, { label: "Primary care reps", value: cs.reps.primaryCare, onChange: v => set("costStructure.reps.primaryCare", v),
+      h(BenchField, { label: "Primary care reps", value: cs.reps.primaryCare, onChange: v => set("costStructure.reps.primaryCare", v), placeholder: "0",
         help: "$" + (SALES_REP_COST.primaryCare.total/1000).toFixed(0) + "K/rep fully loaded" }),
-      h(BenchField, { label: "Specialty reps", value: cs.reps.specialty, onChange: v => set("costStructure.reps.specialty", v),
+      h(BenchField, { label: "Specialty reps", value: cs.reps.specialty, onChange: v => set("costStructure.reps.specialty", v), placeholder: "0",
         help: "$" + (SALES_REP_COST.specialty.total/1000).toFixed(0) + "K/rep fully loaded" }),
-      h(BenchField, { label: "Hospital-based reps", value: cs.reps.hospital, onChange: v => set("costStructure.reps.hospital", v),
+      h(BenchField, { label: "Hospital-based reps", value: cs.reps.hospital, onChange: v => set("costStructure.reps.hospital", v), placeholder: "0",
         help: "$" + (SALES_REP_COST.hospital.total/1000).toFixed(0) + "K/rep fully loaded" }),
       h(BenchField, { label: "Marketing (% of peak revenue)", value: cs.marketingPctOfPeak, onChange: v => set("costStructure.marketingPctOfPeak", v), suffix: "%",
         bench: { value: MARKETING_BENCHMARKS.baseCasePctOfPeakRevenue, source: MARKETING_BENCHMARKS.source + " — base case; " + MARKETING_BENCHMARKS.competitiveScenarioRange.join("-") + "% if highly competitive" } }),
@@ -615,11 +627,11 @@ function ProgramEditor({ program, onChange, onDelete, discountRatePct, terminalV
           "Partnered asset (licensed rights, royalty/milestone deal)"),
         partnership.enabled && h("div", null,
           h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginBottom: 10, lineHeight: 1.6 } },
-            "Royalty replaces the partnered territory's revenue rather than adding to it — Detailed mode's own ex-US pricing above should be turned off for a territory that's actually licensed out, or its revenue and the royalty on it would both be counted. Royalty income is treated as near-pure margin: no COGS and no marketing are charged against it, because the partner is the one manufacturing and selling there. Sales reps are the exception — they're an explicit headcount you enter, so set them to zero yourself for a program you've fully licensed out."),
+            "Royalty replaces the partnered territory's revenue rather than adding to it: the model takes what that territory would have sold (from the pricing above) and keeps only the royalty on it, so leave that territory's pricing on — it is the royalty's base, and turning it off would zero the royalty. Royalty income is treated as near-pure margin: no COGS and no marketing are charged against it, because the partner is the one manufacturing and selling there. Sales reps are the exception — they're an explicit headcount you enter, so set them to zero yourself for a program you've fully licensed out."),
           h("div", { style: { display: "flex", flexWrap: "wrap", gap: "0 16px" } },
             h(BenchField, { label: "Royalty rate", value: partnership.royaltyPct, onChange: v => setPartnership({ royaltyPct: v }), suffix: "%",
               help: "Applied to what the partnered territory's revenue would otherwise have been." }),
-            h(BenchField, { label: "Upfront received", value: partnership.upfrontM, onChange: v => setPartnership({ upfrontM: v }), suffix: "$M",
+            h(BenchField, { label: "Upfront received", value: partnership.upfrontM, onChange: v => setPartnership({ upfrontM: v }), suffix: "$M", placeholder: "none",
               help: "Added directly, undiscounted — treated as near-certain/already-contracted, same as cash." }),
             h(BenchField, { label: "Partner-funded R&D", value: partnership.costSharingPct, onChange: v => setPartnership({ costSharingPct: v }), suffix: "%",
               help: "% of this program's remaining R&D cost the partner covers instead of the company." })

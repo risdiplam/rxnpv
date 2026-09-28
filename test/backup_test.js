@@ -87,6 +87,21 @@ function stub(obj) {
   const fv = w.baseCaseFairValue(sc);
   ok(isFinite(fv) && fv > 0, "sample: produces a positive base fair value (" + fv + ")");
   ok(Number(sc.capitalStructure.cash) > 1e8 && Number(sc.futureRaise.amountM) > 1e7, "sample: dollar fields are in dollars, not millions");
+  // The model counts whole years from today, so a fractional launch year is
+  // rounded — an earlier version typed 1.5, which valued a launch a full year
+  // later than the company guides.
+  ok(Number.isInteger(Number(sc.programs[0].launchYearOffset)), "sample: launch year is a whole number (" + sc.programs[0].launchYearOffset + ")");
+  // The snapshot entry quotes the case's own results; hold them to the engine
+  // so a later input change can't leave the write-up describing another case.
+  const snap = sc.programs[0].evidenceLog.find(e => /snapshot/.test(e.label)).thesis;
+  const quoted = k => Number((snap.match(new RegExp(k + "[^$]*~\\$([0-9.]+)")) || [])[1]);
+  ["Bear", "Base", "Bull"].forEach(k => {
+    const key = k.toLowerCase();
+    const r = w.computeCaseValuation(sc, w.getEffectiveScenarioPreset(sc, key), key, Number(sc.discountRatePct), sc.terminalValue);
+    ok(Math.abs(quoted(k) - r.equity.perShare) < 0.005, "sample: snapshot's " + k + " ($" + quoted(k) + ") matches the engine ($" + r.equity.perShare.toFixed(2) + ")");
+  });
+  const imp = w.solveImpliedPoSMultiplier(sc, Number(sc.discountRatePct), sc.terminalValue);
+  ok(Math.round(imp.impliedAbsolutePct) === sc.programs[0].calibrationLog[0].marketImpliedPoS, "sample: calibration's market-implied PoS matches the reverse-solve (" + imp.impliedAbsolutePct.toFixed(1) + ")");
 
   // ── In the app ──
   click(btn("+ New case")); await wait(300);
@@ -96,6 +111,16 @@ function stub(obj) {
   ok(after.length === before.length + 1 && after.some(c => c.name === "Stoke Therapeutics — sample case"), "Load sample case adds one case");
   ok(before.every(bc => after.some(ac => ac.id === bc.id && JSON.stringify(ac) === JSON.stringify(bc))), "loading the sample leaves existing cases byte-for-byte unchanged");
   ok(/Stoke Therapeutics/.test(d.body.textContent) && !!d.querySelector(".secnav"), "the sample opens in the Workspace");
+  // A fractional launch year says which whole year the model uses.
+  click(d.getElementById("casetab-assumptions")); await wait(300);
+  const launch = d.querySelector('input[aria-label="Launch in year (from today)"]');
+  const setVal = (el, v) => { Object.getOwnPropertyDescriptor(w.HTMLInputElement.prototype, "value").set.call(el, v); el.dispatchEvent(new w.Event("input", { bubbles: true })); };
+  // (body text includes the inline script, so read the rendered notes only)
+  const launchNote = () => [...d.querySelectorAll('[role="note"]')].map(n => n.textContent).find(t => /valued as a launch in year/.test(t)) || "";
+  ok(!!launch && !launchNote(), "launch field: no rounding note for a whole year");
+  if (launch) { setVal(launch, "1.5"); await wait(300); }
+  ok(/valued as a launch in year 2\./.test(launchNote()), "launch field: 1.5 says it is valued as year 2");
+  if (launch) { setVal(launch, "1"); await wait(300); }
   const link = [...d.querySelectorAll("button.side-link")].find(b => /Backup & restore/.test(b.textContent));
   ok(!!link, "sidebar shows Backup & restore");
   click(link); await wait(200);
