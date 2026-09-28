@@ -482,7 +482,9 @@ function WaterfallChart({ steps, total, compare, height, label }) {
         const [l1, l2] = wrap(b.label);
         return h("g", { key: i },
           h("rect", { x: bx, y: top, width: bw, height: Math.max(2, bot - top), rx: 3, fill: fill(b), opacity: b.kind === "step" ? 0.75 : b.kind === "gap" ? 0.8 : 1 }),
-          h("text", { x: cx, y: b.kind === "gap" ? bot + 15 : top - 7, textAnchor: "middle", fontSize: fontV, fontWeight: 600, fontFamily: "var(--mono)", fill: "var(--ink-1)" }, b.text),
+          // A bar standing on zero is labelled above; one hanging below zero
+          // (a negative enterprise value or total) and the gap bar, below.
+          h("text", { x: cx, y: b.kind === "gap" || (b.kind !== "step" && b.b < 0) ? bot + 15 : top - 7, textAnchor: "middle", fontSize: fontV, fontWeight: 600, fontFamily: "var(--mono)", fill: "var(--ink-1)" }, b.text),
           h("text", { x: cx, y: H - padB + 16, textAnchor: "middle", fontSize: 10, fontFamily: "var(--sans)", fill: "var(--ink-2)" }, l1),
           l2 && h("text", { x: cx, y: H - padB + 29, textAnchor: "middle", fontSize: 10, fontFamily: "var(--sans)", fill: "var(--ink-2)" }, l2),
           b.sub && h("text", { x: cx, y: H - padB + 47, textAnchor: "middle", fontSize: 11, fontWeight: 700, fontFamily: "var(--mono)", fill: "var(--ink-1)" }, b.sub));
