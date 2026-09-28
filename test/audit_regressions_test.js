@@ -308,6 +308,13 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
     click([...panel.querySelectorAll(".proj-toggle button")].find(b => b.textContent === "Chart + table")); await wait(200);
     ok(!!panel.querySelector(".proj-table") && !!panel.querySelector('svg[aria-label^="Year-by-year"]'), "Projections: Chart + table shows both again");
 
+    // The whole range on one line, with the failure floor.
+    const rng = [...panel.querySelectorAll("[data-export-section]")].find(e => e.getAttribute("data-export-section") === "The whole range, on one line");
+    const rt = rng ? [...rng.querySelectorAll("svg text")].map(t => t.textContent) : [];
+    ok(!!rng && ["If it fails", "≈$1.40", "If it works", "Today", "Bear", "Base", "Bull"].every(t => rt.includes(t)), "Range strip: floor, scenarios, today and success all marked (" + rt.join(" | ") + ")");
+    ok(!!rng && /paying 56% of the way from failure to success/.test(rng.textContent), "Range strip: the reading places the price between failure and success");
+    ok(!!rng && /1 year of wind-down G&A \$95\.0M/.test(rng.textContent), "Range strip: the floor's arithmetic is written out");
+
     // Break-even and the value bridge, side by side.
     const beSec = [...panel.querySelectorAll("[data-export-section]")].find(e => e.getAttribute("data-export-section") === "Break-even peak revenue");
     ok(!!beSec && /The price needs about \$1\.1\dB of peak revenue/.test(beSec.textContent) && !!beSec.querySelector('svg[aria-label^="Fair value per share at each peak"]'), "Break-even: headline and chart (" + (beSec && beSec.textContent.slice(0, 60)) + ")");

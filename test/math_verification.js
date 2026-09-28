@@ -81,7 +81,7 @@ const EXPORTS = [
   "applyTaxToCalendar", "computeMoleculeTypePoSRatios", "POS_BY_MOLECULE",
   "computeProgramValuation",
   "revenueChartYScale", "niceAxisTicks", "histogramBins", "spreadLabels", "localDateStamp", "selectPeakSalesCompWindow",
-  "readPriceVsScenarios", "readMonteCarlo", "readCashFlow", "readSotp", "readRiskWaterfall", "readTornado", "readPriceGrid", "readInterval", "readPValue", "readSingleArm", "readAssurance", "readPeakSalesRange", "readBinaryImplied", "readPremium", "readForwardRunway", "readBreakEven", "readPriceGap",
+  "readPriceVsScenarios", "readMonteCarlo", "readCashFlow", "readSotp", "readRiskWaterfall", "readTornado", "readPriceGrid", "readInterval", "readPValue", "readSingleArm", "readAssurance", "readPeakSalesRange", "readBinaryImplied", "readPremium", "readForwardRunway", "readBreakEven", "readPriceGap", "readOutcomeRange",
   "measureStorage", "STORAGE_ASSUMED_QUOTA_BYTES", "STORAGE_WARN_FRACTION", "STORAGE_CRITICAL_FRACTION",
   "computeTreatedPopulation", "launchCurveForYears", "erosionMultiplier", "computeProgramRevenue",
   "resolveNetPrice", "aspPctOfBasis", "PRICE_BASIS_OPTIONS", "getRevenueBuild", "PRICING_CONVERSION_MATRIX", "priceBasisArticle",
@@ -4223,6 +4223,16 @@ section("Break-even and price-gap readings");
   ok("price gap: 10-point disagreement, more confident", r.text.includes("the 55% the price implies and this case's 65%") && r.text.includes("A 10-point gap") && r.text.includes("more confident"));
   ok("price gap: within 5 points is judgment", api.readPriceGap(25, 24.8, 62, 65).text.includes("matter of judgment"));
   ok("price gap: price above the case", api.readPriceGap(20, 24.8, null, null).verdict === "About $4.80 a share of the price is not in this case.");
+}
+section("Outcome range reading");
+{
+  // Floor $1.40, success $43.24, price $24.80: (24.80 - 1.40) / (43.24 - 1.40)
+  // = 23.40 / 41.84 = 55.93% -> "56% of the way"; implied odds 54.7 -> "55%".
+  const r = api.readOutcomeRange(1.40, 43.24, 24.80, 54.7);
+  ok("range: binary bet verdict", r.verdict === "A binary bet: about $1.40 if the readout fails, $43.24 if it works.");
+  ok("range: 56% of the way, model says 55%", r.text.includes("paying 56% of the way from failure to success") && r.text.includes("implies at 55%"));
+  ok("range: price above success says so", api.readOutcomeRange(1, 10, 12, null).text.includes("above even the value if it works"));
+  ok("range: nothing to say without a spread", api.readOutcomeRange(5, 5, 5, null) === null);
 }
 report();
 

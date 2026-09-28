@@ -1884,6 +1884,21 @@ function readPriceGap(fairPerShare, price, impliedPct, basePct) {
     (Math.abs(d) <= 5 ? "Close enough to be a matter of judgment." : "A " + Math.round(Math.abs(d)) + "-point gap is a real disagreement — worth being able to say why you are " + (d > 0 ? "more" : "less") + " confident than the market.") };
 }
 
+// The whole range as a binary bet: what is left if the readout fails, what it
+// is worth if it works, and where the price sits between them. The share of
+// the way from floor to success is NOT a probability (it ignores timing and
+// dilution), so the model's own implied odds are quoted beside it when known.
+function readOutcomeRange(floor, success, price, impliedPct) {
+  if (floor == null || success == null || !(success > floor)) return null;
+  const verdict = "A binary bet: about " + fmtShare(floor) + " if the readout fails, " + fmtShare(success) + " if it works.";
+  if (!(price > 0)) return { verdict, text: "Bear, Base and Bull sit between the two because each weighs failure differently." };
+  const share = (price - floor) / (success - floor) * 100;
+  const where = price <= floor ? "At " + fmtShare(price) + " the price is at or below what is left after a failure."
+    : price >= success ? "At " + fmtShare(price) + " the price is above even the value if it works."
+    : "At " + fmtShare(price) + " you are paying " + pctWord(share) + " of the way from failure to success.";
+  return { verdict, text: where + (impliedPct != null ? " Allowing for timing and dilution, the full model puts the odds the price implies at " + Math.round(impliedPct) + "%." : "") };
+}
+
 // Forward runway from the case's own plan: when cash runs out, and how much
 // the plan would need raised at its lowest point.
 function readForwardRunway(runwayMonths, path) {

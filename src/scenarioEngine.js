@@ -410,6 +410,48 @@ function computeBreakEvenCurve(theCase, discountRateBasePct, terminalValueParams
     basePeak: peakOf(baseR), basePerShare: baseR.equity.perShare, bearPeak: peakOf(at("bear")), bullPeak: peakOf(at("bull")) };
 }
 
+// ── Failure floor: roughly what a share is worth if the next readout fails ──
+// Built as cash, not as a valuation with PoS set to zero: that run keeps
+// charging pre-commercial G&A for the whole projection, as if a company with
+// a failed lead asset kept its full overhead for twenty-five years, and came
+// out below zero (the Stoke sample showed -$3.81). What actually happens is a
+// wind-down, so the floor is:
+//   net cash (cash − debt − a convertible that would not convert)
+//   − the company's share of the current stage's cost, to the readout
+//   − corporate G&A until the readout
+//   − corporate G&A for the wind-down (corporateGA.windDownYears, default 1)
+// divided by the shares that would exist at that price (options priced there,
+// so out-of-the-money ones drop out), before any new raise and undiscounted
+// (the horizon is a year or two). Single-program cases only — with more than
+// one program, one failure leaves the others' value standing, and that needs
+// a real model rather than this arithmetic. Null for an approved program,
+// which has no readout left to fail. Anything the other programs, a partner
+// or a sale of the platform might fetch is left out: the floor is cautious.
+const FAILURE_WIND_DOWN_YEARS_DEFAULT = 1;
+function computeFailureFloor(theCase) {
+  if (!theCase || !theCase.programs || theCase.programs.length !== 1) return null;
+  const pv = computeProgramValuation(theCase.programs[0], SCENARIO_PRESETS.base, "base");
+  const stage = (pv.riskAdjItems || [])[0];
+  if (!stage) return null;
+  const cap = theCase.capitalStructure || { mode: "simple" };
+  const ga = theCase.corporateGA || {};
+  const gaYear = (ga.preCommercialAnnualM !== "" && ga.preCommercialAnnualM != null ? Number(ga.preCommercialAnnualM) : SGA_BENCHMARKS.preCommercialGA.medianM) * 1e6;
+  const windDownYears = ga.windDownYears !== "" && ga.windDownYears != null && isFinite(Number(ga.windDownYears)) ? Math.max(0, Number(ga.windDownYears)) : FAILURE_WIND_DOWN_YEARS_DEFAULT;
+  const trialCost = stage.costM * 1e6, gaToReadout = gaYear * stage.years, windDown = gaYear * windDownYears;
+  const netCashAt = p => computeCapitalStructure({ ...cap, currentPrice: p }).netCash;
+  // Shares depend on the price, and the price on the shares: two passes from
+  // the basic count settle it (options either are or are not in the money).
+  let equity = netCashAt(0) - trialCost - gaToReadout - windDown;
+  let shares = computeCapitalStructure({ ...cap, currentPrice: 0 }).dilutedShares;
+  for (let k = 0; k < 2; k++) {
+    const p = shares > 0 ? Math.max(0, equity / shares) : 0;
+    equity = netCashAt(p) - trialCost - gaToReadout - windDown;
+    shares = computeCapitalStructure({ ...cap, currentPrice: p }).dilutedShares;
+  }
+  if (!(shares > 0)) return null;
+  return { perShare: Math.max(0, equity / shares), equity, shares, netCash: netCashAt(Math.max(0, equity / shares)), trialCost, gaToReadout, windDown, windDownYears, readoutYears: stage.years, stageLabel: stage.label, cashShort: equity < 0 };
+}
+
 // ── Partnership economics — upfront and milestones, as a cash figure to add
 // on top of a computed equity value. Upfront is added directly (near-certain /
 // already-contracted, so not PoS-risked and not discounted — same treatment as

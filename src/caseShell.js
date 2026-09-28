@@ -11,7 +11,7 @@ function newCase() {
     updatedAt: Date.now(),
     programs: [newProgram()],
     currentPrice: "", // manually entered, lives at the top near company name — drives upside/downside and treasury-method dilution
-    corporateGA: { preCommercialAnnualM: "", gaShareOfMatureSgaPct: "50" },
+    corporateGA: { preCommercialAnnualM: "", gaShareOfMatureSgaPct: "50", windDownYears: "" },
     discountRatePct: "",
     terminalValue: { enabled: false, method: "exitMultiple", growthPct: "0", exitMultiple: "" },
     // Off by default, deliberately: every case built before taxation existed
@@ -439,6 +439,17 @@ function CaseView({ theCase, onChange, onDelete, onNavigateToTools }) {
               style: { flex: 1, padding: "6px 9px", borderRadius: 6, border: "1.5px solid var(--rule)", background: "var(--surface)", color: "var(--ink-1)", fontFamily: "var(--mono)", fontSize: 12 } }),
             h("span", { style: { fontSize: 11, color: "var(--ink-3)" } }, "%")),
           h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginTop: 3 } }, "Judgment call, not a sourced figure — see help below")
+        ),
+        // Read only by the failure floor on the Overview (computeFailureFloor):
+        // how long overhead keeps running after a failed readout before the
+        // company is wound down or restructured. Blank = one year.
+        h("div", { style: { flex: "1 1 200px" } },
+          h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-2)", marginBottom: 5 } }, "Wind-down after a failed readout"),
+          h("div", { style: { display: "flex", alignItems: "center", gap: 6 } },
+            h("input", { type: "number", min: 0, step: 0.5, value: corpGA.windDownYears == null ? "" : corpGA.windDownYears, placeholder: String(FAILURE_WIND_DOWN_YEARS_DEFAULT), onChange: e => updateCorpGA({ windDownYears: e.target.value }), "aria-label": "Wind-down after a failed readout (years of G&A)",
+              style: { flex: 1, padding: "6px 9px", borderRadius: 6, border: "1.5px solid var(--rule)", background: "var(--surface)", color: "var(--ink-1)", fontFamily: "var(--mono)", fontSize: 12 } }),
+            h("span", { style: { fontSize: 11, color: "var(--ink-3)" } }, "yrs")),
+          h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginTop: 3 } }, "Years of G&A a failure still costs; sets the Overview's failure floor")
         ),
         h("div", { style: { flex: "1 1 100%" } },
           h(Note, { summary: "Why this split exists" },

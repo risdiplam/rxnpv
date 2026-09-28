@@ -491,6 +491,51 @@ function WaterfallChart({ steps, total, compare, height, label }) {
 }
 
 // ════════════════════════════════════════════════════════════════════════════
+// Outcome range strip — every value that matters on one line: what is left if
+// the readout fails, your Bear/Base/Bull, today's price, and the value if the
+// drug works. marks: [{ value, name, text, color, row: "above" | "below" }].
+// Each row's two-line labels are spread in order (spreadLabels) with a leader
+// to the strip, so no label meets another and no leader crosses a label.
+// band: [lo, hi] shaded along the strip (the Bear–Bull range).
+// ════════════════════════════════════════════════════════════════════════════
+function OutcomeRangeStrip({ marks, band, label }) {
+  const h = React.createElement;
+  const wrapRef = React.useRef(null);
+  const measured = useMeasuredWidth(wrapRef, 900);
+  const ms = (marks || []).filter(m => m.value != null && isFinite(m.value));
+  if (ms.length < 2) return h("div", { ref: wrapRef });
+  const W = Math.max(360, measured), padL = 24, padR = 24;
+  const ax = niceAxisTicks(Math.min(0, ...ms.map(m => m.value)), Math.max(...ms.map(m => m.value)), 5);
+  const x = v => padL + (v - ax.lo) / ((ax.hi - ax.lo) || 1) * (W - padL - padR);
+  const above = ms.filter(m => m.row !== "below").sort((a, b) => a.value - b.value);
+  const below = ms.filter(m => m.row === "below").sort((a, b) => a.value - b.value);
+  const widthOf = m => Math.max(measureLabel(m.name, 12, 600), measureLabel(m.text, 12));
+  const place = row => spreadLabels(row.map(m => ({ x: x(m.value), w: widthOf(m) })), padL / 2, W - padR / 2, 16);
+  const cAbove = place(above), cBelow = place(below);
+  const stripY = above.length ? 66 : 20, tickY = stripY + 24, rowTop = stripY + 46;
+  const H = below.length ? rowTop + 36 : tickY + 8;
+  const lo = Math.min(...ms.map(m => m.value)), hi = Math.max(...ms.map(m => m.value));
+  // A below-row leader crosses the tick row; skip any tick label it would touch.
+  const leaderXAtTick = below.map((m, i) => x(m.value) + (cBelow[i] - x(m.value)) * ((tickY - 4 - stripY) / (rowTop - 14 - stripY)));
+  const tickOk = v => leaderXAtTick.every(lx => Math.abs(lx - x(v)) > 22);
+  return h("div", { ref: wrapRef },
+    h("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": label || "Range of outcomes per share", "data-titled": "1", style: { width: "100%", height: H, display: "block" } },
+      h("rect", { x: x(lo) - 5, y: stripY - 5, width: x(hi) - x(lo) + 10, height: 10, rx: 5, fill: "var(--surface-2)", stroke: "var(--rule)" }),
+      band && h("rect", { x: x(band[0]) - 5, y: stripY - 5, width: Math.max(10, x(band[1]) - x(band[0]) + 10), height: 10, rx: 5, fill: "var(--teal)", opacity: 0.22 }),
+      ax.ticks.filter(tickOk).map((v, i) => h("text", { key: "t" + i, x: x(v), y: tickY, textAnchor: "middle", fontSize: 10, fontFamily: "var(--mono)", fill: "var(--ink-3)" }, (v < 0 ? "-$" : "$") + Math.abs(v))),
+      above.map((m, i) => h("g", { key: "a" + i },
+        h("polyline", { points: cAbove[i] + ",38 " + cAbove[i] + ",42 " + x(m.value) + "," + (stripY - 9), fill: "none", stroke: m.color, strokeWidth: 1.25 }),
+        h("text", { x: cAbove[i], y: 15, textAnchor: "middle", fontSize: 12, fontWeight: 600, fontFamily: "var(--sans)", fill: m.color }, m.name),
+        h("text", { x: cAbove[i], y: 31, textAnchor: "middle", fontSize: 12, fontFamily: "var(--mono)", fill: "var(--ink-1)" }, m.text))),
+      below.map((m, i) => h("g", { key: "b" + i },
+        h("polyline", { points: x(m.value) + "," + (stripY + 9) + " " + cBelow[i] + "," + (rowTop - 18) + " " + cBelow[i] + "," + (rowTop - 14), fill: "none", stroke: m.color, strokeWidth: 1.25 }),
+        h("text", { x: cBelow[i], y: rowTop, textAnchor: "middle", fontSize: 12, fontWeight: 600, fontFamily: "var(--sans)", fill: m.color }, m.name),
+        h("text", { x: cBelow[i], y: rowTop + 16, textAnchor: "middle", fontSize: 12, fontFamily: "var(--mono)", fill: "var(--ink-1)" }, m.text))),
+      ms.map((m, i) => h("circle", { key: "d" + i, cx: x(m.value), cy: stripY, r: 5, fill: m.color, stroke: "var(--surface)", strokeWidth: 1.5 })))
+  );
+}
+
+// ════════════════════════════════════════════════════════════════════════════
 // Scatter chart — for comp positioning (e.g. deal value vs. premium), with an
 // optional single "your case" point rendered distinctly so you can see where
 // your own assumption sits among real comps.

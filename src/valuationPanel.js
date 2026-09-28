@@ -187,6 +187,44 @@ function useValuationSections({ theCase, onChange, goToTab }) {
       );
     })()),
 
+    // The whole range on one line: what is left if the readout fails, your
+    // three scenarios, today's price, and the value if the drug works.
+    show("overview") && (!error && scenarioResults && valMethod === "dcf" && (() => {
+      const drBase = discountRatePct !== "" ? Number(discountRatePct) : DISCOUNT_RATE_GUIDANCE.earlyBiotechSelfView[0];
+      const tvParams = { enabled: tv.enabled, method: tv.method, growthPct: tv.growthPct, exitMultiple: tv.exitMultiple };
+      let success = null, floor = null;
+      try {
+        // Literal 100% odds on the raw Base preset — "works" means certain
+        // success, not certain relative to any case-level PoS adjustment.
+        success = computeCaseValuation({ ...theCase, programs: theCase.programs.map(p => ({ ...p, posOverridePct: "100" })) }, SCENARIO_PRESETS.base, "base", drBase, tvParams).equity.perShare;
+        floor = computeFailureFloor(theCase);
+      } catch (e) { return null; }
+      const price = theCase.currentPrice !== "" && theCase.currentPrice != null && Number(theCase.currentPrice) > 0 ? Number(theCase.currentPrice) : null;
+      const by = k => scenarioResults.find(s => s.key === k).result.equity.perShare;
+      const one = theCase.programs.length === 1 && impliedSolved && impliedSolved.ok && !impliedSolved.degenerate;
+      const marks = [
+        floor && { value: floor.perShare, name: "If it fails", text: "≈" + fmtShare(floor.perShare), color: "var(--red)", row: "above" },
+        price != null && { value: price, name: "Today", text: fmtShare(price), color: "var(--warn)", row: "above" },
+        success != null && { value: success, name: "If it works", text: fmtShare(success) + (theCase.programs.length === 1 ? " at Base share" : ""), color: "var(--green)", row: "above" },
+        { value: by("bear"), name: "Bear", text: fmtShare(by("bear")), color: "var(--red)", row: "below" },
+        { value: by("base"), name: "Base", text: fmtShare(by("base")), color: "var(--slate)", row: "below" },
+        { value: by("bull"), name: "Bull", text: fmtShare(by("bull")), color: "var(--green)", row: "below" }
+      ].filter(Boolean);
+      return h(ExportSection, { title: "The whole range, on one line", style: { marginBottom: 16 } },
+        h("div", { style: { fontSize: 13, fontFamily: "var(--display)", fontWeight: 600, color: "var(--ink-1)", marginBottom: 4 } }, "The whole range, on one line"),
+        h("div", { className: "prose", style: { ...UI.caption, marginBottom: 6 } }, (floor ? "From what is left if the next readout fails" : "From your Bear case") + " to what it is worth if it works, with your scenarios and today's price in between. The shaded stretch is Bear to Bull."),
+        h(ExportableBlock, { title: (theCase.name || "Case") + " — range of outcomes per share" },
+          h(OutcomeRangeStrip, { marks, band: [Math.min(by("bear"), by("bull")), Math.max(by("bear"), by("bull"))], label: "Range of outcomes per share: failure, scenarios, today's price and success" })),
+        floor && h(Explain, readOutcomeRange(floor.perShare, success, price, one ? impliedSolved.impliedAbsolutePct : null)),
+        floor && h("div", { className: "prose", style: { ...UI.caption, marginTop: 8 } },
+          "If it fails: net cash " + fmtMoney(floor.netCash) + " − " + floor.stageLabel + " cost to the readout " + fmtMoney(floor.trialCost) + " (the company's share) − G&A to the readout " + fmtMoney(floor.gaToReadout) +
+          " − " + floor.windDownYears + " year" + (floor.windDownYears === 1 ? "" : "s") + " of wind-down G&A " + fmtMoney(floor.windDown) + " = " + fmtMoney(floor.equity) + ", ÷ " + fmtNum(Math.round(floor.shares)) + " shares at that price" +
+          (floor.cashShort ? " — cash runs out first, so without new money the equity is worth about nothing" : "") +
+          ". Before any new raise and not discounted; anything the platform or other assets might fetch is left out. The wind-down is set under Assumptions → Corporate G&A."),
+        !floor && theCase.programs.length > 1 && h("div", { style: { ...UI.caption, marginTop: 8 } }, "No failure floor with more than one program — one failure leaves the others' value standing, which needs more than this arithmetic.")
+      );
+    })()),
+
     // Valuation method toggle — DCF is the full bottoms-up build everything
     // else on this panel assumes; Simple Multiple is the RxNPV-style
     // shortcut (peak revenue x a comp multiple, still PoS-risked and time-

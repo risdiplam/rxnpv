@@ -111,6 +111,19 @@ function stub(obj) {
   ok("sample projection: running total = explicit NPV", Math.abs(pr[pr.length - 1].runningPV - rBase.npvResult.explicitNPV) < 1);
   // Launch year 1 (sample), five-year ramp, LOE 12 years after launch -> index 13.
   ok("sample projection: phases follow launch year, ramp and LOE", pr[0].phase === "Before launch" && pr[1].isLaunch && pr[1].phase === "Launch ramp" && pr[6].phase === "Peak years" && pr[13].isLOE && pr[13].phase === "After LOE");
+  // Failure floor: cash less what the readout and a wind-down cost, over the
+  // shares that exist at that price. Stoke: $420M cash, no debt, G&A $95M/yr.
+  // Options strike $13.84 are out of the money at ~$1.40, so shares = basic
+  // 68,229,972 + 2,157,698 zero-strike RSUs = 70,387,670.
+  const fl = w.computeFailureFloor(sc);
+  ok(fl && Math.abs(fl.equity - (420e6 - fl.trialCost - fl.gaToReadout - fl.windDown)) < 1, "floor: equity = cash − trial cost − G&A to readout − wind-down");
+  ok(fl && Math.abs(fl.gaToReadout - 95e6 * fl.readoutYears) < 1 && fl.windDown === 95e6 && fl.windDownYears === 1, "floor: G&A to readout at $95M/yr; one year of wind-down by default");
+  ok(fl && fl.shares === 70387670, "floor: shares at the floor price exclude out-of-the-money options (" + (fl && fl.shares) + ")");
+  ok(fl && Math.abs(fl.perShare - fl.equity / 70387670) < 1e-9 && fl.perShare > 1 && fl.perShare < 2, "floor: about $1.40 a share (" + (fl && fl.perShare.toFixed(2)) + ")");
+  const fl2 = w.computeFailureFloor(Object.assign({}, sc, { corporateGA: Object.assign({}, sc.corporateGA, { windDownYears: "2" }) }));
+  ok(Math.abs((fl.equity - fl2.equity) - 95e6) < 1, "floor: a second wind-down year costs exactly one more year of G&A");
+  ok(w.computeFailureFloor(Object.assign({}, sc, { programs: [sc.programs[0], sc.programs[0]] })) === null, "floor: none for more than one program");
+
   // ── In the app ──
   click(btn("+ New case")); await wait(300);
   const before = JSON.parse(w.localStorage.getItem("rxnpv_cases_v1") || "[]");
