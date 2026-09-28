@@ -21,7 +21,7 @@ const REPORT_SECTIONS = [
   { id: "summary",      label: "Valuation summary",        defaultOn: true,  group: "Core" },
   { id: "programs",     label: "Programs & assumptions",   defaultOn: true,  group: "Core" },
   { id: "revenueChart", label: "Revenue projection chart", defaultOn: true,  group: "Charts" },
-  { id: "cashFlow",     label: "Risk-adjusted cash flow",  defaultOn: true,  group: "Charts" },
+  { id: "cashFlow",     label: "Year by year",  defaultOn: true,  group: "Charts" },
   { id: "sotp",         label: "Sum-of-the-parts",         defaultOn: true,  group: "Core" },
   { id: "bridge",       label: "EV → per-share bridge",    defaultOn: true,  group: "Core" },
   { id: "priceVsValue", label: "Price vs. fair value",     defaultOn: true,  group: "Core" },
@@ -96,7 +96,6 @@ function ReportView({ theCase, onBack, updateCase }) {
     : { bg: "#FFFFFF", ink1: "#15181D", ink2: "#4D5663", ink3: "#5E6776", rule: "#DADEE4", teal: "#4353E0", onTeal: "#FFFFFF", amber: "#8A5B00", red: "#B8322B", surface2: "#F1F3F5" };
   usePrintBackground(rpt.bg);
   const revenueSeries = (baseResult && baseResult.calendar) ? [{ name: "Company revenue", color: rpt.teal, points: baseResult.calendar.map(c => ({ v: c.revenue, label: c.calendarYear })) }] : [];
-  const fcfSeries = (baseResult && baseResult.calendar) ? [{ name: "Risk-adjusted FCF", color: rpt.amber, points: baseResult.calendar.map(c => ({ v: c.riskAdjFCF, label: c.calendarYear })) }] : [];
 
   const doExport = async () => {
     if (!window.electronAPI || !window.electronAPI.exportPDF) { setExportMsg("PDF export requires the desktop app."); return; }
@@ -255,9 +254,11 @@ function ReportView({ theCase, onBack, updateCase }) {
         )),
 
         // Cash flow chart (DCF-only, same reason)
-        inc("cashFlow") && valMethod === "dcf" ? h("div", { style: cardStyle },
-          h("div", { style: { fontSize: 13, fontWeight: 700, marginBottom: 10, color: rpt.ink2 } }, "Risk-Adjusted Cash Flow (Base Case)"),
-          h(RevenueChart, { series: fcfSeries, height: 180, label: "Risk-adjusted free cash flow, base case, by year" })
+        inc("cashFlow") && valMethod === "dcf" && baseResult ? h("div", { style: cardStyle, className: reportDark ? "theme-scope-dark" : "theme-scope-light" },
+          h("div", { style: { fontSize: 13, fontWeight: 700, marginBottom: 4, color: rpt.ink2 } }, "Year by Year (Base Case)"),
+          h("div", { style: { fontSize: 11, color: rpt.ink3, marginBottom: 10 } }, "Odds-weighted cash flows by year; the pale top of each bar is the revenue added if success were certain. " + new Date().getFullYear() + " is the twelve months from the report date."),
+          h(ProjectionChart, { rows: computeProjectionRows(baseResult, theCase), startYear: new Date().getFullYear(), height: 260, label: "Year-by-year odds-weighted cash flows and running present value, base case" }),
+          h(ProjectionTable, { rows: computeProjectionRows(baseResult, theCase), startYear: new Date().getFullYear(), npv: baseResult.npvResult, compact: true })
         ) : null,
 
         // Sum-of-the-Parts — multi-program, DCF-mode only, same rule as the

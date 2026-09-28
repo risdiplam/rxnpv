@@ -91,9 +91,6 @@ function useValuationSections({ theCase, onChange, goToTab }) {
   } catch (e) { error = e.message; }
 
   const baseResult = scenarioResults && scenarioResults.find(s => s.key === "base").result;
-  const cfSeries = (baseResult && baseResult.calendar) ? [
-    { name: "Risk-adjusted FCF", color: "var(--teal)", points: baseResult.calendar.map(c => ({ v: c.riskAdjFCF, label: c.calendarYear })) }
-  ] : [];
 
   // Hoisted out of the detailed "What this case's price implies" box further
   // down so the prominent summary card at the top of this panel can use the
@@ -581,13 +578,7 @@ function useValuationSections({ theCase, onChange, goToTab }) {
               fmtShare(s.result.equity.perShare))
           ))
         )),
-        show("overview") && (h(ExportSection, { title: "Base-case risk-adjusted cash flow by year", reportSection: "cashFlow", style: { marginTop: 16 } },
-          h("div", { style: { fontSize: 12, fontFamily: "var(--mono)", color: "var(--ink-2)", marginBottom: 6 } }, "Base-case risk-adjusted cash flow by year"),
-          h(ExportableBlock, { title: (theCase.name || "Case") + " — base-case risk-adjusted cash flow" },
-            h(RevenueChart, { series: cfSeries, showLegend: false, height: 180 })),
-          h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginTop: 4 } }, "Each year's free cash flow weighted by the odds of reaching it. Years below the solid zero line are burn; hover for any year's value."),
-          cfSeries.length > 0 && h(Explain, readCashFlow(cfSeries[0].points))
-        )),
+        show("overview") && (valMethod === "dcf" && baseResult && h(ProjectionsCard, { theCase, result: baseResult })),
 
         // Implied PoS — the reverse direction from everything else on this
         // panel: solve backwards from the current price to find what PoS the
@@ -787,4 +778,103 @@ function useValuationSections({ theCase, onChange, goToTab }) {
   );
   };
   return { overview: renderPart("overview"), inputs: renderPart("inputs"), scenarios: renderPart("scenarios"), evidence: renderPart("evidence"), flagCount: flags.length };
+}
+
+// ── Projections: the base case year by year ────────────────────────────────
+// Replaced a single line of risk-adjusted cash flow. The chart shows what each
+// year is made of; the table gives every number behind it, ending at the
+// explicit NPV the headline uses (computeProjectionRows reads the engine's own
+// per-year present values, so the two cannot disagree). Year labels count from
+// today, the same way "Launch in year" does: this year is the next twelve months.
+const PROJECTION_VIEW_KEY = "rxnpv_proj_view";
+const PROJECTION_TABLE_ROWS = 16;
+function projectionsCsv(rows, startYear, npvResult) {
+  const cols = ["Year", "Phase", "Revenue if it works", "Revenue x odds", "R&D", "COGS + sales & marketing", "Corporate G&A", "Cash tax", "Cash flow", "Discount factor", "Present value", "Running total"];
+  const m = v => (v / 1e6).toFixed(2);
+  const lines = [cols.join(",")].concat(rows.map(r => [startYear + r.index, r.phase || "", m(r.revenueIfWorks), m(r.revenue), m(-r.rnd), m(-r.commercialCosts), m(-r.ga), m(-r.tax), m(r.fcf), r.discountFactor.toFixed(4), m(r.pv), m(r.runningPV)].map(x => /[,"]/.test(String(x)) ? '"' + String(x).replace(/"/g, '""') + '"' : x).join(",")));
+  if (npvResult.terminalValuePV) lines.push(["Terminal value (present value)", "", "", "", "", "", "", "", "", "", m(npvResult.terminalValuePV), m(npvResult.npv)].join(","));
+  lines.push("");
+  lines.push("Dollar amounts in $M. Odds-weighted except 'Revenue if it works'. Year 0 is the twelve months from today.");
+  return lines.join("\n");
+}
+function ProjectionsCard({ theCase, result }) {
+  const h = React.createElement;
+  const [view, setView] = React.useState(() => { try { return localStorage.getItem(PROJECTION_VIEW_KEY) || "both"; } catch (e) { return "both"; } });
+  const [showAll, setShowAll] = React.useState(false);
+  const [csvMsg, setCsvMsg] = React.useState(null);
+  const pickView = v => { setView(v); try { localStorage.setItem(PROJECTION_VIEW_KEY, v); } catch (e) {} };
+  const rows = computeProjectionRows(result, theCase);
+  if (!rows.length) return null;
+  const startYear = new Date().getFullYear();
+  const npv = result.npvResult;
+  const shown = showAll ? rows : rows.slice(0, PROJECTION_TABLE_ROWS);
+  const isDesktop = typeof window !== "undefined" && window.electronAPI && window.electronAPI.isDesktop;
+  const saveCsv = async () => {
+    const slug = (theCase.ticker || theCase.name || "case").replace(/[^A-Za-z0-9]+/g, "-").replace(/^-|-$/g, "") || "case";
+    try {
+      const r = await window.electronAPI.saveAsset({ data: projectionsCsv(rows, startYear, npv), suggestedName: slug + "-projections.csv", filterName: "CSV", extensions: ["csv"] });
+      setCsvMsg(r && r.ok ? "Saved." : r && r.canceled ? null : "Could not save: " + ((r && r.error) || "unknown error"));
+    } catch (e) { setCsvMsg("Could not save: " + e.message); }
+  };
+  const title = "Year by year — where the value comes from";
+  return h(ExportSection, { title, reportSection: "cashFlow", style: { marginTop: 16 } },
+    h("div", { className: "proj-head" },
+      h("div", null,
+        h("div", { style: { fontSize: 13, fontFamily: "var(--display)", fontWeight: 600, color: "var(--ink-1)", marginBottom: 4 } }, title),
+        h("div", { className: "prose", style: UI.caption }, "Base case. Bars are each year's odds-weighted cash flows; the pale top is the revenue you would add if success were certain. The line is the running total of present value. " + startYear + " is the next twelve months, counted the same way as “Launch in year”.")),
+      h("div", { className: "proj-toggle", role: "group", "aria-label": "Projection view", "data-no-export": "" },
+        [["both", "Chart + table"], ["chart", "Chart"], ["table", "Table"]].map(([k, l]) => h("button", { key: k, type: "button", "aria-pressed": view === k, className: view === k ? "on" : "", onClick: () => pickView(k) }, l)))),
+    view !== "table" && h(ExportableBlock, { title: (theCase.name || "Case") + " — year-by-year cash flows (Base case)" },
+      h(ProjectionChart, { rows, startYear, height: 300, label: "Year-by-year odds-weighted cash flows and running present value, base case" })),
+    view !== "chart" && h(ProjectionTable, { rows: shown, allCount: rows.length, startYear, npv,
+      footer: h(React.Fragment, null,
+        rows.length > PROJECTION_TABLE_ROWS && h("button", { type: "button", className: "link-btn", "data-no-export": "", onClick: () => setShowAll(!showAll) },
+          showAll ? "Show the first " + PROJECTION_TABLE_ROWS + " years" : "Show all " + rows.length + " years (to " + (startYear + rows[rows.length - 1].index) + ")"),
+        isDesktop && h("button", { type: "button", className: "link-btn", "data-no-export": "", onClick: saveCsv, style: { marginLeft: 14 } }, "Save as CSV…"),
+        csvMsg && h("span", { role: "status", style: { marginLeft: 10, color: "var(--ink-3)" } }, csvMsg)) }),
+    h(Explain, readCashFlow(rows.map(r => ({ v: r.fcf, label: String(startYear + r.index) }))))
+  );
+}
+
+// The year table on its own, shared by the Overview card and the report.
+// rows: the rows to show (possibly a first slice); footer: controls for the
+// left of the total line (the report passes none).
+function ProjectionTable({ rows, startYear, npv, footer, compact }) {
+  const h = React.createElement;
+  const hasPhase = rows.some(r => r.phase);
+  const m = v => v === 0 ? "—" : fmtMoney(v, Math.abs(v) >= 1e9 ? 2 : 0);
+  const neg = v => v > 0 ? m(-v) : "—";
+  // compact (the report's 800px page): R&D, COGS + S&M and G&A fold into one
+  // "Costs" column and the discount factor is left out, so all of it prints.
+  const cols = compact
+    ? [["Year", "l"], hasPhase && ["Phase", "l"], ["If it works"], ["× odds"], ["Costs"], ["Tax"], ["Cash flow"], ["Present value"], ["Running total"]]
+    : [["Year", "l"], hasPhase && ["Phase", "l"], ["Revenue if it works"], ["Revenue × odds"], ["R&D"], ["COGS + S&M"], ["G&A"], ["Tax"], ["Cash flow"], ["Discount"], ["Present value"], ["Running total"]];
+  const shownCols = cols.filter(Boolean);
+  const span = shownCols.length - 2;
+  const cell = (v, cls) => h("td", { className: cls || "" }, v);
+  return h("div", { className: "proj-table-wrap" },
+    h("table", { className: "proj-table" + (compact ? " compact" : "") },
+      h("thead", null, h("tr", null, shownCols.map((c, i) => h("th", { key: i, scope: "col", className: c[1] || "" }, c[0])))),
+      h("tbody", null, rows.map(r => {
+        const costs = r.rnd + r.commercialCosts + r.ga;
+        return h("tr", { key: r.index, className: r.isLaunch ? "launch" : r.isLOE ? "loe" : "" },
+          cell(String(startYear + r.index), "l"),
+          hasPhase && cell(r.phase, "l phase"),
+          cell(m(r.revenueIfWorks)),
+          cell(m(r.revenue)),
+          compact ? cell(neg(costs), costs > 0 ? "neg" : "") : [
+            h("td", { key: "rd", className: r.rnd > 0 ? "neg" : "" }, neg(r.rnd)),
+            h("td", { key: "cm", className: r.commercialCosts > 0 ? "neg" : "" }, neg(r.commercialCosts)),
+            h("td", { key: "ga", className: r.ga > 0 ? "neg" : "" }, neg(r.ga))],
+          cell(neg(r.tax), r.tax > 0 ? "neg" : ""),
+          cell(m(r.fcf), r.fcf < 0 ? "neg" : ""),
+          !compact && cell(r.discountFactor.toFixed(3)),
+          cell(m(r.pv), r.pv < 0 ? "neg" : ""),
+          cell(m(r.runningPV), "strong" + (r.runningPV < 0 ? " neg" : "")));
+      })),
+      h("tfoot", null,
+        npv.terminalValuePV > 0 && h("tr", null, h("td", { className: "l", colSpan: span }, "Terminal value, present value"), h("td", null, m(npv.terminalValuePV)), h("td", null, "")),
+        h("tr", null,
+          h("td", { className: "l", colSpan: span }, footer || null),
+          h("td", { colSpan: 2 }, "Enterprise value " + fmtMoney(npv.npv))))));
 }

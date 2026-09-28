@@ -167,6 +167,103 @@ function RevenueChart({ series, height, showLegend, xPrefix, xAxisPrefix, label 
 }
 
 // ════════════════════════════════════════════════════════════════════════════
+// Year-by-year projection chart — each year's odds-weighted cash flows as a
+// stacked bar (revenue up, the costs that eat it down), the revenue the odds
+// are taking away as a pale cap, and the running present value as a line.
+// rows come from computeProjectionRows; startYear labels index 0.
+// ════════════════════════════════════════════════════════════════════════════
+const PROJECTION_PARTS = [
+  { key: "revenue", label: "Revenue, odds-weighted", color: "var(--teal)" },
+  { key: "atRisk", label: "Revenue at risk", color: "var(--teal)", opacity: 0.22 },
+  { key: "commercialCosts", label: "COGS, sales & marketing", color: "var(--amber)", opacity: 0.8 },
+  { key: "rnd", label: "R&D", color: "var(--red)", opacity: 0.8 },
+  { key: "ga", label: "Corporate G&A", color: "var(--ink-3)", opacity: 0.8 },
+  { key: "tax", label: "Cash tax", color: "var(--warn)", opacity: 0.8 }
+];
+function ProjectionChart({ rows, startYear, height, label }) {
+  const h = React.createElement;
+  height = height || 300;
+  const wrapRef = React.useRef(null);
+  const svgRef = React.useRef(null);
+  const measured = useMeasuredWidth(wrapRef, 900);
+  const [hoverIdx, setHoverIdx] = React.useState(null);
+  if (!rows || !rows.length) return h("div", { ref: wrapRef, style: { height, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--ink-3)", fontSize: 12, fontFamily: "var(--mono)" } }, "No projection yet — fill in the revenue build to see one.");
+
+  const costOf = r => r.commercialCosts + r.rnd + r.ga + r.tax;
+  const top = Math.max(...rows.map(r => Math.max(r.revenueIfWorks, r.revenue, r.runningPV)), 1);
+  const bottom = Math.min(0, ...rows.map(r => Math.min(-costOf(r), r.runningPV)));
+  const axis = niceAxisTicks(bottom, top, 5);
+  // The right margin holds the running total's end label, so it never sits
+  // on a bar; the top margin keeps the tallest bar off the card edge.
+  const W = Math.max(360, measured), H = height, padL = 58, padR = 92, padT = 10, padB = 24;
+  const plotW = W - padL - padR, plotH = H - padT - padB;
+  const y = v => padT + (axis.hi - v) / ((axis.hi - axis.lo) || 1) * plotH;
+  const bw = plotW / rows.length;
+  const barX = i => padL + i * bw + bw * 0.18, barW = bw * 0.64;
+  const cx = i => padL + i * bw + bw / 2;
+  const fmtAxis = v => {
+    const a = Math.abs(v);
+    const s = a === 0 ? "$0" : a >= 1e9 ? "$" + (a / 1e9).toFixed(axis.step < 1e8 ? 2 : 1).replace(/\.?0+$/, "") + "B" : "$" + (a / 1e6).toFixed(0) + "M";
+    return (v < 0 ? "-" : "") + s;
+  };
+  const labelEvery = bw >= 38 ? 1 : bw >= 19 ? 2 : Math.ceil(34 / bw);
+  const line = rows.map((r, i) => (i ? "L" : "M") + cx(i).toFixed(1) + "," + y(r.runningPV).toFixed(1)).join("");
+  const last = rows[rows.length - 1];
+  const handleMove = e => {
+    if (!svgRef.current) return;
+    const rect = svgRef.current.getBoundingClientRect();
+    const i = Math.floor(((e.clientX - rect.left) / rect.width * W - padL) / bw);
+    setHoverIdx(i >= 0 && i < rows.length ? i : null);
+  };
+  const hr = hoverIdx != null ? rows[hoverIdx] : null;
+  const tipRight = hoverIdx != null && cx(hoverIdx) > padL + plotW * 0.6;
+
+  return h("div", { ref: wrapRef, style: { position: "relative" } },
+    h("div", { className: "proj-legend" },
+      PROJECTION_PARTS.map(p => h("span", { key: p.key }, h("i", { style: { background: p.color, opacity: p.opacity || 1 } }), p.label)),
+      h("span", null, h("i", { className: "proj-legend-line" }), "Running present value"),
+      rows.some(r => r.isLaunch) && h("span", null, h("i", { className: "proj-legend-band launch" }), "Launch year"),
+      rows.some(r => r.isLOE) && h("span", null, h("i", { className: "proj-legend-band loe" }), "Loss of exclusivity")),
+    h("svg", { ref: svgRef, viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": label || "Year-by-year cash flows", "data-titled": "1", style: { width: "100%", height, display: "block" },
+        onMouseMove: handleMove, onMouseLeave: () => setHoverIdx(null) },
+      rows.map((r, i) => (r.isLaunch || r.isLOE) && h("rect", { key: "band" + i, x: padL + i * bw + 1, y: padT, width: bw - 2, height: plotH, rx: 4,
+        fill: r.isLaunch ? "var(--teal)" : "var(--warn)", opacity: 0.07 })),
+      axis.ticks.map((v, i) => h("g", { key: "t" + i },
+        h("line", { x1: padL, x2: W - padR, y1: y(v), y2: y(v), stroke: v === 0 ? "var(--ink-3)" : "var(--rule)", strokeWidth: v === 0 ? 1.25 : 1, strokeDasharray: v === 0 ? "none" : "3,3" }),
+        h("text", { x: padL - 8, y: y(v) + 3.5, textAnchor: "end", fontSize: 10, fontFamily: "var(--mono)", fill: "var(--ink-3)" }, fmtAxis(v)))),
+      hoverIdx != null && h("rect", { x: padL + hoverIdx * bw, y: padT, width: bw, height: plotH, fill: "var(--ink-3)", opacity: 0.08 }),
+      rows.map((r, i) => {
+        const parts = [];
+        const atRisk = Math.max(0, r.revenueIfWorks - r.revenue);
+        if (r.revenue > 0) parts.push(h("rect", { key: "rv", x: barX(i), y: y(r.revenue), width: barW, height: y(0) - y(r.revenue), fill: "var(--teal)" }));
+        if (atRisk > 0) parts.push(h("rect", { key: "ar", x: barX(i), y: y(r.revenue + atRisk), width: barW, height: y(r.revenue) - y(r.revenue + atRisk), fill: "var(--teal)", opacity: 0.22 }));
+        let base = 0;
+        PROJECTION_PARTS.slice(2).forEach(p => {
+          const v = r[p.key];
+          if (v > 0) { parts.push(h("rect", { key: p.key, x: barX(i), y: y(-base), width: barW, height: y(-base - v) - y(-base), fill: p.color, opacity: p.opacity })); base += v; }
+        });
+        return h("g", { key: "b" + i }, parts,
+          i % labelEvery === 0 && h("text", { x: cx(i), y: H - 6, textAnchor: "middle", fontSize: 10, fontFamily: "var(--mono)", fill: "var(--ink-3)" }, String(startYear + r.index)));
+      }),
+      h("path", { d: line, fill: "none", stroke: "var(--surface)", strokeWidth: 6, strokeLinejoin: "round" }),
+      h("path", { d: line, fill: "none", stroke: "var(--amber)", strokeWidth: 2.5, strokeLinejoin: "round" }),
+      h("circle", { cx: cx(rows.length - 1), cy: y(last.runningPV), r: 4, fill: "var(--amber)" }),
+      h("text", { x: cx(rows.length - 1) + 12, y: y(last.runningPV) - 1, fontSize: 12, fontWeight: 700, fontFamily: "var(--mono)", fill: "var(--amber)" }, fmtMoney(last.runningPV)),
+      h("text", { x: cx(rows.length - 1) + 12, y: y(last.runningPV) + 13, fontSize: 10, fontFamily: "var(--mono)", fill: "var(--ink-3)" }, "by " + (startYear + last.index))
+    ),
+    hr && h("div", { className: "proj-tip", style: {
+        top: padT + 4, left: tipRight ? "auto" : (cx(hoverIdx) / W * 100) + "%", right: tipRight ? ((W - cx(hoverIdx)) / W * 100) + "%" : "auto",
+        transform: tipRight ? "translate(-10px, 0)" : "translate(10px, 0)" } },
+      h("div", { style: { color: "var(--ink-1)", fontWeight: 700, marginBottom: 3 } }, String(startYear + hr.index) + (hr.phase ? " · " + hr.phase : "")),
+      h("div", null, "Revenue × odds: " + fmtMoney(hr.revenue)),
+      hr.revenueIfWorks > hr.revenue && h("div", null, "If it works: " + fmtMoney(hr.revenueIfWorks)),
+      h("div", null, "Costs: " + fmtMoney(-costOf(hr))),
+      h("div", { style: { color: "var(--ink-1)" } }, "Cash flow: " + fmtMoney(hr.fcf)),
+      h("div", { style: { color: "var(--amber)" } }, "Running PV: " + fmtMoney(hr.runningPV)))
+  );
+}
+
+// ════════════════════════════════════════════════════════════════════════════
 // Scatter chart — for comp positioning (e.g. deal value vs. premium), with an
 // optional single "your case" point rendered distinctly so you can see where
 // your own assumption sits among real comps.

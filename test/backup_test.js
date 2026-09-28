@@ -103,6 +103,14 @@ function stub(obj) {
   const imp = w.solveImpliedPoSMultiplier(sc, Number(sc.discountRatePct), sc.terminalValue);
   ok(Math.round(imp.impliedAbsolutePct) === sc.programs[0].calibrationLog[0].marketImpliedPoS, "sample: calibration's market-implied PoS matches the reverse-solve (" + imp.impliedAbsolutePct.toFixed(1) + ")");
 
+  // The sample case: every row's parts sum to its cash flow, and the running
+  // total ends exactly at the engine's explicit NPV.
+  const rBase = w.computeCaseValuation(sc, w.getEffectiveScenarioPreset(sc, "base"), "base", 12, sc.terminalValue);
+  const pr = w.computeProjectionRows(rBase, sc);
+  ok("sample projection: each row's revenue - costs - tax = its cash flow", pr.every(x => Math.abs(x.revenue - x.commercialCosts - x.rnd - x.ga - x.tax - x.fcf) < 1));
+  ok("sample projection: running total = explicit NPV", Math.abs(pr[pr.length - 1].runningPV - rBase.npvResult.explicitNPV) < 1);
+  // Launch year 1 (sample), five-year ramp, LOE 12 years after launch -> index 13.
+  ok("sample projection: phases follow launch year, ramp and LOE", pr[0].phase === "Before launch" && pr[1].isLaunch && pr[1].phase === "Launch ramp" && pr[6].phase === "Peak years" && pr[13].isLOE && pr[13].phase === "After LOE");
   // ── In the app ──
   click(btn("+ New case")); await wait(300);
   const before = JSON.parse(w.localStorage.getItem("rxnpv_cases_v1") || "[]");

@@ -248,7 +248,10 @@ function App() {
       // Main content — keyed on activeCaseId (not just view) so switching to
       // a different, working case resets a tripped boundary immediately,
       // not just switching views.
-      h("div", { style: { flex: 1, padding: "24px 28px 60px", maxWidth: "var(--app-max-width)", margin: "0 auto", width: "100%" } },
+      // minWidth 0: a flex item otherwise grows to its widest content's
+      // min-content width — and a wide table inside a scroll box still counts,
+      // so the year-by-year table pushed the whole page sideways at 900px.
+      h("div", { style: { flex: 1, minWidth: 0, padding: "24px 28px 60px", maxWidth: "var(--app-max-width)", margin: "0 auto", width: "100%" } },
         h(ErrorBoundary, { key: activeCaseId },
           activeCase
             ? h(React.Fragment, null,

@@ -810,3 +810,11 @@ Math checks 1,130; export_test 31.
 - **Judgment changes, written up in the Evidence Log:** Biogen's assumed $100M milestones now gate on approval rather than filing; Bull is 130% share / 120% odds (78%) / −1pt, with an entry explaining it and noting that Bull is still probability-weighted (the approved-drug value is ~$43 at Base share, ~$59 at Bull share).
 
 Result: Bear $13.78 / Base $29.05 / Bull $46.84 (was $12.00 / $25.73 / $38.79); the price implies 55% odds against the case's 65%. `backup_test.js` now holds the snapshot entry's quoted Bear/Base/Bull and the calibration's implied PoS to the engine, requires a whole-number launch year, and checks the rounding note.
+
+## Phase 39 — Building the approved mockups: year by year
+
+✅ From the user, on the mockups: "yes, these look good. start building."
+
+**Projections card** (Overview, replacing the one-line cash-flow chart; the report's "Year by year" section too). Stacked bars per year — odds-weighted revenue up, COGS/sales/marketing, R&D, G&A and cash tax down — with the revenue the odds take away drawn as a pale cap, the running present value as a line ending in its own margin label, and the launch and loss-of-exclusivity years banded. A hover readout gives each year's figures. The table beneath has every number behind the bars, a phase column for single-program cases, the first 16 years with "Show all", CSV export on the desktop, and a Chart / Table / both toggle that is remembered (and backed up). The rows come straight from the valuation's own per-year present values, so the running total ends at the enterprise value to the dollar (checked by hand-worked rows in `math_verification.js`, the sample case's reconciliation in `backup_test.js`, and the UI in `audit_regressions_test.js`).
+
+Found while checking it at 900px: the table widened the whole page, because the main column was a flex item without `min-width: 0`. And the report's narrower page cut off three columns, so the report uses a compact version (costs folded into one column, no discount factor).

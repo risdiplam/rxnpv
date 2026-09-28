@@ -303,6 +303,72 @@ function computeEquityBridgeSteps(theCase, result) {
   return steps;
 }
 
+// ── Year-by-year projection rows for the Overview's Projections card ──────
+// One row per discounted year of a DCF result, built only from numbers the
+// valuation already produced: the calendar's odds-weighted lines, and the
+// engine's own per-year present values (npvResult.pvByYear), so the running
+// total ends exactly at the explicit NPV and nothing here is a second
+// derivation that could drift from the headline. The one added figure is
+// revenue "if it works" — each program's unweighted revenue on the same
+// calendar — so the chart can show what the odds are taking away.
+// Rows stop where the NPV stops (an exit multiple truncates at peak).
+// Phase labels need a single program: with several, a year is several
+// phases at once, so `phase` is null.
+function computeProjectionRows(result, theCase) {
+  if (!result || !result.calendar || !result.npvResult || !result.npvResult.pvByYear) return [];
+  const r = (result.discountRateUsed || 0) / 100;
+  const pvs = result.programVals || [];
+  const program = pvs.length === 1 && theCase && theCase.programs && theCase.programs.find(p => p.id === pvs[0].id);
+  let phaseOf = null;
+  if (program) {
+    // The same inputs the revenue engine reads: the launch curve's length is
+    // the ramp, and erosion starts in the first program year past yearsToLOE
+    // (erosionMultiplier), so the labels cannot disagree with the numbers.
+    const L = pvs[0].launchYearOffset || 0;
+    const rb = getRevenueBuild(program);
+    const quick = (program.revenueMode || "quick") === "quick";
+    const q = program.quickRevenue || {};
+    const rampLen = quick ? launchCurveForYears(q.yearsToPeak || 6, q.profile || "median").length
+      : launchCurveForYears(rb.launchCurve.yearsToPeak, rb.launchCurve.profile).length;
+    const loeK = Math.floor(resolveErosionParams(rb.exclusivity).yearsToLOE);
+    phaseOf = i => {
+      const k = i - L;
+      if (k < 0) return "Before launch";
+      if (k >= loeK) return "After LOE";
+      return k < rampLen ? "Launch ramp" : "Peak years";
+    };
+    phaseOf.launchIndex = L;
+    phaseOf.loeIndex = L + loeK;
+  }
+  let running = 0;
+  return result.npvResult.pvByYear.map((pv, i) => {
+    const c = result.calendar[i] || {};
+    const revenue = c.revenue || 0;
+    const unrisked = pvs.reduce((s, p) => {
+      const row = p.pnl && p.pnl[i - (p.launchYearOffset || 0)];
+      return s + (row ? row.revenue : 0);
+    }, 0);
+    const commercial = revenue - (c.riskAdjProductContribution || 0);
+    running += pv;
+    return {
+      index: i,
+      phase: phaseOf ? phaseOf(i) : null,
+      isLaunch: !!phaseOf && i === phaseOf.launchIndex,
+      isLOE: !!phaseOf && i === phaseOf.loeIndex,
+      revenueIfWorks: unrisked,
+      revenue,
+      commercialCosts: commercial,
+      rnd: c.riskAdjRnDCost || 0,
+      ga: c.corporateGA || 0,
+      tax: c.tax || 0,
+      fcf: c.riskAdjFCF || 0,
+      discountFactor: 1 / Math.pow(1 + r, i + 1),
+      pv,
+      runningPV: running
+    };
+  });
+}
+
 // ── Partnership economics — upfront and milestones, as a cash figure to add
 // on top of a computed equity value. Upfront is added directly (near-certain /
 // already-contracted, so not PoS-risked and not discounted — same treatment as

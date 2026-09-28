@@ -64,7 +64,7 @@ const EXPORTS = [
   "ciToSE", "computeFixedEffectMetaAnalysis", "computeHeterogeneity", "computeRandomEffectsMetaAnalysis",
   "POS_MODIFIERS", "POS_REGULATORY", "POS_REGULATORY_MODIFIERS",
   "SCENARIO_PRESETS", "getEffectiveScenarioPreset", "applyBasePosAdjustment",
-  "computeProgramValuation", "computeCaseValuation", "baseCaseFairValue", "computeSensitivityDrivers", "computeProgramRiskWaterfall",
+  "computeProgramValuation", "computeCaseValuation", "baseCaseFairValue", "computeProjectionRows", "computeSensitivityDrivers", "computeProgramRiskWaterfall",
   "computeEffectivePoS", "computeRnDToLaunch", "resolveLaunchYearOffset",
   "computeFullCaseMonteCarlo", "solveImpliedPoSMultiplier", "computeEquityBridgeSteps", "computeRedFlags",
   "computePortfolioSummary", "shrinkBinaryResponseRate", "shrinkHazardRatio",
@@ -4166,6 +4166,27 @@ section("Plain-English readings: each sentence matches the numbers under it");
   r = api.readForwardRunway(14.4, [50, 10, -40, -20].map((b, i) => ({ year: i, balanceEnd: b * 1e6 })));
   ok("runway 14.4 mo -> about 14 months; needs $40.0M at year 2", r.verdict === "Cash runs out in about 14 months." && r.text.includes("in year 2, it needs about $40.0M"));
   ok("never negative -> never runs out", api.readForwardRunway(null, [{ year: 0, balanceEnd: 5e6 }, { year: 1, balanceEnd: 3e6 }]).verdict === "The plan never runs out of cash.");
+}
+section("Year-by-year projection rows");
+{
+  // Two years at 10%. Year 0: $100 R&D + $20 G&A, no revenue -> FCF -120,
+  // PV -120/1.1 = -109.0909. Year 1: launch (offset 1), $100 revenue if it
+  // works at 50% odds -> $50 weighted; contribution $40, so COGS+S&M = 10;
+  // G&A 20, tax 0 -> FCF 50 - 10 - 20 = 20, PV 20/1.21 = 16.5289.
+  // Running total -109.0909 + 16.5289 = -92.5620. Discount factor 1/1.21 = 0.8264.
+  const res = { discountRateUsed: 10,
+    calendar: [{ revenue: 0, riskAdjProductContribution: 0, riskAdjRnDCost: 100, corporateGA: 20, riskAdjFCF: -120 },
+               { revenue: 50, riskAdjProductContribution: 40, riskAdjRnDCost: 0, corporateGA: 20, tax: 0, riskAdjFCF: 20 }],
+    npvResult: { pvByYear: [-120 / 1.1, 20 / 1.21] },
+    programVals: [{ id: "x", launchYearOffset: 1, pnl: [{ year: 1, revenue: 100 }] }] };
+  const rows = api.computeProjectionRows(res, null);
+  ok("projection: two rows, one per discounted year", rows.length === 2);
+  ok("projection: revenue if it works 0 then 100", rows[0].revenueIfWorks === 0 && rows[1].revenueIfWorks === 100);
+  ok("projection: COGS + S&M = revenue - contribution = 10", Math.abs(rows[1].commercialCosts - 10) < 1e-9);
+  ok("projection: discount factor 0.8264 in year 1", Math.abs(rows[1].discountFactor - 0.826446) < 1e-6);
+  ok("projection: running total -92.5620", Math.abs(rows[1].runningPV - -92.56198) < 1e-4);
+  ok("projection: no phase without a single matching program", rows[0].phase === null);
+
 }
 report();
 

@@ -222,6 +222,30 @@
   .side-link:hover { color: var(--ink-1); opacity: 1; }
   .side-dot { width: 7px; height: 7px; border-radius: 50%; flex: none; }
   /* ── Plain-English reading under a result ─────────────────────────── */
+  /* Projections card (Overview): legend, view toggle, hover readout, year table */
+  .proj-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; margin-bottom: 12px; flex-wrap: wrap; }
+  .proj-toggle { display: inline-flex; gap: 2px; padding: 2px; border-radius: 8px; background: var(--surface-2); flex: none; }
+  .proj-toggle button { min-height: 26px; padding: 4px 10px; border: 0; border-radius: 6px; background: transparent; color: var(--ink-2); font: 500 12px var(--sans); cursor: pointer; }
+  .proj-toggle button.on { background: var(--surface); color: var(--ink-1); box-shadow: 0 0 0 1px var(--rule); }
+  .proj-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 0 0 10px; font: 500 11.5px var(--sans); color: var(--ink-2); }
+  .proj-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+  .proj-legend i.proj-legend-line { height: 3px; border-radius: 2px; vertical-align: 2px; background: var(--amber); }
+  .proj-legend i.proj-legend-band.launch { background: var(--teal-bg); box-shadow: inset 0 0 0 1px var(--teal); }
+  .proj-legend i.proj-legend-band.loe { background: var(--warn-bg); box-shadow: inset 0 0 0 1px var(--warn); }
+  .proj-tip { position: absolute; background: var(--surface); border: 1px solid var(--rule); border-radius: 6px; padding: 6px 10px; font: 400 11px/1.55 var(--mono); color: var(--ink-2); pointer-events: none; white-space: nowrap; box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
+  .proj-table-wrap { overflow-x: auto; margin-top: 14px; }
+  .proj-table { width: 100%; font: 400 12px var(--mono); color: var(--ink-1); }
+  .proj-table th { font: 600 11px var(--sans); color: var(--ink-2); text-align: right; padding: 7px 8px; border-bottom: 1.5px solid var(--ink-2); white-space: nowrap; }
+  .proj-table td { text-align: right; padding: 5px 8px; border-bottom: 1px solid var(--rule); white-space: nowrap; }
+  .proj-table .l { text-align: left; }
+  .proj-table td.phase { color: var(--ink-2); font-family: var(--sans); }
+  .proj-table td.neg { color: var(--red); }
+  .proj-table td.strong { font-weight: 700; }
+  .proj-table tr.launch td { background: var(--teal-bg); }
+  .proj-table tr.loe td { background: var(--warn-bg); }
+  .proj-table.compact { font-size: 11px; }
+  .proj-table.compact th, .proj-table.compact td { padding-left: 6px; padding-right: 6px; }
+  .proj-table tfoot td { border-bottom: 0; border-top: 1.5px solid var(--ink-2); font-weight: 600; padding-top: 7px; }
   .explain { display: flex; gap: 9px; align-items: flex-start; margin-top: 12px; padding: 9px 12px; border-radius: 8px; background: var(--surface-2);
     font: 400 12.5px/1.55 var(--sans); color: var(--ink-2); max-width: var(--prose-width); }
   .explain.on-tint { background: var(--surface); }

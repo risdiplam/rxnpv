@@ -289,6 +289,26 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
     }
   }
 
+  // ── Projections card: table ends at the enterprise value; view toggle remembered ──
+  {
+    click([...d.querySelectorAll("button")].find(b => b.textContent.trim() === "Load sample case")); await wait(500);
+    click(d.getElementById("casetab-overview")); await wait(300);
+    const panel = d.getElementById("casepanel-overview");
+    const table = panel && panel.querySelector(".proj-table");
+    ok(!!table && table.querySelectorAll("tbody tr").length === 16, "Projections: the table shows the first 16 years");
+    ok(!!table && /Enterprise value \$1\.65B/.test(table.querySelector("tfoot").textContent), "Projections: the table ends at the Base enterprise value");
+    const lastRun = table && [...table.querySelectorAll("tbody tr")].pop().lastChild.textContent;
+    ok(!!panel.querySelector('svg[aria-label^="Year-by-year"]'), "Projections: the chart renders");
+    const showAll = [...panel.querySelectorAll("button")].find(b => /^Show all \d+ years/.test(b.textContent));
+    ok(!!showAll, "Projections: offers the remaining years");
+    if (showAll) { click(showAll); await wait(200); }
+    ok(table && table.querySelectorAll("tbody tr").length > 16, "Projections: Show all expands the table (" + lastRun + ")");
+    click([...panel.querySelectorAll(".proj-toggle button")].find(b => b.textContent === "Chart")); await wait(200);
+    ok(!panel.querySelector(".proj-table") && w.localStorage.getItem("rxnpv_proj_view") === "chart", "Projections: Chart hides the table and remembers");
+    click([...panel.querySelectorAll(".proj-toggle button")].find(b => b.textContent === "Chart + table")); await wait(200);
+    ok(!!panel.querySelector(".proj-table") && !!panel.querySelector('svg[aria-label^="Year-by-year"]'), "Projections: Chart + table shows both again");
+  }
+
   // ── Assumptions section list: states come from the data, links are live ──
   {
     const find = (groups, id) => { for (const g of groups) for (const i of g.items) if (i.id === id) return i; return null; };

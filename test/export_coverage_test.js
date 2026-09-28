@@ -73,7 +73,7 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
     const el = d.getElementById(id);
     ok(el && el.hasAttribute("data-export-section"), "Workspace: #" + id + " is an exportable section");
   }
-  for (const t of ["Scenario comparison", "Base-case risk-adjusted cash flow by year", "Full-case Monte Carlo", "Enterprise Value → Per-Share bridge (Base case)"]) {
+  for (const t of ["Scenario comparison", "Year by year — where the value comes from", "Full-case Monte Carlo", "Enterprise Value → Per-Share bridge (Base case)"]) {
     ok(!!d.querySelector('[data-export-section="' + t + '"]'), "Workspace: “" + t + "” is its own section");
   }
   ok((d.querySelector("[data-export-context]") || {}).getAttribute && d.querySelector("[data-export-context]").getAttribute("data-export-context") === "Workspace · Coverage Co",
