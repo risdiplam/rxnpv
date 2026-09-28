@@ -840,3 +840,23 @@ Batch 1 of the approved mockups is complete: year by year, Monte Carlo histogram
 **Compare Trials** (Tools → Trial, a nineteenth tool). Two to four registered trials side by side — design, patients, ages, primary endpoint, when it is measured, dates and each sponsor's posted primary result — from the same records the Trial Decoder reads. Checked live against EMPEROR, Fintepla's Study 1 and Epidiolex's GWPCARE1: it shades the sham control and the week-28 time point (against weeks 14), quotes the 62% reduction and the −23-point median difference as registered, and says they are different measures rather than ranking them. The first render shaded every row, because counts and free-text endpoints always differ; shading is now limited to design and timing, where a difference means something.
 
 All three batch-2 mockups are built.
+
+## Phase 41 — Full app audit (September 28, 2026)
+
+✅ From the user: "run a full blown full app audit looking for bugs (especially visual) and fix them."
+
+**What ran.** The automated UI audit over every view and tab (both themes, 1470 and 900px) — zero findings, zero console errors, and it now covers Compare Trials; the full export sweep (872 checks, 346 exports compared with the screen) — only the six known ink-score flags, each checked by eye before; a new edge-case probe loading the sample case seven ways (fresh empty case, Quick mode, Simple Multiple, two programs, an approved drug, no price, negative value) and scanning every tab for crashes, sideways scroll, console errors and "NaN / undefined / Infinity"; and a by-eye pass over the screenshots.
+
+**Found and fixed:**
+- An approved program's Probability of Success card printed "PoS to next stage undefined% · per-patient trial cost $undefinedK · trial duration undefinedyr". It now says no trial phase remains.
+- A fresh case with no share count drew the whole-range strip, the break-even curve and a bridge ending in "—/sh" and "÷ 0 diluted shares". Those need a share count and now wait for one; the bridge says where to add it.
+- An approved drug drew the case-at-a-glance (odds already 100%) and marked "If it works" on top of Base. Both are left out when there is nothing to show.
+- Break-even: when this case sits below the price, its label and the break-even label collided. The labels now take opposite empty corners of the rising curve.
+- Case names ending in "s" read "Edge two-programs's price implies" and "…'s report" across the app. A shared `possessive()` fixes every place a name takes an 's.
+- The M&A deal-value scatter was drawn at a fixed 560px, filling half its card. It now follows the card's width (the Portfolio diagonal chart stays square on purpose).
+- At 900px the three scenario cards wrapped two-and-one with Bull stretched across the row; they are now a grid.
+- Two programs with the same name showed as two identical rows in Sum-of-the-Parts (Overview and report); repeats are numbered.
+- Quick-mode programs showed "Peak patients on drug: 0"; the count only appears where patients are estimated.
+- Company revenue and P&L charts and their "Peak … in year 12" lines used year indexes while the new year-by-year chart used calendar years; all now use calendar years.
+- Compare Trials said "against weeks 14 and 14"; repeated weeks now read "week 14 for both the others".
+- The wind-down field stretched full width when it wrapped; it now matches the fields above it.

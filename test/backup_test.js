@@ -154,6 +154,11 @@ function stub(obj) {
   const rs2 = w.computeReadoutScenarios(Object.assign({}, sc, { readoutScenarios: { clearOfWinsPct: "50", modestPosPct: "70" } }), 12, sc.terminalValue);
   ok(rs2 && Math.abs(rs2.rows[0].prob - rs2.rows[1].prob) < 1e-12 && rs2.settings.modestPosPct === 70 && rs2.rows[1].value < rsx.rows[1].value, "readout: edits are honoured (50/50 split, lower modest odds lower its value)");
 
+  // Approved programs: the glance has no odds to draw, the tree has no gate,
+  // and the failure floor has nothing left to fail.
+  const appr = Object.assign({}, sc, { programs: [Object.assign({}, sc.programs[0], { currentPhase: "approved", launchYearOffset: "0", posOverridePct: "", rndOverride: { totalYears: "", totalCostM: "" } })] });
+  ok(w.computeOutcomeTree(appr, 12, sc.terminalValue) === null && w.computeFailureFloor(appr) === null, "approved: no outcome tree and no failure floor");
+
   // ── In the app ──
   click(btn("+ New case")); await wait(300);
   const before = JSON.parse(w.localStorage.getItem("rxnpv_cases_v1") || "[]");

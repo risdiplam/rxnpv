@@ -339,13 +339,16 @@ function compareTrials(entries) {
 function readTrialComparison(cmp) {
   if (!cmp || cmp.cols.length < 2) return null;
   const [first, ...others] = cmp.cols;
-  const who = first.drugs[0] ? first.drugs[0] + "'s trial" : first.nctId;
+  const who = first.drugs[0] ? possessive(first.drugs[0]) + " trial" : first.nctId;
   const bits = [];
   if (cmp.designDiff) {
     const parts = ["comp", "mask", "alloc"].filter(k => others.every(o => o.design[k] !== first.design[k]));
     bits.push(parts.map(k => first.design[k] + " (the " + (others.length === 1 ? "other" : "others") + ": " + others.map(o => o.design[k]).filter((v, i, a) => a.indexOf(v) === i).join(" / ") + ")").join(" and "));
   }
-  if (cmp.timeDiff) bits.push("measured at week " + first.weeks + " against week" + (others.length > 1 ? "s " : " ") + others.map(o => o.weeks).join(" and "));
+  if (cmp.timeDiff) {
+    const wk = others.map(o => o.weeks).filter((v, i, arr) => arr.indexOf(v) === i);
+    bits.push("measured at week " + first.weeks + " against " + (wk.length === 1 ? "week " + wk[0] + (others.length > 1 ? " for " + (others.length === 2 ? "both" : "all") + " the others" : "") : "weeks " + wk.slice(0, -1).join(", ") + " and " + wk[wk.length - 1]));
+  }
   const verdict = bits.length ? who + " differs on " + (cmp.designDiff && cmp.timeDiff ? "design and timing" : cmp.designDiff ? "design" : "timing") + "." : who + " is registered much like the others on design and timing.";
   const res = cmp.resultsComparable === false ? " The posted results use different measures, so they are shown side by side, not ranked."
     : cmp.resultsComparable === true ? " The posted results use the same measure, though different populations and time points can still make them hard to compare." : "";

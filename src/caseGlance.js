@@ -197,6 +197,8 @@ function glanceInputs(theCase, scenarioResults, impliedSolved, drivers) {
   const posOf = k => { const r = by(k); return r && r.programVals && r.programVals[0] ? r.programVals[0].posToLaunch * 100 : null; };
   const pos = { bear: posOf("bear"), base: posOf("base"), bull: posOf("bull"), implied: impliedSolved && impliedSolved.ok && !impliedSolved.degenerate ? impliedSolved.impliedAbsolutePct : null };
   if ([pos.bear, pos.base, pos.bull].some(v => v == null || !isFinite(v))) return null;
+  // An approved drug (odds already 100%) has no odds to picture.
+  if (pos.base >= 99.99) return null;
   const log = theCase.programs[0].evidenceLog || [];
   const evidence = pickGlanceEvidence(log, 5);
   const price = theCase.currentPrice !== "" && theCase.currentPrice != null && Number(theCase.currentPrice) > 0 ? Number(theCase.currentPrice) : null;

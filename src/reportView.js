@@ -96,7 +96,7 @@ function ReportView({ theCase, onBack, updateCase }) {
     ? { bg: "#15181D", ink1: "#E6EAF0", ink2: "#A7B0BD", ink3: "#939DAB", rule: "#2A313B", teal: "#8D9BFF", onTeal: "#0B0D10", amber: "#E0B25C", red: "#F2766E", surface2: "#1D2229" }
     : { bg: "#FFFFFF", ink1: "#15181D", ink2: "#4D5663", ink3: "#5E6776", rule: "#DADEE4", teal: "#4353E0", onTeal: "#FFFFFF", amber: "#8A5B00", red: "#B8322B", surface2: "#F1F3F5" };
   usePrintBackground(rpt.bg);
-  const revenueSeries = (baseResult && baseResult.calendar) ? [{ name: "Company revenue", color: rpt.teal, points: baseResult.calendar.map(c => ({ v: c.revenue, label: c.calendarYear })) }] : [];
+  const revenueSeries = (baseResult && baseResult.calendar) ? [{ name: "Company revenue", color: rpt.teal, points: baseResult.calendar.map(c => ({ v: c.revenue, label: new Date().getFullYear() + c.calendarYear })) }] : [];
 
   const doExport = async () => {
     if (!window.electronAPI || !window.electronAPI.exportPDF) { setExportMsg("PDF export requires the desktop app."); return; }
@@ -266,7 +266,7 @@ function ReportView({ theCase, onBack, updateCase }) {
         // Revenue chart (DCF-only — Simple Multiple doesn't compute year-by-year cash flows)
         inc("revenueChart") && (valMethod === "dcf" ? h("div", { style: cardStyle },
           h("div", { style: { fontSize: 13, fontWeight: 700, marginBottom: 10, color: rpt.ink2 } }, "Company Revenue Projection (Base Case)"),
-          h(RevenueChart, { series: revenueSeries, height: 200, label: "Company revenue projection, base case, by year" })
+          h(RevenueChart, { series: revenueSeries, height: 200, xPrefix: "", xAxisPrefix: "", label: "Company revenue projection, base case, by year" })
         ) : h("div", { style: cardStyle },
           h("div", { style: { fontSize: 13, fontWeight: 700, marginBottom: 10, color: rpt.ink2 } }, "Company Revenue Projection"),
           h("div", { style: { fontSize: 11, color: rpt.ink3 } }, "Not shown — this case uses Simple Multiple valuation, which doesn't build a year-by-year revenue projection. Switch to DCF mode to see this chart.")
@@ -297,7 +297,7 @@ function ReportView({ theCase, onBack, updateCase }) {
             h("table", { style: { width: "100%", borderCollapse: "collapse", fontSize: 12 } },
               h("tbody", null,
                 sotp.programBreakdown.map((p, i) => h("tr", { key: i, style: { borderBottom: "1px solid " + rpt.rule } },
-                  h("td", { style: { padding: "5px 8px" } }, p.name),
+                  h("td", { style: { padding: "5px 8px" } }, (() => { const same = sotp.programBreakdown.filter(q => q.name === p.name); return same.length > 1 ? p.name + " (" + (same.indexOf(p) + 1) + ")" : p.name; })()),
                   h("td", { style: { padding: "5px 8px", textAlign: "right", fontFamily: "var(--mono)", color: p.npv >= 0 ? rpt.teal : rpt.red } }, fmtMoney(p.npv)))),
                 h("tr", { style: { borderBottom: "1px solid " + rpt.rule } },
                   h("td", { style: { padding: "5px 8px", color: rpt.ink3 } }, "Corporate G&A (shared)"),

@@ -217,6 +217,9 @@ app.whenReady().then(async () => {
     await waitFor(`/Design flags/i.test(document.body.innerText)`, 30000);
     await click("Load what these trials actually reported", 300);
     await waitFor(`/Safety as reported/i.test(document.body.innerText)`, 30000); });
+  await tool("Trial", "Compare Trials", async () => {
+    await js(`__t.setVal(document.querySelector('input[aria-label="ClinicalTrials.gov IDs to compare"]'), "NCT06872125, NCT02682927, NCT02091375")`); await sleep(200); await click("Compare 3 trials", 300);
+    await waitFor(`!!document.querySelector(".cmp-table")`, 45000); });
   await tool("Trial", "Asset Program", async () => {
     await js(`__t.setVal(__t.ph("drug or intervention name"), "dapagliflozin")`); await sleep(200);
     await js(`(() => { const i = __t.ph("drug or intervention name"); const b = i && [...i.parentElement.querySelectorAll("button")][0]; if (b) b.click(); return !!b; })()`);

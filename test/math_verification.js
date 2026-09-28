@@ -81,7 +81,7 @@ const EXPORTS = [
   "applyTaxToCalendar", "computeMoleculeTypePoSRatios", "POS_BY_MOLECULE",
   "computeProgramValuation",
   "revenueChartYScale", "niceAxisTicks", "histogramBins", "spreadLabels", "localDateStamp", "selectPeakSalesCompWindow",
-  "readPriceVsScenarios", "readMonteCarlo", "readCashFlow", "readSotp", "readRiskWaterfall", "readTornado", "readPriceGrid", "readInterval", "readPValue", "readSingleArm", "readAssurance", "readPeakSalesRange", "readBinaryImplied", "readPremium", "readForwardRunway", "readBreakEven", "readPriceGap", "readOutcomeRange", "compareTrials", "compareTrialsWeeks", "readTrialComparison",
+  "readPriceVsScenarios", "readMonteCarlo", "readCashFlow", "readSotp", "readRiskWaterfall", "readTornado", "readPriceGrid", "readInterval", "readPValue", "readSingleArm", "readAssurance", "readPeakSalesRange", "readBinaryImplied", "readPremium", "readForwardRunway", "readBreakEven", "readPriceGap", "readOutcomeRange", "possessive", "compareTrials", "compareTrialsWeeks", "readTrialComparison",
   "measureStorage", "STORAGE_ASSUMED_QUOTA_BYTES", "STORAGE_WARN_FRACTION", "STORAGE_CRITICAL_FRACTION",
   "computeTreatedPopulation", "launchCurveForYears", "erosionMultiplier", "computeProgramRevenue",
   "resolveNetPrice", "aspPctOfBasis", "PRICE_BASIS_OPTIONS", "getRevenueBuild", "PRICING_CONVERSION_MATRIX", "priceBasisArticle",
@@ -4247,9 +4247,13 @@ section("Trial comparison");
   ok("compare: placebo is not listed as a drug; ages read 2 to 18", c.cols[0].drugs.join() === "A-drug" && row("ages").values[0] === "2 to 18");
   ok("compare: a plain 'Week 28' is not repeated; others get their week", row("measuredAt").values[0] === "Week 28" && row("measuredAt").values[1].startsWith("≈ week 14 — "));
   const rd = api.readTrialComparison(c);
-  ok("compare: reading names the sham control and the weeks", rd.verdict === "A-drug's trial differs on design and timing." && rd.text.includes("sham-controlled (the others: placebo-controlled)") && rd.text.includes("week 28 against weeks 14 and 14"));
+  ok("compare: reading names the sham control and the weeks", rd.verdict === "A-drug's trial differs on design and timing." && rd.text.includes("sham-controlled (the others: placebo-controlled)") && rd.text.includes("week 28 against week 14 for both the others"));
   const same = api.compareTrials([st("A", "PLACEBO_COMPARATOR", "Week 14", 1), st("B", "PLACEBO_COMPARATOR", "Week 15", 2)]);
   ok("compare: a week apart is not a difference", !same.designDiff && !same.timeDiff);
+}
+section("Possessive names");
+{
+  ok("possessive: Stoke's, Biologics', blank case's", api.possessive("Stoke") === "Stoke's" && api.possessive("Edge two-programs") === "Edge two-programs'" && api.possessive("") === "'s");
 }
 report();
 

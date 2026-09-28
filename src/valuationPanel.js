@@ -204,18 +204,21 @@ function useValuationSections({ theCase, onChange, goToTab }) {
       } catch (e) { return null; }
       const price = theCase.currentPrice !== "" && theCase.currentPrice != null && Number(theCase.currentPrice) > 0 ? Number(theCase.currentPrice) : null;
       const by = k => scenarioResults.find(s => s.key === k).result.equity.perShare;
+      // Nothing to place on a per-share line until there is a share count.
+      if (![by("bear"), by("base"), by("bull")].every(v => v != null && isFinite(v))) return null;
       const one = theCase.programs.length === 1 && impliedSolved && impliedSolved.ok && !impliedSolved.degenerate;
       const marks = [
         floor && { value: floor.perShare, name: "If it fails", text: "≈" + fmtShare(floor.perShare), color: "var(--red)", row: "above" },
         price != null && { value: price, name: "Today", text: fmtShare(price), color: "var(--warn)", row: "above" },
-        success != null && { value: success, name: "If it works", text: fmtShare(success) + (theCase.programs.length === 1 ? " at Base share" : ""), color: "var(--green)", row: "above" },
+        // Already approved: "if it works" is simply Base, so not marked twice.
+        success != null && Math.abs(success - by("base")) >= 0.005 && { value: success, name: "If it works", text: fmtShare(success) + (theCase.programs.length === 1 ? " at Base share" : ""), color: "var(--green)", row: "above" },
         { value: by("bear"), name: "Bear", text: fmtShare(by("bear")), color: "var(--red)", row: "below" },
         { value: by("base"), name: "Base", text: fmtShare(by("base")), color: "var(--slate)", row: "below" },
         { value: by("bull"), name: "Bull", text: fmtShare(by("bull")), color: "var(--green)", row: "below" }
       ].filter(Boolean);
       return h(ExportSection, { title: "The whole range, on one line", style: { marginBottom: 16 } },
         h("div", { style: { fontSize: 13, fontFamily: "var(--display)", fontWeight: 600, color: "var(--ink-1)", marginBottom: 4 } }, "The whole range, on one line"),
-        h("div", { className: "prose", style: { ...UI.caption, marginBottom: 6 } }, (floor ? "From what is left if the next readout fails" : "From your Bear case") + " to what it is worth if it works, with your scenarios and today's price in between. The shaded stretch is Bear to Bull."),
+        h("div", { className: "prose", style: { ...UI.caption, marginBottom: 6 } }, (Math.abs((success || 0) - by("base")) < 0.005 ? "Your scenarios and today's price on one line; with no catalyst left to fail, there is no failure floor." : (floor ? "From what is left if the next readout fails" : "From your Bear case") + " to what it is worth if it works, with your scenarios and today's price in between.") + " The shaded stretch is Bear to Bull."),
         h(ExportableBlock, { title: (theCase.name || "Case") + " — range of outcomes per share" },
           h(OutcomeRangeStrip, { marks, band: [Math.min(by("bear"), by("bull")), Math.max(by("bear"), by("bull"))], label: "Range of outcomes per share: failure, scenarios, today's price and success" })),
         floor && h(Explain, readOutcomeRange(floor.perShare, success, price, one ? impliedSolved.impliedAbsolutePct : null)),
@@ -591,9 +594,11 @@ function useValuationSections({ theCase, onChange, goToTab }) {
           ))
         )),
 
-        h("div", { style: { display: "flex", gap: 12, flexWrap: "wrap" } },
+        // A grid, so the three cards stay a row of three (or, very narrow, a
+        // column) instead of wrapping two-and-one with Bull stretched alone.
+        h("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12 } },
           scenarioResults.map(s => h("div", { key: s.key, style: {
-              flex: "1 1 200px", padding: "12px 14px", borderRadius: 8, background: "var(--surface-2)",
+              minWidth: 0, padding: "12px 14px", borderRadius: 8, background: "var(--surface-2)",
               border: "1.5px solid " + s.preset.color
             } },
             h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", fontWeight: 700, color: s.preset.color, marginBottom: 8 } }, s.preset.label),
@@ -641,8 +646,8 @@ function useValuationSections({ theCase, onChange, goToTab }) {
           if (solveError || !solved) return null;
           const caseLabel = theCase.name || "This case";
           if (!solved.ok) return h("div", { style: { marginTop: 16, padding: "12px 14px", borderRadius: 8, background: "var(--warn-bg)", border: "1px solid var(--warn)", fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-2)" } }, "Implied PoS: " + solved.error);
-          return h(ExportSection, { title: "What " + caseLabel + "'s price implies", style: { marginTop: 16, padding: "14px 16px 14px 18px", borderRadius: 10, background: "var(--surface)", border: "1px solid var(--rule)", boxShadow: "inset 3px 0 0 var(--teal)" } },
-            h("div", { style: { fontSize: 13, fontFamily: "var(--display)", fontWeight: 700, color: "var(--ink-1)", marginBottom: 4 } }, "What " + caseLabel + "'s price implies"),
+          return h(ExportSection, { title: "What " + possessive(caseLabel) + " price implies", style: { marginTop: 16, padding: "14px 16px 14px 18px", borderRadius: 10, background: "var(--surface)", border: "1px solid var(--rule)", boxShadow: "inset 3px 0 0 var(--teal)" } },
+            h("div", { style: { fontSize: 13, fontFamily: "var(--display)", fontWeight: 700, color: "var(--ink-1)", marginBottom: 4 } }, "What " + possessive(caseLabel) + " price implies"),
             h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-2)", marginBottom: 10 } }, "The PoS the current price requires, given your assumptions — the reverse of fair value."),
             solved.degenerate
               ? h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-2)" } }, solved.note)
@@ -684,6 +689,8 @@ function useValuationSections({ theCase, onChange, goToTab }) {
           const price = theCase.currentPrice !== "" && theCase.currentPrice != null && Number(theCase.currentPrice) > 0 ? Number(theCase.currentPrice) : null;
           let curve = null;
           if (valMethod === "dcf") { try { curve = computeBreakEvenCurve(theCase, drBase, tvParams); } catch (e) { curve = null; } }
+          // A curve needs per-share values (a share count) and some revenue to vary.
+          if (curve && !(curve.points.length > 1 && curve.points.every(p => p.perShare != null && isFinite(p.perShare)) && curve.basePeak > 0)) curve = null;
           // Line items come from the result itself, so they always sum to the
           // equity value shown (see computeEquityBridgeSteps).
           const steps = computeEquityBridgeSteps(theCase, baseR);
@@ -708,12 +715,14 @@ function useValuationSections({ theCase, onChange, goToTab }) {
               h(ExportableBlock, { title: (theCase.name || "Case") + " — value bridge (Base case)" },
                 h(WaterfallChart, { height: 320, label: "Value bridge from enterprise value to equity value" + (mcap != null ? " and the market value" : ""),
                   steps: steps.map(st => ({ label: shortLabel[st.label] || st.label, value: st.sign < 0 ? -st.value : st.value })),
-                  total: { label: "Your fair value", value: eq.equityValue, sub: fmtShare(eq.perShare) + "/sh" },
+                  total: { label: "Your fair value", value: eq.equityValue, sub: eq.perShare != null && isFinite(eq.perShare) ? fmtShare(eq.perShare) + "/sh" : null },
                   compare: mcap != null ? { label: "Market value", value: mcap, sub: fmtShare(price) + "/sh" } : null })),
               // The same figures as one line of text, exact to the dollar.
               h("div", { className: "bridge-line" },
                 steps.map((st, i) => h("span", { key: i }, (i ? (st.sign < 0 ? " − " : " + ") : "") + st.label + " ", h("b", null, fmtMoney(st.value)))),
-                h("span", null, " = Equity value ", h("b", null, fmtMoney(eq.equityValue)), " ÷ ", fmtNum(eq.dilutedShares), " diluted shares = ", h("b", null, fmtShare(eq.perShare)), " a share")),
+                eq.dilutedShares > 0
+                  ? h("span", null, " = Equity value ", h("b", null, fmtMoney(eq.equityValue)), " ÷ ", fmtNum(eq.dilutedShares), " diluted shares = ", h("b", null, fmtShare(eq.perShare)), " a share")
+                  : h("span", null, " = Equity value ", h("b", null, fmtMoney(eq.equityValue)), ". Add diluted shares under Assumptions → Capital structure to turn this into a price per share.")),
               mcap != null && h(Explain, readPriceGap(eq.perShare, price, oneProgram ? impliedSolved.impliedAbsolutePct : null, oneProgram ? impliedSolved.baseAbsolutePct : null))));
         })()),
 
@@ -739,7 +748,13 @@ function useValuationSections({ theCase, onChange, goToTab }) {
             h("div", { style: { fontSize: 13, fontFamily: "var(--display)", fontWeight: 600, color: "var(--ink-1)", marginBottom: 4 } }, "Sum-of-the-Parts (Base case)"),
             h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginBottom: 12 } }, "Which program actually drives total value — each run standalone, G&A shown separately. Bar width is proportional to size."),
             h("div", null,
-              sotp.programBreakdown.map(p => barRow(p.id, p.name, p.npv, p.npv >= 0 ? "var(--green)" : "var(--red)")),
+              // Two programs with the same name would be two identical rows;
+              // number repeats the way readSotp does in its sentence.
+              sotp.programBreakdown.map((p, i, all) => {
+                const same = all.filter(q => q.name === p.name);
+                const label = same.length > 1 ? p.name + " (" + (same.indexOf(p) + 1) + ")" : p.name;
+                return barRow(p.id, label, p.npv, p.npv >= 0 ? "var(--green)" : "var(--red)");
+              }),
               barRow("__ga_drag__", "Corporate G&A (shared)", sotp.gaDrag, "var(--red)")
             ),
             h("div", { style: { display: "flex", justifyContent: "space-between", fontSize: 13, fontFamily: "var(--mono)", padding: "8px 10px", marginTop: 8, borderTop: "1px solid var(--rule)", fontWeight: 700 } },

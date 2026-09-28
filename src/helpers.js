@@ -16,6 +16,8 @@ const UI = {
   stat: { fontSize: 18, fontFamily: "var(--mono)", fontWeight: 700, color: "var(--ink-1)" },
 };
 
+// "Stoke's", but "Biologics'" — for case names shown in running text.
+function possessive(name) { name = String(name || ""); return /s$/i.test(name) ? name + "'" : name + "'s"; }
 function fmtMoney(v, decimals) {
   if (v == null || isNaN(v)) return "—";
   const a = Math.abs(v);
@@ -330,13 +332,13 @@ function ExportBar({ scope, title, heading, reportSection, source }) {
       const was = reportSectionIncluded(live, reportSection);
       src.updateCase({ ...live, reportInclusions: { ...(live.reportInclusions || {}), [reportSection]: !was }, updatedAt: Date.now() });
       flash(was
-        ? { tone: "ok", text: "Removed from " + (live.name || "case") + "'s report" }
-        : { tone: "ok", text: "In " + (live.name || "case") + "'s report", caseId: live.id }, 7000);
+        ? { tone: "ok", text: "Removed from " + possessive(live.name || "case") + " report" }
+        : { tone: "ok", text: "In " + possessive(live.name || "case") + " report", caseId: live.id }, 7000);
       return;
     }
     const existing = pinnedResultsOf(live);
     if (existing.length >= PINNED_MAX_PER_CASE_V2) {
-      flash({ tone: "err", text: (live.name || "This case") + "'s report already holds " + PINNED_MAX_PER_CASE_V2 + " added items — remove one there first.", caseId: live.id }, 8000);
+      flash({ tone: "err", text: possessive(live.name || "This case") + " report already holds " + PINNED_MAX_PER_CASE_V2 + " added items — remove one there first.", caseId: live.id }, 8000);
       return;
     }
     setBusy("report");
@@ -351,7 +353,7 @@ function ExportBar({ scope, title, heading, reportSection, source }) {
     const src2 = liveSource();
     const fresh = (src2.cases || []).find(c => c.id === targetId) || live;
     src2.updateCase({ ...fresh, pinnedResults: pinnedResultsOf(fresh).concat([r.pin]), updatedAt: Date.now() });
-    flash({ tone: "ok", text: "Added to " + (fresh.name || "case") + "'s report", caseId: fresh.id }, 9000);
+    flash({ tone: "ok", text: "Added to " + possessive(fresh.name || "case") + " report", caseId: fresh.id }, 9000);
   };
 
   const btn = (text, kind, onClick, tip, extra) => h("button", Object.assign({
@@ -404,7 +406,7 @@ function ExportBar({ scope, title, heading, reportSection, source }) {
         style: { marginLeft: 8, background: "none", border: "none", padding: 0, color: "var(--teal)", textDecoration: "underline", fontFamily: "var(--sans)", fontSize: 11, cursor: "pointer" } },
         "Open bundle →")),
     // At-a-glance status the old row showed: this live section is in the report.
-    inReport && h("span", { className: "xm-status", title: "Included in " + (target && target.name) + "'s report — open Export to take it out" }, "✓ In report"),
+    inReport && h("span", { className: "xm-status", title: "Included in " + possessive(target && target.name) + " report — open Export to take it out" }, "✓ In report"),
     h("button", { ref: trigRef, type: "button", className: "xm-trigger" + (open ? " on" : ""), onClick: toggle,
       "aria-haspopup": "true", "aria-expanded": open, "aria-controls": menuId,
       title: (isChart ? "Export this chart" : "Export this section") + (label ? " — " + label : "") + ": PNG, PDF" + (isChart && hasSvg ? ", SVG" : "") + ", add to a report or to your PDF bundle" },
@@ -427,8 +429,8 @@ function ExportBar({ scope, title, heading, reportSection, source }) {
           noCase ? undefined : doReport,
           noCase ? "Reports belong to a case — create one in Workspace first, then sections and charts can be added to its report"
             : reportSection
-              ? (inReport ? "This section is in " + (target && target.name) + "'s report — click to take it out" : "Include this section in " + (target && target.name) + "'s report (it renders live from the model there)")
-              : "Add " + (isChart ? "just this chart" : "this whole section") + " to " + (target && target.name) + "'s report, to build a PDF of only what you choose",
+              ? (inReport ? "This section is in " + possessive(target && target.name) + " report — click to take it out" : "Include this section in " + possessive(target && target.name) + " report (it renders live from the model there)")
+              : "Add " + (isChart ? "just this chart" : "this whole section") + " to " + possessive(target && target.name) + " report, to build a PDF of only what you choose",
           noCase ? { disabled: true, className: "xm-item is-off" } : (inReport ? { className: "xm-item is-on" } : null)),
         menuBtn("+ Bundle", "bundle", doBundle, "Collect " + (isChart ? "just this chart" : "this whole section") + " into your PDF bundle — then export everything you collected as one PDF, or each as its own PDF, from Bundle in the rail. No case needed.")),
       cases.length > 1 && h("label", { className: "xm-case" }, "Report for",
@@ -1414,8 +1416,8 @@ function ReverseSolveBox({ theCase, discountRatePct, tv, options }) {
   // eleven-digit "$14,417,500,064" is easy to misread by a factor of ten.
   const fmtVal = (v, suffix) => suffix === "$" ? fmtMoney(v) : v.toFixed(suffix === "yr" ? 0 : 1) + suffix;
 
-  return h(ExportSection, { title: "What else " + caseLabel + "'s price implies", style: { marginTop: 16, padding: "14px 16px 14px 18px", borderRadius: 10, background: "var(--surface)", border: "1px solid var(--rule)", boxShadow: "inset 3px 0 0 var(--teal)" } },
-    h("div", { style: { fontSize: 13, fontFamily: "var(--display)", fontWeight: 700, color: "var(--ink-1)", marginBottom: 4 } }, "What else " + caseLabel + "'s price implies"),
+  return h(ExportSection, { title: "What else " + possessive(caseLabel) + " price implies", style: { marginTop: 16, padding: "14px 16px 14px 18px", borderRadius: 10, background: "var(--surface)", border: "1px solid var(--rule)", boxShadow: "inset 3px 0 0 var(--teal)" } },
+    h("div", { style: { fontSize: 13, fontFamily: "var(--display)", fontWeight: 700, color: "var(--ink-1)", marginBottom: 4 } }, "What else " + possessive(caseLabel) + " price implies"),
     h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-2)", marginBottom: 10 } }, "Same idea as Implied PoS above, holding every other assumption fixed and solving for this one instead."),
     options.length > 1 && h("div", { style: { display: "flex", gap: 6, marginBottom: 10 } },
       options.map(o => h("button", {

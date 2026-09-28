@@ -400,11 +400,25 @@ function BreakEvenChart({ curve, height, label }) {
   const bandLabelY = bx1 - bx0 > bandW + 8 ? (clearAt(bandTopY - 4) ? bandTopY : clearAt(bandBotY - 4) ? bandBotY : null) : null;
   const price = curve.price, py = price != null ? y(price) : null;
   const priceText = "today " + fmtShare(price || 0);
-  const priceLabelAbove = price != null && curveY(xs.hi) > py - 22;
   const bp = curve.basePeak, bv = curve.basePerShare;
   const caseText = "this case: " + fmtMoney(bp) + " → " + fmtShare(bv);
   const caseW = measureLabel(caseText, 11, 600);
-  const caseLeft = x(bp) - 16 - caseW > padL;
+  // The curve rises, so above-left and below-right of any point on it are
+  // empty. This case's label goes into whichever of those is away from the
+  // price line; the break-even label takes the other one, so the two never
+  // meet however close the points are.
+  const caseBelow = price != null && bv < price;
+  const caseLeft = caseBelow ? x(bp) + 16 + caseW > W - padR : x(bp) - 16 - caseW > padL;
+  const caseDy = caseBelow ? 20 : -20, caseTy = caseBelow ? y(bv) + 34 : y(bv) - 23;
+  const beAbove = caseBelow;
+  const beX = curve.breakEvenPeak != null ? x(curve.breakEvenPeak) : null;
+  const beW = beX != null ? measureLabel("break-even ≈ " + fmtMoney(curve.breakEvenPeak), 11, 600) : 0;
+  const priceW = measureLabel(priceText, 11, 600), priceL = W - padR - 2 - priceW;
+  // "today" sits at the right end of its line: above it, unless the curve
+  // runs there, or the break-even label would reach it from the same side.
+  let priceBelow = price != null && curveY(xs.hi) > py - 22;
+  if (beX != null && beAbove && !priceBelow && beX - 13 > priceL - 8) priceBelow = true;
+  if (beX != null && !beAbove && priceBelow && beX + 13 + beW > priceL - 8) priceBelow = false;
   return h("div", { ref: wrapRef },
     h("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": label || "Fair value at each peak revenue level", "data-titled": "1", style: { width: "100%", height: H, display: "block" } },
       ys.ticks.map((v, i) => h("g", { key: "y" + i },
@@ -416,13 +430,13 @@ function BreakEvenChart({ curve, height, label }) {
       bandLabelY != null && h("text", { x: (bx0 + bx1) / 2, y: bandLabelY, textAnchor: "middle", fontSize: 10.5, fontFamily: "var(--mono)", fill: "var(--teal)" }, bandText),
       h("path", { d: path, fill: "none", stroke: "var(--teal)", strokeWidth: 2.5, strokeLinejoin: "round" }),
       price != null && h("line", { x1: padL, x2: W - padR, y1: py, y2: py, stroke: "var(--warn)", strokeWidth: 1.5 }),
-      price != null && h("text", { x: W - padR - 2, y: priceLabelAbove ? py + 16 : py - 7, textAnchor: "end", fontSize: 11, fontWeight: 600, fontFamily: "var(--mono)", fill: "var(--warn)" }, priceText),
-      h("line", { x1: x(bp), y1: y(bv) - 6, x2: x(bp) + (caseLeft ? -12 : 12), y2: y(bv) - 20, stroke: "var(--ink-1)" }),
-      h("text", { x: x(bp) + (caseLeft ? -15 : 15), y: y(bv) - 23, textAnchor: caseLeft ? "end" : "start", fontSize: 11, fontWeight: 600, fontFamily: "var(--mono)", fill: "var(--ink-1)" }, caseText),
+      price != null && h("text", { x: W - padR - 2, y: priceBelow ? py + 16 : py - 7, textAnchor: "end", fontSize: 11, fontWeight: 600, fontFamily: "var(--mono)", fill: "var(--warn)" }, priceText),
+      h("line", { x1: x(bp), y1: y(bv) + (caseBelow ? 6 : -6), x2: x(bp) + (caseLeft ? -12 : 12), y2: y(bv) + caseDy, stroke: "var(--ink-1)" }),
+      h("text", { x: x(bp) + (caseLeft ? -15 : 15), y: caseTy, textAnchor: caseLeft ? "end" : "start", fontSize: 11, fontWeight: 600, fontFamily: "var(--mono)", fill: "var(--ink-1)" }, caseText),
       h("circle", { cx: x(bp), cy: y(bv), r: 5, fill: "var(--surface)", stroke: "var(--ink-1)", strokeWidth: 2 }),
       curve.breakEvenPeak != null && h("g", null,
-        h("line", { x1: x(curve.breakEvenPeak), y1: py + 6, x2: x(curve.breakEvenPeak), y2: py + 24, stroke: "var(--warn)" }),
-        h("text", { x: x(curve.breakEvenPeak), y: py + 37, textAnchor: "middle", fontSize: 11, fontWeight: 600, fontFamily: "var(--mono)", fill: "var(--warn)" }, "break-even ≈ " + fmtMoney(curve.breakEvenPeak)),
+        h("line", { x1: x(curve.breakEvenPeak), y1: py + (beAbove ? -6 : 6), x2: x(curve.breakEvenPeak) + (beAbove ? -10 : 10), y2: py + (beAbove ? -18 : 18), stroke: "var(--warn)" }),
+        h("text", { x: x(curve.breakEvenPeak) + (beAbove ? -13 : 13), y: beAbove ? py - 21 : py + 30, textAnchor: beAbove ? "end" : "start", fontSize: 11, fontWeight: 600, fontFamily: "var(--mono)", fill: "var(--warn)" }, "break-even ≈ " + fmtMoney(curve.breakEvenPeak)),
         h("circle", { cx: x(curve.breakEvenPeak), cy: py, r: 5, fill: "var(--surface)", stroke: "var(--warn)", strokeWidth: 2 })))
   );
 }
@@ -545,13 +559,18 @@ function OutcomeRangeStrip({ marks, band, label }) {
 function ScatterChart({ points, highlightPoint, xLabel, yLabel, xFmt, yFmt, height, label, diagonal }) {
   const h = React.createElement;
   height = height || 280;
-  const W = 560, H = height, padL = 60, padR = 20, padT = 16, padB = 40;
+  // Drawn at the card's real width (a fixed 560 left half the M&A card
+  // empty). A chart with the x = y diagonal stays near-square, so the line
+  // still reads as "the same on both axes".
+  const wrapRef = React.useRef(null);
+  const measured = useMeasuredWidth(wrapRef, 560);
+  const W = diagonal ? 560 : Math.max(360, measured), H = height, padL = 60, padR = 20, padT = 16, padB = 40;
   const plotW = W - padL - padR, plotH = H - padT - padB;
   const [hover, setHover] = React.useState(null); // { kind: 'point'|'highlight', idx }
 
   const allPoints = highlightPoint ? [...points, highlightPoint] : points;
   if (!allPoints.length) {
-    return h("div", { style: { height, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--ink-3)", fontSize: 12, fontFamily: "var(--mono)" } }, "No comp data to plot.");
+    return h("div", { ref: wrapRef, style: { height, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--ink-3)", fontSize: 12, fontFamily: "var(--mono)" } }, "No comp data to plot.");
   }
 
   const xVals = allPoints.map(p => p.x), yVals = allPoints.map(p => p.y);
@@ -583,8 +602,8 @@ function ScatterChart({ points, highlightPoint, xLabel, yLabel, xFmt, yFmt, heig
   const hoveredPoint = hover ? (hover.kind === "highlight" ? highlightPoint : points[hover.idx]) : null;
   const tooltipOnRight = hoveredPoint && toX(hoveredPoint.x) > padL + plotW * 0.6;
 
-  return h("div", { style: { position: "relative" } },
-    h("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": label || ((yLabel || "") + " against " + (xLabel || "")), style: { width: "100%", maxWidth: 560, height: "auto", display: "block" } },
+  return h("div", { ref: wrapRef, style: { position: "relative" } },
+    h("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": label || ((yLabel || "") + " against " + (xLabel || "")), style: { width: "100%", maxWidth: diagonal ? 560 : "none", height: "auto", display: "block" } },
       yT.ticks.map((v, i) => h("g", { key: "y" + i },
         h("line", { x1: padL, x2: W - padR, y1: toY(v), y2: toY(v), stroke: "var(--rule)", strokeWidth: 1, strokeDasharray: "3,3" }),
         h("text", { x: padL - 8, y: toY(v) + 3, textAnchor: "end", fontSize: 10, fontFamily: "var(--mono)", fill: "var(--ink-3)" }, fmtY(v))

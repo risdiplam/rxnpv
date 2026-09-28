@@ -194,9 +194,9 @@ function CaseView({ theCase, onChange, onDelete, onNavigateToTools }) {
   const companyPnL = programPnLs.length ? computeCompanyPnL(programPnLs, corpGA, COMPANY_CALENDAR_YEARS) : [];
   const peakEbitYear = companyPnL.length ? companyPnL.reduce((best, c) => c.ebit > best.ebit ? c : best, companyPnL[0]) : null;
   const ebitSeries = companyPnL.length ? [
-    { name: "Revenue", color: "var(--ink-2)", points: companyPnL.map(c => ({ v: c.revenue, label: c.calendarYear })) },
-    { name: "Product contribution", color: "var(--teal)", points: companyPnL.map(c => ({ v: c.productContribution, label: c.calendarYear })) },
-    { name: "EBIT (after corporate G&A)", color: "var(--amber)", points: companyPnL.map(c => ({ v: c.ebit, label: c.calendarYear })) }
+    { name: "Revenue", color: "var(--ink-2)", points: companyPnL.map(c => ({ v: c.revenue, label: new Date().getFullYear() + c.calendarYear })) },
+    { name: "Product contribution", color: "var(--teal)", points: companyPnL.map(c => ({ v: c.productContribution, label: new Date().getFullYear() + c.calendarYear })) },
+    { name: "EBIT (after corporate G&A)", color: "var(--amber)", points: companyPnL.map(c => ({ v: c.ebit, label: new Date().getFullYear() + c.calendarYear })) }
   ] : [];
 
   // Theme-aware for the first 5 (reuses the existing semantic tokens, so
@@ -205,9 +205,9 @@ function CaseView({ theCase, onChange, onDelete, onNavigateToTools }) {
   const PROGRAM_COLORS = ["var(--teal)", "var(--amber)", "var(--slate)", "var(--red)", "var(--green)", "#9B7FA6"];
   const aggChartSeries = programResults.map((p, i) => ({
     name: p.name, color: PROGRAM_COLORS[i % PROGRAM_COLORS.length], fill: false,
-    points: calendar.map(c => ({ v: (c.byProgram.find(bp => bp.id === p.id) || { revenue: 0 }).revenue, label: c.calendarYear }))
+    points: calendar.map(c => ({ v: (c.byProgram.find(bp => bp.id === p.id) || { revenue: 0 }).revenue, label: new Date().getFullYear() + c.calendarYear }))
   }));
-  const totalSeries = calendar.length ? [{ name: "Total company revenue", color: "var(--ink-2)", points: calendar.map(c => ({ v: c.totalRevenue, label: c.calendarYear })) }] : [];
+  const totalSeries = calendar.length ? [{ name: "Total company revenue", color: "var(--ink-2)", points: calendar.map(c => ({ v: c.totalRevenue, label: new Date().getFullYear() + c.calendarYear })) }] : [];
 
   const activeProg = theCase.programs.find(p => p.id === activeProgId) || theCase.programs[0];
 
@@ -338,14 +338,14 @@ function CaseView({ theCase, onChange, onDelete, onNavigateToTools }) {
       h("div", { style: { display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 10, flexWrap: "wrap", gap: 8 } },
         h("div", { style: { fontFamily: "var(--display)", fontSize: 16, fontWeight: 600, color: "var(--ink-1)" } }, "Company revenue rollup — all programs"),
         peakCalendarYear && h("div", { style: { fontSize: 12, fontFamily: "var(--mono)", color: "var(--ink-2)" } },
-          "Peak: ", h("b", { style: { color: "var(--ink-1)" } }, fmtMoney(peakCalendarYear.totalRevenue)), " in year ", peakCalendarYear.calendarYear)
+          "Peak: ", h("b", { style: { color: "var(--ink-1)" } }, fmtMoney(peakCalendarYear.totalRevenue)), " in ", new Date().getFullYear() + peakCalendarYear.calendarYear)
       ),
       excludedPrograms.length > 0 && h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--warn)", background: "var(--warn-bg)", border: "1px solid var(--warn)", borderRadius: 6, padding: "8px 10px", marginBottom: 10, lineHeight: 1.6 } },
         (excludedPrograms.length === 1 ? "“" + excludedPrograms[0] + "” is" : excludedPrograms.length + " programs are")
         + " not included in this rollup or in any valuation below — their revenue build couldn't be computed, usually because a required field is still blank. "
         + "Every total on this page excludes " + (excludedPrograms.length === 1 ? "it" : "them") + "."),
       h(ExportableBlock, { title: (theCase.name || "Case") + " — company revenue rollup" },
-        h(RevenueChart, { series: totalSeries.concat(aggChartSeries.length > 1 ? aggChartSeries : []), showLegend: theCase.programs.length > 1, height: 200 }))
+        h(RevenueChart, { series: totalSeries.concat(aggChartSeries.length > 1 ? aggChartSeries : []), showLegend: theCase.programs.length > 1, height: 200, xPrefix: "", xAxisPrefix: "" }))
     ),
 
     // Company-level P&L / EBIT panel
@@ -353,7 +353,7 @@ function CaseView({ theCase, onChange, onDelete, onNavigateToTools }) {
       h("div", { style: { display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 12, flexWrap: "wrap", gap: 8 } },
         h("div", { style: { fontFamily: "var(--display)", fontSize: 16, fontWeight: 600, color: "var(--ink-1)" } }, "Company P&L — costs applied"),
         peakEbitYear && h("div", { style: { fontSize: 12, fontFamily: "var(--mono)", color: "var(--ink-2)" } },
-          "Peak EBIT: ", h("b", { style: { color: "var(--ink-1)" } }, fmtMoney(peakEbitYear.ebit)), " in year ", peakEbitYear.calendarYear)
+          "Peak EBIT: ", h("b", { style: { color: "var(--ink-1)" } }, fmtMoney(peakEbitYear.ebit)), " in ", new Date().getFullYear() + peakEbitYear.calendarYear)
       ),
       h("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap", fontSize: 12, color: "var(--ink-2)", marginBottom: 12 } },
         h("span", null, "Corporate G&A: ", h("b", { style: { color: "var(--ink-1)" } }, "$" + (corpGA.preCommercialAnnualM || SGA_BENCHMARKS.preCommercialGA.medianM) + "M/yr"), " before launch · ",
@@ -365,7 +365,7 @@ function CaseView({ theCase, onChange, onDelete, onNavigateToTools }) {
             background: rollupView === id ? "var(--teal-bg)" : "transparent", color: rollupView === id ? "var(--teal)" : "var(--ink-2)", fontWeight: rollupView === id ? 700 : 400 } }, lbl))
       ),
       rollupView === "ebit" && h(ExportableBlock, { title: (theCase.name || "Case") + " — P&L by year" },
-        h(RevenueChart, { series: ebitSeries, showLegend: true, height: 200 })),
+        h(RevenueChart, { series: ebitSeries, showLegend: true, height: 200, xPrefix: "", xAxisPrefix: "" })),
       rollupView === "ebit" && (() => {
         const troughYear = companyPnL.reduce((worst, c) => c.ebit < worst.ebit ? c : worst, companyPnL[0]);
         return h("div", { style: { display: "flex", gap: 24, marginTop: 12, flexWrap: "wrap" } },
@@ -443,7 +443,8 @@ function CaseView({ theCase, onChange, onDelete, onNavigateToTools }) {
         // Read only by the failure floor on the Overview (computeFailureFloor):
         // how long overhead keeps running after a failed readout before the
         // company is wound down or restructured. Blank = one year.
-        h("div", { style: { flex: "1 1 200px" } },
+        // Same width as the two fields above when it wraps under them.
+        h("div", { style: { flex: "0 1 calc(50% - 6px)", minWidth: 200 } },
           h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-2)", marginBottom: 5 } }, "Wind-down after a failed readout"),
           h("div", { style: { display: "flex", alignItems: "center", gap: 6 } },
             h("input", { type: "number", min: 0, step: 0.5, value: corpGA.windDownYears == null ? "" : corpGA.windDownYears, placeholder: String(FAILURE_WIND_DOWN_YEARS_DEFAULT), onChange: e => updateCorpGA({ windDownYears: e.target.value }), "aria-label": "Wind-down after a failed readout (years of G&A)",

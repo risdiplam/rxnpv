@@ -213,7 +213,7 @@ app.whenReady().then(async () => {
     }
     await js(`document.getElementById("casetab-overview").click()`);
     await click("Tools", 700);
-    const tools = [["Trial", ["Trial Decoder", "Asset Program", "Trial Explorer", "FDA Lookup"]], ["Science", ["Target Dossier", "Literature"]],
+    const tools = [["Trial", ["Trial Decoder", "Compare Trials", "Asset Program", "Trial Explorer", "FDA Lookup"]], ["Science", ["Target Dossier", "Literature"]],
       ["Company", ["Company Lookup", "Catalyst Calendar", "Cash Runway", "Runway vs. Catalyst"]], ["Commercial", ["Launch & Actuals", "Exclusivity / LOE"]],
       ["Valuation", ["Sensitivity", "Binary Event", "Diluted Market Cap"]], ["Benchmarks", ["M&A Premium", "Peak Sales Comps", "Licensing Comps"]]];
     for (const [bench, names] of tools) for (const n of names) {
@@ -222,6 +222,10 @@ app.whenReady().then(async () => {
         await js(`__t.setVal(__t.ph("NCT number"), "NCT03036124")`); await sleep(200); await click("Decode", 300);
         await waitFor(`/Design flags/i.test(document.body.innerText)`, 30000);
         await click("Load what these trials actually reported", 300); await waitFor(`/Safety as reported/i.test(document.body.innerText)`, 30000);
+      }
+      if (n === "Compare Trials" && !(await js(`!!document.querySelector(".cmp-table")`))) {
+        await js(`__t.setVal(document.querySelector('input[aria-label="ClinicalTrials.gov IDs to compare"]'), "NCT06872125, NCT02682927, NCT02091375")`); await sleep(200); await click("Compare 3 trials", 300);
+        await waitFor(`!!document.querySelector(".cmp-table")`, 45000);
       }
       await stop("Tools " + n);
     }

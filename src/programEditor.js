@@ -445,9 +445,11 @@ function ProgramEditor({ program, onChange, onDelete, discountRatePct, terminalV
     show("inputs") && (error ? h("div", { style: { padding: 14, borderRadius: 8, background: "var(--red-bg)", border: "1px solid var(--red)", color: "var(--red)", fontFamily: "var(--mono)", fontSize: 12 } }, "Calculation error: " + error)
     : h(ExportSection, { nav: "output", title: (program.drugName || program.name || "Program") + " — revenue build output", style: { background: "var(--surface)", border: "1px solid var(--rule)", borderRadius: 10, padding: "16px 18px" } },
         h("div", { style: { display: "flex", gap: 24, flexWrap: "wrap", marginBottom: 14 } },
-          h("div", null,
+          // Quick mode types a peak revenue and never estimates patients, so
+          // the count is not shown there (it printed 0).
+          revenueMode !== "quick" && h("div", null,
             h("div", { style: UI.caption }, "Peak patients on drug (US)"),
-            h("div", { style: { fontSize: 22, fontFamily: "var(--mono)", fontWeight: 700, color: "var(--ink-1)" } }, result ? fmtNum(result.peakPatients) : "—")),
+            h("div", { style: { fontSize: 22, fontFamily: "var(--mono)", fontWeight: 700, color: "var(--ink-1)" } }, result && result.peakPatients != null ? fmtNum(result.peakPatients) : "—")),
           h("div", null,
             h("div", { style: UI.caption }, "Peak US revenue"),
             h("div", { style: { fontSize: 22, fontFamily: "var(--mono)", fontWeight: 700, color: "var(--teal)" } }, result ? fmtMoney(result.peakUSRevenue) : "—")),
@@ -483,10 +485,14 @@ function ProgramEditor({ program, onChange, onDelete, discountRatePct, terminalV
 
       return h("div", { "data-nav": "pos", style: { marginTop: 14, padding: "10px 14px", borderRadius: 8, background: "var(--surface-2)", border: "1px dashed var(--rule)" } },
         h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-3)", lineHeight: 1.7, marginBottom: 10 } },
-          "For reference — ", program.therapeuticArea, ", ", phaseKey.replace("phase","Phase "), ": ",
-          "PoS to next stage ", h("b", { style: { color: "var(--ink-2)" } }, posInfo.value + "%"),
-          " · per-patient trial cost ", h("b", { style: { color: "var(--ink-2)" } }, "$" + trialCostInfo.value + "K"),
-          " · trial duration ", h("b", { style: { color: "var(--ink-2)" } }, trialDurInfo.value + "yr")),
+          // Phase benchmarks only exist for trial phases; an approved or filed
+          // program has none, and printed "undefined%" here.
+          posInfo.value == null && trialCostInfo.value == null && trialDurInfo.value == null
+            ? ["For reference — ", program.therapeuticArea, ", ", phaseKey === "approved" ? "approved" : phaseKey.replace("phase", "Phase "), ": no remaining trial phase, so no phase benchmarks apply."]
+            : ["For reference — ", program.therapeuticArea, ", ", phaseKey.replace("phase", "Phase "), ": ",
+              "PoS to next stage ", h("b", { key: "p", style: { color: "var(--ink-2)" } }, posInfo.value != null ? posInfo.value + "%" : "—"),
+              " · per-patient trial cost ", h("b", { key: "c", style: { color: "var(--ink-2)" } }, trialCostInfo.value != null ? "$" + trialCostInfo.value + "K" : "—"),
+              " · trial duration ", h("b", { key: "d", style: { color: "var(--ink-2)" } }, trialDurInfo.value != null ? trialDurInfo.value + "yr" : "—")]),
 
         // ── Program attributes that measurably shift PoS ──────────────────
         // These drive the computed benchmark directly rather than leaving you
