@@ -428,16 +428,21 @@ function computeBreakEvenCurve(theCase, discountRateBasePct, terminalValueParams
 // which has no readout left to fail. Anything the other programs, a partner
 // or a sale of the platform might fetch is left out: the floor is cautious.
 const FAILURE_WIND_DOWN_YEARS_DEFAULT = 1;
-function computeFailureFloor(theCase) {
+// throughStage (default 0): the stage whose readout fails — later stages add
+// their cost and time first (the outcome tree values a rejection at the FDA
+// this way, after the Phase 3 has been paid for).
+function computeFailureFloor(theCase, throughStage) {
   if (!theCase || !theCase.programs || theCase.programs.length !== 1) return null;
   const pv = computeProgramValuation(theCase.programs[0], SCENARIO_PRESETS.base, "base");
-  const stage = (pv.riskAdjItems || [])[0];
-  if (!stage) return null;
+  const items = (pv.riskAdjItems || []).slice(0, (throughStage || 0) + 1);
+  const stage = items[items.length - 1];
+  if (!stage || items.length !== (throughStage || 0) + 1) return null;
   const cap = theCase.capitalStructure || { mode: "simple" };
   const ga = theCase.corporateGA || {};
   const gaYear = (ga.preCommercialAnnualM !== "" && ga.preCommercialAnnualM != null ? Number(ga.preCommercialAnnualM) : SGA_BENCHMARKS.preCommercialGA.medianM) * 1e6;
   const windDownYears = ga.windDownYears !== "" && ga.windDownYears != null && isFinite(Number(ga.windDownYears)) ? Math.max(0, Number(ga.windDownYears)) : FAILURE_WIND_DOWN_YEARS_DEFAULT;
-  const trialCost = stage.costM * 1e6, gaToReadout = gaYear * stage.years, windDown = gaYear * windDownYears;
+  const years = items.reduce((a, it) => a + it.years, 0);
+  const trialCost = items.reduce((a, it) => a + it.costM, 0) * 1e6, gaToReadout = gaYear * years, windDown = gaYear * windDownYears;
   const netCashAt = p => computeCapitalStructure({ ...cap, currentPrice: p }).netCash;
   // Shares depend on the price, and the price on the shares: two passes from
   // the basic count settle it (options either are or are not in the money).
@@ -449,7 +454,45 @@ function computeFailureFloor(theCase) {
     shares = computeCapitalStructure({ ...cap, currentPrice: p }).dilutedShares;
   }
   if (!(shares > 0)) return null;
-  return { perShare: Math.max(0, equity / shares), equity, shares, netCash: netCashAt(Math.max(0, equity / shares)), trialCost, gaToReadout, windDown, windDownYears, readoutYears: stage.years, stageLabel: stage.label, cashShort: equity < 0 };
+  return { perShare: Math.max(0, equity / shares), equity, shares, netCash: netCashAt(Math.max(0, equity / shares)), trialCost, gaToReadout, windDown, windDownYears, readoutYears: years, stageLabel: stage.label, cashShort: equity < 0 };
+}
+
+// ── Outcome tree: how the remaining catalysts play out ─────────────────────
+// One gate per remaining development stage (a readout at the end of each
+// trial, then the FDA's decision), each with the case's own odds of passing:
+// the chance of reaching the next stage over the chance of reaching this one,
+// and at the last gate the odds of launch over the odds of filing — so the
+// branches multiply back exactly to the Base PoS. Every ending is valued by
+// the model: success at literal 100% odds on Base inputs (the range strip's
+// "if it works"), each failure with computeFailureFloor after the stages paid
+// for so far. The weighted sum is shown beside the model's Base, which it
+// should sit near but not equal: the tree values each ending as it stands,
+// the DCF charges costs year by year at the odds of reaching them.
+// Single-program, not yet approved.
+function computeOutcomeTree(theCase, discountRateBasePct, terminalValueParams) {
+  if (!theCase || !theCase.programs || theCase.programs.length !== 1) return null;
+  const program = theCase.programs[0];
+  const pv = computeProgramValuation(program, getEffectiveScenarioPreset(theCase, "base"), "base");
+  const items = pv.riskAdjItems || [];
+  if (!items.length || !(pv.posToLaunch > 0)) return null;
+  const success = computeCaseValuation({ ...theCase, programs: [{ ...program, posOverridePct: "100" }] }, SCENARIO_PRESETS.base, "base", discountRateBasePct, terminalValueParams).equity.perShare;
+  let cum = 0;
+  const gates = [];
+  for (let i = 0; i < items.length; i++) {
+    const it = items[i];
+    const reach = it.posToReachStage != null ? it.posToReachStage : 1;
+    const next = i + 1 < items.length ? (items[i + 1].posToReachStage != null ? items[i + 1].posToReachStage : 1) : pv.posToLaunch;
+    const pass = reach > 0 ? Math.min(1, next / reach) : 0;
+    cum += it.years;
+    const fl = computeFailureFloor(theCase, i);
+    if (!fl) return null;
+    const regulatory = it.key === "regulatory";
+    gates.push({ key: it.key, label: regulatory ? "FDA decision" : it.label + " readout", passWord: regulatory ? "approved" : "positive", failWord: regulatory ? "not approved" : "negative",
+      endYears: cum, reach, pass, failProb: reach * (1 - pass), failValue: fl.perShare, failDetail: fl });
+  }
+  const leaves = [{ kind: "success", prob: pv.posToLaunch, value: success }].concat(gates.map((g, i) => ({ kind: "fail", gate: i, prob: g.failProb, value: g.failValue })));
+  const weighted = leaves.reduce((a, l) => a + l.prob * l.value, 0);
+  return { gates, leaves, success, weighted, posToLaunch: pv.posToLaunch };
 }
 
 // ── Partnership economics — upfront and milestones, as a cash figure to add

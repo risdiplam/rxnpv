@@ -44,7 +44,7 @@ const MODULE_ORDER = [
   'chart.js', 'helpers.js',
   // Workspace view components
   'valuationPanel.js',
-  'caseGlance.js', 'programEditor.js', 'caseShell.js', 'sampleCase.js', 'backup.js',
+  'caseGlance.js', 'catalystViews.js', 'programEditor.js', 'caseShell.js', 'sampleCase.js', 'backup.js',
   // Other top-level views
   'referenceSheet.js', 'reportView.js', 'toolsView.js',
   // Tools, one file per workbench (split out of toolsView.js, September 2026)

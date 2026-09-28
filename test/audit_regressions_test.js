@@ -329,6 +329,16 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
     click([...panel.querySelectorAll("button")].find(b => b.textContent === "Show the case at a glance")); await wait(300);
     ok([...panel.querySelectorAll("[data-export-section]")].some(e => e.getAttribute("data-export-section") === "The case at a glance"), "Glance: Show brings it back");
 
+    // Outcome tree reading: failures 0.30 at "A readout" and 0.10 at the FDA ->
+    // 0.30 / 0.40 = 75% at A -> "most of the risk".
+    const rt2 = w.readOutcomeTree([{ label: "A readout", failProb: 0.3 }, { label: "FDA decision", failProb: 0.1 }], 20, 21);
+    ok(rt2 && rt2.verdict === "The A readout is most of the risk." && rt2.text.startsWith("75% of the failures in this case happen at the A readout.") && rt2.text.includes("$20.00, against the model's Base of $21.00"), "Tree: the reading names where the failures sit");
+    ok(w.readOutcomeTree([{ label: "A", failProb: 0.2 }, { label: "B", failProb: 0.15 }], 1, 1).verdict === "The risk is spread across 2 gates.", "Tree: under 60% at one gate reads as spread");
+    const tree = [...panel.querySelectorAll("[data-export-section]")].find(e => e.getAttribute("data-export-section") === "How the catalysts play out");
+    const tt = tree ? [...tree.querySelectorAll("svg text, .tree-list")].map(t => t.textContent).join(" | ") : "";
+    ok(!!tree && ["Launches", "$43.24 a share", "≈$1.40 a share", "≈$0.74 a share", "positive · 80%", "approved · 81%"].every(t => tt.includes(t)) || (!!tree && /Phase 3 readout.*positive 80%.*≈\$1\.40/.test(tt)), "Tree: gates, odds and endings render (" + tt.slice(0, 160) + ")");
+    ok(!!tree && /0\.65 × \$43\.24/.test(tree.textContent), "Tree: the weighted sum is written out");
+
     // The whole range on one line, with the failure floor.
     const rng = [...panel.querySelectorAll("[data-export-section]")].find(e => e.getAttribute("data-export-section") === "The whole range, on one line");
     const rt = rng ? [...rng.querySelectorAll("svg text")].map(t => t.textContent) : [];

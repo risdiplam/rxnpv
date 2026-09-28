@@ -124,6 +124,17 @@ function stub(obj) {
   ok(Math.abs((fl.equity - fl2.equity) - 95e6) < 1, "floor: a second wind-down year costs exactly one more year of G&A");
   ok(w.computeFailureFloor(Object.assign({}, sc, { programs: [sc.programs[0], sc.programs[0]] })) === null, "floor: none for more than one program");
 
+  // Outcome tree: the gates multiply back to the Base PoS, the endings sum to
+  // one, and a rejection at the FDA is valued after the Phase 3 and the review
+  // have been paid for.
+  const tr = w.computeOutcomeTree(sc, 12, sc.terminalValue);
+  ok(tr && tr.gates.length === 2 && tr.gates[0].label === "Phase 3 readout" && tr.gates[1].label === "FDA decision", "tree: two gates, Phase 3 readout then FDA decision");
+  ok(tr && Math.abs(tr.gates[0].pass * tr.gates[1].pass - 0.65) < 1e-9, "tree: passing both gates = the case's 65%");
+  ok(tr && Math.abs(tr.leaves.reduce((a, l) => a + l.prob, 0) - 1) < 1e-9, "tree: the endings' chances sum to 1");
+  ok(tr && Math.abs(tr.weighted - tr.leaves.reduce((a, l) => a + l.prob * l.value, 0)) < 1e-9 && Math.abs(tr.gates[0].failValue - fl.perShare) < 1e-9, "tree: weighted value is the sum of chance × value; the first failure is the floor");
+  const fda = tr && tr.gates[1].failDetail;
+  ok(fda && Math.abs(fda.equity - (420e6 - fda.trialCost - 95e6 * fda.readoutYears - 95e6)) < 1 && fda.trialCost > fl.trialCost && fda.readoutYears > fl.readoutYears, "tree: an FDA rejection is valued after both stages' cost and time");
+
   // ── In the app ──
   click(btn("+ New case")); await wait(300);
   const before = JSON.parse(w.localStorage.getItem("rxnpv_cases_v1") || "[]");

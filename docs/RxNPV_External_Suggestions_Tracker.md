@@ -828,3 +828,9 @@ Found while checking it at 900px: the table widened the whole page, because the 
 **The case at a glance** (the same phase) — the Agios-style evidence → probability → value picture the user flagged, built from the case's own data rather than illustration: its Evidence Log (facts first, then the least certain judgment), its Bear–Base–Bull odds with what the price implies, and a fan of fair value from Base (each line one input's range, shaded Bear to Bull, today's price across it, the top drivers listed). Top of the Overview, hideable, and the report's new "At a glance" opening section. Three layouts by width so text never shrinks; looking at each caught a Base label cut off at the left and card dots and a price tag cut off at the right, all fixed before this commit.
 
 Batch 1 of the approved mockups is complete: year by year, Monte Carlo histogram, break-even, value bridge, whole range with failure floor, and the case at a glance.
+
+## Phase 40 — Batch 2: how the catalysts play out
+
+✅ From the user, on the batch-2 mockups: "whatever is easiest for you to do next" — built in order of effort.
+
+**Outcome tree.** Each remaining catalyst as a gate with the case's own odds (for Stoke: 80% at the Phase 3 readout, 81% at the FDA, together the 65%), and every ending valued by the model — $43.24 if it launches, ≈$1.40 if the readout fails, ≈$0.74 if a positive readout is rejected (the failure floor, now able to value a failure after later stages have been paid for). The weighted sum ($28.50) is shown beside the model's Base ($29.05) with the reason they differ. Building it corrected the mockup's own reading: "four in five failures at the readout" was wrong — 0.20 against 0.15 is 57%, so the app says the risk is spread across two gates. A Phase 2 test case (three gates) checked the layout; below the width where the tree stays clean it becomes a plain list.
