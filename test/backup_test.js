@@ -135,6 +135,15 @@ function stub(obj) {
   const fda = tr && tr.gates[1].failDetail;
   ok(fda && Math.abs(fda.equity - (420e6 - fda.trialCost - 95e6 * fda.readoutYears - 95e6)) < 1 && fda.trialCost > fl.trialCost && fda.readoutYears > fl.readoutYears, "tree: an FDA rejection is valued after both stages' cost and time");
 
+  // Resubmission branch: 30% of FDA rejections move to "approved a year late",
+  // valued with launch one year later at certain odds; chances still sum to 1
+  // and the gates (the case's own odds) are unchanged.
+  const trL = w.computeOutcomeTree(Object.assign({}, sc, { outcomeTree: { resubmitFixPct: "30" } }), 12, sc.terminalValue);
+  const lateV = w.computeCaseValuation(Object.assign({}, sc, { programs: [Object.assign({}, sc.programs[0], { posOverridePct: "100", launchYearOffset: "2" })] }), { label: "Base", shareMultiplierPct: 100, posMultiplierPct: 100, discountRateAddPct: 0 }, "base", 12, sc.terminalValue).equity.perShare;
+  ok(trL && trL.late && Math.abs(trL.late.prob - tr.gates[1].failProb * 0.3) < 1e-12 && Math.abs(trL.late.value - lateV) < 1e-9, "tree: resubmission takes 30% of FDA rejections, valued a year late");
+  ok(trL && Math.abs(trL.leaves.reduce((a, l) => a + l.prob, 0) - 1) < 1e-9 && trL.gates.every((g, i) => g.pass === tr.gates[i].pass) && lateV < tr.success, "tree: chances still sum to 1, gates unchanged, a late approval is worth less");
+  ok(tr.late === null, "tree: the branch is off by default");
+
   // Before the readout: odds after a positive readout = 0.65 / 0.8023 = 81.02%;
   // a clear win closes 40% of the gap: 81.02 + 0.4 × 18.98 = 88.61%. Chances:
   // 0.8023 × 0.6 = 0.4814, 0.8023 × 0.4 = 0.3209, miss 0.1977 (the floor).

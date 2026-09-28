@@ -490,9 +490,26 @@ function computeOutcomeTree(theCase, discountRateBasePct, terminalValueParams) {
     gates.push({ key: it.key, label: regulatory ? "FDA decision" : it.label + " readout", passWord: regulatory ? "approved" : "positive", failWord: regulatory ? "not approved" : "negative",
       endYears: cum, reach, pass, failProb: reach * (1 - pass), failValue: fl.perShare, failDetail: fl });
   }
-  const leaves = [{ kind: "success", prob: pv.posToLaunch, value: success }].concat(gates.map((g, i) => ({ kind: "fail", gate: i, prob: g.failProb, value: g.failValue })));
+  // Optional resubmission branch (theCase.outcomeTree.resubmitFixPct, blank
+  // or 0 = off): that share of FDA rejections is fixed and approved a year
+  // later, valued as the success case with launch pushed back a year. It
+  // moves probability out of the rejection ending; the gates' odds (and so
+  // the case's own PoS) are untouched — the branch is a view on what a
+  // rejection means, not a second opinion on the odds.
+  let late = null;
+  const last = gates[gates.length - 1];
+  const fixPct = Number(((theCase.outcomeTree || {}).resubmitFixPct) || 0);
+  if (last && last.key === "regulatory" && fixPct > 0) {
+    const fix = Math.min(100, fixPct) / 100;
+    const offset = resolveLaunchYearOffset(program);
+    const value = computeCaseValuation({ ...theCase, programs: [{ ...program, posOverridePct: "100", launchYearOffset: String(offset + 1) }] }, SCENARIO_PRESETS.base, "base", discountRateBasePct, terminalValueParams).equity.perShare;
+    late = { prob: last.failProb * fix, value, fixPct: fix * 100 };
+  }
+  const leaves = [{ kind: "success", prob: pv.posToLaunch, value: success }]
+    .concat(late ? [{ kind: "late", prob: late.prob, value: late.value }] : [])
+    .concat(gates.map((g, i) => ({ kind: "fail", gate: i, prob: late && i === gates.length - 1 ? g.failProb - late.prob : g.failProb, value: g.failValue })));
   const weighted = leaves.reduce((a, l) => a + l.prob * l.value, 0);
-  return { gates, leaves, success, weighted, posToLaunch: pv.posToLaunch };
+  return { gates, leaves, success, late, weighted, posToLaunch: pv.posToLaunch };
 }
 
 // ── Before the next readout: what each result would do to the value ────────

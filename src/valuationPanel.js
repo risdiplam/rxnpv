@@ -229,7 +229,7 @@ function useValuationSections({ theCase, onChange, goToTab }) {
     })()),
 
     // How the remaining catalysts play out (catalystViews.js).
-    show("overview") && (!error && scenarioResults && valMethod === "dcf" && theCase.programs.length === 1 && h(OutcomeTreeSection, { theCase, discountRatePct, tv, baseValue: baseResult && baseResult.equity ? baseResult.equity.perShare : null })),
+    show("overview") && (!error && scenarioResults && valMethod === "dcf" && theCase.programs.length === 1 && h(OutcomeTreeSection, { theCase, discountRatePct, tv, onChange, baseValue: baseResult && baseResult.equity ? baseResult.equity.perShare : null })),
 
     // Valuation method toggle — DCF is the full bottoms-up build everything
     // else on this panel assumes; Simple Multiple is the RxNPV-style

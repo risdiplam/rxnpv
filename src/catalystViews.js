@@ -44,7 +44,8 @@ function OutcomeTreeChart({ tree, price, label }) {
     return h("div", { ref: wrapRef, className: "tree-list" },
       tree.gates.map((g, i) => h("div", { key: i, className: "tree-list-gate" },
         h("b", null, g.label), " · ~" + monthsFromNow(g.endYears) + ": " + g.passWord + " " + pct(g.pass) + ", " + g.failWord + " " + pct(1 - g.pass) + " → ≈" + fmtShare(g.failValue) + " a share")),
-      h("div", { className: "tree-list-gate" }, h("b", null, "Launch"), " · " + pct(tree.posToLaunch) + " of outcomes → " + fmtShare(tree.success) + " a share"));
+      h("div", { className: "tree-list-gate" }, h("b", null, "Launch"), " · " + pct(tree.posToLaunch) + " of outcomes → " + fmtShare(tree.success) + " a share"),
+      tree.late && h("div", { className: "tree-list-gate" }, h("b", null, "Approved a year late"), " · " + pct(tree.late.prob) + " of outcomes → " + fmtShare(tree.late.value) + " a share"));
   }
   const els = [];
   const node = (key, x, y, w, lines, kind) => {
@@ -58,39 +59,51 @@ function OutcomeTreeChart({ tree, price, label }) {
     return { x, y, w };
   };
   const edges = [];
-  const edge = (key, a, b, text, color) => {
-    const x1 = a.x + a.w, y1 = a.y, x2 = b.x, y2 = b.y, mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
+  // at: where along the edge the label sits (0.5 = midway). A label on a
+  // straight edge that shares its start with two curving ones goes further
+  // along, where the curves have already moved away from it.
+  const edge = (key, a, b, text, color, at) => {
+    const x1 = a.x + a.w, y1 = a.y, x2 = b.x, y2 = b.y, mx = (x1 + x2) / 2;
     const pw = text ? measureLabel(text, 12, 600) + 16 : 0;
+    // Never closer than 10px to either box, wherever `at` would put it.
+    const lx = Math.min(x2 - pw / 2 - 10, Math.max(x1 + pw / 2 + 10, x1 + (x2 - x1) * (at || 0.5))), ly = y1 + (y2 - y1) * ((lx - x1) / ((x2 - x1) || 1));
     edges.push(h("g", { key },
       h("path", { d: "M" + x1 + "," + y1 + " C" + mx + "," + y1 + " " + mx + "," + y2 + " " + x2 + "," + y2, fill: "none", stroke: color, strokeWidth: 1.6 }),
-      text && h("rect", { x: mx - pw / 2, y: my - 11, width: pw, height: 22, rx: 11, fill: "var(--surface)", stroke: color }),
-      text && h("text", { x: mx, y: my + 4, textAnchor: "middle", fontSize: 12, fontWeight: 600, fontFamily: "var(--sans)", fill: color }, text)));
+      text && h("rect", { x: lx - pw / 2, y: ly - 11, width: pw, height: 22, rx: 11, fill: "var(--surface)", stroke: color }),
+      text && h("text", { x: lx, y: ly + 4, textAnchor: "middle", fontSize: 12, fontWeight: 600, fontFamily: "var(--sans)", fill: color }, text)));
   };
   // Leaves down the right: success at the top, then the failure at each gate,
   // last gate first. Each gate sits halfway between the branch it passes to
   // and its own failure, so the passing lines climb and the failing ones fall.
+  // With the resubmission branch on, its leaf sits under "Launches" and the
+  // failures move down one slot; the last gate then lines up with it.
+  const E = tree.late ? 1 : 0;
   const S = 116, L0 = 44;
   const leafY = j => L0 + j * S;
   const gy = new Array(N);
-  gy[N - 1] = (leafY(0) + leafY(1)) / 2;
-  for (let k = N - 2; k >= 0; k--) gy[k] = (gy[k + 1] + leafY(N - k)) / 2;
-  const H = leafY(N) + 44;
+  gy[N - 1] = (leafY(0) + leafY(1 + E)) / 2;
+  for (let k = N - 2; k >= 0; k--) gy[k] = (gy[k + 1] + leafY(N - k + E)) / 2;
+  const H = leafY(N + E) + 44;
   const succ = node("leaf-s", leafX, leafY(0), leafW, ["Launches", { t: fmtShare(tree.success) + " a share", mono: true, bold: true, color: "var(--green)" }, { t: pct(tree.posToLaunch) + " of outcomes" }], "good");
-  const fails = tree.gates.map((g, k) => node("leaf-f" + k, leafX, leafY(N - k), leafW,
+  const lateLeaf = tree.late && node("leaf-l", leafX, leafY(1), leafW, ["Approved a year late", { t: fmtShare(tree.late.value) + " a share", mono: true, bold: true, color: "var(--green)" }, { t: pct(tree.late.prob) + " of outcomes" }], "good");
+  const failProbOf = k => tree.leaves.find(l => l.kind === "fail" && l.gate === k).prob;
+  const fails = tree.gates.map((g, k) => node("leaf-f" + k, leafX, leafY(N - k + E), leafW,
     [k === N - 1 && g.key === "regulatory" ? "Not approved after a positive readout" : g.label.replace(/ readout$/, "") + (k === 0 ? " fails" : " fails after earlier success"),
-      { t: "≈" + fmtShare(g.failValue) + " a share", mono: true, bold: true, color: "var(--red)" }, { t: pct(g.failProb) + " of outcomes" }], "bad"));
+      { t: "≈" + fmtShare(g.failValue) + " a share", mono: true, bold: true, color: "var(--red)" }, { t: pct(failProbOf(k)) + " of outcomes" }], "bad"));
   const gates = tree.gates.map((g, k) => node("gate" + k, firstGateX + k * step, gy[k], gateW, [g.label, { t: "~" + monthsFromNow(g.endYears) + " in the model" }]));
   const today = node("today", 0, gy[0], todayW, ["Today", { t: price > 0 ? fmtShare(price) + " a share" : "—", mono: true }], "root");
   edge("e-t", today, gates[0], "", "var(--ink-3)");
   tree.gates.forEach((g, k) => {
     edge("e-p" + k, gates[k], k === N - 1 ? succ : gates[k + 1], g.passWord + " · " + pct(g.pass), "var(--green)");
-    edge("e-f" + k, gates[k], fails[k], g.failWord + " · " + pct(1 - g.pass), "var(--red)");
+    const fixShare = tree.late && k === N - 1 ? tree.late.fixPct / 100 : 0;
+    edge("e-f" + k, gates[k], fails[k], g.failWord + " · " + pct((1 - g.pass) * (1 - fixShare)), "var(--red)");
+    if (fixShare) edge("e-l", gates[k], lateLeaf, "resubmitted · " + pct((1 - g.pass) * fixShare), "var(--green)", 0.72);
   });
   return h("div", { ref: wrapRef },
     h("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": label || "Outcome tree", "data-titled": "1", style: { width: "100%", height: H, display: "block" } }, edges, els));
 }
 
-function OutcomeTreeSection({ theCase, discountRatePct, tv, baseValue }) {
+function OutcomeTreeSection({ theCase, discountRatePct, tv, baseValue, onChange }) {
   const h = React.createElement;
   let tree = null;
   try {
@@ -114,7 +127,15 @@ function OutcomeTreeSection({ theCase, discountRatePct, tv, baseValue }) {
         h("div", { style: { ...UI.caption, marginTop: 2 } }, tree.leaves.map(l => l.prob.toFixed(2) + " × " + fmtShare(l.value)).join(" + "))),
       baseValue != null && h("div", { className: "mc-stat" }, h("div", { style: UI.caption }, "Model Base"),
         h("div", { style: { fontSize: 20, fontFamily: "var(--mono)", fontWeight: 700, color: "var(--ink-1)" } }, fmtShare(baseValue)))),
-    h(Explain, readOutcomeTree(tree.gates, tree.weighted, baseValue)));
+    h(Explain, readOutcomeTree(tree.gates, tree.weighted, baseValue)),
+    onChange && tree.gates[tree.gates.length - 1].key === "regulatory" && h("div", { className: "prose", style: { ...UI.caption, marginTop: 10 } },
+      h("label", { style: { display: "inline-flex", alignItems: "center", gap: 6, flexWrap: "nowrap" } },
+      h("span", null, "Optional: FDA rejections fixed and approved a year later"),
+      h("input", { type: "number", min: 0, max: 100, step: 5, className: "rs-input", placeholder: "0", "aria-label": "Share of FDA rejections fixed on resubmission (%)",
+        value: ((theCase.outcomeTree || {}).resubmitFixPct) == null ? "" : theCase.outcomeTree.resubmitFixPct,
+        onChange: e => onChange({ ...theCase, outcomeTree: { ...(theCase.outcomeTree || {}), resubmitFixPct: e.target.value }, updatedAt: Date.now() }) }),
+      h("span", null, "%")),
+      h("div", { style: { marginTop: 4 } }, "Blank or 0 leaves the branch off. The case's own odds do not change; this only says what a rejection turns into.")));
 }
 
 // ── Before the next readout: the three results as a table ──────────────────
