@@ -51,7 +51,7 @@ const cps=[];function cp(n){cps.push({n,e:errors.length});}
   // Monte Carlo
   const mcBtn=[...d.querySelectorAll("button")].find(b=>b.textContent.includes("Run 3,000 trials"));
   if(mcBtn){click(mcBtn);await wait(3500);cp("Monte Carlo run");
-    t=root.textContent; console.log("Monte Carlo produces results:", t.includes("P50"));}
+    t=root.textContent; console.log("Monte Carlo produces results:", t.includes("Median") && !!d.querySelector('svg[aria-label^="Histogram of"]'));}
 
   // All top-level views
   for(const v of ["Tools","Simulation","Portfolio","Reference Sheet"]){click(btn(v));await wait(600);cp("view: "+v);}

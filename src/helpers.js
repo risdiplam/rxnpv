@@ -1006,7 +1006,7 @@ function appendEdgarEvidenceToPrograms(programs, edgarResult, contextLabel) {
 // computed on every render, since thousands of full DCF runs per click is
 // meaningfully more expensive than anything else on this panel; running it
 // on every keystroke would make the UI feel sluggish for no benefit.
-function MonteCarloBox({ theCase, discountRatePct, tv }) {
+function MonteCarloBox({ theCase, discountRatePct, tv, baseValue }) {
   const h = React.createElement;
   const [result, setResult] = React.useState(null);
   const [running, setRunning] = React.useState(false);
@@ -1024,20 +1024,12 @@ function MonteCarloBox({ theCase, discountRatePct, tv }) {
     }, 10); // yield one tick so the "Running..." state actually paints before the heavy loop blocks the thread
   };
 
-  const fmt = fmtShare;
-  // All five bars share one axis that always contains zero, and each bar runs
-  // from zero to its value. Scaling by v / P90 (as this once did) drew every
-  // negative percentile as a 2% stub and a small positive P90 as the full
-  // width — so a distribution centred on -$0.15 looked like it sat at +$0.05.
-  const axisLo = result ? Math.min(0, result.percentiles.p10) : 0;
-  const axisHi = result ? Math.max(0, result.percentiles.p90) : 1;
-  const axisSpan = (axisHi - axisLo) || 1;
-  const axisPos = v => ((v - axisLo) / axisSpan) * 100;
-  const zeroPct = axisPos(0);
-  const barStyle = (v, color) => {
-    const a = axisPos(v), left = Math.min(a, zeroPct), width = Math.abs(a - zeroPct);
-    return { position: "absolute", top: 0, bottom: 0, left: left + "%", width: "max(3px, " + width + "%)", borderRadius: 3, background: color };
-  };
+  const price = theCase.currentPrice !== "" && theCase.currentPrice != null && Number(theCase.currentPrice) > 0 ? Number(theCase.currentPrice) : null;
+  const aboveCount = result && price != null ? result.sortedValues.filter(v => v >= price).length : null;
+  const stat = (label, value, sub, color) => h("div", { key: label, className: "mc-stat" },
+    h("div", { style: UI.caption }, label),
+    h("div", { style: { fontSize: 20, fontFamily: "var(--mono)", fontWeight: 700, color: color || "var(--ink-1)" } }, value),
+    sub && h("div", { style: { ...UI.caption, marginTop: 2 } }, sub));
 
   return h(ExportSection, { title: "Full-case Monte Carlo", style: { marginTop: 16, padding: "14px 16px", borderRadius: 10, background: "var(--surface-2)", border: "1.5px solid var(--teal)" } },
     h("div", { style: { fontSize: 13, fontFamily: "var(--display)", fontWeight: 700, color: "var(--ink-1)", marginBottom: 4 } }, "Full-case Monte Carlo"),
@@ -1048,26 +1040,24 @@ function MonteCarloBox({ theCase, discountRatePct, tv }) {
     }, running ? "Running…" : result ? "Re-run" : "Run 3,000 trials"),
     error && h("div", { style: { marginTop: 10, fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-2)" } }, error),
     result && h("div", { style: { marginTop: 14 } },
+      // Every trial, not five summary points: the histogram shows the shape
+      // (a long tail, a lump at failure) that percentiles alone hide.
+      h("div", { className: "mc-stats" },
+        stat("P10", fmtShare(result.percentiles.p10)),
+        stat("Median", fmtShare(result.percentiles.p50), baseValue != null ? "Base point estimate " + fmtShare(baseValue) : null),
+        stat("P90", fmtShare(result.percentiles.p90)),
+        aboveCount != null && stat("Above today's price", Math.round(aboveCount / result.sortedValues.length * 100) + "%", aboveCount.toLocaleString() + " of " + result.sortedValues.length.toLocaleString(), aboveCount / result.sortedValues.length >= 0.5 ? "var(--green)" : "var(--red)")),
       h(ExportableBlock, { title: (theCase.name || "Case") + " — Monte Carlo fair-value distribution" },
-      h("div", { style: { display: "flex", gap: 20, flexWrap: "wrap", marginBottom: 14 } },
-        [["P10", result.percentiles.p10], ["P25", result.percentiles.p25], ["P50 (median)", result.percentiles.p50], ["P75", result.percentiles.p75], ["P90", result.percentiles.p90]].map(([label, v]) =>
-          h("div", { key: label }, h("div", { style: UI.caption }, label),
-            h("div", { style: { fontSize: 15, fontFamily: "var(--mono)", fontWeight: 700, color: label.startsWith("P50") ? "var(--teal)" : "var(--ink-1)" } }, fmt(v))))
-      ),
-      [["P10", result.percentiles.p10, "var(--ink-3)"], ["P25", result.percentiles.p25, "var(--amber)"], ["P50", result.percentiles.p50, "var(--teal)"], ["P75", result.percentiles.p75, "var(--amber)"], ["P90", result.percentiles.p90, "var(--ink-3)"]].map(([label, v, color]) =>
-        h("div", { key: label, style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 4 } },
-          h("div", { style: { width: 28, fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)" } }, label),
-          h("div", { style: { position: "relative", flex: 1, height: 6, borderRadius: 3, background: "var(--surface)" } },
-            axisLo < 0 && axisHi > 0 && h("div", { style: { position: "absolute", top: -3, bottom: -3, left: zeroPct + "%", width: 1, background: "var(--ink-3)" } }),
-            h("div", { style: barStyle(v, color) })))
-      ),
-      h("div", { style: { display: "flex", alignItems: "center", gap: 8, marginTop: 2 } },
-        h("div", { style: { width: 28 } }),
-        h("div", { style: { position: "relative", flex: 1, height: 14, fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)" } },
-          h("span", { style: { position: "absolute", left: 0 } }, fmt(axisLo)),
-          axisLo < 0 && axisHi > 0 && zeroPct > 8 && zeroPct < 92 && h("span", { style: { position: "absolute", left: zeroPct + "%", transform: "translateX(-50%)" } }, "0"),
-          h("span", { style: { position: "absolute", right: 0 } }, fmt(axisHi))))
-      ),
+        h(HistogramChart, { sortedValues: result.sortedValues, price, height: 250,
+          label: "Histogram of " + result.sortedValues.length.toLocaleString() + " simulated fair values per share",
+          markers: [
+            { value: result.percentiles.p10, label: "P10", color: "var(--ink-3)", dash: "4,3" },
+            { value: result.percentiles.p50, label: "Median", color: "var(--ink-1)", dash: "4,3" },
+            { value: result.percentiles.p90, label: "P90", color: "var(--ink-3)", dash: "4,3" },
+            price != null && { value: price, label: "Today", color: "var(--warn)" },
+            baseValue != null && { value: baseValue, label: "Base", color: "var(--teal)", dash: "2,3" }
+          ].filter(Boolean) }),
+        h("div", { style: { ...UI.caption, marginTop: 4 } }, "Fair value per share across " + result.sortedValues.length.toLocaleString() + " simulations. P25 " + fmtShare(result.percentiles.p25) + " · P75 " + fmtShare(result.percentiles.p75) + (price != null ? ". Green bars are outcomes at or above today's price." : "."))),
       h(Explain, Object.assign({ onTint: true }, readMonteCarlo(result.sortedValues, result.percentiles.p10, result.percentiles.p90, theCase.currentPrice !== "" && theCase.currentPrice != null ? Number(theCase.currentPrice) : null, result.drivers))),
       h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginTop: 10, lineHeight: 1.6 } },
         "Median can differ from the Base-case point estimate above — that's expected, not a discrepancy: discounting is non-linear (a higher rate hurts value more than an equal-sized lower rate helps it), so averaging across a range captures that in a way three fixed points can't."),

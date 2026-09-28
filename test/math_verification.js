@@ -80,7 +80,7 @@ const EXPORTS = [
   "computeBinaryEventImpliedPoS", "selectPeakSalesCompWindow",
   "applyTaxToCalendar", "computeMoleculeTypePoSRatios", "POS_BY_MOLECULE",
   "computeProgramValuation",
-  "revenueChartYScale", "niceAxisTicks", "localDateStamp", "selectPeakSalesCompWindow",
+  "revenueChartYScale", "niceAxisTicks", "histogramBins", "spreadLabels", "localDateStamp", "selectPeakSalesCompWindow",
   "readPriceVsScenarios", "readMonteCarlo", "readCashFlow", "readSotp", "readRiskWaterfall", "readTornado", "readPriceGrid", "readInterval", "readPValue", "readSingleArm", "readAssurance", "readPeakSalesRange", "readBinaryImplied", "readPremium", "readForwardRunway",
   "measureStorage", "STORAGE_ASSUMED_QUOTA_BYTES", "STORAGE_WARN_FRACTION", "STORAGE_CRITICAL_FRACTION",
   "computeTreatedPopulation", "launchCurveForYears", "erosionMultiplier", "computeProgramRevenue",
@@ -4187,6 +4187,23 @@ section("Year-by-year projection rows");
   ok("projection: running total -92.5620", Math.abs(rows[1].runningPV - -92.56198) < 1e-4);
   ok("projection: no phase without a single matching program", rows[0].phase === null);
 
+}
+section("Histogram bins and label lanes");
+{
+  // [3, 4, 4, 7, 12] aiming for 5 bins: range 9 / 5 = 1.8 -> step 2. Start at
+  // floor(3/2)*2 = 2; ceil((12-2)/2) = 5 bins: [2,4) 1 · [4,6) 2 · [6,8) 1 ·
+  // [8,10) 0 · [10,12] 1 (the maximum falls in the last bin, not past it).
+  const b = api.histogramBins([3, 4, 4, 7, 12], 5);
+  ok("histogram: width 2 from 2", b.width === 2 && b.lo === 2);
+  ok("histogram: counts 1,2,1,0,1", JSON.stringify(b.counts) === "[1,2,1,0,1]");
+  ok("histogram: every value counted once", b.counts.reduce((a, c) => a + c, 0) === 5);
+  // Labels 50 wide at 100, 120, 200, 10px apart, room 0-400. Left to right:
+  // 100 stays (75-125); 120 must start at 135 -> centre 160 (135-185); 200
+  // must start at 195 -> centre 220. Nothing pushes back from the right.
+  ok("spread labels: 100, 160, 220", JSON.stringify(api.spreadLabels([{ x: 100, w: 50 }, { x: 120, w: 50 }, { x: 200, w: 50 }], 0, 400, 10)) === "[100,160,220]");
+  // Against the right edge at 230: 200's label ends at 225 (fine), but at
+  // 180 max the right pass pulls 200 to 155, 120 to 95, 100 to 35.
+  ok("spread labels: pushed back from the right edge", JSON.stringify(api.spreadLabels([{ x: 100, w: 50 }, { x: 120, w: 50 }, { x: 200, w: 50 }], 0, 180, 10)) === "[35,95,155]");
 }
 report();
 

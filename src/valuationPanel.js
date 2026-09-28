@@ -496,7 +496,7 @@ function useValuationSections({ theCase, onChange, goToTab }) {
       );
     })()),
 
-    show("overview") && (!error && h(MonteCarloBox, { theCase, discountRatePct, tv })),
+    show("overview") && (!error && h(MonteCarloBox, { theCase, discountRatePct, tv, baseValue: baseResult && baseResult.equity ? baseResult.equity.perShare : null })),
 
     // Scenario comparison
     show("overview|scenarios") && (error ? h("div", { style: { padding: 14, borderRadius: 8, background: "var(--red-bg)", border: "1px solid var(--red)", color: "var(--red)", fontFamily: "var(--mono)", fontSize: 12 } }, "Calculation error: " + error)

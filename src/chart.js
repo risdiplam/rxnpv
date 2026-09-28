@@ -263,6 +263,114 @@ function ProjectionChart({ rows, startYear, height, label }) {
   );
 }
 
+// ── Label placement shared by the marker charts ────────────────────────────
+// Text width in px for a label drawn in the app's mono face. Measured with a
+// canvas where there is one; jsdom has none, so a per-character estimate
+// stands in (mono glyphs are ~0.6em wide).
+let _labelCanvas = null;
+function measureLabel(text, px, weight) {
+  try {
+    // jsdom has no 2D context (and logs an error when asked for one).
+    if (!_labelCanvas && typeof CanvasRenderingContext2D !== "undefined") _labelCanvas = document.createElement("canvas").getContext("2d");
+    if (_labelCanvas) {
+      const mono = getComputedStyle(document.documentElement).getPropertyValue("--mono").trim() || "monospace";
+      _labelCanvas.font = (weight || 400) + " " + px + "px " + mono;
+      const w = _labelCanvas.measureText(text).width;
+      if (w > 0) return w;
+    }
+  } catch (e) { /* fall through to the estimate */ }
+  return String(text).length * px * 0.62;
+}
+// Spreads labels along one row so none overlap, keeping them in the same
+// left-to-right order as the points they name and each as close to its own
+// point as the others allow. Because the order is preserved, the leader lines
+// from each label down to its point can never cross each other or another
+// label — which stacked rows of labels could not promise (a line from the top
+// row ran through a label in the row below). items: [{ x, w }]; returns the
+// centre x for each label. If they cannot all fit, they spill past the edge
+// rather than overlap.
+function spreadLabels(items, minX, maxX, gap) {
+  const order = items.map((_, i) => i).sort((a, b) => items[a].x - items[b].x);
+  const c = items.map(it => it.x);
+  let prevRight = -Infinity;
+  order.forEach(i => { const w = items[i].w, l = Math.max(c[i] - w / 2, prevRight + gap, minX); c[i] = l + w / 2; prevRight = l + w; });
+  let nextLeft = Infinity;
+  order.slice().reverse().forEach(i => { const w = items[i].w, r = Math.min(c[i] + w / 2, nextLeft - gap, maxX); c[i] = r - w / 2; nextLeft = r - w; });
+  return c;
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Histogram of simulated values — every trial, binned on round-number steps,
+// with the bins at or above a reference price shaded green and labelled
+// marker lines (percentiles, today's price, the point estimate) whose labels
+// sit in their own lanes above the bars.
+// markers: [{ value, label, color, dash }]; price: bins >= price go green.
+// ════════════════════════════════════════════════════════════════════════════
+function histogramBins(sortedValues, targetBins) {
+  const lo0 = sortedValues[0], hi0 = sortedValues[sortedValues.length - 1];
+  if (!(hi0 > lo0)) return { lo: lo0 - 0.5, width: 1, counts: [sortedValues.length] };
+  const width = niceAxisTicks(0, hi0 - lo0, targetBins || 30).step;
+  const lo = Math.floor(lo0 / width) * width;
+  const n = Math.max(1, Math.ceil((hi0 - lo) / width - 1e-9));
+  const counts = new Array(n).fill(0);
+  sortedValues.forEach(v => { counts[Math.min(n - 1, Math.floor((v - lo) / width + 1e-9))]++; });
+  return { lo, width, counts };
+}
+function HistogramChart({ sortedValues, markers, price, height, label, fmt }) {
+  const h = React.createElement;
+  height = height || 260;
+  fmt = fmt || fmtShare;
+  const wrapRef = React.useRef(null);
+  const svgRef = React.useRef(null);
+  const measured = useMeasuredWidth(wrapRef, 900);
+  const [hoverBin, setHoverBin] = React.useState(null);
+  if (!sortedValues || !sortedValues.length) return h("div", { ref: wrapRef });
+  const bins = histogramBins(sortedValues, 30);
+  const hi = bins.lo + bins.width * bins.counts.length;
+  const W = Math.max(360, measured), padL = 16, padR = 16, padB = 30;
+  const x = v => padL + (v - bins.lo) / (hi - bins.lo) * (W - padL - padR);
+  const ms = (markers || []).filter(m => m.value != null && isFinite(m.value) && m.value >= bins.lo && m.value <= hi)
+    .map(m => ({ ...m, text: m.label + " " + fmt(m.value) })).sort((a, b) => a.value - b.value);
+  // One row of labels, spread apart in marker order, each joined to its
+  // marker by a leader; the marker lines start below the leaders.
+  const labelY = 14, top = ms.length ? 44 : 10;
+  const centers = spreadLabels(ms.map(m => ({ x: x(m.value), w: measureLabel(m.text, 11, 600) })), padL, W - padR, 14);
+  const H = height, y1 = H - padB;
+  const maxC = Math.max(...bins.counts, 1);
+  const yc = c => y1 - c / maxC * (y1 - top);
+  const axisT = niceAxisTicks(bins.lo, hi, 8);
+  const ticks = axisT.ticks.filter(v => v >= bins.lo - 1e-9 && v <= hi + 1e-9);
+  // Whole-number steps read as "$20", not "$20.00".
+  const tickFmt = v => axisT.step >= 1 && Number.isInteger(v) && fmt === fmtShare ? (v < 0 ? "-$" : "$") + Math.abs(v) : fmt(v);
+  const handleMove = e => {
+    if (!svgRef.current) return;
+    const rect = svgRef.current.getBoundingClientRect();
+    const i = Math.floor(((e.clientX - rect.left) / rect.width * W - padL) / ((W - padL - padR) / bins.counts.length));
+    setHoverBin(i >= 0 && i < bins.counts.length ? i : null);
+  };
+  const tipRight = hoverBin != null && hoverBin > bins.counts.length * 0.6;
+  return h("div", { ref: wrapRef, style: { position: "relative" } },
+    h("svg", { ref: svgRef, viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": label || "Distribution of simulated values", "data-titled": "1", style: { width: "100%", height: H, display: "block" },
+        onMouseMove: handleMove, onMouseLeave: () => setHoverBin(null) },
+      bins.counts.map((c, i) => {
+        const a = bins.lo + i * bins.width, above = price > 0 && a + bins.width / 2 >= price;
+        const bx = x(a) + 1.5, bw = Math.max(1, x(a + bins.width) - x(a) - 3);
+        return c > 0 && h("rect", { key: i, x: bx, y: yc(c), width: bw, height: y1 - yc(c), rx: 2,
+          fill: above ? "var(--green)" : "var(--teal)", opacity: hoverBin === i ? 0.95 : above ? 0.7 : 0.5 });
+      }),
+      h("line", { x1: padL, x2: W - padR, y1: y1, y2: y1, stroke: "var(--ink-3)" }),
+      ticks.map((v, i) => h("text", { key: "t" + i, x: x(v), y: y1 + 18, textAnchor: "middle", fontSize: 10, fontFamily: "var(--mono)", fill: "var(--ink-3)" }, tickFmt(v))),
+      ms.map((m, i) => h("g", { key: "m" + i },
+        h("polyline", { points: centers[i] + "," + (labelY + 5) + " " + centers[i] + "," + (labelY + 10) + " " + x(m.value) + "," + (top - 4), fill: "none", stroke: m.color, strokeWidth: 1, opacity: 0.8 }),
+        h("line", { x1: x(m.value), x2: x(m.value), y1: top - 4, y2: y1, stroke: m.color, strokeWidth: 1.5, strokeDasharray: m.dash || "none" }),
+        h("text", { x: centers[i], y: labelY, textAnchor: "middle", fontSize: 11, fontWeight: 600, fontFamily: "var(--mono)", fill: m.color }, m.text)))
+    ),
+    hoverBin != null && h("div", { className: "proj-tip", style: { top: top, left: tipRight ? "auto" : (x(bins.lo + (hoverBin + 1) * bins.width) / W * 100) + "%", right: tipRight ? ((W - x(bins.lo + hoverBin * bins.width)) / W * 100) + "%" : "auto", transform: tipRight ? "translate(-6px, 0)" : "translate(6px, 0)" } },
+      h("div", { style: { color: "var(--ink-1)", fontWeight: 700 } }, fmt(bins.lo + hoverBin * bins.width) + " – " + fmt(bins.lo + (hoverBin + 1) * bins.width)),
+      h("div", null, bins.counts[hoverBin].toLocaleString() + " of " + sortedValues.length.toLocaleString() + " trials"))
+  );
+}
+
 // ════════════════════════════════════════════════════════════════════════════
 // Scatter chart — for comp positioning (e.g. deal value vs. premium), with an
 // optional single "your case" point rendered distinctly so you can see where

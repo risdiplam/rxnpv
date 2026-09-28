@@ -307,6 +307,14 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
     ok(!panel.querySelector(".proj-table") && w.localStorage.getItem("rxnpv_proj_view") === "chart", "Projections: Chart hides the table and remembers");
     click([...panel.querySelectorAll(".proj-toggle button")].find(b => b.textContent === "Chart + table")); await wait(200);
     ok(!!panel.querySelector(".proj-table") && !!panel.querySelector('svg[aria-label^="Year-by-year"]'), "Projections: Chart + table shows both again");
+
+    // Monte Carlo: a histogram of every trial with labelled markers, not five bars.
+    click([...panel.querySelectorAll("button")].find(b => b.textContent.includes("Run 3,000 trials"))); await wait(4000);
+    const hist = panel.querySelector('svg[aria-label^="Histogram of 3,000"]');
+    ok(!!hist && hist.querySelectorAll("rect").length >= 8, "Monte Carlo: histogram of every trial renders");
+    const labels = hist ? [...hist.querySelectorAll("text")].map(t => t.textContent) : [];
+    ok(["P10 ", "Median ", "P90 ", "Today $24.80", "Base $29.05"].every(l => labels.some(t => t.startsWith(l))), "Monte Carlo: P10, median, P90, today and Base are all marked (" + labels.filter(t => /\s\$/.test(t)).join(" | ") + ")");
+    ok(/Above today's price/.test(panel.textContent), "Monte Carlo: states the share of trials above today's price");
   }
 
   // ── Assumptions section list: states come from the data, links are live ──
