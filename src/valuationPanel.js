@@ -622,6 +622,7 @@ function useValuationSections({ theCase, onChange, goToTab }) {
               fmtShare(s.result.equity.perShare))
           ))
         )),
+        show("scenarios") && (valMethod === "dcf" && theCase.programs.length === 1 && h(ReadoutScenariosSection, { theCase, discountRatePct, tv, baseValue: baseResult && baseResult.equity ? baseResult.equity.perShare : null, onChange })),
         show("overview") && (valMethod === "dcf" && baseResult && h(ProjectionsCard, { theCase, result: baseResult })),
 
         // Implied PoS — the reverse direction from everything else on this

@@ -339,6 +339,21 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
     ok(!!tree && ["Launches", "$43.24 a share", "≈$1.40 a share", "≈$0.74 a share", "positive · 80%", "approved · 81%"].every(t => tt.includes(t)) || (!!tree && /Phase 3 readout.*positive 80%.*≈\$1\.40/.test(tt)), "Tree: gates, odds and endings render (" + tt.slice(0, 160) + ")");
     ok(!!tree && /0\.65 × \$43\.24/.test(tree.textContent), "Tree: the weighted sum is written out");
 
+    // Readout scenarios reading: price $20; clear $30 (+50%), modest $22 (+10%),
+    // miss $2 (-90%); weighted $24 = +20%; miss chance 0.25 -> "one time in four".
+    const rr = w.readReadoutScenarios([{ value: 30, prob: 0.45 }, { value: 22, prob: 0.3 }, { value: 2, prob: 0.25 }], 24, 20, 25);
+    ok(rr && rr.verdict === "A win is worth +10% to +50%; a miss costs 90%." && rr.text.includes("$24.00 — 20% above today's price, against the Base case's $25.00") && rr.text.includes("one time in four"), "Readout: the reading states the moves and the weighted value");
+    click(d.getElementById("casetab-scenarios")); await wait(300);
+    const rsSec = [...d.querySelectorAll("[data-export-section]")].find(e => e.getAttribute("data-export-section") === "Before the next readout");
+    ok(!!rsSec && /EMPEROR Phase 3 topline: what each result would do to the value/.test(rsSec.textContent) && /≈\$1\.40/.test(rsSec.textContent), "Readout: the table renders on Scenarios, named from the Calibration Log");
+    const splitIn = rsSec && rsSec.querySelector('input[aria-label="Clear wins as a share of all wins (%)"]');
+    ok(!!splitIn && splitIn.placeholder === "60", "Readout: blank inputs show their defaults");
+    if (splitIn) { Object.getOwnPropertyDescriptor(w.HTMLInputElement.prototype, "value").set.call(splitIn, "50"); splitIn.dispatchEvent(new w.Event("input", { bubbles: true })); await wait(300); }
+    const stored = JSON.parse(w.localStorage.getItem("rxnpv_cases_v1")).find(c => c.name === "Stoke Therapeutics — sample case");
+    const rsNow = [...d.querySelectorAll("[data-export-section]")].find(e => e.getAttribute("data-export-section") === "Before the next readout");
+    ok(stored && stored.readoutScenarios && stored.readoutScenarios.clearOfWinsPct === "50" && /40%[\s\S]*40%[\s\S]*20%/.test(rsNow.querySelector("tbody").textContent), "Readout: an edit is saved on the case and splits wins 40/40");
+    click(d.getElementById("casetab-overview")); await wait(300);
+
     // The whole range on one line, with the failure floor.
     const rng = [...panel.querySelectorAll("[data-export-section]")].find(e => e.getAttribute("data-export-section") === "The whole range, on one line");
     const rt = rng ? [...rng.querySelectorAll("svg text")].map(t => t.textContent) : [];

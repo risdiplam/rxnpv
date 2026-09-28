@@ -495,6 +495,46 @@ function computeOutcomeTree(theCase, discountRateBasePct, terminalValueParams) {
   return { gates, leaves, success, weighted, posToLaunch: pv.posToLaunch };
 }
 
+// ── Before the next readout: what each result would do to the value ────────
+// Three results for the next gate in the outcome tree — a clear win, a modest
+// win, a miss — each run through the model "as if already known": the
+// program's odds of launch set to what they would be after that result, its
+// peak share scaled, everything else at Base. The chance of a positive readout
+// is the case's own (the tree's first gate); how wins split between clear and
+// modest is the user's call. Defaults, all editable (theCase.readoutScenarios):
+//   modest win — odds of launch after a positive readout, from the case itself
+//                (posToLaunch / pass at this gate), 75% of Base share;
+//   clear win  — 40% of the way from those odds to certainty, 115% of share;
+//   clear share of wins — 60%.
+// A miss is the failure floor. Single-program; null when there is no readout.
+const READOUT_DEFAULTS = { clearSharePct: 115, modestSharePct: 75, clearOfWinsPct: 60, clearLiftToward100: 0.4 };
+function computeReadoutScenarios(theCase, discountRateBasePct, terminalValueParams) {
+  const tree = computeOutcomeTree(theCase, discountRateBasePct, terminalValueParams);
+  if (!tree || !tree.gates.length) return null;
+  const g = tree.gates[0];
+  const s = theCase.readoutScenarios || {};
+  const num = (v, d) => v !== "" && v != null && isFinite(Number(v)) ? Number(v) : d;
+  const conditional = g.pass > 0 ? Math.min(100, tree.posToLaunch / g.pass * 100) : 0;
+  const defaults = { clearPosPct: conditional + (100 - conditional) * READOUT_DEFAULTS.clearLiftToward100, modestPosPct: conditional };
+  const set = {
+    clearPosPct: Math.max(0, Math.min(100, num(s.clearPosPct, defaults.clearPosPct))),
+    clearSharePct: Math.max(0, num(s.clearSharePct, READOUT_DEFAULTS.clearSharePct)),
+    modestPosPct: Math.max(0, Math.min(100, num(s.modestPosPct, defaults.modestPosPct))),
+    modestSharePct: Math.max(0, num(s.modestSharePct, READOUT_DEFAULTS.modestSharePct)),
+    clearOfWinsPct: Math.max(0, Math.min(100, num(s.clearOfWinsPct, READOUT_DEFAULTS.clearOfWinsPct)))
+  };
+  const program = theCase.programs[0];
+  const valueAt = (posPct, sharePct) => computeCaseValuation({ ...theCase, programs: [{ ...program, posOverridePct: String(posPct) }] },
+    { ...SCENARIO_PRESETS.base, shareMultiplierPct: sharePct }, "base", discountRateBasePct, terminalValueParams).equity.perShare;
+  const pWin = g.pass, clearOf = set.clearOfWinsPct / 100;
+  const rows = [
+    { key: "clear", posPct: set.clearPosPct, sharePct: set.clearSharePct, prob: pWin * clearOf, value: valueAt(set.clearPosPct, set.clearSharePct) },
+    { key: "modest", posPct: set.modestPosPct, sharePct: set.modestSharePct, prob: pWin * (1 - clearOf), value: valueAt(set.modestPosPct, set.modestSharePct) },
+    { key: "miss", posPct: null, sharePct: null, prob: 1 - pWin, value: g.failValue }
+  ];
+  return { gate: g, conditionalPosPct: conditional, defaults, settings: set, rows, weighted: rows.reduce((a, r) => a + r.prob * r.value, 0) };
+}
+
 // ── Partnership economics — upfront and milestones, as a cash figure to add
 // on top of a computed equity value. Upfront is added directly (near-certain /
 // already-contracted, so not PoS-risked and not discounted — same treatment as

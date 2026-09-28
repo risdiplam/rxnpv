@@ -135,6 +135,16 @@ function stub(obj) {
   const fda = tr && tr.gates[1].failDetail;
   ok(fda && Math.abs(fda.equity - (420e6 - fda.trialCost - 95e6 * fda.readoutYears - 95e6)) < 1 && fda.trialCost > fl.trialCost && fda.readoutYears > fl.readoutYears, "tree: an FDA rejection is valued after both stages' cost and time");
 
+  // Before the readout: odds after a positive readout = 0.65 / 0.8023 = 81.02%;
+  // a clear win closes 40% of the gap: 81.02 + 0.4 × 18.98 = 88.61%. Chances:
+  // 0.8023 × 0.6 = 0.4814, 0.8023 × 0.4 = 0.3209, miss 0.1977 (the floor).
+  const rsx = w.computeReadoutScenarios(sc, 12, sc.terminalValue);
+  ok(rsx && Math.abs(rsx.conditionalPosPct - 65 / tr.gates[0].pass) < 1e-9 && Math.abs(rsx.defaults.clearPosPct - (rsx.conditionalPosPct + 0.4 * (100 - rsx.conditionalPosPct))) < 1e-9, "readout: default odds after a modest / clear win");
+  ok(rsx && Math.abs(rsx.rows[0].prob - tr.gates[0].pass * 0.6) < 1e-9 && Math.abs(rsx.rows[1].prob - tr.gates[0].pass * 0.4) < 1e-9 && Math.abs(rsx.rows[2].prob - (1 - tr.gates[0].pass)) < 1e-9, "readout: chances from the case's own odds, split 60/40");
+  ok(rsx && rsx.rows[2].value === fl.perShare && rsx.rows[0].value > rsx.rows[1].value && Math.abs(rsx.weighted - rsx.rows.reduce((a, x) => a + x.prob * x.value, 0)) < 1e-9, "readout: miss = floor, clear > modest, weighted = sum");
+  const rs2 = w.computeReadoutScenarios(Object.assign({}, sc, { readoutScenarios: { clearOfWinsPct: "50", modestPosPct: "70" } }), 12, sc.terminalValue);
+  ok(rs2 && Math.abs(rs2.rows[0].prob - rs2.rows[1].prob) < 1e-12 && rs2.settings.modestPosPct === 70 && rs2.rows[1].value < rsx.rows[1].value, "readout: edits are honoured (50/50 split, lower modest odds lower its value)");
+
   // ── In the app ──
   click(btn("+ New case")); await wait(300);
   const before = JSON.parse(w.localStorage.getItem("rxnpv_cases_v1") || "[]");

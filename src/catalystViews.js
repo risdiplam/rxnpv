@@ -116,3 +116,69 @@ function OutcomeTreeSection({ theCase, discountRatePct, tv, baseValue }) {
         h("div", { style: { fontSize: 20, fontFamily: "var(--mono)", fontWeight: 700, color: "var(--ink-1)" } }, fmtShare(baseValue)))),
     h(Explain, readOutcomeTree(tree.gates, tree.weighted, baseValue)));
 }
+
+// ── Before the next readout: the three results as a table ──────────────────
+function readReadoutScenarios(rows, weighted, price, base) {
+  if (!rows || rows.length !== 3) return null;
+  const [clear, modest, miss] = rows;
+  const move = v => (v >= price ? "+" : "−") + Math.abs(Math.round((v / price - 1) * 100)) + "%";
+  if (!(price > 0)) return { verdict: "A win is worth " + fmtShare(modest.value) + " to " + fmtShare(clear.value) + "; a miss leaves ≈" + fmtShare(miss.value) + ".",
+    text: "Weighted by these chances, " + fmtShare(weighted) + (base != null ? ", against the Base case's " + fmtShare(base) : "") + "." };
+  const lo = Math.min(clear.value, modest.value), hi = Math.max(clear.value, modest.value);
+  const winText = lo >= price ? "A win is worth " + move(lo) + " to " + move(hi) : hi >= price ? "A clear win is worth " + move(hi) + ", a modest one " + move(lo) : "Even a win is worth " + move(hi) + " at best";
+  const oneIn = miss.prob > 0 ? Math.round(1 / miss.prob) : null;
+  return { verdict: winText + "; a miss " + (miss.value < price ? "costs " + Math.abs(Math.round((miss.value / price - 1) * 100)) + "%" : "still clears today's price") + ".",
+    text: "Weighted by these chances, the three come to " + fmtShare(weighted) + " — " + Math.abs(Math.round((weighted / price - 1) * 100)) + "% " + (weighted >= price ? "above" : "below") + " today's price" +
+      (base != null ? ", against the Base case's " + fmtShare(base) : "") + "." + (oneIn && oneIn > 1 ? " The miss happens about one time in " + (["", "", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten"][oneIn] || oneIn) + " in this case, so the question the price is asking is whether that is too generous." : "") };
+}
+
+function ReadoutScenariosSection({ theCase, discountRatePct, tv, baseValue, onChange }) {
+  const h = React.createElement;
+  let r = null;
+  try {
+    const drBase = discountRatePct !== "" && discountRatePct != null ? Number(discountRatePct) : DISCOUNT_RATE_GUIDANCE.earlyBiotechSelfView[0];
+    r = computeReadoutScenarios(theCase, drBase, { enabled: tv.enabled, method: tv.method, growthPct: tv.growthPct, exitMultiple: tv.exitMultiple });
+  } catch (e) { r = null; }
+  if (!r) return null;
+  const price = theCase.currentPrice !== "" && theCase.currentPrice != null && Number(theCase.currentPrice) > 0 ? Number(theCase.currentPrice) : null;
+  const s = theCase.readoutScenarios || {};
+  const setS = patch => onChange({ ...theCase, readoutScenarios: { ...s, ...patch }, updatedAt: Date.now() });
+  // The catalyst's own name when the Calibration Log has one pending.
+  const pending = ((theCase.programs[0] || {}).calibrationLog || []).find(e => !e.outcome || e.outcome === "pending");
+  const name = pending && pending.catalystLabel ? pending.catalystLabel.split(/[,(]/)[0].trim() : r.gate.label;
+  const pct1 = v => Math.round(v * 10) / 10;
+  const input = (key, placeholder, label) => h("input", { type: "number", min: 0, max: key.endsWith("SharePct") ? undefined : 100, step: 1, className: "rs-input",
+    value: s[key] == null ? "" : s[key], placeholder: String(Math.round(placeholder)), "aria-label": label, onChange: e => setS({ [key]: e.target.value }) });
+  const names = { clear: "Clear win", modest: "Modest win", miss: "Miss" };
+  const colors = { clear: "var(--green)", modest: "var(--teal)", miss: "var(--red)" };
+  const axisHi = niceAxisTicks(0, Math.max(...r.rows.map(x => x.value), price || 0), 4).hi;
+  const bar = row => h("svg", { viewBox: "0 0 220 22", width: 220, height: 22, "aria-hidden": "true", style: { display: "block" } },
+    h("rect", { x: 4, y: 6, width: Math.max(2, row.value / axisHi * 212), height: 10, rx: 3, fill: colors[row.key], opacity: 0.75 }),
+    price != null && h("line", { x1: 4 + price / axisHi * 212, x2: 4 + price / axisHi * 212, y1: 1, y2: 21, stroke: "var(--warn)", strokeWidth: 1.5 }));
+  const move = v => price ? (v >= price ? "+" : "−") + Math.abs(Math.round((v / price - 1) * 100)) + "%" : "—";
+  return h(ExportSection, { title: "Before the next readout", style: { marginTop: 16, borderTop: "1px dashed var(--rule)", paddingTop: 14 } },
+    h("div", { style: { fontSize: 13, fontFamily: "var(--display)", fontWeight: 600, color: "var(--ink-1)", marginBottom: 4 } }, name + ": what each result would do to the value"),
+    h("div", { className: "prose", style: { ...UI.caption, marginBottom: 10 } },
+      "Each result run through the model as if already known. The chance of a positive readout (" + Math.round(r.gate.pass * 100) + "%) is this case's own; how wins split between clear and modest, and what each does to the odds and the share, are yours to set — blank fields use the defaults shown."),
+    h("div", { className: "proj-table-wrap" },
+      h("table", { className: "proj-table rs-table" },
+        h("thead", null, h("tr", null, ["Result", "Odds to launch after it", "Peak share vs Base", "Chance", "Value / share", "vs today", price != null ? "│ today " + fmtShare(price) : ""].map((c, i) => h("th", { key: i, scope: "col", className: i === 0 || i === 6 ? "l" : "", style: i === 6 ? { color: "var(--warn)" } : null }, c)))),
+        h("tbody", null, r.rows.map(row => h("tr", { key: row.key },
+          h("td", { className: "l", style: { color: colors[row.key], fontWeight: 600, fontFamily: "var(--sans)" } }, names[row.key]),
+          h("td", null, row.key === "miss" ? "—" : h("span", { className: "rs-cell" }, input(row.key + "PosPct", r.defaults[row.key + "PosPct"], names[row.key] + " odds to launch (%)"), "%")),
+          h("td", null, row.key === "miss" ? "—" : h("span", { className: "rs-cell" }, input(row.key + "SharePct", row.key === "clear" ? READOUT_DEFAULTS.clearSharePct : READOUT_DEFAULTS.modestSharePct, names[row.key] + " peak share vs Base (%)"), "%")),
+          h("td", null, Math.round(row.prob * 100) + "%"),
+          h("td", { className: "strong" }, (row.key === "miss" ? "≈" : "") + fmtShare(row.value)),
+          h("td", { className: row.value < (price || 0) ? "neg" : "" , style: price && row.value >= price ? { color: "var(--green)" } : null }, move(row.value)),
+          h("td", { className: "l" }, bar(row))))),
+        h("tfoot", null, h("tr", null,
+          h("td", { className: "l" }, "Weighted by chance"),
+          h("td", { className: "l", colSpan: 2 }, h("span", { className: "rs-cell" }, "Clear wins are ", input("clearOfWinsPct", READOUT_DEFAULTS.clearOfWinsPct, "Clear wins as a share of all wins (%)"), "% of wins")),
+          h("td", null, "100%"),
+          h("td", null, fmtShare(r.weighted)),
+          h("td", { style: price && r.weighted >= price ? { color: "var(--green)" } : null, className: price && r.weighted < price ? "neg" : "" }, move(r.weighted)),
+          h("td", null, ""))))),
+    h(Explain, readReadoutScenarios(r.rows, r.weighted, price, baseValue)),
+    h("div", { className: "prose", style: { ...UI.caption, marginTop: 8 } },
+      "Defaults: a modest win leaves the odds this case already has after a positive readout (" + pct1(r.conditionalPosPct) + "%); a clear win closes 40% of the gap to certainty (" + pct1(r.defaults.clearPosPct) + "%). A miss is the failure floor. Values are the model re-run, not a forecast of the share price on the day."));
+}
