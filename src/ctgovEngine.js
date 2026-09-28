@@ -49,6 +49,7 @@ function parseStudy(study) {
       name: i.name || "", type: i.type || "", otherNames: i.otherNames || []
     })),
     enrollment: design.enrollmentInfo ? design.enrollmentInfo.count : null,
+    enrollmentType: design.enrollmentInfo ? design.enrollmentInfo.type || null : null, // ACTUAL | ESTIMATED
     startDate: status.startDateStruct ? status.startDateStruct.date : null,
     primaryCompletionDate: status.primaryCompletionDateStruct ? status.primaryCompletionDateStruct.date : null,
     briefSummary: desc.briefSummary || "",
@@ -80,6 +81,7 @@ function parseStudy(study) {
     eligibilityCriteria: (p.eligibilityModule || {}).eligibilityCriteria || "",
     healthyVolunteers: (p.eligibilityModule || {}).healthyVolunteers,
     minimumAge: (p.eligibilityModule || {}).minimumAge || null,
+    maximumAge: (p.eligibilityModule || {}).maximumAge || null,
     sex: (p.eligibilityModule || {}).sex || null,
     // Full primary/secondary outcome detail, not just the measure string the
     // snapshot diff uses — the decoder needs timeFrame to judge whether a

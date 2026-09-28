@@ -1009,3 +1009,63 @@ function TrialWatchTool({ initialNctId, onConsumedInitialNctId }) {
     ])
   );
 }
+
+// ── Compare trials ─────────────────────────────────────────────────────────
+// Two to four registered trials side by side, from the same records and the
+// same classifications the Trial Decoder uses (compareTrials in
+// trialDecoder.js), including each sponsor's own primary analysis where one
+// was posted. Rows where the first trial differs from every other are shaded.
+// Typical use: a Phase 3 you are modelling next to the trials that got drugs
+// approved in the same indication.
+function TrialCompareTool() {
+  const h = React.createElement;
+  const [input, setInput] = React.useState("");
+  const [loading, setLoading] = React.useState(false);
+  const [cmp, setCmp] = React.useState(null);
+  const [errors, setErrors] = React.useState([]);
+  const seq = React.useRef(0);
+  const ids = input.toUpperCase().match(/NCT\d{8}/g) || [];
+  const unique = ids.filter((x, i) => ids.indexOf(x) === i).slice(0, 4);
+  const run = async () => {
+    if (unique.length < 2) return;
+    const mine = ++seq.current;
+    setLoading(true); setErrors([]); setCmp(null);
+    const got = await Promise.all(unique.map(id => fetchStudyByNctId(id).then(r => ({ id, r }))));
+    if (mine !== seq.current) return;
+    setErrors(got.filter(g => !g.r.ok).map(g => g.id + ": " + g.r.error));
+    const ok = got.filter(g => g.r.ok).map(g => ({ study: g.r.study, results: g.r.results }));
+    setCmp(ok.length >= 2 ? compareTrials(ok) : null);
+    setLoading(false);
+  };
+  return h("div", null,
+    toolCard(h, [
+      toolLabel(h, "Compare trials side by side"),
+      h(Note, { summary: "New here? What this does" },
+        h("div", { style: { lineHeight: 1.6 } }, "Paste two to four ClinicalTrials.gov IDs — the first is the one you are studying — and this lines up how each was registered: design, patients, ages, primary endpoint and when it is measured, and the result each sponsor posted. Shaded rows are where the first trial differs from all the others. It reads the same fields as the Trial Decoder and adds nothing of its own: results are quoted as the sponsor registered them, and results on different measures are never ranked against each other.")),
+      h("div", { style: { display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 } },
+        h("input", { type: "text", value: input, placeholder: "NCT numbers, e.g. NCT06872125, NCT02682927, NCT02091375", "aria-label": "ClinicalTrials.gov IDs to compare",
+          onChange: e => setInput(e.target.value), onKeyDown: e => { if (e.key === "Enter") run(); },
+          style: { flex: "1 1 360px", padding: "9px 12px", borderRadius: 7, border: "1.5px solid var(--rule)", background: "var(--surface)", color: "var(--ink-1)", fontFamily: "var(--mono)", fontSize: 13 } }),
+        h("button", { onClick: run, disabled: loading || unique.length < 2,
+          style: { padding: "9px 18px", borderRadius: 7, border: "1px solid var(--teal)", background: "var(--teal-bg)", color: "var(--teal)", fontFamily: "var(--mono)", fontSize: 12, fontWeight: 700, cursor: loading ? "default" : "pointer", opacity: unique.length >= 2 ? 1 : 0.5 } },
+          loading ? "Fetching…" : "Compare " + (unique.length || "") + (unique.length ? " trials" : ""))),
+      ids.length > 4 && h("div", { style: { ...UI.caption, marginTop: 6 } }, "Up to four trials at a time; the first four are used.")
+    ]),
+    errors.length > 0 && toolCard(h, errors.map((e, i) => h("div", { key: i, style: UI.warnNote }, e))),
+    cmp && toolCard(h, [
+      toolLabel(h, cmp.cols.map(c => c.drugs[0] || c.nctId).join(" vs ")),
+      h("div", { className: "proj-table-wrap" },
+        h("table", { className: "proj-table cmp-table" },
+          h("thead", null, h("tr", null,
+            h("th", { scope: "col", className: "l" }, ""),
+            cmp.cols.map((c, i) => h("th", { key: c.nctId, scope: "col", className: "l" + (i === 0 ? " first" : "") },
+              c.drugs.slice(0, 2).join(" + ") || c.nctId,
+              h("div", { className: "cmp-sub" }, c.nctId + " · " + (c.sponsor || "sponsor not stated")))))),
+          h("tbody", null, cmp.rows.map(r => h("tr", { key: r.key, className: r.differs ? "differs" : "" },
+            h("th", { scope: "row", className: "l" }, r.label),
+            r.values.map((v, i) => h("td", { key: i, className: "l" }, v))))))),
+      h(Explain, readTrialComparison(cmp)),
+      h("div", { style: { ...UI.caption, marginTop: 8 } }, "Shaded: the first trial differs from every other. Figures are as registered on ClinicalTrials.gov; open any trial in the Trial Decoder for its full design, flow and safety tables.")
+    ])
+  );
+}

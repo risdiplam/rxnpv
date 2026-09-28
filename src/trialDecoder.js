@@ -262,6 +262,96 @@ function decodeTrial(study, opts) {
   };
 }
 
+// ── Trials side by side ────────────────────────────────────────────────────
+// entries: [{ study (parseStudy shape), results (parseTrialResults or null) }].
+// Rows hold each trial's value for one question, as registered; `differs` is
+// set when the first trial's value matches none of the others, which is what
+// the table shades. Results are the sponsor's own first primary analysis,
+// quoted with its parameter type, never re-computed or ranked — two posted
+// results on different measures are not comparable numbers.
+const COMPARE_PLACEBO_RE = /placebo|sham|vehicle|standard of care|best supportive/i;
+function compareTrialsAge(s) {
+  const clean = v => v ? String(v).replace(/\s*Years?/i, "").trim() : null;
+  const lo = clean(s.minimumAge), hi = clean(s.maximumAge);
+  return lo && hi ? lo + " to " + hi : lo ? lo + " and up" : hi ? "up to " + hi : "not stated";
+}
+function compareTrialsResult(study, results) {
+  const primary = results && results.primaryOutcomes && results.primaryOutcomes[0];
+  if (!primary) return study.hasResults ? "Results posted, but no primary outcome could be read" : "No results posted" + (study.primaryCompletionDate ? " (primary completion " + study.primaryCompletionDate + ")" : "");
+  const a = (primary.analyses || []).find(x => x.value != null);
+  if (!a) return "Primary outcome posted without a comparison statistic";
+  const ci = a.lower != null && a.upper != null ? " (" + (a.ciPct ? a.ciPct + "% " : "") + "CI " + a.lower + " to " + a.upper + ")" : "";
+  return (a.paramType || "Estimate") + ": " + a.value + ci + (a.pValue ? ", p = " + a.pValue : "");
+}
+// Weeks from a registered time frame: "Week 28", "up to 14 weeks", "Day 99",
+// "6 months". The first time stated is taken; null when there is none.
+function compareTrialsWeeks(timeFrame) {
+  const t = String(timeFrame || "");
+  let m = t.match(/week\s*(\d+(?:\.\d+)?)/i) || t.match(/(\d+(?:\.\d+)?)\s*weeks?/i);
+  if (m) return Number(m[1]);
+  m = t.match(/day\s*(\d+)/i) || t.match(/(\d+)\s*days?/i);
+  if (m) return Math.round(Number(m[1]) / 7);
+  m = t.match(/month\s*(\d+(?:\.\d+)?)/i) || t.match(/(\d+(?:\.\d+)?)\s*months?/i);
+  if (m) return Math.round(Number(m[1]) * 4.345);
+  return null;
+}
+function compareTrials(entries) {
+  const list = (entries || []).filter(e => e && e.study);
+  if (!list.length) return null;
+  const cols = list.map(({ study, results }) => {
+    const alloc = classifyAllocation(study), mask = classifyMasking(study), comp = classifyComparator(study), ep = classifyPrimaryEndpoint(study);
+    const drugs = (study.interventions || []).filter(n => !COMPARE_PLACEBO_RE.test(n));
+    const primary = ep.items || [];
+    const firstA = results && results.primaryOutcomes && results.primaryOutcomes[0] && (results.primaryOutcomes[0].analyses || []).find(x => x.value != null);
+    const weeks = primary.length ? compareTrialsWeeks(primary[0].timeFrame) : null;
+    return {
+      nctId: study.nctId, title: study.title, sponsor: study.sponsor, drugs: drugs.length ? drugs : study.interventions || [],
+      design: { alloc: alloc.value, mask: mask.value, comp: comp.value }, weeks,
+      values: {
+        status: String(study.phase || "").replace(/PHASE(\d)/g, "Phase $1").replace(/EARLY_Phase 1/, "Early Phase 1") + " · " + String(study.status || "").replace(/_/g, " ").toLowerCase(),
+        design: [alloc.value, mask.value, comp.value].join(", "),
+        patients: study.enrollment != null ? study.enrollment + (study.enrollmentType === "ESTIMATED" ? " (planned)" : "") : "not stated",
+        ages: compareTrialsAge(study),
+        endpoint: primary.length ? primary.map(o => o.measure).join("; ") : "not stated",
+        // A plain "Week 28" is already the answer; anything longer gets the
+        // week it works out to first, so the column reads at a glance.
+        measuredAt: primary.length ? (weeks != null && !/^\s*week\s*\d+\s*$/i.test(primary[0].timeFrame || "") ? "≈ week " + weeks + " — " : "") + primary.map(o => o.timeFrame || "not stated").join("; ") : "not stated",
+        dates: (study.startDate || "?") + " → " + (study.primaryCompletionDate || "?"),
+        result: compareTrialsResult(study, results)
+      },
+      resultMeasure: firstA ? String(firstA.paramType || "").toLowerCase() : null
+    };
+  });
+  // Only what can be compared honestly is shaded: the design classification,
+  // part by part, and the primary time point in weeks (differing by more than
+  // two). Counts, ages and free-text endpoints always differ a little and
+  // would shade every row, which says nothing.
+  const [first, ...others] = cols;
+  const designDiff = others.length > 0 && ["alloc", "mask", "comp"].some(k => others.every(o => o.design[k] !== first.design[k]));
+  const timeDiff = others.length > 0 && first.weeks != null && others.every(o => o.weeks != null && Math.abs(o.weeks - first.weeks) > 2);
+  const LABELS = [["status", "Phase and status"], ["design", "Design"], ["patients", "Patients"], ["ages", "Ages"], ["endpoint", "Primary endpoint"], ["measuredAt", "Measured at"], ["dates", "Start → primary completion"], ["result", "Result (sponsor's primary analysis)"]];
+  const rows = LABELS.map(([key, label]) => ({ key, label, values: cols.map(c => c.values[key]), differs: key === "design" ? designDiff : key === "measuredAt" ? timeDiff : false }));
+  const measures = cols.map(c => c.resultMeasure).filter(Boolean);
+  return { cols, rows, designDiff, timeDiff, resultsComparable: measures.length > 1 ? measures.every(m => m === measures[0]) : null };
+}
+// What the first trial does differently on design and timing, and whether the
+// posted results can be read against each other at all.
+function readTrialComparison(cmp) {
+  if (!cmp || cmp.cols.length < 2) return null;
+  const [first, ...others] = cmp.cols;
+  const who = first.drugs[0] ? first.drugs[0] + "'s trial" : first.nctId;
+  const bits = [];
+  if (cmp.designDiff) {
+    const parts = ["comp", "mask", "alloc"].filter(k => others.every(o => o.design[k] !== first.design[k]));
+    bits.push(parts.map(k => first.design[k] + " (the " + (others.length === 1 ? "other" : "others") + ": " + others.map(o => o.design[k]).filter((v, i, a) => a.indexOf(v) === i).join(" / ") + ")").join(" and "));
+  }
+  if (cmp.timeDiff) bits.push("measured at week " + first.weeks + " against week" + (others.length > 1 ? "s " : " ") + others.map(o => o.weeks).join(" and "));
+  const verdict = bits.length ? who + " differs on " + (cmp.designDiff && cmp.timeDiff ? "design and timing" : cmp.designDiff ? "design" : "timing") + "." : who + " is registered much like the others on design and timing.";
+  const res = cmp.resultsComparable === false ? " The posted results use different measures, so they are shown side by side, not ranked."
+    : cmp.resultsComparable === true ? " The posted results use the same measure, though different populations and time points can still make them hard to compare." : "";
+  return { verdict, text: ((bits.length ? "It is " + bits.join("; ") + "." : "Read each column against its own registered endpoint and population.") + res).trim() };
+}
+
 if (typeof module !== "undefined" && module.exports) {
   module.exports = {
     decodeTrial, decodeTrialRedFlags, whatItCanProve,

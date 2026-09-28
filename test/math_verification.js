@@ -81,7 +81,7 @@ const EXPORTS = [
   "applyTaxToCalendar", "computeMoleculeTypePoSRatios", "POS_BY_MOLECULE",
   "computeProgramValuation",
   "revenueChartYScale", "niceAxisTicks", "histogramBins", "spreadLabels", "localDateStamp", "selectPeakSalesCompWindow",
-  "readPriceVsScenarios", "readMonteCarlo", "readCashFlow", "readSotp", "readRiskWaterfall", "readTornado", "readPriceGrid", "readInterval", "readPValue", "readSingleArm", "readAssurance", "readPeakSalesRange", "readBinaryImplied", "readPremium", "readForwardRunway", "readBreakEven", "readPriceGap", "readOutcomeRange",
+  "readPriceVsScenarios", "readMonteCarlo", "readCashFlow", "readSotp", "readRiskWaterfall", "readTornado", "readPriceGrid", "readInterval", "readPValue", "readSingleArm", "readAssurance", "readPeakSalesRange", "readBinaryImplied", "readPremium", "readForwardRunway", "readBreakEven", "readPriceGap", "readOutcomeRange", "compareTrials", "compareTrialsWeeks", "readTrialComparison",
   "measureStorage", "STORAGE_ASSUMED_QUOTA_BYTES", "STORAGE_WARN_FRACTION", "STORAGE_CRITICAL_FRACTION",
   "computeTreatedPopulation", "launchCurveForYears", "erosionMultiplier", "computeProgramRevenue",
   "resolveNetPrice", "aspPctOfBasis", "PRICE_BASIS_OPTIONS", "getRevenueBuild", "PRICING_CONVERSION_MATRIX", "priceBasisArticle",
@@ -4233,6 +4233,23 @@ section("Outcome range reading");
   ok("range: 56% of the way, model says 55%", r.text.includes("paying 56% of the way from failure to success") && r.text.includes("implies at 55%"));
   ok("range: price above success says so", api.readOutcomeRange(1, 10, 12, null).text.includes("above even the value if it works"));
   ok("range: nothing to say without a spread", api.readOutcomeRange(5, 5, 5, null) === null);
+}
+section("Trial comparison");
+{
+  // Time frames to weeks: "Week 28" -> 28; "up to 14 weeks" -> 14; "Day 99"
+  // -> 99 / 7 = 14.1 -> 14; "6 months" -> 6 × 4.345 = 26.07 -> 26.
+  ok("weeks from time frames", api.compareTrialsWeeks("Week 28") === 28 && api.compareTrialsWeeks("From Baseline up to 14 weeks") === 14 && api.compareTrialsWeeks("Baseline to EOT (Day 99)") === 14 && api.compareTrialsWeeks("6 months") === 26 && api.compareTrialsWeeks("end of study") === null);
+  const st = (id, comp, tf, n) => ({ study: { nctId: id, title: id, sponsor: "S", phase: "PHASE3", status: "COMPLETED", interventions: [id + "-drug", "Placebo"], enrollment: n,
+    allocation: "RANDOMIZED", interventionModel: "PARALLEL", masking: "QUADRUPLE", armTypes: ["EXPERIMENTAL", comp], primaryOutcomesFull: [{ measure: "Seizures", timeFrame: tf }], minimumAge: "2 Years", maximumAge: "18 Years" }, results: null });
+  const c = api.compareTrials([st("A", "SHAM_COMPARATOR", "Week 28", 170), st("B", "PLACEBO_COMPARATOR", "up to 14 weeks", 262), st("C", "PLACEBO_COMPARATOR", "Day 99", 120)]);
+  const row = k => c.rows.find(r => r.key === k);
+  ok("compare: design and timing shaded, counts and ages not", row("design").differs && row("measuredAt").differs && !row("patients").differs && !row("ages").differs);
+  ok("compare: placebo is not listed as a drug; ages read 2 to 18", c.cols[0].drugs.join() === "A-drug" && row("ages").values[0] === "2 to 18");
+  ok("compare: a plain 'Week 28' is not repeated; others get their week", row("measuredAt").values[0] === "Week 28" && row("measuredAt").values[1].startsWith("≈ week 14 — "));
+  const rd = api.readTrialComparison(c);
+  ok("compare: reading names the sham control and the weeks", rd.verdict === "A-drug's trial differs on design and timing." && rd.text.includes("sham-controlled (the others: placebo-controlled)") && rd.text.includes("week 28 against weeks 14 and 14"));
+  const same = api.compareTrials([st("A", "PLACEBO_COMPARATOR", "Week 14", 1), st("B", "PLACEBO_COMPARATOR", "Week 15", 2)]);
+  ok("compare: a week apart is not a difference", !same.designDiff && !same.timeDiff);
 }
 report();
 

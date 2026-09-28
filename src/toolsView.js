@@ -39,7 +39,7 @@ function CasePicker({ cases, selectedId, onChange, placeholder }) {
 // covers the results reader now, and "Launch & Actuals" is new.
 const TOOL_WORKBENCHES = [
   { id: "trial", label: "Trial", question: "What is this trial, what can it prove, and what did it report?",
-    tools: [["decoder", "Trial Decoder"], ["asset", "Asset Program"], ["trialwatch", "Trial Explorer"], ["fdaLookup", "FDA Lookup"]] },
+    tools: [["decoder", "Trial Decoder"], ["compare", "Compare Trials"], ["asset", "Asset Program"], ["trialwatch", "Trial Explorer"], ["fdaLookup", "FDA Lookup"]] },
   { id: "science", label: "Science", question: "Is the target real, and what has been published about it?",
     tools: [["target", "Target Dossier"], ["literature", "Literature"]] },
   { id: "company", label: "Company", question: "Can this company reach its next catalyst, and who is buying or selling it?",
@@ -109,6 +109,7 @@ function ToolsView({ cases, updateCase, activeCase, navRequest }) {
     tab === "licensing" ? h(LicensingCompsTool, { cases, updateCase, activeCase }) :
     tab === "calendar" ? h(CatalystCalendarTool, { cases, updateCase, activeCase }) :
     tab === "decoder" ? h(TrialDecoderTool, { initialNctId: pendingNctId, onConsumedInitialNctId: () => setPendingNctId(null) }) :
+    tab === "compare" ? h(TrialCompareTool, null) :
     tab === "target" ? h(TargetDossierTool, null) :
     tab === "literature" ? h(LiteratureTool, null) :
     tab === "asset" ? h(AssetProgramTool, { onDecodeTrial: goToTrialDecoder, onWatchTrial: goToTrialWatch }) :
