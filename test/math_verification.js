@@ -81,7 +81,7 @@ const EXPORTS = [
   "applyTaxToCalendar", "computeMoleculeTypePoSRatios", "POS_BY_MOLECULE",
   "computeProgramValuation",
   "revenueChartYScale", "niceAxisTicks", "histogramBins", "spreadLabels", "localDateStamp", "selectPeakSalesCompWindow",
-  "readPriceVsScenarios", "readMonteCarlo", "readCashFlow", "readSotp", "readRiskWaterfall", "readTornado", "readPriceGrid", "readInterval", "readPValue", "readSingleArm", "readAssurance", "readPeakSalesRange", "readBinaryImplied", "readPremium", "readForwardRunway",
+  "readPriceVsScenarios", "readMonteCarlo", "readCashFlow", "readSotp", "readRiskWaterfall", "readTornado", "readPriceGrid", "readInterval", "readPValue", "readSingleArm", "readAssurance", "readPeakSalesRange", "readBinaryImplied", "readPremium", "readForwardRunway", "readBreakEven", "readPriceGap",
   "measureStorage", "STORAGE_ASSUMED_QUOTA_BYTES", "STORAGE_WARN_FRACTION", "STORAGE_CRITICAL_FRACTION",
   "computeTreatedPopulation", "launchCurveForYears", "erosionMultiplier", "computeProgramRevenue",
   "resolveNetPrice", "aspPctOfBasis", "PRICE_BASIS_OPTIONS", "getRevenueBuild", "PRICING_CONVERSION_MATRIX", "priceBasisArticle",
@@ -4204,6 +4204,25 @@ section("Histogram bins and label lanes");
   // Against the right edge at 230: 200's label ends at 225 (fine), but at
   // 180 max the right pass pulls 200 to 155, 120 to 95, 100 to 35.
   ok("spread labels: pushed back from the right edge", JSON.stringify(api.spreadLabels([{ x: 100, w: 50 }, { x: 120, w: 50 }, { x: 200, w: 50 }], 0, 180, 10)) === "[35,95,155]");
+}
+section("Break-even and price-gap readings");
+{
+  // Case carries $1.31B, price needs $1.10B: 1.31 / 1.10 - 1 = 19.09% -> "19% more";
+  // $1.10B sits between Bear $917M and Bull $1.704B -> inside the range.
+  let r = api.readBreakEven(1.31e9, 1.10e9, 0.917e9, 1.704e9);
+  ok("break-even: price needs $1.10B", r.verdict === "The price needs about $1.10B of peak revenue.");
+  ok("break-even: 19% more, inside Bear-Bull", r.text.includes("This case carries $1.31B, 19% more") && r.text.includes("inside your Bear–Bull range of $917.0M to $1.70B"));
+  // Needs $2.0B against Bull $1.704B -> above the best case; 1.31 / 2.0 - 1 = -0.345
+  // -> 34.5, which Math.round takes up to 35 -> "35% less".
+  r = api.readBreakEven(1.31e9, 2.0e9, 0.917e9, 1.704e9);
+  ok("break-even: above Bull says so", r.text.includes("above your Bull case's $1.70B") && r.text.includes("35% less"));
+  ok("break-even: price below the whole curve", api.readBreakEven(1e9, null, 0.5e9, 2e9, true, false).verdict === "The price is below every level on this curve.");
+  // Fair $29.05 vs $24.80 -> $4.25 a share; odds 65 vs 54.7 -> 10.3 -> "A 10-point gap".
+  r = api.readPriceGap(29.05, 24.80, 54.7, 65);
+  ok("price gap: $4.25 a share below this case", r.verdict === "About $4.25 a share separates the price from this case.");
+  ok("price gap: 10-point disagreement, more confident", r.text.includes("the 55% the price implies and this case's 65%") && r.text.includes("A 10-point gap") && r.text.includes("more confident"));
+  ok("price gap: within 5 points is judgment", api.readPriceGap(25, 24.8, 62, 65).text.includes("matter of judgment"));
+  ok("price gap: price above the case", api.readPriceGap(20, 24.8, null, null).verdict === "About $4.80 a share of the price is not in this case.");
 }
 report();
 

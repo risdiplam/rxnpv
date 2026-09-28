@@ -308,6 +308,14 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
     click([...panel.querySelectorAll(".proj-toggle button")].find(b => b.textContent === "Chart + table")); await wait(200);
     ok(!!panel.querySelector(".proj-table") && !!panel.querySelector('svg[aria-label^="Year-by-year"]'), "Projections: Chart + table shows both again");
 
+    // Break-even and the value bridge, side by side.
+    const beSec = [...panel.querySelectorAll("[data-export-section]")].find(e => e.getAttribute("data-export-section") === "Break-even peak revenue");
+    ok(!!beSec && /The price needs about \$1\.1\dB of peak revenue/.test(beSec.textContent) && !!beSec.querySelector('svg[aria-label^="Fair value per share at each peak"]'), "Break-even: headline and chart (" + (beSec && beSec.textContent.slice(0, 60)) + ")");
+    const br = d.getElementById("ws-bridge");
+    ok(!!br && /The price is \$3\d\d\.\dM below what this case finds/.test(br.textContent) && !!br.querySelector('svg[aria-label^="Value bridge"]'), "Bridge: gap headline and waterfall");
+    ok(!!br && /= Equity value \$2\.35B ÷ [\d,]+ diluted shares = \$29\.05 a share/.test(br.textContent), "Bridge: the exact one-line version ends at the Base per-share value");
+    ok(!!br && /A 10-point gap/.test(br.textContent), "Bridge: the reading states the odds gap");
+
     // Monte Carlo: a histogram of every trial with labelled markers, not five bars.
     click([...panel.querySelectorAll("button")].find(b => b.textContent.includes("Run 3,000 trials"))); await wait(4000);
     const hist = panel.querySelector('svg[aria-label^="Histogram of 3,000"]');

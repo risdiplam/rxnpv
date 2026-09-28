@@ -630,37 +630,46 @@ function useValuationSections({ theCase, onChange, goToTab }) {
           return h(ReverseSolveBox, { theCase, discountRatePct, tv, options });
         })()),
 
-        // Enterprise Value -> Equity Value -> Per-Share bridge, Base case. A
-        // simple connected flow rather than a proportional waterfall bar —
-        // renders correctly regardless of sign (EV, cash, debt can all be
-        // negative or positive) without the complexity a true waterfall needs
-        // to handle that safely.
+        // Break-even peak revenue beside the value bridge — two views of the
+        // same question: how far is the price from this case, and in what.
         show("overview") && ((() => {
           const baseR = scenarioResults.find(s => s.key === "base").result;
+          const drBase = discountRatePct !== "" ? Number(discountRatePct) : DISCOUNT_RATE_GUIDANCE.earlyBiotechSelfView[0];
+          const tvParams = { enabled: tv.enabled, method: tv.method, growthPct: tv.growthPct, exitMultiple: tv.exitMultiple };
+          const price = theCase.currentPrice !== "" && theCase.currentPrice != null && Number(theCase.currentPrice) > 0 ? Number(theCase.currentPrice) : null;
+          let curve = null;
+          if (valMethod === "dcf") { try { curve = computeBreakEvenCurve(theCase, drBase, tvParams); } catch (e) { curve = null; } }
           // Line items come from the result itself, so they always sum to the
           // equity value shown (see computeEquityBridgeSteps).
-          const steps = computeEquityBridgeSteps(theCase, baseR)
-            .map(st => ({ label: st.label, value: st.value, op: st.sign === 0 ? null : st.sign > 0 ? "+" : "-" }));
-          steps.push({ label: "Equity Value", value: baseR.equity.equityValue, op: "=" });
-          return h(ExportSection, { id: "ws-bridge", title: "Enterprise Value → Per-Share bridge (Base case)", reportSection: "bridge", style: { marginTop: 16, borderTop: "1px dashed var(--rule)", paddingTop: 14 } },
-            h("div", { style: { fontSize: 13, fontFamily: "var(--display)", fontWeight: 600, color: "var(--ink-1)", marginBottom: 10 } }, "Enterprise Value → Per-Share bridge (Base case)"),
-            h("div", { style: { display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" } },
-              steps.map((s, i) => h(React.Fragment, { key: i },
-                i > 0 && h("span", { style: { fontSize: 16, fontFamily: "var(--mono)", color: "var(--ink-3)" } }, s.op),
-                h("div", { style: { padding: "8px 12px", borderRadius: 8, background: "var(--surface-2)", border: s.op === "=" ? "1.5px solid var(--teal)" : "1px solid var(--rule)", textAlign: "center" } },
-                  h("div", { style: UI.caption }, s.label),
-                  h("div", { style: { fontSize: 13, fontFamily: "var(--mono)", fontWeight: 700, color: s.op === "=" ? "var(--teal)" : "var(--ink-1)" } }, fmtMoney(s.value)))
-              )),
-              h("span", { style: { fontSize: 16, fontFamily: "var(--mono)", color: "var(--ink-3)" } }, "÷"),
-              h("div", { style: { padding: "8px 12px", borderRadius: 8, background: "var(--surface-2)", border: "1px solid var(--rule)", textAlign: "center" } },
-                h("div", { style: UI.caption }, "Diluted shares"),
-                h("div", { style: { fontSize: 13, fontFamily: "var(--mono)", fontWeight: 700, color: "var(--ink-1)" } }, fmtNum(baseR.equity.dilutedShares))),
-              h("span", { style: { fontSize: 16, fontFamily: "var(--mono)", color: "var(--ink-3)" } }, "="),
-              h("div", { style: { padding: "8px 14px", borderRadius: 8, background: "var(--teal-bg)", border: "1.5px solid var(--teal)", textAlign: "center" } },
-                h("div", { style: UI.caption }, "Per share"),
-                h("div", { style: { fontSize: 16, fontFamily: "var(--mono)", fontWeight: 800, color: "var(--teal)" } }, fmtShare(baseR.equity.perShare)))
-            )
-          );
+          const steps = computeEquityBridgeSteps(theCase, baseR);
+          const eq = baseR.equity, mcap = price != null ? price * eq.dilutedShares : null;
+          const gap = mcap != null ? mcap - eq.equityValue : null;
+          const oneProgram = theCase.programs.length === 1 && impliedSolved && impliedSolved.ok && !impliedSolved.degenerate;
+          const heading = gap == null ? "From enterprise value to a price per share"
+            : Math.abs(gap) < 0.5e6 ? "The price matches what this case finds"
+            : gap < 0 ? "The price is " + fmtMoney(-gap) + " below what this case finds" : "The price asks for " + fmtMoney(gap) + " more than this case finds";
+          const shortLabel = { "Enterprise Value": "Programs (rNPV)", "Modeled future raise": "Future raise", "PRV (risk-adj.)": "Voucher (PRV)", "Partnership (upfront + milestones)": "Partner payments", "Convertible notes (not converting)": "Convertible notes" };
+          return h("div", { className: "pair-grid", style: { marginTop: 16 } },
+            curve && h(ExportSection, { title: "Break-even peak revenue", style: { borderTop: "1px dashed var(--rule)", paddingTop: 14 } },
+              h("div", { style: { fontSize: 13, fontFamily: "var(--display)", fontWeight: 600, color: "var(--ink-1)", marginBottom: 4 } },
+                curve.breakEvenPeak != null ? "The price needs about " + fmtMoney(curve.breakEvenPeak) + " of peak revenue" : "Fair value at every peak-revenue level"),
+              h("div", { className: "prose", style: { ...UI.caption, marginBottom: 8 } }, "Base case, re-run at each level of peak market share with everything else held — computed, not drawn between two points."),
+              h(ExportableBlock, { title: (theCase.name || "Case") + " — break-even peak revenue" },
+                h(BreakEvenChart, { curve, height: 300, label: "Fair value per share at each peak revenue level, with today's price" })),
+              h(Explain, readBreakEven(curve.basePeak, curve.breakEvenPeak, curve.bearPeak, curve.bullPeak, curve.belowRange, curve.aboveRange))),
+            h(ExportSection, { id: "ws-bridge", title: "Enterprise Value → Per-Share bridge (Base case)", reportSection: "bridge", style: { borderTop: "1px dashed var(--rule)", paddingTop: 14 } },
+              h("div", { style: { fontSize: 13, fontFamily: "var(--display)", fontWeight: 600, color: "var(--ink-1)", marginBottom: 4 } }, heading),
+              h("div", { className: "prose", style: { ...UI.caption, marginBottom: 8 } }, "Base case, built up piece by piece" + (mcap != null ? ", then the gap to what the market pays." : ".")),
+              h(ExportableBlock, { title: (theCase.name || "Case") + " — value bridge (Base case)" },
+                h(WaterfallChart, { height: 320, label: "Value bridge from enterprise value to equity value" + (mcap != null ? " and the market value" : ""),
+                  steps: steps.map(st => ({ label: shortLabel[st.label] || st.label, value: st.sign < 0 ? -st.value : st.value })),
+                  total: { label: "Your fair value", value: eq.equityValue, sub: fmtShare(eq.perShare) + "/sh" },
+                  compare: mcap != null ? { label: "Market value", value: mcap, sub: fmtShare(price) + "/sh" } : null })),
+              // The same figures as one line of text, exact to the dollar.
+              h("div", { className: "bridge-line" },
+                steps.map((st, i) => h("span", { key: i }, (i ? (st.sign < 0 ? " − " : " + ") : "") + st.label + " ", h("b", null, fmtMoney(st.value)))),
+                h("span", null, " = Equity value ", h("b", null, fmtMoney(eq.equityValue)), " ÷ ", fmtNum(eq.dilutedShares), " diluted shares = ", h("b", null, fmtShare(eq.perShare)), " a share")),
+              mcap != null && h(Explain, readPriceGap(eq.perShare, price, oneProgram ? impliedSolved.impliedAbsolutePct : null, oneProgram ? impliedSolved.baseAbsolutePct : null))));
         })()),
 
         // Sum-of-the-Parts breakdown — only meaningful with more than one program.

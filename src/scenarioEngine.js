@@ -369,6 +369,47 @@ function computeProjectionRows(result, theCase) {
   });
 }
 
+// ── Break-even peak revenue: fair value at every peak-sales level ──────────
+// Re-runs the Base valuation with the peak-share multiplier stepped from 30%
+// to 200% of Base, recording the resulting peak revenue and fair value, so the
+// curve is the model's own answer at each level — never a line drawn between
+// two points. Share is capped at 100% of eligible patients by the revenue
+// engine, so past that cap peak revenue stops moving and the repeats are
+// dropped. The break-even is where fair value crosses today's price,
+// interpolated between the two surrounding runs; null when the price sits
+// outside what the curve spans (belowRange / aboveRange say which way).
+function computeBreakEvenCurve(theCase, discountRateBasePct, terminalValueParams) {
+  const base = getEffectiveScenarioPreset(theCase, "base");
+  const peakOf = r => (r.programVals || []).reduce((s, p) => s + (p.peakRevenue || 0), 0);
+  const points = [];
+  for (let m = 30; m <= 200; m += 10) {
+    const r = computeCaseValuation(theCase, { ...base, shareMultiplierPct: base.shareMultiplierPct * m / 100 }, "base", discountRateBasePct, terminalValueParams);
+    const peak = peakOf(r);
+    if (points.length && Math.abs(peak - points[points.length - 1].peak) < 1) continue;
+    points.push({ multiplierPct: m, peak, perShare: r.equity.perShare });
+  }
+  const at = key => computeCaseValuation(theCase, getEffectiveScenarioPreset(theCase, key), key, discountRateBasePct, terminalValueParams);
+  const baseR = at("base");
+  const price = theCase.currentPrice !== "" && theCase.currentPrice != null && Number(theCase.currentPrice) > 0 ? Number(theCase.currentPrice) : null;
+  let breakEvenPeak = null, belowRange = false, aboveRange = false;
+  if (price != null && points.length > 1) {
+    for (let i = 1; i < points.length; i++) {
+      const a = points[i - 1], b = points[i];
+      if ((a.perShare - price) * (b.perShare - price) <= 0 && b.perShare !== a.perShare) {
+        breakEvenPeak = a.peak + (price - a.perShare) / (b.perShare - a.perShare) * (b.peak - a.peak);
+        break;
+      }
+    }
+    if (breakEvenPeak == null) {
+      const vals = points.map(p => p.perShare);
+      belowRange = price < Math.min(...vals);
+      aboveRange = price > Math.max(...vals);
+    }
+  }
+  return { points, price, breakEvenPeak, belowRange, aboveRange,
+    basePeak: peakOf(baseR), basePerShare: baseR.equity.perShare, bearPeak: peakOf(at("bear")), bullPeak: peakOf(at("bull")) };
+}
+
 // ── Partnership economics — upfront and milestones, as a cash figure to add
 // on top of a computed equity value. Upfront is added directly (near-certain /
 // already-contracted, so not PoS-risked and not discounted — same treatment as

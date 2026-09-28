@@ -372,6 +372,125 @@ function HistogramChart({ sortedValues, markers, price, height, label, fmt }) {
 }
 
 // ════════════════════════════════════════════════════════════════════════════
+// Break-even curve — fair value per share at every peak-revenue level (from
+// computeBreakEvenCurve), today's price as a line, this case's point, the
+// break-even where they cross, and the Bear→Bull peak range as a band. Each
+// label is placed on the side of its point the rising curve leaves empty:
+// this case above-left, the break-even below-right.
+// ════════════════════════════════════════════════════════════════════════════
+function BreakEvenChart({ curve, height, label }) {
+  const h = React.createElement;
+  height = height || 300;
+  const wrapRef = React.useRef(null);
+  const measured = useMeasuredWidth(wrapRef, 560);
+  if (!curve || !curve.points || curve.points.length < 2) return h("div", { ref: wrapRef });
+  const pts = curve.points;
+  const W = Math.max(320, measured), H = height, padL = 52, padR = 14, padT = 12, padB = 44;
+  const xs = niceAxisTicks(Math.min(pts[0].peak, curve.bearPeak), Math.max(pts[pts.length - 1].peak, curve.bullPeak), 4);
+  const ys = niceAxisTicks(Math.min(0, ...pts.map(p => p.perShare), curve.price || 0), Math.max(...pts.map(p => p.perShare), curve.price || 0), 4);
+  const x = v => padL + (v - xs.lo) / ((xs.hi - xs.lo) || 1) * (W - padL - padR);
+  const y = v => padT + (ys.hi - v) / ((ys.hi - ys.lo) || 1) * (H - padT - padB);
+  const path = pts.map((p, i) => (i ? "L" : "M") + x(p.peak).toFixed(1) + "," + y(p.perShare).toFixed(1)).join("");
+  // Curve height (screen y) at a given peak, interpolated between runs.
+  const curveY = v => { for (let i = 1; i < pts.length; i++) if (v <= pts[i].peak) { const a = pts[i - 1], b = pts[i]; return y(a.perShare + (v - a.peak) / ((b.peak - a.peak) || 1) * (b.perShare - a.perShare)); } return y(pts[pts.length - 1].perShare); };
+  const bx0 = x(curve.bearPeak), bx1 = x(curve.bullPeak);
+  const bandText = "Bear → Bull peak", bandW = measureLabel(bandText, 10.5);
+  const bandTopY = padT + 14, bandBotY = H - padB - 6;
+  const clearAt = ty => [bx0 + (bx1 - bx0) / 2 - bandW / 2, bx0 + (bx1 - bx0) / 2 + bandW / 2].every(xx => Math.abs(curveY(xs.lo + (xx - padL) / (W - padL - padR) * (xs.hi - xs.lo)) - ty) > 14);
+  const bandLabelY = bx1 - bx0 > bandW + 8 ? (clearAt(bandTopY - 4) ? bandTopY : clearAt(bandBotY - 4) ? bandBotY : null) : null;
+  const price = curve.price, py = price != null ? y(price) : null;
+  const priceText = "today " + fmtShare(price || 0);
+  const priceLabelAbove = price != null && curveY(xs.hi) > py - 22;
+  const bp = curve.basePeak, bv = curve.basePerShare;
+  const caseText = "this case: " + fmtMoney(bp) + " → " + fmtShare(bv);
+  const caseW = measureLabel(caseText, 11, 600);
+  const caseLeft = x(bp) - 16 - caseW > padL;
+  return h("div", { ref: wrapRef },
+    h("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": label || "Fair value at each peak revenue level", "data-titled": "1", style: { width: "100%", height: H, display: "block" } },
+      ys.ticks.map((v, i) => h("g", { key: "y" + i },
+        h("line", { x1: padL, x2: W - padR, y1: y(v), y2: y(v), stroke: v === 0 ? "var(--ink-3)" : "var(--rule)", strokeDasharray: v === 0 ? "none" : "3,3" }),
+        h("text", { x: padL - 8, y: y(v) + 3.5, textAnchor: "end", fontSize: 10, fontFamily: "var(--mono)", fill: "var(--ink-3)" }, (v < 0 ? "-$" : "$") + Math.abs(v)))),
+      xs.ticks.map((v, i) => h("text", { key: "x" + i, x: x(v), y: H - padB + 17, textAnchor: "middle", fontSize: 10, fontFamily: "var(--mono)", fill: "var(--ink-3)" }, fmtMoney(v, v >= 1e9 ? 1 : 0))),
+      h("text", { x: padL + (W - padL - padR) / 2, y: H - 6, textAnchor: "middle", fontSize: 11, fontFamily: "var(--sans)", fill: "var(--ink-2)" }, "Peak revenue"),
+      h("rect", { x: bx0, y: padT, width: Math.max(0, bx1 - bx0), height: H - padT - padB, fill: "var(--teal)", opacity: 0.07 }),
+      bandLabelY != null && h("text", { x: (bx0 + bx1) / 2, y: bandLabelY, textAnchor: "middle", fontSize: 10.5, fontFamily: "var(--mono)", fill: "var(--teal)" }, bandText),
+      h("path", { d: path, fill: "none", stroke: "var(--teal)", strokeWidth: 2.5, strokeLinejoin: "round" }),
+      price != null && h("line", { x1: padL, x2: W - padR, y1: py, y2: py, stroke: "var(--warn)", strokeWidth: 1.5 }),
+      price != null && h("text", { x: W - padR - 2, y: priceLabelAbove ? py + 16 : py - 7, textAnchor: "end", fontSize: 11, fontWeight: 600, fontFamily: "var(--mono)", fill: "var(--warn)" }, priceText),
+      h("line", { x1: x(bp), y1: y(bv) - 6, x2: x(bp) + (caseLeft ? -12 : 12), y2: y(bv) - 20, stroke: "var(--ink-1)" }),
+      h("text", { x: x(bp) + (caseLeft ? -15 : 15), y: y(bv) - 23, textAnchor: caseLeft ? "end" : "start", fontSize: 11, fontWeight: 600, fontFamily: "var(--mono)", fill: "var(--ink-1)" }, caseText),
+      h("circle", { cx: x(bp), cy: y(bv), r: 5, fill: "var(--surface)", stroke: "var(--ink-1)", strokeWidth: 2 }),
+      curve.breakEvenPeak != null && h("g", null,
+        h("line", { x1: x(curve.breakEvenPeak), y1: py + 6, x2: x(curve.breakEvenPeak), y2: py + 24, stroke: "var(--warn)" }),
+        h("text", { x: x(curve.breakEvenPeak), y: py + 37, textAnchor: "middle", fontSize: 11, fontWeight: 600, fontFamily: "var(--mono)", fill: "var(--warn)" }, "break-even ≈ " + fmtMoney(curve.breakEvenPeak)),
+        h("circle", { cx: x(curve.breakEvenPeak), cy: py, r: 5, fill: "var(--surface)", stroke: "var(--warn)", strokeWidth: 2 })))
+  );
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Waterfall — a value built up step by step to a total, then optionally the
+// gap to a comparison (the market value), drawn as its own floating bar.
+// steps: [{ label, value }] — the first is the starting amount, the rest are
+// signed changes. total / compare: { label, value, sub }. Labels: amounts
+// above each bar (a falling step's amount sits above its top too); the gap's
+// amount goes under its floating bar, where its column is always empty.
+// ════════════════════════════════════════════════════════════════════════════
+function WaterfallChart({ steps, total, compare, height, label }) {
+  const h = React.createElement;
+  height = height || 320;
+  const wrapRef = React.useRef(null);
+  const measured = useMeasuredWidth(wrapRef, 560);
+  if (!steps || !steps.length) return h("div", { ref: wrapRef });
+  const bars = [];
+  let run = 0;
+  // Whole millions above $100M and two-decimal billions keep the amounts short
+  // enough that neighbouring labels never meet.
+  const money = v => Math.abs(v) >= 1e9 ? fmtMoney(v, 2) : Math.abs(v) >= 1e8 ? fmtMoney(v, 0) : fmtMoney(v, 1);
+  // A zero step (no debt) is a bar with nothing in it; the text line under the
+  // chart still lists it.
+  steps = steps.filter((s, i) => i === 0 || Math.abs(s.value) >= 0.5);
+  steps.forEach((s, i) => {
+    const a = i === 0 ? 0 : run, b = i === 0 ? s.value : run + s.value;
+    bars.push({ kind: i === 0 ? "start" : "step", label: s.label, a, b, text: (i === 0 ? "" : s.value >= 0 ? "+" : "−") + money(i === 0 ? s.value : Math.abs(s.value)) });
+    run = b;
+  });
+  if (total) bars.push({ kind: "total", label: total.label, sub: total.sub, a: 0, b: total.value, text: money(total.value) });
+  if (compare && total) {
+    const gap = compare.value - total.value;
+    bars.push({ kind: "gap", label: gap >= 0 ? "Price premium" : "Price discount", a: total.value, b: compare.value, text: (gap >= 0 ? "+" : "−") + money(Math.abs(gap)), up: gap >= 0 });
+    bars.push({ kind: "compare", label: compare.label, sub: compare.sub, a: 0, b: compare.value, text: money(compare.value) });
+  }
+  // The right margin fits half of the last bar's widest label, so a per-share
+  // line under the last bar is never cut at the card edge.
+  const lastW = Math.max(measureLabel(bars[bars.length - 1].sub || "", 11, 700), measureLabel(bars[bars.length - 1].text, 11, 600));
+  const W = Math.max(320, measured), H = height, padL = 50, padT = 24, padB = 58;
+  const padR = Math.max(8, lastW / 2 - (W - padL) / bars.length * 0.33 + 4);
+  const ax = niceAxisTicks(Math.min(0, ...bars.map(b => Math.min(b.a, b.b))), Math.max(0, ...bars.map(b => Math.max(b.a, b.b))), 5);
+  const y = v => padT + (ax.hi - v) / ((ax.hi - ax.lo) || 1) * (H - padT - padB);
+  const pitch = (W - padL - padR) / bars.length, bw = pitch * 0.66;
+  const fontV = Math.max(...bars.map(b => measureLabel(b.text, 11, 600))) > pitch - 6 ? 10 : 11;
+  // Category names wrap onto two lines at the space nearest the middle.
+  const wrap = t => { const w = String(t).split(" "); if (w.length < 2) return [t, ""]; let best = 1, bd = Infinity; for (let i = 1; i < w.length; i++) { const d = Math.abs(w.slice(0, i).join(" ").length - w.slice(i).join(" ").length); if (d < bd) { bd = d; best = i; } } return [w.slice(0, best).join(" "), w.slice(best).join(" ")]; };
+  const fill = b => b.kind === "total" ? "var(--slate)" : b.kind === "compare" ? "var(--warn)" : b.kind === "gap" ? (b.up ? "var(--red)" : "var(--green)") : b.b < b.a ? "var(--red)" : "var(--teal)";
+  return h("div", { ref: wrapRef },
+    h("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": label || "Value bridge", "data-titled": "1", style: { width: "100%", height: H, display: "block" } },
+      ax.ticks.map((v, i) => h("g", { key: "t" + i },
+        h("line", { x1: padL, x2: W - padR, y1: y(v), y2: y(v), stroke: v === 0 ? "var(--ink-3)" : "var(--rule)", strokeDasharray: v === 0 ? "none" : "3,3" }),
+        h("text", { x: padL - 6, y: y(v) + 3.5, textAnchor: "end", fontSize: 10, fontFamily: "var(--mono)", fill: "var(--ink-3)" }, fmtMoney(v, Math.abs(ax.step) >= 1e9 ? 0 : 1).replace(/\.0([MB])$/, "$1")))),
+      bars.map((b, i) => {
+        const bx = padL + i * pitch + (pitch - bw) / 2, cx = bx + bw / 2, top = y(Math.max(b.a, b.b)), bot = y(Math.min(b.a, b.b));
+        const [l1, l2] = wrap(b.label);
+        return h("g", { key: i },
+          h("rect", { x: bx, y: top, width: bw, height: Math.max(2, bot - top), rx: 3, fill: fill(b), opacity: b.kind === "step" ? 0.75 : b.kind === "gap" ? 0.8 : 1 }),
+          h("text", { x: cx, y: b.kind === "gap" ? bot + 15 : top - 7, textAnchor: "middle", fontSize: fontV, fontWeight: 600, fontFamily: "var(--mono)", fill: "var(--ink-1)" }, b.text),
+          h("text", { x: cx, y: H - padB + 16, textAnchor: "middle", fontSize: 10, fontFamily: "var(--sans)", fill: "var(--ink-2)" }, l1),
+          l2 && h("text", { x: cx, y: H - padB + 29, textAnchor: "middle", fontSize: 10, fontFamily: "var(--sans)", fill: "var(--ink-2)" }, l2),
+          b.sub && h("text", { x: cx, y: H - padB + 47, textAnchor: "middle", fontSize: 11, fontWeight: 700, fontFamily: "var(--mono)", fill: "var(--ink-1)" }, b.sub));
+      }))
+  );
+}
+
+// ════════════════════════════════════════════════════════════════════════════
 // Scatter chart — for comp positioning (e.g. deal value vs. premium), with an
 // optional single "your case" point rendered distinctly so you can see where
 // your own assumption sits among real comps.

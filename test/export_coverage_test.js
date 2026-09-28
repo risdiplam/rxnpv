@@ -81,7 +81,9 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
 
   // "+ Report" on a section the report already renders live is a toggle, not a snapshot.
   const bridge = d.getElementById("ws-bridge");
-  const bridgeBtn = [...bridge.querySelectorAll("button")].find(b => sectionOf(b) === bridge && /In report|\+ Report/.test(b.textContent));
+  // The section's own button, not the one on the waterfall chart inside it
+  // (a chart's "+ Report" stores a snapshot; the section's toggles the live one).
+  const bridgeBtn = [...bridge.querySelectorAll("button")].find(b => sectionOf(b) === bridge && !b.closest("[data-export-chart]") && /In report|\+ Report/.test(b.textContent));
   ok(bridgeBtn && /In report/.test(bridgeBtn.textContent), "Workspace: the bridge shows as already in the report (it is on by default)");
   click(bridgeBtn); await wait(300);
   const storedCase = () => JSON.parse(w.localStorage.getItem("rxnpv_cases_v1") || "[]").find(c => c.name === "Coverage Co");

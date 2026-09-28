@@ -1854,6 +1854,36 @@ function readPremium(pct, premiumsKnown) {
   const verdict = below / n >= 0.75 ? "Richer than most real deals." : below / n <= 0.25 ? "Leaner than most real deals." : "In line with real deals.";
   return { verdict, text: "A " + pctWord(pct) + " premium is above " + below + " of the " + n + " tracked deals with a disclosed premium; the median is " + pctWord(median) + "." };
 }
+// Break-even peak revenue: how much the price needs against what the case
+// carries, and whether that sits inside the case's own Bear–Bull range.
+function readBreakEven(basePeak, breakEvenPeak, bearPeak, bullPeak, belowRange, aboveRange) {
+  if (breakEvenPeak == null) {
+    if (belowRange) return { verdict: "The price is below every level on this curve.", text: "Even the lowest peak revenue modelled here is worth more than today's price, so the market is pricing in something worse than a weak launch — a failure, or dilution this case does not model." };
+    if (aboveRange) return { verdict: "The price is above every level on this curve.", text: "Even at twice this case's market share the model does not reach today's price, so the market is paying for something beyond peak sales — other programs, a takeover, or odds higher than yours." };
+    return null;
+  }
+  if (!(basePeak > 0)) return null;
+  const gap = basePeak / breakEvenPeak - 1;
+  const where = breakEvenPeak < bearPeak ? "below your Bear case's " + fmtMoney(bearPeak) + ", so the price assumes a launch weaker than your own worst case"
+    : breakEvenPeak > bullPeak ? "above your Bull case's " + fmtMoney(bullPeak) + ", so the price assumes a launch better than your own best case"
+    : "inside your Bear–Bull range of " + fmtMoney(bearPeak) + " to " + fmtMoney(bullPeak);
+  return { verdict: "The price needs about " + fmtMoney(breakEvenPeak) + " of peak revenue.",
+    text: "This case carries " + fmtMoney(basePeak) + ", " + (Math.abs(gap) < 0.005 ? "about the same" : pctWord(Math.abs(gap) * 100) + (gap > 0 ? " more" : " less")) + ". That is " + where + "." };
+}
+
+// The gap between this case's fair value and the price, per share, and what
+// it means in odds when the implied PoS is known. Never calls the gap a
+// mispricing: a model disagreeing with the market is a question, not an answer.
+function readPriceGap(fairPerShare, price, impliedPct, basePct) {
+  if (!(price > 0) || fairPerShare == null || !isFinite(fairPerShare)) return null;
+  const gap = fairPerShare - price;
+  const verdict = Math.abs(gap) < 0.005 ? "The price matches this case." : "About " + fmtShare(Math.abs(gap)) + " a share " + (gap > 0 ? "separates the price from this case." : "of the price is not in this case.");
+  if (impliedPct == null || basePct == null) return { verdict, text: gap > 0 ? "The market values the company below this case's Base assumptions." : "The market values the company above this case's Base assumptions." };
+  const d = basePct - impliedPct;
+  return { verdict, text: "In odds, that is the difference between the " + Math.round(impliedPct) + "% the price implies and this case's " + Math.round(basePct) + "%. " +
+    (Math.abs(d) <= 5 ? "Close enough to be a matter of judgment." : "A " + Math.round(Math.abs(d)) + "-point gap is a real disagreement — worth being able to say why you are " + (d > 0 ? "more" : "less") + " confident than the market.") };
+}
+
 // Forward runway from the case's own plan: when cash runs out, and how much
 // the plan would need raised at its lowest point.
 function readForwardRunway(runwayMonths, path) {

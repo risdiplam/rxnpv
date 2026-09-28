@@ -304,8 +304,13 @@ function ReportView({ theCase, onBack, updateCase }) {
             ["÷ Diluted shares", fmtNum(baseR.equity.dilutedShares)],
             ["= Per Share", fmtShare(baseR.equity.perShare)]
           ]);
-          return h("div", { style: cardStyle },
+          const price = theCase.currentPrice !== "" && theCase.currentPrice != null && Number(theCase.currentPrice) > 0 ? Number(theCase.currentPrice) : null;
+          return h("div", { style: cardStyle, className: reportDark ? "theme-scope-dark" : "theme-scope-light" },
             h("div", { style: { fontSize: 13, fontWeight: 700, marginBottom: 10, color: rpt.ink2 } }, "Enterprise Value → Per-Share Bridge (Base Case)"),
+            h(WaterfallChart, { height: 300, label: "Value bridge from enterprise value to equity value",
+              steps: computeEquityBridgeSteps(theCase, baseR).map(st => ({ label: st.label.replace(" (risk-adj.)", "").replace(" (upfront + milestones)", "").replace(" (not converting)", ""), value: st.sign < 0 ? -st.value : st.value })),
+              total: { label: "Equity value", value: baseR.equity.equityValue, sub: fmtShare(baseR.equity.perShare) + "/sh" },
+              compare: price != null ? { label: "Market value", value: price * baseR.equity.dilutedShares, sub: fmtShare(price) + "/sh" } : null }),
             h("table", { style: { width: "100%", borderCollapse: "collapse", fontSize: 12 } },
               h("tbody", null, rows.map((r, i) => h("tr", { key: i, style: { borderBottom: i < rows.length - 1 ? "1px solid " + rpt.rule : "none" } },
                 h("td", { style: { padding: "5px 8px", fontWeight: r[0].startsWith("=") ? 700 : 400 } }, r[0]),
