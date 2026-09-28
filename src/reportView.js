@@ -18,6 +18,7 @@
 // checkboxes and this picker are two views of the same stored state, not two
 // competing ones.
 const REPORT_SECTIONS = [
+  { id: "glance",       label: "At a glance",              defaultOn: true,  group: "Core" },
   { id: "summary",      label: "Valuation summary",        defaultOn: true,  group: "Core" },
   { id: "programs",     label: "Programs & assumptions",   defaultOn: true,  group: "Core" },
   { id: "revenueChart", label: "Revenue projection chart", defaultOn: true,  group: "Charts" },
@@ -210,6 +211,24 @@ function ReportView({ theCase, onBack, updateCase }) {
       ),
 
       error ? h("div", { style: { color: rpt.red } }, "Could not compute valuation: " + error) : h("div", null,
+        // The case at a glance, as the report's opening picture (caseGlance.js).
+        inc("glance") && valMethod === "dcf" && theCase.programs.length === 1 && (() => {
+          let g = null, drivers = [];
+          try {
+            const drBase = theCase.discountRatePct !== "" && theCase.discountRatePct != null ? Number(theCase.discountRatePct) : DISCOUNT_RATE_GUIDANCE.earlyBiotechSelfView[0];
+            const tv = theCase.terminalValue || { enabled: false, growthPct: "0" };
+            const implied = theCase.currentPrice !== "" && theCase.currentPrice != null ? solveImpliedPoSMultiplier(theCase, drBase, { enabled: tv.enabled, method: tv.method, growthPct: tv.growthPct, exitMultiple: tv.exitMultiple }) : null;
+            const sens = computeSensitivityDrivers(theCase, { skipGrid: true });
+            drivers = sens.error ? [] : sens.rows.slice(0, 4);
+            g = glanceInputs(theCase, scenarioResults, implied, drivers);
+          } catch (e) { return null; }
+          if (!g) return null;
+          return h("div", { style: cardStyle, className: reportDark ? "theme-scope-dark" : "theme-scope-light" },
+            h("div", { style: { fontSize: 13, fontWeight: 700, marginBottom: 10, color: rpt.ink2 } }, "At a Glance"),
+            h(CaseGlanceChart, { evidence: g.evidence, moreCount: g.moreCount, pos: g.pos, value: g.value }),
+            h(Explain, readGlance(g.evidenceCount, Math.min(g.pos.bear, g.pos.bull), Math.max(g.pos.bear, g.pos.bull), g.value.bear, g.value.bull, g.value.price, drivers[0] ? GLANCE_DRIVER_NAME(drivers[0].name) : null)));
+        })(),
+
         // Executive summary
         inc("summary") && h("div", { style: cardStyle },
           h("div", { style: { fontSize: 13, fontWeight: 700, marginBottom: 10, color: rpt.ink2 } }, "Valuation Summary"),

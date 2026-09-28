@@ -228,7 +228,7 @@ Re-run `node setup.js` after every `node build.js`. `npm test` does this for you
 ### Architecture: unusual on purpose
 
 - **No bundler, no modules.**
-  - `build.js` concatenates 46 plain JS files from `src/`, in the order set by `MODULE_ORDER`, into one inline `<script>` inside `shell.html`. The result is `electron/rxnpv.html`.
+  - `build.js` concatenates 47 plain JS files from `src/`, in the order set by `MODULE_ORDER`, into one inline `<script>` inside `shell.html`. The result is `electron/rxnpv.html`.
   - Everything shares global scope. Function declarations hoist across files, but `const`, `let` and `class` do not, so the order matters.
   - This dates from the app being built in a chat sandbox with no tooling. Moving to a real bundler is a legitimate improvement, but it should be its own change, with full re-verification.
 - **Syntax checks.** `build.js` checks every file's syntax before concatenating.
@@ -300,7 +300,7 @@ export PATH="$HOME/.local/nodejs/current/bin:$PATH"
 ## Project structure and where the docs are
 
 ```
-src/        46 source modules — MODULE_ORDER in build.js is the authoritative list and order
+src/        47 source modules — MODULE_ORDER in build.js is the authoritative list and order
 shell.html  HTML template: styles, CSP (with __SCRIPT_HASH__), __SCRIPT__ placeholder
 build.js    assembles src/ into electron/rxnpv.html; --package / --install
 electron/   main.js, preload.js, package.json (electron-builder config), vendor/ (React), icons

@@ -308,6 +308,27 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
     click([...panel.querySelectorAll(".proj-toggle button")].find(b => b.textContent === "Chart + table")); await wait(200);
     ok(!!panel.querySelector(".proj-table") && !!panel.querySelector('svg[aria-label^="Year-by-year"]'), "Projections: Chart + table shows both again");
 
+    // The case at a glance: facts first, then the least certain judgment call.
+    const E = (label, classification, confidence) => ({ label, classification, confidence });
+    const pickd = w.pickGlanceEvidence([E("a", "inference", "moderate"), E("b", "fact", "moderate"), E("c", "fact", "high"), E("d", "inference", "low"), E("e", "fact", "high"), E("f", "speculation", "low"), E("g", "fact", "low")], 5).map(e => e.label);
+    // Facts by confidence then log order: c, e (high), b (moderate), g (low) -> four;
+    // the least certain judgment: d and f are both low; speculation ranks as less
+    // certain than inference -> f.
+    ok(JSON.stringify(pickd) === '["c","e","b","g","f"]', "Glance: facts by confidence, then the least certain judgment (" + pickd.join(",") + ")");
+    ok(w.pickGlanceEvidence([E("x", "inference", "high"), E("y", "inference", "low")], 5).map(e => e.label).join(",") === "y,x", "Glance: with no facts, judgments fill in, least certain first");
+    // Bear $13.78, Bull $46.84, price $24.80: midpoint $30.31 -> lower half.
+    const rg = w.readGlance(20, 48.75, 78, 13.78, 46.84, 24.80, "PoS");
+    ok(rg && rg.text.includes("20 logged pieces of evidence sit behind odds of 49–78% of reaching launch") && rg.text.includes("$13.78 to $46.84 a share, and today's $24.80 sits in the lower half") && rg.text.endsWith("PoS moves the value most."), "Glance: the reading states the ranges and where the price sits");
+    ok(w.readGlance(3, 40, 60, 10, 20, 25, null).text.includes("above even your Bull case"), "Glance: a price above Bull says so");
+    const gl = [...panel.querySelectorAll("[data-export-section]")].find(e => e.getAttribute("data-export-section") === "The case at a glance");
+    const gt = gl ? [...gl.querySelectorAll("svg text")].map(t => t.textContent) : [];
+    ok(!!gl && ["WHAT THE EVIDENCE SAYS", "ODDS OF REACHING LAUNCH", "65%", "price implies 55%", "Base $29.05", "today $24.80"].every(t => gt.includes(t)) && gt.some(t => /^\+\d+ more in the Evidence Log$/.test(t)), "Glance: evidence, odds and value panels render (" + gt.slice(0, 12).join(" | ") + ")");
+    ok(!!gl && gt.includes("Lead asset and mechanism") && gt.includes("Diagnosed 75%, treated 60%"), "Glance: the sample's high-confidence facts and its least certain judgment are shown");
+    click([...gl.querySelectorAll("button")].find(b => b.textContent === "Hide")); await wait(200);
+    ok(![...panel.querySelectorAll("[data-export-section]")].some(e => e.getAttribute("data-export-section") === "The case at a glance") && w.localStorage.getItem("rxnpv_glance_hidden") === "1", "Glance: Hide removes it and remembers");
+    click([...panel.querySelectorAll("button")].find(b => b.textContent === "Show the case at a glance")); await wait(300);
+    ok([...panel.querySelectorAll("[data-export-section]")].some(e => e.getAttribute("data-export-section") === "The case at a glance"), "Glance: Show brings it back");
+
     // The whole range on one line, with the failure floor.
     const rng = [...panel.querySelectorAll("[data-export-section]")].find(e => e.getAttribute("data-export-section") === "The whole range, on one line");
     const rt = rng ? [...rng.querySelectorAll("svg text")].map(t => t.textContent) : [];

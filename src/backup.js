@@ -21,7 +21,7 @@ const BACKUP_FORMAT = "rxnpv-backup";
 const CASE_FILE_FORMAT = "rxnpv-case";
 const BACKUP_VERSION = 1;
 const BACKUP_DATA_KEYS = ["rxnpv_cases_v1", "rxnpv_custom_ma", "rxnpv_custom_peaksales", "rxnpv_custom_licensing", "rxnpv_pdf_bundle"];
-const BACKUP_PREF_KEYS = ["rxnpv_theme", "rxnpv_secnav_hidden", "rxnpv_proj_view"];
+const BACKUP_PREF_KEYS = ["rxnpv_theme", "rxnpv_secnav_hidden", "rxnpv_proj_view", "rxnpv_glance_hidden"];
 const BACKUP_SNAPSHOT_PREFIX = "rxnpv_ctgov_snapshot_";
 
 // "data" (irreplaceable work), "pref" (a setting), or null (not ours to back

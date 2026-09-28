@@ -144,6 +144,9 @@ function useValuationSections({ theCase, onChange, goToTab }) {
       );
     })()),
 
+    // The case at a glance — evidence, odds and value as one picture (caseGlance.js).
+    show("overview") && (!error && scenarioResults && valMethod === "dcf" && theCase.programs.length === 1 && h(CaseGlance, { theCase, scenarioResults, impliedSolved })),
+
     // Price vs. model — a prominent, glanceable summary placed ahead of every
     // input section rather than buried after them, so "what does this case
     // say right now" doesn't require scrolling past the whole build to find.
