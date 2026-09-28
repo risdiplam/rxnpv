@@ -476,7 +476,7 @@ const PLACEBO_RESPONSE_BENCHMARKS = {
 // asset with a similar profile might fetch. Compiled from public deal
 // announcements and SEC filings; refreshed periodically, not real-time. ──
 const MA_COMPS = {
-  asOf: "August 2026",
+  asOf: "September 2026",
   marketContext: {
     // dealValue2025B, dealValue2024B, and the avgDealValue figures below are
     // all from the same source (PitchBook data via CNBC, reported ~June
@@ -565,7 +565,7 @@ const MA_COMPS = {
     { acquirer: "Merck", target: "Prometheus Biosciences", year: 2023, valueB: 10.8, area: "Immunology / IBD", stage: "Clinical (Ph3)", asset: "PRA023 (later tulisokibart)" },
     { acquirer: "Pfizer", target: "Metsera", year: 2025, valueB: 10, area: "Metabolic / obesity (GLP-1)", stage: "Clinical", note: "Won a bidding war against Novo Nordisk and others; up to $10B including contingent payments" },
     { acquirer: "Merck", target: "Terns Pharmaceuticals", year: 2026, valueB: 6.7, area: "Oncology", stage: "Clinical", asset: "TERN-701 — oral CML" },
-    { acquirer: "AbbVie", target: "Apogee Therapeutics", year: 2026, valueB: 10.9, premiumPct: 53, area: "Immunology", stage: "Clinical (Phase 3 pending)", asset: "Zumilokibart (APG777) — IL-13 mAb, atopic dermatitis/asthma" },
+    { acquirer: "AbbVie", target: "Apogee Therapeutics", year: 2026, valueB: 10.9, perShare: 135.11, premiumPct: 53, note: "Premium is to the Jun 17, 2026 close (63% to 30-day VWAP), as stated in Apogee's merger proxy (DEFM14A, Jul 13, 2026)", area: "Immunology", stage: "Clinical (Phase 3 pending)", asset: "Zumilokibart (APG777) — IL-13 mAb, atopic dermatitis/asthma" },
     { acquirer: "GSK", target: "Nuvalent", year: 2026, valueB: 10.6, premiumPct: 40, area: "Oncology", stage: "Under FDA review (2 assets) + Phase 1", asset: "Zidesamtinib (ROS1), neladalkib (ALK) — NSCLC" },
     { acquirer: "Eli Lilly", target: "Centessa Pharmaceuticals", year: 2026, valueB: 6.3, area: "CNS / sleep disorders", stage: "Clinical", note: "$6.3B upfront + up to $1.5B in contingent value rights" },
     { acquirer: "UCB", target: "Neurona Therapeutics", year: 2026, valueB: 1.15, area: "Neurology / cell therapy", stage: "Clinical", asset: "NRTX-1001 — epilepsy", note: "Up to $1.15B including milestones" },
@@ -576,7 +576,18 @@ const MA_COMPS = {
     { acquirer: "Boehringer Ingelheim", target: "Nerio Therapeutics", year: 2024, valueB: 0.6, area: "Oncology / immuno-oncology", stage: "Preclinical" },
     { acquirer: "Novartis", target: "Regulus Therapeutics", year: 2025, valueB: 0.8, area: "Rare disease / RNA therapeutics", stage: "Clinical", asset: "Farabursen — ADPKD (kidney)", note: "$800M upfront + up to $900M milestones ($1.7B total)" },
     { acquirer: "BioNTech", target: "Biotheus", year: 2025, valueB: 0.8, area: "Oncology / bispecific antibody", stage: "Clinical", note: "$800M upfront + up to $150M milestones" },
-    { acquirer: "J&J", target: "Halda Therapeutics", year: 2025, valueB: 3.05, area: "Oncology", stage: "Clinical", asset: "Prostate cancer (oral targeted therapy)" }
+    { acquirer: "J&J", target: "Halda Therapeutics", year: 2025, valueB: 3.05, area: "Oncology", stage: "Clinical", asset: "Prostate cancer (oral targeted therapy)" },
+    // Round 3 (September 2026 comps refresh) — 2026 deals, each read from the
+    // target's 8-K exhibit or merger documents and the acquirer's release.
+    // Premiums are the ones the parties stated, with the reference price named.
+    { acquirer: "Vertex", target: "Crinetics Pharmaceuticals", year: 2026, valueB: 10.0, perShare: 85, premiumPct: 101, area: "Rare endocrine", stage: "Approved + Phase 3", asset: "Palsonify (paltusotine) — acromegaly; atumelnant Phase 3 in CAH", note: "Premium is to the Jul 2, 2026 close (127% to 30-day VWAP); ~$8.8B net of cash acquired. Vertex was reportedly the sole bidder" },
+    { acquirer: "Biogen", target: "Apellis Pharmaceuticals", year: 2026, valueB: 5.6, perShare: 41, premiumPct: 86, area: "Rare disease / ophthalmology / nephrology", stage: "Multiple approved", asset: "Syfovre (geographic atrophy), Empaveli (PNH, C3G)", note: "Premium is to the 90-day VWAP (35% to 52-week high). Plus CVR up to $4/sh tied to Syfovre sales thresholds. Combined 2025 product sales $689M" },
+    { acquirer: "Gilead", target: "Arcellx", year: 2026, valueB: 7.8, perShare: 115, premiumPct: 68, area: "Oncology / CAR-T", stage: "Filed (BLA accepted)", asset: "Anito-cel — BCMA CAR-T, multiple myeloma (PDUFA Dec 23, 2026)", note: "Premium is to the 30-day VWAP as of Feb 20, 2026. Plus $5/sh CVR on $6B cumulative anito-cel sales through 2029; $7.8B implied equity value" },
+    { acquirer: "argenx", target: "Forte Biosciences", year: 2026, valueB: 2.2, perShare: 77, premiumPct: 86, area: "Immunology / autoimmune", stage: "Phase 1b (completed)", asset: "FB102 — anti-CD122 mAb, vitiligo and celiac disease", note: "Premium is to the VWAP since the Jul 9, 2026 positive Phase 1b readout, not to a pre-deal close — i.e. measured after the stock had already re-rated on data" },
+    { acquirer: "Neurocrine Biosciences", target: "Soleno Therapeutics", year: 2026, valueB: 2.9, perShare: 53, premiumPct: 34, area: "Rare disease / endocrine", stage: "Approved", asset: "Vykat XR (diazoxide choline) — hyperphagia in Prader-Willi syndrome", note: "Premium is to the Apr 2, 2026 close (51% to 30-day VWAP). Vykat XR 2025 revenue $190M ($92M in Q4)" },
+    { acquirer: "Servier", target: "Day One Biopharmaceuticals", year: 2026, valueB: 2.5, perShare: 21.5, premiumPct: 68, area: "Oncology / rare pediatric", stage: "Approved", asset: "Ojemda (tovorafenib) — pediatric low-grade glioma", note: "Premium is to the Mar 5, 2026 close (86% to one-month VWAP)" },
+    { acquirer: "Chiesi", target: "KalVista Pharmaceuticals", year: 2026, valueB: 1.9, perShare: 27, premiumPct: 36, area: "Rare disease / HAE", stage: "Approved", asset: "Ekterly (sebetralstat) — oral on-demand HAE", note: "Premium is to the 30-day VWAP as of Apr 28, 2026. Ekterly 2025 sales $49M (launched Jul 2025)" },
+    { acquirer: "Telix Pharmaceuticals", target: "ITM Isotope Technologies Munich", year: 2026, valueB: 1.65, area: "Radiopharmaceuticals", stage: "Phase 3 (positive COMPETE trial)", asset: "ITM-11 (n.c.a. 177Lu-edotreotide) — GEP-NETs; plus isotope production", note: "Private target, no premium. $1.65B upfront on a cash-free/debt-free basis, paid mostly in Telix shares (~$1.25B); up to $700M more contingent on ITM-11 approvals and FY2030 sales. Not yet closed (Telix shareholder vote ~Nov 2026)" }
   ]
 };
 
@@ -624,20 +635,20 @@ const SIMPLE_MULTIPLE_PRECEDENTS = {
 // your own asset's ambitions are. Compiled from company disclosures and
 // public deal/analyst commentary; refreshed periodically, not a live feed. ──
 const PEAK_SALES_COMPS = {
-  asOf: "August 2026",
+  asOf: "September 2026",
   drugs: [
-    { drug: "Keytruda", company: "Merck", area: "Oncology (broad, PD-1)", modality: "biologic", peakSalesB: 29.5, asOfYear: 2024, status: "still growing" },
+    { drug: "Keytruda", company: "Merck", area: "Oncology (broad, PD-1)", modality: "biologic", peakSalesB: 31.7, asOfYear: 2025, status: "still growing (includes subcutaneous Keytruda Qlex)" },
     { drug: "Humira", company: "AbbVie", area: "Immunology", modality: "biologic", peakSalesB: 21.2, asOfYear: 2022, status: "peaked, now eroding to biosimilars" },
     { drug: "Eliquis", company: "BMS / Pfizer", area: "Cardiovascular", modality: "small molecule", peakSalesB: 12.9, asOfYear: 2024, status: "still growing" },
     { drug: "Stelara", company: "J&J", area: "Immunology", modality: "biologic", peakSalesB: 10.36, asOfYear: 2024, status: "peaked, now eroding to biosimilars" },
     { drug: "Trikafta / Vanzatri", company: "Vertex", area: "Rare disease (cystic fibrosis)", modality: "small molecule", peakSalesB: 10.2, asOfYear: 2024, status: "still growing" },
-    { drug: "Darzalex", company: "J&J", area: "Oncology (multiple myeloma)", modality: "biologic", peakSalesB: 11.7, asOfYear: 2024, status: "still growing" },
+    { drug: "Darzalex", company: "J&J", area: "Oncology (multiple myeloma)", modality: "biologic", peakSalesB: 14.35, asOfYear: 2025, status: "still growing" },
     { drug: "Opdivo", company: "Bristol Myers Squibb", area: "Oncology (PD-1)", modality: "biologic", peakSalesB: 9.0, asOfYear: 2023, status: "roughly plateaued" },
     { drug: "Imbruvica", company: "AbbVie / J&J", area: "Oncology (hematology, BTK)", modality: "small molecule", peakSalesB: 9.5, asOfYear: 2021, status: "peaked, now declining" },
     { drug: "Biktarvy", company: "Gilead", area: "Infectious disease (HIV)", modality: "small molecule", peakSalesB: 12.9, asOfYear: 2024, status: "still growing" },
     { drug: "Ocrevus", company: "Roche", area: "Neurology (multiple sclerosis)", modality: "biologic", peakSalesB: 7.5, asOfYear: 2024, status: "still growing" },
     { drug: "Soliris", company: "Alexion / AstraZeneca", area: "Rare disease (PNH)", modality: "biologic", peakSalesB: 5.0, asOfYear: 2020, status: "peaked pre-acquisition, cited directly in AZ deal commentary" },
-    { drug: "Skyrizi", company: "AbbVie", area: "Immunology", modality: "biologic", peakSalesB: 11.7, asOfYear: 2024, status: "still growing rapidly (Humira successor)" },
+    { drug: "Skyrizi", company: "AbbVie", area: "Immunology", modality: "biologic", peakSalesB: 17.56, asOfYear: 2025, status: "still growing rapidly (Humira successor)" },
     { drug: "Vyndaqel / Vyndamax", company: "Pfizer", area: "Rare disease (ATTR-CM)", modality: "small molecule", peakSalesB: 3.3, asOfYear: 2023, status: "still growing" },
     { drug: "Trodelvy", company: "Gilead (ex-Immunomedics)", area: "Oncology (TNBC, ADC)", modality: "biologic (ADC)", peakSalesB: 4.0, asOfYear: null, status: "2020 deal-time consensus estimate — actual FY2025 sales were $1.4B (still growing, boosted by positive Phase 3 ASCENT-03/04 readouts), a useful reminder of how far early deal-time estimates can run from reality years later" },
     { drug: "Enhertu", company: "Daiichi Sankyo / AstraZeneca", area: "Oncology (HER2, ADC)", modality: "biologic (ADC)", peakSalesB: 15.0, asOfYear: null, status: "analyst consensus peak, driven by ongoing indication expansion — real combined FY2025 sales already reached ~$5.0B and still growing, so this is a forward projection, not yet a realized figure. Complements the Daiichi Sankyo/AstraZeneca profit-share licensing entry in Licensing Comps — same asset, deal-economics vs. commercial-scale view of it" },
@@ -654,10 +665,10 @@ const PEAK_SALES_COMPS = {
     // as a single analyst's (Goldman's) estimate, above the broader
     // consensus, since it's too newly launched to have an actual figure.
     { drug: "Ozempic", company: "Novo Nordisk", area: "Metabolic (type 2 diabetes, GLP-1)", modality: "biologic", peakSalesB: 17.5, asOfYear: 2024, status: "still growing" },
-    { drug: "Mounjaro", company: "Eli Lilly", area: "Metabolic (type 2 diabetes, GLP-1/GIP)", modality: "biologic", peakSalesB: 11.5, asOfYear: 2024, status: "still growing rapidly" },
-    { drug: "Dupixent", company: "Sanofi / Regeneron", area: "Immunology (atopic dermatitis, asthma, COPD)", modality: "biologic", peakSalesB: 13.6, asOfYear: 2024, status: "still growing" },
+    { drug: "Mounjaro", company: "Eli Lilly", area: "Metabolic (type 2 diabetes, GLP-1/GIP)", modality: "biologic", peakSalesB: 22.97, asOfYear: 2025, status: "still growing rapidly — nearly doubled from 2024" },
+    { drug: "Dupixent", company: "Sanofi / Regeneron", area: "Immunology (atopic dermatitis, asthma, COPD)", modality: "biologic", peakSalesB: 17.8, asOfYear: 2025, status: "still growing" },
     { drug: "Wegovy", company: "Novo Nordisk", area: "Metabolic (obesity, GLP-1)", modality: "biologic", peakSalesB: 8.4, asOfYear: 2024, status: "still growing rapidly" },
-    { drug: "Zepbound", company: "Eli Lilly", area: "Metabolic (obesity, GLP-1/GIP)", modality: "biologic", peakSalesB: 4.93, asOfYear: 2024, status: "still growing very rapidly — launched Nov 2023" },
+    { drug: "Zepbound", company: "Eli Lilly", area: "Metabolic (obesity, GLP-1/GIP)", modality: "biologic", peakSalesB: 13.54, asOfYear: 2025, status: "still growing very rapidly — launched Nov 2023" },
     { drug: "Yescarta", company: "Gilead / Kite Pharma", area: "Oncology (CAR-T, large B-cell lymphoma)", modality: "biologic", peakSalesB: 1.5, asOfYear: 2024, status: "still growing modestly — leading CAR-T product by sales" },
     { drug: "Zolgensma", company: "Novartis", area: "Rare disease (gene therapy, spinal muscular atrophy)", modality: "biologic", peakSalesB: 1.2, asOfYear: 2024, status: "stabilized — one-time dosing means revenue is driven by incident (new) patients, not repeat purchase" },
     { drug: "Elevidys", company: "Sarepta Therapeutics", area: "Rare disease (gene therapy, Duchenne muscular dystrophy)", modality: "biologic", peakSalesB: 0.82, asOfYear: 2024, status: "still growing rapidly — launched mid-2023" },
@@ -680,6 +691,8 @@ const PEAK_SALES_COMPS = {
     // token examples.
     { drug: "Fabhalta", company: "Novartis", area: "Rare disease (IgA nephropathy, kidney)", modality: "small molecule", peakSalesB: 0.505, asOfYear: 2024, status: "still growing very rapidly (+291% YoY)" },
     { drug: "Rezdiffra", company: "Madrigal Pharmaceuticals", area: "Metabolic (MASH/NASH, first-in-class)", modality: "small molecule", peakSalesB: 0.18, asOfYear: 2024, status: "still growing extremely rapidly — first full year of launch; run-rate implied >$1B annualized by Q3 2025" },
+    // September 2026 comps refresh — Merck FY2025 results (Feb 3, 2026).
+    { drug: "Winrevair", company: "Merck", area: "Cardiovascular / rare (pulmonary arterial hypertension)", modality: "biologic", peakSalesB: 1.4, asOfYear: 2025, status: "still growing rapidly — up from $419M in 2024, its first launch year" },
     { drug: "Wainua", company: "AstraZeneca / Ionis", area: "Rare disease (hereditary ATTR amyloidosis, nerve)", modality: "small molecule", peakSalesB: 0.044, asOfYear: 2024, status: "very early launch — small-scale comp, useful floor reference" }
   ]
 };
@@ -701,7 +714,7 @@ const PEAK_SALES_COMPS = {
 // is profit-shared rather than royalty-based; royaltyNote always describes
 // what's actually known, never fills a gap with an assumed figure.
 const LICENSING_COMPS = {
-  asOf: "August 2026",
+  asOf: "September 2026",
   heuristics: [
     "Upfront typically runs 5-15% of total deal value for preclinical/Phase 1 assets, rising to 20-30%+ for Phase 3 or approved products — most of a deal's headline value sits in milestones that may never be paid.",
     "A disclosed royalty rate is the exception, not the rule — most deals only ever say \"tiered royalties,\" without a number. Treat an undisclosed rate as genuinely unknown, not as license to assume a market-average figure.",
@@ -729,6 +742,12 @@ const LICENSING_COMPS = {
     { licensor: "3SBio", licensee: "Pfizer", year: 2025, asset: "SSGJ-707 (PD-1/VEGF bispecific)", area: "Oncology (NSCLC, colorectal, gynecologic)", stage: "Phase 2 (China), entering Phase 3", territory: "Worldwide ex-China", upfrontM: 1250, totalDealValueM: 6050, royaltyLow: null, royaltyHigh: null, royaltyNote: "tiered double-digit royalties on worldwide net sales, no low/high split disclosed; excludes a separate $100M equity investment Pfizer made in 3SBio alongside the license, kept out of upfrontM/totalDealValueM per the same equity-vs-license convention as the BMS/Prime Medicine entry above" },
     { licensor: "BioNTech", licensee: "Bristol Myers Squibb", year: 2025, asset: "BNT327 / pumitamig (PD-L1/VEGF-A bispecific)", area: "Oncology (broad solid tumor)", stage: "Phase 2/3 (multiple registrational trials ongoing or planned)", territory: "Worldwide, co-developed and co-commercialized 50/50", upfrontM: 1500, totalDealValueM: 11100, royaltyLow: null, royaltyHigh: null, royaltyNote: "50/50 global cost-and-profit share — not royalty-based at all; total includes $2B in non-contingent anniversary payments through 2028 on top of the $1.5B upfront, plus up to $7.6B in additional development/regulatory/commercial milestones" },
     { licensor: "LaNova Medicines", licensee: "Merck & Co.", year: 2024, asset: "LM-299 (PD-1/VEGF bispecific)", area: "Oncology", stage: "Phase 1", territory: "Worldwide", upfrontM: 588, totalDealValueM: 3288, royaltyLow: null, royaltyHigh: null, royaltyNote: "milestone-heavy structure ($300M of the $2.7B tied specifically to technology transfer, separate from clinical/regulatory/commercial gates); royalty terms not disclosed in public reporting" },
-    { licensor: "Zealand Pharma", licensee: "Roche", year: 2025, asset: "Petrelintide (amylin analog)", area: "Metabolic (obesity)", stage: "Phase 2 (positive results reported; Phase 3 planned H2 2026)", territory: "US & Europe (co-commercialized 50/50), Roche exclusive rest-of-world", upfrontM: 1400, totalDealValueM: 5300, royaltyLow: 10, royaltyHigh: 19, royaltyNote: "tiered double-digit up to high-teens royalties apply only to rest-of-world net sales; US/Europe is a 50/50 profit share instead, not royalty-based there" }
+    { licensor: "Zealand Pharma", licensee: "Roche", year: 2025, asset: "Petrelintide (amylin analog)", area: "Metabolic (obesity)", stage: "Phase 2 (positive results reported; Phase 3 planned H2 2026)", territory: "US & Europe (co-commercialized 50/50), Roche exclusive rest-of-world", upfrontM: 1400, totalDealValueM: 5300, royaltyLow: 10, royaltyHigh: 19, royaltyNote: "tiered double-digit up to high-teens royalties apply only to rest-of-world net sales; US/Europe is a 50/50 profit share instead, not royalty-based there" },
+    // September 2026 comps refresh — each from the licensor's or licensee's
+    // own release or 8-K. Vir/Astellas rests on Vir's 8-K alone, which carries
+    // the full terms.
+    { licensor: "Vir Biotechnology", licensee: "Astellas", year: 2026, asset: "VIR-5500 (PSMA-targeted masked T-cell engager)", area: "Oncology (prostate cancer)", stage: "Phase 1", territory: "Ex-US exclusive to Astellas; US co-developed with 50/50 profit share", upfrontM: 240, totalDealValueM: 1630, royaltyLow: null, royaltyHigh: null, royaltyNote: "tiered double-digit royalties on ex-US net sales, no low/high split disclosed; US is a 50/50 profit share (global development costs 40% Vir / 60% Astellas). totalDealValueM = $240M upfront + $20M tech-transfer milestone + up to $1.37B milestones; excludes the separate $75M equity purchase per the equity-vs-license convention. Milestones rise to $1.60B if Vir opts out of cost-sharing" },
+    { licensor: "Hanmi Pharmaceutical", licensee: "Genentech (Roche)", year: 2026, asset: "HM17321 (urocortin-2 analog, non-incretin)", area: "Metabolic (obesity)", stage: "Phase 1", territory: "Worldwide ex-South Korea", upfrontM: 190, totalDealValueM: 2300, royaltyLow: null, royaltyHigh: null, royaltyNote: "tiered royalties on net sales, rate undisclosed; Hanmi completes Phase 1, Genentech takes over from Phase 2" },
+    { licensor: "Alphamab Oncology", licensee: "Pathos AI", year: 2026, asset: "JSKN016 (TROP2/HER3 bispecific ADC)", area: "Oncology (ADC)", stage: "Phase 3 in China (TNBC), earlier-phase elsewhere", territory: "Worldwide ex-Greater China", upfrontM: 125, totalDealValueM: 2218, royaltyLow: 8, royaltyHigh: 12, royaltyNote: "tiered high-single-digit to low-double-digit royalties on net sales (numeric range mapped the same way as the Precision/TG entry); $2,093M milestones on top of the $125M upfront" }
   ]
 };
