@@ -207,7 +207,7 @@ app.whenReady().then(async () => {
     // The Workspace is five sub-tabs; each is its own stop. Tabs are clicked by
     // id because a tab's text can carry a count badge ("Evidence 3").
     await click("Workspace", 700);
-    for (const t of ["overview", "assumptions", "scenarios", "evidence", "calibration"]) {
+    for (const t of ["overview", "assumptions", "scenarios", "evidence", "calibration", "saved"]) {
       await js(`document.getElementById("casetab-${t}").click()`); await sleep(500);
       await stop("Workspace " + t);
     }
