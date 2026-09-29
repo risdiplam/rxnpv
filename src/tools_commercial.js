@@ -151,7 +151,7 @@ function LaunchTrackerTool() {
 // ── Actual vs modelled ─────────────────────────────────────────────────────
 function ActualVsModelTool({ cases, updateCase, activeCase }) {
   const h = React.createElement;
-  const [caseId, setCaseId] = React.useState(activeCase ? activeCase.id : "");
+  const [caseId, setCaseId] = useActiveCaseId(activeCase);
   const theCase = (cases || []).find(c => c.id === caseId);
   const [draft, setDraft] = React.useState({ year: "", quarters: "4", revenueM: "" });
 

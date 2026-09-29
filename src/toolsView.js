@@ -7,17 +7,22 @@
 // ════════════════════════════════════════════════════════════════════════════
 
 // ── Shared case picker — used by every tool's import/export controls ──
-function CasePicker({ cases, selectedId, onChange, placeholder }) {
+// Every tool works in the case open in the "Working in" bar (CaseContextBar),
+// so a tool no longer carries its own case dropdown — that let one tool sit on
+// a different case from the rest, or stay on an old case after a switch. The
+// chip keeps the case named inside the tool card, so an exported card still
+// says which case it came from. (cases / onChange are kept in the signature
+// so the call sites read the same.)
+function CasePicker({ cases, selectedId }) {
   const h = React.createElement;
-  if (!cases || cases.length === 0) {
-    return h("span", { style: UI.captionMd }, "No cases yet — create one in Workspace first.");
-  }
-  return h("select", { value: selectedId || "", onChange: e => onChange(e.target.value),
-    "aria-label": placeholder || "Select a case",
-    style: { padding: "6px 10px", borderRadius: 6, border: "1.5px solid var(--rule)", background: "var(--surface)", color: "var(--ink-1)", fontFamily: "var(--mono)", fontSize: 12 } },
-    h("option", { value: "" }, placeholder || "Select a case…"),
-    cases.map(c => h("option", { key: c.id, value: c.id }, c.name + (c.ticker ? " (" + c.ticker + ")" : "")))
-  );
+  const c = (cases || []).find(x => x.id === selectedId);
+  return h("span", { className: "case-chip", title: "Switch cases in the Working in bar at the top" },
+    c ? ["Case: ", h("b", { key: "n" }, c.name + (c.ticker ? " (" + c.ticker + ")" : ""))] : "No case open — open or create one in Workspace");
+}
+// The case a tool works in: always the open case. Returned in useState's shape
+// ([id, setter]) so tools that used to hold their own copy read the same.
+function useActiveCaseId(activeCase) {
+  return [activeCase ? activeCase.id : "", () => {}];
 }
 
 // ── The workbench layout ───────────────────────────────────────────────────
@@ -56,7 +61,7 @@ function workbenchForTool(toolId) {
   return TOOL_WORKBENCHES.find(w => w.tools.some(t => t[0] === toolId)) || TOOL_WORKBENCHES[0];
 }
 
-function ToolsView({ cases, updateCase, activeCase, navRequest }) {
+function ToolsView({ cases, updateCase, activeCase, navRequest, onSelectCase, onOpenWorkspace }) {
   const h = React.createElement;
   const [tab, setTab] = React.useState("decoder");
   // Set by Company Lookup's "Watch this trial" link and consumed once by
@@ -77,6 +82,7 @@ function ToolsView({ cases, updateCase, activeCase, navRequest }) {
 
   const toolEntry = bench.tools.find(([id]) => id === tab);
   return h("div", { "data-export-context": "Tools · " + bench.label + (toolEntry ? " · " + toolEntry[1] : ""), style: { maxWidth: "var(--app-max-width)", margin: "0 auto", padding: "24px 28px 60px" } },
+    h(CaseContextBar, { cases, activeCase, onSelectCase, onOpenWorkspace }),
     h("div", { style: { display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 } },
       TOOL_WORKBENCHES.map(w => h("button", { key: w.id,
         // Selecting a workbench lands on its first tool, which is the one most

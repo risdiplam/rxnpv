@@ -12,7 +12,7 @@
 // guaranteed consistent with what you'd see there — no separate/duplicated math.
 function SensitivityTool({ cases, updateCase, activeCase }) {
   const h = React.createElement;
-  const [caseId, setCaseId] = React.useState(activeCase ? activeCase.id : "");
+  const [caseId, setCaseId] = useActiveCaseId(activeCase);
   const theCase = cases.find(c => c.id === caseId);
 
   const { rows, error, baseline, gridData } = computeSensitivityDrivers(theCase);
@@ -231,8 +231,8 @@ function FdmcTool({ cases, updateCase, activeCase }) {
   const [pullError, setPullError] = React.useState(null);
   const [pullResult, setPullResult] = React.useState(null);
   const [fields, setFields] = React.useState({ currentPrice: "", dilutedSharesSimple: "", basicShares: "", opts: "", optK: "", war: "", warK: "", convFace: "", convPrice: "" });
-  const [importCaseId, setImportCaseId] = React.useState(activeCase ? activeCase.id : "");
-  const [exportCaseId, setExportCaseId] = React.useState(activeCase ? activeCase.id : "");
+  const [importCaseId, setImportCaseId] = useActiveCaseId(activeCase);
+  const [exportCaseId, setExportCaseId] = useActiveCaseId(activeCase);
   const [exportMsg, setExportMsg] = React.useState(null);
   const isDesktop = typeof window !== "undefined" && window.electronAPI && window.electronAPI.isDesktop;
   const setF = (patch) => setFields(prev => ({ ...prev, ...patch }));

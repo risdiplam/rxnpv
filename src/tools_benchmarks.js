@@ -10,7 +10,7 @@ function MaPremiumTool({ cases, updateCase, activeCase }) {
   const h = React.createElement;
   const [startValue, setStartValue] = React.useState("");
   const [premiumPct, setPremiumPct] = React.useState("");
-  const [importCaseId, setImportCaseId] = React.useState(activeCase ? activeCase.id : "");
+  const [importCaseId, setImportCaseId] = useActiveCaseId(activeCase);
   const [caseValueB, setCaseValueB] = React.useState(null); // total equity value in $B, for the scatter's x-axis
   // Full read/write here now, matching Peak Sales Comps and Licensing Comps
   // exactly — this used to be read-only with add/edit/delete living only on
@@ -177,7 +177,7 @@ function MaPremiumTool({ cases, updateCase, activeCase }) {
 function PeakSalesCompsTool({ cases, updateCase, activeCase }) {
   const h = React.createElement;
   const [filter, setFilter] = React.useState("");
-  const [exportCaseId, setExportCaseId] = React.useState(activeCase ? activeCase.id : "");
+  const [exportCaseId, setExportCaseId] = useActiveCaseId(activeCase);
   const [exportProgramId, setExportProgramId] = React.useState(activeCase && activeCase.programs[0] ? activeCase.programs[0].id : "");
   const [exportMsg, setExportMsg] = React.useState(null);
   const [fdaData, setFdaData] = React.useState({}); // drugName -> result, cached per lookup
@@ -411,7 +411,7 @@ function PeakSalesCompsTool({ cases, updateCase, activeCase }) {
 function LicensingCompsTool({ cases, updateCase, activeCase }) {
   const h = React.createElement;
   const [filter, setFilter] = React.useState("");
-  const [exportCaseId, setExportCaseId] = React.useState(activeCase ? activeCase.id : "");
+  const [exportCaseId, setExportCaseId] = useActiveCaseId(activeCase);
   const [exportProgramId, setExportProgramId] = React.useState(activeCase && activeCase.programs[0] ? activeCase.programs[0].id : "");
   const [exportMsg, setExportMsg] = React.useState(null);
   const [customDeals, setCustomDeals] = React.useState(() => loadCustomComps(CUSTOM_LICENSING_KEY));

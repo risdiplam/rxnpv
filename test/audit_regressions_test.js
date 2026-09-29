@@ -378,6 +378,26 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
     ok(/Above today's price/.test(panel.textContent), "Monte Carlo: states the share of trials above today's price");
   }
 
+  // ── Working in: Tools and Simulation follow the open case ──
+  {
+    const btnT = t => [...d.querySelectorAll("button")].find(b => b.textContent.trim() === t);
+    const cs = JSON.parse(w.localStorage.getItem("rxnpv_cases_v1"));
+    click(btnT("Tools")); await wait(400);
+    const bar = d.querySelector('select[aria-label="Case these tools work in"]');
+    ok(!!bar && bar.options.length === cs.length, "Working in: the bar lists every case in Tools");
+    click(btnT("Valuation")); await wait(200); click(btnT("Sensitivity")); await wait(400);
+    const other = [...bar.options].find(o => o.value !== bar.value);
+    const setSel = (el, v) => { Object.getOwnPropertyDescriptor(w.HTMLSelectElement.prototype, "value").set.call(el, v); el.dispatchEvent(new w.Event("change", { bubbles: true })); };
+    setSel(bar, other.value); await wait(400);
+    const chip = d.querySelector(".case-chip");
+    ok(!!chip && chip.textContent.includes(cs.find(c => c.id === other.value).name), "Working in: switching the bar moves the tool to that case (" + (chip && chip.textContent) + ")");
+    click(btnT("Simulation")); await wait(600);
+    const simBar = d.querySelector('select[aria-label="Case these tools work in"]');
+    ok(!!simBar && simBar.value === other.value, "Working in: Simulation shows the same case");
+    click(btnT("Workspace")); await wait(400);
+    ok((d.querySelector('input[aria-label="Case name"]') || {}).value === cs.find(c => c.id === other.value).name, "Working in: the Workspace opens on the case chosen in the bar");
+  }
+
   // ── Assumptions section list: states come from the data, links are live ──
   {
     const find = (groups, id) => { for (const g of groups) for (const i of g.items) if (i.id === id) return i; return null; };

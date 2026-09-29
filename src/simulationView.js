@@ -19,7 +19,7 @@
 // this needs no restructuring of TrialSim's own code to work.
 // ════════════════════════════════════════════════════════════════════════════
 
-function SimulationView({ cases, updateCase }) {
+function SimulationView({ cases, updateCase, activeCase, onSelectCase, onOpenWorkspace }) {
   const h = React.createElement;
   const containerRef = React.useRef(null);
   const bootedRef = React.useRef(false);
@@ -28,8 +28,8 @@ function SimulationView({ cases, updateCase }) {
   // The vanilla half reaches the case list through this bridge. It now also
   // carries the active case and report navigation, so the export bars on
   // Simulation panels can say where an added section went and open it.
-  window.rxnpvSimBridge = { cases, updateCase,
-    activeCaseId: ctx ? ctx.activeCaseId : null,
+  window.rxnpvSimBridge = { cases, updateCase, activeCase: activeCase || null,
+    activeCaseId: activeCase ? activeCase.id : (ctx ? ctx.activeCaseId : null),
     openReport: ctx ? ctx.openReport : null,
     openBundle: ctx ? ctx.openBundle : null };
 
@@ -42,6 +42,8 @@ function SimulationView({ cases, updateCase }) {
   }, []);
 
   return h("div", { "data-export-context": "Simulation", style: { minHeight: "100vh" } },
+    h("div", { className: "sim-case-bar", style: { maxWidth: "var(--app-max-width)", margin: "0 auto", padding: "20px 28px 0" } },
+      h(CaseContextBar, { cases, activeCase, onSelectCase, onOpenWorkspace })),
     h("div", { id: "ts-root", ref: containerRef })
   );
 }

@@ -159,6 +159,34 @@ function BenchField({ label, value, onChange, bench, suffix, placeholder, step, 
   );
 }
 
+// ── Working in: the case every tool and simulation is tuned to ─────────────
+// Top of Tools and Simulation. Switching here switches the app's open case
+// (the same one the Workspace shows), so there is exactly one "current case"
+// everywhere. Reference material and Portfolio are case-independent and do
+// not carry it.
+function CaseContextBar({ cases, activeCase, onSelectCase, onOpenWorkspace }) {
+  const h = React.createElement;
+  if (!cases || !cases.length) {
+    return h("div", { className: "case-bar empty", role: "region", "aria-label": "Working in" },
+      h("span", null, "No case open — tools start blank. Create a case or load the sample in Workspace and every tool here will work in it."),
+      onOpenWorkspace && h("button", { type: "button", className: "link-btn", onClick: onOpenWorkspace }, "Go to Workspace →"));
+  }
+  const p = activeCase && activeCase.programs && activeCase.programs[0];
+  const facts = activeCase ? [
+    p && (p.drugName || p.name),
+    p && p.indication && p.indication.split(/[—(]/)[0].trim(),
+    p && p.currentPhase && p.currentPhase.replace("phase", "Phase ").replace("approved", "Approved").replace("filed", "Filed"),
+    activeCase.programs.length > 1 ? activeCase.programs.length + " programs" : null,
+    activeCase.ticker ? activeCase.ticker + (activeCase.currentPrice ? " " + fmtShare(Number(activeCase.currentPrice)) : "") : null
+  ].filter(Boolean) : [];
+  return h("div", { className: "case-bar", role: "region", "aria-label": "Working in" },
+    h("span", { className: "case-bar-label" }, "Working in"),
+    h("select", { value: activeCase ? activeCase.id : "", "aria-label": "Case these tools work in", onChange: e => onSelectCase && onSelectCase(e.target.value) },
+      cases.map(c => h("option", { key: c.id, value: c.id }, c.name + (c.ticker ? " (" + c.ticker + ")" : "")))),
+    facts.length > 0 && h("span", { className: "case-bar-facts" }, facts.join(" · ")),
+    onOpenWorkspace && h("button", { type: "button", className: "link-btn case-bar-open", onClick: onOpenWorkspace }, "Open in Workspace →"));
+}
+
 // ── ConfirmDialog: a real "are you sure?" for irreversible actions ─────────
 // Deleting a case or a program used to fire on a single click — one misclick
 // and hours of assumptions, an Evidence Log, a Calibration Log, are gone with

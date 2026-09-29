@@ -18,7 +18,7 @@ function CompanyLookupTool({ cases, updateCase, activeCase, onWatchTrial }) {
   const [competitors, setCompetitors] = React.useState(null);
   const [competitorsError, setCompetitorsError] = React.useState(null);
   const [competitorsLoading, setCompetitorsLoading] = React.useState(false);
-  const [exportCaseId, setExportCaseId] = React.useState(activeCase ? activeCase.id : "");
+  const [exportCaseId, setExportCaseId] = useActiveCaseId(activeCase);
   const [exportMsg, setExportMsg] = React.useState(null);
   const [insiderResult, setInsiderResult] = React.useState(null);
   const [insiderError, setInsiderError] = React.useState(null);
@@ -279,7 +279,10 @@ function CompanyLookupTool({ cases, updateCase, activeCase, onWatchTrial }) {
 // more certainty than the data supports.
 function CatalystCalendarTool({ cases, updateCase, activeCase }) {
   const h = React.createElement;
-  const [selectedIds, setSelectedIds] = React.useState(() => new Set(cases.map(c => c.id)));
+  // Starts on the open case only (tick others in to widen it), and moves with
+  // it when the case is switched.
+  const [selectedIds, setSelectedIds] = React.useState(() => new Set(activeCase ? [activeCase.id] : cases.map(c => c.id)));
+  React.useEffect(() => { if (activeCase) setSelectedIds(new Set([activeCase.id])); }, [activeCase && activeCase.id]);
   const [loading, setLoading] = React.useState(false);
   const [upcomingEvents, setUpcomingEvents] = React.useState(null);
   const [recentFilings, setRecentFilings] = React.useState(null);
@@ -459,9 +462,9 @@ function RunwayTool({ cases, updateCase, activeCase }) {
   const [pullResult, setPullResult] = React.useState(null);
   const [manualCash, setManualCash] = React.useState("");
   const [manualMonthlyBurn, setManualMonthlyBurn] = React.useState("");
-  const [exportCaseId, setExportCaseId] = React.useState(activeCase ? activeCase.id : "");
+  const [exportCaseId, setExportCaseId] = useActiveCaseId(activeCase);
   const [exportMsg, setExportMsg] = React.useState(null);
-  const [forwardCaseId, setForwardCaseId] = React.useState(activeCase ? activeCase.id : "");
+  const [forwardCaseId, setForwardCaseId] = useActiveCaseId(activeCase);
   const isDesktop = typeof window !== "undefined" && window.electronAPI && window.electronAPI.isDesktop;
 
   const pull = async () => {
@@ -589,7 +592,7 @@ function RunwayTool({ cases, updateCase, activeCase }) {
 // is no meaningful standalone answer without a case's own burn and dates.
 function RunwayVsCatalystTool({ cases, activeCase }) {
   const h = React.createElement;
-  const [caseId, setCaseId] = React.useState(activeCase ? activeCase.id : "");
+  const [caseId, setCaseId] = useActiveCaseId(activeCase);
   const [cushion, setCushion] = React.useState("6");
   const theCase = cases.find(c => c.id === caseId);
   const rvcRef = React.useRef(null);
