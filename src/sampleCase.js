@@ -30,6 +30,8 @@ function sampleCaseStoke() {
     currentPhase: "phase3",
     posBiomarkerUse: "selection",   // genetically confirmed SCN1A patients only
     posDiseaseType: "rare",
+    trialIds: "NCT06872125",       // EMPEROR (Phase 3)
+    target: "SCN1A",
     posOverridePct: "65",
     // Company guides a US launch in early 2028, ~1.4 years out. The model works
     // in whole years (a typed 1.5 is used as 2), and year 1 puts the first

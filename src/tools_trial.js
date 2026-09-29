@@ -17,9 +17,10 @@ function fmtFdaSubmissionDate(yyyymmdd) {
   return yyyymmdd.slice(0, 4) + "-" + yyyymmdd.slice(4, 6) + "-" + yyyymmdd.slice(6, 8);
 }
 
-function FdaLookupTool() {
+function FdaLookupTool({ activeCase }) {
   const h = React.createElement;
   const [drugName, setDrugName] = React.useState("");
+  const fdaFromCase = useCasePrefill(activeCase, caseToolDefaults(activeCase).marketedDrug, drugName, setDrugName);
   const [loading, setLoading] = React.useState(false);
   const [approval, setApproval] = React.useState(null);
   const [label, setLabel] = React.useState(null);
@@ -80,7 +81,8 @@ function FdaLookupTool() {
         h("button", { onClick: search, disabled: loading,
           style: { padding: "7px 16px", borderRadius: 6, border: "1px solid var(--teal)", background: "var(--teal-bg)", color: "var(--teal)", fontFamily: "var(--mono)", fontSize: 12, fontWeight: 700, cursor: loading ? "default" : "pointer" }
         }, loading ? "Searching…" : "Search openFDA")
-      )
+      ),
+      h(CaseFilledNote, { activeCase, filled: [fdaFromCase && "drug name"] })
     ]),
 
     error && toolCard(h, h("div", { style: UI.warnNote }, error)),
@@ -134,9 +136,10 @@ function FdaLookupTool() {
 // Every registered trial for one drug at once. Engine in assetProgram.js; this
 // only lays it out. The evidence-base checklist sits at the top on purpose —
 // the shape of a programme is what a reader should meet before the list.
-function AssetProgramTool({ onDecodeTrial, onWatchTrial }) {
+function AssetProgramTool({ activeCase, onDecodeTrial, onWatchTrial }) {
   const h = React.createElement;
   const [drug, setDrug] = React.useState("");
+  const drugFromCase = useCasePrefill(activeCase, caseToolDefaults(activeCase).drugName, drug, setDrug);
   const [loading, setLoading] = React.useState(false);
   const [summary, setSummary] = React.useState(null);
   const [error, setError] = React.useState(null);
@@ -172,7 +175,8 @@ function AssetProgramTool({ onDecodeTrial, onWatchTrial }) {
           style: { flex: "1 1 260px", padding: "9px 12px", borderRadius: 7, border: "1.5px solid var(--rule)", background: "var(--surface)", color: "var(--ink-1)", fontFamily: "var(--mono)", fontSize: 13 } }),
         h("button", { onClick: run, disabled: loading || !drug.trim(),
           style: { padding: "9px 18px", borderRadius: 7, border: "1px solid var(--teal)", background: "var(--teal-bg)", color: "var(--teal)", fontFamily: "var(--mono)", fontSize: 12, fontWeight: 700, cursor: loading ? "default" : "pointer", opacity: drug.trim() ? 1 : 0.5 } },
-          loading ? "Reading the registry…" : "Build the program"))
+          loading ? "Reading the registry…" : "Build the program")),
+      h(CaseFilledNote, { activeCase, filled: [drugFromCase && "drug name"] })
     ]),
 
     error && toolCard(h, h("div", { style: UI.warnNote },
@@ -517,9 +521,10 @@ function TrialResultsPanels({ results, study }) {
 // Everything shown is derived from registered CT.gov fields only — see
 // trialDecoder.js. Nothing here predicts success, and nothing is inferred
 // from the sponsor or the drug.
-function TrialDecoderTool({ initialNctId, onConsumedInitialNctId }) {
+function TrialDecoderTool({ activeCase, initialNctId, onConsumedInitialNctId }) {
   const h = React.createElement;
   const [nctInput, setNctInput] = React.useState("");
+  const nctFromCase = useCasePrefill(activeCase, initialNctId ? "" : caseToolDefaults(activeCase).leadNct, nctInput, setNctInput);
   const [loading, setLoading] = React.useState(false);
   const [decoded, setDecoded] = React.useState(null);
   const [raw, setRaw] = React.useState(null);
@@ -591,7 +596,8 @@ function TrialDecoderTool({ initialNctId, onConsumedInitialNctId }) {
         h("button", { onClick: () => run(), disabled: loading || !nctInput.trim(),
           style: { padding: "9px 18px", borderRadius: 7, border: "1px solid var(--teal)", background: "var(--teal-bg)", color: "var(--teal)", fontFamily: "var(--mono)", fontSize: 12, fontWeight: 700, cursor: loading ? "default" : "pointer", opacity: nctInput.trim() ? 1 : 0.5 } },
           loading ? "Decoding…" : "Decode")
-      )
+      ),
+      h(CaseFilledNote, { activeCase, filled: [nctFromCase && "the lead trial"] })
     ]),
 
     error && toolCard(h, h("div", { style: UI.warnNote }, error)),
@@ -709,10 +715,14 @@ function h0(n) { return String(n); }
 // several relevant trials and forcing a one-trial-per-program data model
 // would be the wrong shape for that. First check on any NCT ID saves the
 // baseline with nothing to compare yet — that's expected, not an error.
-function TrialWatchTool({ initialNctId, onConsumedInitialNctId }) {
+function TrialWatchTool({ activeCase, initialNctId, onConsumedInitialNctId }) {
   const h = React.createElement;
   const [ctCondition, setCtCondition] = React.useState("non-small cell lung cancer");
   const [ctPhase, setCtPhase] = React.useState("PHASE2");
+  const cd = caseToolDefaults(activeCase);
+  const condFromCase = useCasePrefill(activeCase, cd.indication, ctCondition, setCtCondition, "non-small cell lung cancer");
+  const casePhase = activeCase && activeCase.programs && activeCase.programs[0] && /^phase[123]$/.test(activeCase.programs[0].currentPhase) ? activeCase.programs[0].currentPhase.toUpperCase() : "";
+  const phaseFromCase = useCasePrefill(activeCase, casePhase, ctPhase, setCtPhase, "PHASE2");
   const [ctIntervention, setCtIntervention] = React.useState("");
   const [ctLoading, setCtLoading] = React.useState(false);
   const [ctSummary, setCtSummary] = React.useState(null);
@@ -763,6 +773,7 @@ function TrialWatchTool({ initialNctId, onConsumedInitialNctId }) {
   };
 
   const [nctInput, setNctInput] = React.useState("");
+  const watchFromCase = useCasePrefill(activeCase, initialNctId ? "" : cd.leadNct, nctInput, setNctInput);
   const [checking, setChecking] = React.useState(false);
   const [result, setResult] = React.useState(null);
   const [error, setError] = React.useState(null);
@@ -817,6 +828,7 @@ function TrialWatchTool({ initialNctId, onConsumedInitialNctId }) {
           style: { padding: "7px 16px", borderRadius: 6, border: "1px solid var(--teal)", background: "var(--teal-bg)", color: "var(--teal)", fontFamily: "var(--mono)", fontSize: 12, fontWeight: 700, cursor: ctLoading ? "default" : "pointer" }
         }, ctLoading ? "Searching…" : "Search ClinicalTrials.gov")
       ),
+      h(CaseFilledNote, { activeCase, filled: [condFromCase && "condition", phaseFromCase && "phase"] }),
       ctError && h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--red)" } }, ctError),
       ctSummary && h("div", { style: { padding: "10px 14px", borderRadius: 8, background: "var(--surface-2)" } },
         h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", fontWeight: 700, color: "var(--ink-2)", marginBottom: 6 } },
@@ -950,6 +962,7 @@ function TrialWatchTool({ initialNctId, onConsumedInitialNctId }) {
           style: { padding: "7px 16px", borderRadius: 6, border: "1px solid var(--teal)", background: "var(--teal-bg)", color: "var(--teal)", fontFamily: "var(--mono)", fontSize: 12, fontWeight: 700, cursor: checking ? "default" : "pointer" }
         }, checking ? "Checking…" : "Check for changes")
       ),
+      h(CaseFilledNote, { activeCase, filled: [watchFromCase && "the lead trial"] }),
       error && h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--red)", marginBottom: 10 } }, error),
 
       result && h("div", { style: { padding: "12px 14px", borderRadius: 8, background: "var(--surface-2)" } },
@@ -1017,9 +1030,10 @@ function TrialWatchTool({ initialNctId, onConsumedInitialNctId }) {
 // was posted. Rows where the first trial differs from every other are shaded.
 // Typical use: a Phase 3 you are modelling next to the trials that got drugs
 // approved in the same indication.
-function TrialCompareTool() {
+function TrialCompareTool({ activeCase }) {
   const h = React.createElement;
   const [input, setInput] = React.useState("");
+  const cmpFromCase = useCasePrefill(activeCase, caseToolDefaults(activeCase).nctIds.join(", "), input, setInput);
   const [loading, setLoading] = React.useState(false);
   const [cmp, setCmp] = React.useState(null);
   const [errors, setErrors] = React.useState([]);
@@ -1049,7 +1063,8 @@ function TrialCompareTool() {
         h("button", { onClick: run, disabled: loading || unique.length < 2,
           style: { padding: "9px 18px", borderRadius: 7, border: "1px solid var(--teal)", background: "var(--teal-bg)", color: "var(--teal)", fontFamily: "var(--mono)", fontSize: 12, fontWeight: 700, cursor: loading ? "default" : "pointer", opacity: unique.length >= 2 ? 1 : 0.5 } },
           loading ? "Fetching…" : "Compare " + (unique.length || "") + (unique.length ? " trials" : ""))),
-      ids.length > 4 && h("div", { style: { ...UI.caption, marginTop: 6 } }, "Up to four trials at a time; the first four are used.")
+      ids.length > 4 && h("div", { style: { ...UI.caption, marginTop: 6 } }, "Up to four trials at a time; the first four are used."),
+      h(CaseFilledNote, { activeCase, filled: [cmpFromCase && "this case's trials" + (unique.length < 2 ? " (add the trials you want to compare against)" : "")] })
     ]),
     errors.length > 0 && toolCard(h, errors.map((e, i) => h("div", { key: i, style: UI.warnNote }, e))),
     cmp && toolCard(h, [

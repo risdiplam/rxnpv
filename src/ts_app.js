@@ -1602,6 +1602,51 @@ function runTrialOutcome() {
 
 // ── Tab: Peak Sales ──────────────────────────────────────────────────────
 
+// ── Peak sales from the open case ──────────────────────────────────────────
+// The simulator's five inputs, mapped from the open case's Detailed revenue
+// build so a run starts where the case is: population = prevalence (or
+// incidence × duration) × the eligible subgroup; diagnosis and treatment
+// rates as entered; peak share = the case's peak share × adherence (the share
+// of treated patients actually on the drug), spread from its Bear to its Bull
+// share multiplier; price = the case's US net price. US only, like the
+// simulator. Null for a Quick-mode or US-partnered program, which have no
+// such build to map.
+function simPeakSalesFromCase() {
+  const b = window.rxnpvSimBridge, c = b && b.activeCase;
+  if (!c || !c.programs || !c.programs.length) return null;
+  const p = c.programs[0];
+  if ((p.revenueMode || 'quick') !== 'full') return null;
+  const part = p.partnership;
+  if (part && part.enabled && (part.territory === 'us' || part.territory === 'global')) return null;
+  let rr;
+  try { rr = computeProgramRevenue(getRevenueBuild(p), 20); } catch (e) { return null; }
+  const f = rr.funnel, rb = getRevenueBuild(p);
+  if (!f || !(f.addressable > 0) || !(rr.pricing && rr.pricing.netPrice > 0)) return null;
+  const pct = (v, d) => (v !== '' && v != null && isFinite(Number(v)) ? Number(v) : d);
+  const adherence = pct(rb.adherencePct, 100) / 100;
+  const share = rr.peakShare * adherence;
+  const mult = k => pct(getEffectiveScenarioPreset(c, k).shareMultiplierPct, 100) / 100;
+  const r1 = v => Math.round(v * 10) / 10;
+  return {
+    caseName: c.name, drug: p.drugName || p.name || 'the program',
+    pop: Math.round(f.addressable * pct(rb.population.eligiblePct, 100) / 100),
+    dx: pct(rb.population.diagnosisRatePct, 100), tx: pct(rb.population.treatmentRatePct, 100),
+    shareLow: r1(Math.min(100, share * Math.min(mult('bear'), mult('bull')))), shareHigh: r1(Math.min(100, share * Math.max(mult('bear'), mult('bull')))),
+    price: Math.round(rr.pricing.netPrice)
+  };
+}
+// What the Peak Sales form was last filled with, so a case switch only
+// refills it while nobody has typed over it.
+let peakSalesFilled = null;
+function peakSalesUntouched() {
+  if (!peakSalesFilled) return true;
+  return Object.keys(peakSalesFilled).every(id => { const e = document.getElementById(id); return !e || String(e.value) === String(peakSalesFilled[id]); });
+}
+// Called by SimulationView when the open case changes.
+function simCaseChanged() {
+  if (activeTab === 'peakSales' && document.getElementById('popA') && peakSalesUntouched()) renderApp();
+}
+
 function renderPeakSalesTab(content) {
   const distTypes = [{ value: 'point', label: 'Fixed' }, { value: 'uniform', label: 'Uniform (low/high)' }, { value: 'normal', label: 'Normal (mean/SD)' }, { value: 'triangular', label: 'Triangular (low/mode/high)' }];
   // B/C start blank for any field whose default type doesn't need them (see
@@ -1663,16 +1708,20 @@ function renderPeakSalesTab(content) {
     setTimeout(() => relabelDist(prefix), 0);
     return wrap;
   }
+  const cd = simPeakSalesFromCase();
+  const fill = cd || { pop: 1000000, dx: 60, tx: 50, shareLow: 15, shareHigh: 35, price: 100000 };
+  peakSalesFilled = { popA: fill.pop, dxA: fill.dx, txA: fill.tx, shareA: fill.shareLow, shareB: fill.shareHigh, priceA: fill.price };
   const form = el('div', { class: 'panel' }, [
     el('h2', {}, ['Peak-sales Monte Carlo', el('span', { class: 'badge info' }, '→ Forward-looking')]),
     el('p', { class: 'subtle' }, 'Each input below can be a fixed value or a distribution; the boxes relabel to match the one you pick.'),
     note('Which distribution type should I pick?', '"Fixed" is for anything you actually know or want to hold constant — a stated price, a fixed population count. "Uniform" (low/high) says any value in that range is equally plausible — a reasonable default when you have a range but no real opinion on where within it the true value sits, like peak market share here. "Normal" (mean/SD) is for a value you have a real point estimate for plus a sense of how uncertain it is — most values cluster near the mean, symmetric in both directions. "Triangular" (low/mode/high) is for when you have a most-likely case plus a plausible low and high, but the low and high aren’t equally far from the most-likely value — common when a range is asymmetric (e.g. "probably $2B, could be as low as $1B, but a real blowout could hit $5B").'),
-    field('Addressable population', distFields('pop', { type: 'point', a: 1000000, b: '', c: '' })),
+    cd && el('p', { class: 'subtle case-filled-sim' }, 'Started from ' + cd.caseName + ' (' + cd.drug + ', US): population is prevalence × the eligible subgroup, peak share is the case\u2019s share × adherence spread from its Bear to its Bull case, and price is its US net price. Type over any of it.'),
+    field('Addressable population', distFields('pop', { type: 'point', a: fill.pop, b: '', c: '' })),
     // Rates are whole percents, like everywhere else in the app (FIN-003).
-    field('Diagnosis rate (%)', distFields('dx', { type: 'point', a: 60, b: '', c: '' })),
-    field('Treatment rate (%)', distFields('tx', { type: 'point', a: 50, b: '', c: '' })),
-    field('Peak market share (%)', distFields('share', { type: 'uniform', a: 15, b: 35, c: '' })),
-    field('Annual price (USD)', distFields('price', { type: 'point', a: 100000, b: '', c: '' })),
+    field('Diagnosis rate (%)', distFields('dx', { type: 'point', a: fill.dx, b: '', c: '' })),
+    field('Treatment rate (%)', distFields('tx', { type: 'point', a: fill.tx, b: '', c: '' })),
+    field('Peak market share (%)', distFields('share', { type: 'uniform', a: fill.shareLow, b: fill.shareHigh, c: '' })),
+    field('Annual price (USD)', distFields('price', { type: 'point', a: fill.price, b: '', c: '' })),
     fieldGrid([field('Iterations', numberInput('peakIterations', 10000, { step: '1000' }))]),
     el('button', { class: 'runbtn', onclick: runPeakSales }, 'Run simulation'),
     el('div', { id: 'peakSalesResults', class: 'results' })

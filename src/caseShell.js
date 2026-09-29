@@ -93,7 +93,7 @@ function assumptionNavSections(theCase, program) {
   const quick = (program.revenueMode || "quick") === "quick";
   const method = theCase.valuationMethod || "dcf";
   const items = [
-    { id: "program", label: "Drug & indication", state: changed(pick(program, ["name", "drugName", "indication", "therapeuticArea", "modality", "currentPhase", "launchYearOffset"]), pick(dp, ["name", "drugName", "indication", "therapeuticArea", "modality", "currentPhase", "launchYearOffset"])) },
+    { id: "program", label: "Drug & indication", state: changed(pick(program, ["name", "drugName", "indication", "therapeuticArea", "modality", "currentPhase", "launchYearOffset", "trialIds", "target"]), pick(dp, ["name", "drugName", "indication", "therapeuticArea", "modality", "currentPhase", "launchYearOffset", "trialIds", "target"])) },
     { id: "rnd", label: "R&D to launch", state: changed(program.rndOverride, dp.rndOverride) }
   ];
   if (quick) {

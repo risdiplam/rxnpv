@@ -159,6 +159,75 @@ function BenchField({ label, value, onChange, bench, suffix, placeholder, step, 
   );
 }
 
+// ── Tools start from the open case ──────────────────────────────────────────
+// What a tool can start from when a case is open: the lead program's drug,
+// indication, trials and target, and the company's ticker and price. Only
+// ever a starting value — the user can type over any of it.
+function caseToolDefaults(theCase) {
+  if (!theCase) return {};
+  const p = (theCase.programs || [])[0] || {};
+  const ids = String(p.trialIds || "").toUpperCase().match(/NCT\d{8}/g) || [];
+  const onMarket = p.currentPhase === "approved" || p.currentPhase === "filed";
+  return {
+    drugName: (p.drugName || "").trim(),
+    indication: String(p.indication || "").split(/[—(,;]/)[0].trim(),
+    nctIds: ids.filter((x, i) => ids.indexOf(x) === i), leadNct: ids[0] || "",
+    target: String(p.target || "").trim().toUpperCase(),
+    company: (theCase.ticker || theCase.name || "").trim(),
+    price: theCase.currentPrice != null ? String(theCase.currentPrice) : "",
+    // Tools that read a drug's sales, label or patents only have anything to
+    // find once it is on the market.
+    marketedDrug: onMarket ? (p.drugName || "").trim() : ""
+  };
+}
+// Fills a tool's field from the open case: when the case opens or changes,
+// the field takes the case's value — unless the user has typed their own.
+// `replaceable` is a built-in example value that counts as not typed.
+// Returns true while the field still holds the case's value.
+function useCasePrefill(activeCase, caseValue, value, setValue, replaceable) {
+  const last = React.useRef(null);
+  const cv = caseValue == null ? "" : String(caseValue);
+  React.useEffect(() => {
+    const untouched = value === "" || value === last.current || (replaceable != null && value === replaceable);
+    if (untouched && cv !== "") setValue(cv);
+    else if (untouched && cv === "" && last.current && value === last.current) setValue(replaceable != null ? replaceable : "");
+    last.current = cv;
+  }, [activeCase ? activeCase.id : "", cv]);
+  return cv !== "" && value === cv;
+}
+// The binary-event view of a case: today's price, what a share is worth if
+// the drug is approved (literal 100% odds on Base inputs, as the Overview's
+// range strip), what is left if the next readout fails (computeFailureFloor)
+// and the case's own odds of launch. Single-program DCF cases only; anything
+// it cannot compute honestly comes back blank.
+function caseBinaryDefaults(theCase) {
+  const out = { price: "", success: "", fail: "", pos: "" };
+  if (!theCase || !theCase.programs || theCase.programs.length !== 1 || (theCase.valuationMethod || "dcf") !== "dcf") return out;
+  try {
+    const dr = theCase.discountRatePct !== "" && theCase.discountRatePct != null ? Number(theCase.discountRatePct) : DISCOUNT_RATE_GUIDANCE.earlyBiotechSelfView[0];
+    const tv = theCase.terminalValue || { enabled: false };
+    const tvp = { enabled: tv.enabled, method: tv.method, growthPct: tv.growthPct, exitMultiple: tv.exitMultiple };
+    const p = theCase.programs[0];
+    const base = computeCaseValuation(theCase, getEffectiveScenarioPreset(theCase, "base"), "base", dr, tvp);
+    const win = computeCaseValuation({ ...theCase, programs: [{ ...p, posOverridePct: "100" }] }, SCENARIO_PRESETS.base, "base", dr, tvp).equity.perShare;
+    const fl = computeFailureFloor(theCase);
+    const pos = base.programVals && base.programVals[0] ? base.programVals[0].posToLaunch * 100 : null;
+    if (theCase.currentPrice !== "" && theCase.currentPrice != null) out.price = String(theCase.currentPrice);
+    if (win != null && isFinite(win)) out.success = win.toFixed(2);
+    if (fl) out.fail = fl.perShare.toFixed(2);
+    if (pos != null && pos < 99.99) out.pos = String(Math.round(pos * 10) / 10);
+  } catch (e) { /* blank is the honest answer */ }
+  return out;
+}
+
+// One line under a tool's inputs saying which of them came from the case.
+function CaseFilledNote({ activeCase, filled }) {
+  const h = React.createElement;
+  const list = (filled || []).filter(Boolean);
+  if (!activeCase || !list.length) return null;
+  return h("div", { className: "case-filled" }, "Started from " + activeCase.name + ": " + list.join(", ") + ". Type over any of it to use your own.");
+}
+
 // ── Working in: the case every tool and simulation is tuned to ─────────────
 // Top of Tools and Simulation. Switching here switches the app's open case
 // (the same one the Workspace shows), so there is exactly one "current case"

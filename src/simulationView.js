@@ -33,6 +33,9 @@ function SimulationView({ cases, updateCase, activeCase, onSelectCase, onOpenWor
     openReport: ctx ? ctx.openReport : null,
     openBundle: ctx ? ctx.openBundle : null };
 
+  // The Peak Sales form follows the open case (see simCaseChanged).
+  React.useEffect(() => { if (bootedRef.current && typeof simCaseChanged === "function") simCaseChanged(); }, [activeCase ? activeCase.id : ""]);
+
   React.useEffect(() => {
     if (bootedRef.current) return; // guard against any double-invoke (e.g. StrictMode-style double effects)
     bootedRef.current = true;

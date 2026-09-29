@@ -25,14 +25,15 @@ function CommercialTool({ cases, updateCase, activeCase }) {
     h("div", { style: { display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" } },
       subTab("launch", "Launch tracker"),
       subTab("actual", "Actual vs modeled")),
-    sub === "launch" ? h(LaunchTrackerTool, null) : h(ActualVsModelTool, { cases, updateCase, activeCase })
+    sub === "launch" ? h(LaunchTrackerTool, { activeCase }) : h(ActualVsModelTool, { cases, updateCase, activeCase })
   );
 }
 
 // ── Launch tracker: Medicare spending as an uptake proxy ───────────────────
-function LaunchTrackerTool() {
+function LaunchTrackerTool({ activeCase }) {
   const h = React.createElement;
   const [brand, setBrand] = React.useState("");
+  const brandFromCase = useCasePrefill(activeCase, caseToolDefaults(activeCase).marketedDrug, brand, setBrand);
   const [programme, setProgramme] = React.useState("Part D");
   const [analogInput, setAnalogInput] = React.useState("");
   const [rows, setRows] = React.useState([]);        // [{result}] — the drug first, then analogs
@@ -80,7 +81,8 @@ function LaunchTrackerTool() {
         "aria-label": "Analog brand names", onChange: e => setAnalogInput(e.target.value), onKeyDown: e => { if (e.key === "Enter") run(); },
         style: { width: "100%", boxSizing: "border-box", marginTop: 8, padding: "8px 12px", borderRadius: 7, border: "1.5px solid var(--rule)", background: "var(--surface)", color: "var(--ink-1)", fontFamily: "var(--mono)", fontSize: 12 } }),
       h("div", { className: "prose", style: { fontSize: 10, fontFamily: "var(--sans)", color: "var(--ink-3)", lineHeight: 1.6, marginTop: 6 } },
-        "Part B covers what a clinician administers — infusions, injections given in a clinic. Part D covers what a pharmacy dispenses. A drug appears in one or the other, occasionally both, and picking the wrong one returns nothing rather than a zero.")
+        "Part B covers what a clinician administers — infusions, injections given in a clinic. Part D covers what a pharmacy dispenses. A drug appears in one or the other, occasionally both, and picking the wrong one returns nothing rather than a zero."),
+      h(CaseFilledNote, { activeCase, filled: [brandFromCase && "drug name"] })
     ]),
 
     error && toolCard(h, h("div", { style: UI.warnNote },
@@ -274,9 +276,10 @@ function ActualVsModelTool({ cases, updateCase, activeCase }) {
 // around or challenge under Paragraph IV; the drug SUBSTANCE (compound) patent
 // is the hard floor. Showing both, labelled, is honest — one number would be
 // false precision dressed up as sourced data.
-function ExclusivityTool({ cases, updateCase }) {
+function ExclusivityTool({ cases, updateCase, activeCase }) {
   const h = React.createElement;
   const [name, setName] = React.useState("");
+  const exFromCase = useCasePrefill(activeCase, caseToolDefaults(activeCase).marketedDrug, name, setName);
   const [res, setRes] = React.useState(null);
   const [loading, setLoading] = React.useState(false);
   const exRef = React.useRef(null);
@@ -324,6 +327,7 @@ function ExclusivityTool({ cases, updateCase }) {
           style: { padding: "9px 18px", borderRadius: 7, border: "1px solid var(--teal)", background: "var(--teal-bg)", color: "var(--teal)", fontFamily: "var(--mono)", fontSize: 12, fontWeight: 700, cursor: loading ? "default" : "pointer", opacity: name.trim() ? 1 : 0.5 } },
           loading ? "Searching…" : "Look up")
       ),
+      h(CaseFilledNote, { activeCase, filled: [exFromCase && "drug name"] }),
       h("div", { style: { ...UI.caption, marginTop: 8 } },
         "Small molecules only — the Orange Book does not cover biologics.")
     ]),

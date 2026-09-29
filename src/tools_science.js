@@ -12,9 +12,10 @@
 // project avoids. What it answers is a conviction question the rest of the
 // app can't: does human genetics point at this target, and what has already
 // been tried against it.
-function TargetDossierTool() {
+function TargetDossierTool({ activeCase }) {
   const h = React.createElement;
   const [query, setQuery] = React.useState("");
+  const targetFromCase = useCasePrefill(activeCase, caseToolDefaults(activeCase).target, query, setQuery);
   const [loading, setLoading] = React.useState(false);
   const [candidates, setCandidates] = React.useState(null);
   const [dossier, setDossier] = React.useState(null);
@@ -57,7 +58,8 @@ function TargetDossierTool() {
         h("button", { onClick: search, disabled: loading || !query.trim(),
           style: { padding: "9px 18px", borderRadius: 7, border: "1px solid var(--teal)", background: "var(--teal-bg)", color: "var(--teal)", fontFamily: "var(--mono)", fontSize: 12, fontWeight: 700, cursor: loading ? "default" : "pointer", opacity: query.trim() ? 1 : 0.5 } },
           loading ? "Looking up…" : "Look up target")
-      )
+      ),
+      h(CaseFilledNote, { activeCase, filled: [targetFromCase && "target gene"] })
     ]),
 
     error && toolCard(h, h("div", { style: UI.warnNote }, error)),
@@ -189,9 +191,10 @@ function LiteratureList({ result, emptyText }) {
   );
 }
 
-function LiteratureTool({ initialQuery }) {
+function LiteratureTool({ initialQuery, activeCase }) {
   const h = React.createElement;
   const [q, setQ] = React.useState(initialQuery || "");
+  const litFromCase = useCasePrefill(activeCase, initialQuery ? "" : caseToolDefaults(activeCase).drugName, q, setQ);
   // Most-cited by default, and deliberately so: relevance ranking on a
   // drug+indication query returns this month's editorials, while the pivotal
   // trial everyone is arguing about sits on page three. Verified on
@@ -236,7 +239,8 @@ function LiteratureTool({ initialQuery }) {
           loading ? "Searching…" : "Search")),
       h("label", { style: { display: "flex", alignItems: "center", gap: 8, fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-2)", cursor: "pointer", marginTop: 8 } },
         h("input", { type: "checkbox", checked: excludePreprints, onChange: e => setExcludePreprints(e.target.checked) }),
-        "Peer-reviewed only (exclude preprints)")
+        "Peer-reviewed only (exclude preprints)"),
+      h(CaseFilledNote, { activeCase, filled: [litFromCase && "drug name"] })
     ]),
     error && toolCard(h, h("div", { style: UI.warnNote },
       error + " This is a connection problem, not a finding that no papers exist.")),

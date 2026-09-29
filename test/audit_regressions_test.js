@@ -398,6 +398,46 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
     ok((d.querySelector('input[aria-label="Case name"]') || {}).value === cs.find(c => c.id === other.value).name, "Working in: the Workspace opens on the case chosen in the bar");
   }
 
+  // ── Tools start from the open case (Stoke sample) ──
+  {
+    const btnT = t => [...d.querySelectorAll("button")].find(b => b.textContent.trim() === t);
+    click(btnT("Workspace")); await wait(300);
+    const stoke = [...d.querySelectorAll('[aria-label^="Open case Stoke"]')][0];
+    if (stoke) { click(stoke); await wait(400); }
+    click(btnT("Tools")); await wait(400);
+    const valOf = sel => (d.querySelector(sel) || {}).value;
+    click(btnT("Trial")); await wait(150); click(btnT("Trial Decoder")); await wait(300);
+    ok(valOf('input[aria-label="ClinicalTrials.gov ID"]') === "NCT06872125", "Case tools: the Decoder starts on the case's lead trial");
+    ok(/^Started from Stoke Therapeutics — sample case: the lead trial\./.test((d.querySelector(".case-filled") || {}).textContent || ""), "Case tools: says the value came from the case");
+    click(btnT("Compare Trials")); await wait(300);
+    ok(valOf('input[aria-label="ClinicalTrials.gov IDs to compare"]') === "NCT06872125", "Case tools: Compare Trials starts with the case's trials");
+    click(btnT("Asset Program")); await wait(300);
+    ok(valOf('input[aria-label="Drug or intervention name"]') === "Zorevunersen", "Case tools: Asset Program starts on the drug");
+    click(btnT("Trial Explorer")); await wait(300);
+    ok(valOf('input[aria-label="Condition"]') === "Dravet syndrome" && valOf('select[aria-label="Phase"]') === "PHASE3", "Case tools: Trial Explorer starts on the indication and phase");
+    click(btnT("FDA Lookup")); await wait(300);
+    ok(valOf('input[aria-label="Drug name"]') === "", "Case tools: FDA Lookup stays blank for a drug not yet on the market");
+    click(btnT("Science")); await wait(150); click(btnT("Target Dossier")); await wait(300);
+    ok(valOf('input[aria-label="Gene symbol or target name"]') === "SCN1A", "Case tools: Target Dossier starts on the target gene");
+    click(btnT("Literature")); await wait(300);
+    ok(valOf('input[aria-label="Literature search"]') === "Zorevunersen", "Case tools: Literature starts on the drug");
+    click(btnT("Company")); await wait(150); click(btnT("Company Lookup")); await wait(300);
+    ok([...d.querySelectorAll('input[aria-label="Company name or ticker"]')].some(i => i.value === "STOK"), "Case tools: Company Lookup starts on the ticker");
+    click(btnT("Valuation")); await wait(150); click(btnT("Binary Event")); await wait(500);
+    const bf = l => valOf('input[aria-label="' + l + '"]');
+    ok(bf("Today") === "24.80" && bf("If it works") === "43.24" && bf("If it fails") === "1.40" && bf("Your PoS (%)") === "65", "Case tools: Binary Event starts from price, success, failure floor and odds (" + [bf("Today"), bf("If it works"), bf("If it fails"), bf("Your PoS (%)")].join(" / ") + ")");
+    // Typing over a field keeps the typed value.
+    const t = d.querySelector('input[aria-label="Today"]');
+    Object.getOwnPropertyDescriptor(w.HTMLInputElement.prototype, "value").set.call(t, "20"); t.dispatchEvent(new w.Event("input", { bubbles: true })); await wait(200);
+    ok(bf("Today") === "20", "Case tools: a typed value is kept");
+    click(btnT("Simulation")); await wait(600);
+    click([...d.querySelectorAll("#ts-root button")].find(b => b.textContent.trim() === "Peak Sales")); await wait(400);
+    // Stoke: 15,700 × 80% eligible = 12,560; share 60% × 85% adherence = 51%,
+    // Bear 70% → 35.7, Bull 130% → 66.3; US net price $375K × 80% = $300,000.
+    ok(valOf("#popA") === "12560" && valOf("#dxA") === "75" && valOf("#txA") === "60" && valOf("#shareA") === "35.7" && valOf("#shareB") === "66.3" && valOf("#priceA") === "300000", "Case tools: Peak Sales simulation starts from the case's build (" + ["popA", "dxA", "txA", "shareA", "shareB", "priceA"].map(i => valOf("#" + i)).join(" / ") + ")");
+    click(btnT("Workspace")); await wait(300);
+  }
+
   // ── Assumptions section list: states come from the data, links are live ──
   {
     const find = (groups, id) => { for (const g of groups) for (const i of g.items) if (i.id === id) return i; return null; };

@@ -114,15 +114,15 @@ function ToolsView({ cases, updateCase, activeCase, navRequest, onSelectCase, on
     tab === "peaksales" ? h(PeakSalesCompsTool, { cases, updateCase, activeCase }) :
     tab === "licensing" ? h(LicensingCompsTool, { cases, updateCase, activeCase }) :
     tab === "calendar" ? h(CatalystCalendarTool, { cases, updateCase, activeCase }) :
-    tab === "decoder" ? h(TrialDecoderTool, { initialNctId: pendingNctId, onConsumedInitialNctId: () => setPendingNctId(null) }) :
-    tab === "compare" ? h(TrialCompareTool, null) :
-    tab === "target" ? h(TargetDossierTool, null) :
-    tab === "literature" ? h(LiteratureTool, null) :
-    tab === "asset" ? h(AssetProgramTool, { onDecodeTrial: goToTrialDecoder, onWatchTrial: goToTrialWatch }) :
+    tab === "decoder" ? h(TrialDecoderTool, { activeCase, initialNctId: pendingNctId, onConsumedInitialNctId: () => setPendingNctId(null) }) :
+    tab === "compare" ? h(TrialCompareTool, { activeCase }) :
+    tab === "target" ? h(TargetDossierTool, { activeCase }) :
+    tab === "literature" ? h(LiteratureTool, { activeCase }) :
+    tab === "asset" ? h(AssetProgramTool, { activeCase, onDecodeTrial: goToTrialDecoder, onWatchTrial: goToTrialWatch }) :
     tab === "commercial" ? h(CommercialTool, { cases, updateCase, activeCase }) :
-    tab === "trialwatch" ? h(TrialWatchTool, { initialNctId: pendingNctId, onConsumedInitialNctId: () => setPendingNctId(null) }) :
-    tab === "fdaLookup" ? h(FdaLookupTool, null) :
-    tab === "exclusivity" ? h(ExclusivityTool, { cases, updateCase }) :
+    tab === "trialwatch" ? h(TrialWatchTool, { activeCase, initialNctId: pendingNctId, onConsumedInitialNctId: () => setPendingNctId(null) }) :
+    tab === "fdaLookup" ? h(FdaLookupTool, { activeCase }) :
+    tab === "exclusivity" ? h(ExclusivityTool, { cases, updateCase, activeCase }) :
     h(SensitivityTool, { cases, updateCase, activeCase })
   );
 }

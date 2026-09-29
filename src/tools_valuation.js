@@ -117,6 +117,13 @@ function BinaryEventTool({ cases, activeCase }) {
   const [fail, setFail] = React.useState("");
   const [yourPoS, setYourPoS] = React.useState("");
   const [unit, setUnit] = React.useState("perShare");
+  // Per share only: the case's figures are per-share values.
+  const bd = React.useMemo(() => caseBinaryDefaults(activeCase), [activeCase]);
+  const perShare = unit === "perShare";
+  const f1 = useCasePrefill(activeCase, perShare ? bd.price : "", current, setCurrent);
+  const f2 = useCasePrefill(activeCase, perShare ? bd.success : "", success, setSuccess);
+  const f3 = useCasePrefill(activeCase, perShare ? bd.fail : "", fail, setFail);
+  const f4 = useCasePrefill(activeCase, bd.pos, yourPoS, setYourPoS);
   const beRef = React.useRef(null);
 
   const res = computeBinaryEventImpliedPoS({ currentValue: current, successValue: success, failValue: fail, yourPoSPct: yourPoS });
@@ -152,7 +159,8 @@ function BinaryEventTool({ cases, activeCase }) {
         field("If it works", success, setSuccess, "e.g. 30", "your success-case value"),
         field("If it fails", fail, setFail, "e.g. 5", "cash/other assets left"),
         field("Your PoS (%)", yourPoS, setYourPoS, "e.g. 40", "optional — your own odds")
-      )
+      ),
+      h(CaseFilledNote, { activeCase, filled: [f1 && "today's price", f2 && "the value if it is approved", f3 && "the failure floor", f4 && "your odds of launch"] })
     ]),
 
     showing && !res.ok && toolCard(h, [
@@ -271,6 +279,10 @@ function FdmcTool({ cases, updateCase, activeCase }) {
     });
     if (cap.mode) setMode(cap.mode);
   };
+
+  // Tuned to the open case: its capital structure loads when the case opens
+  // or changes (edit freely afterwards; switching cases reloads).
+  React.useEffect(() => { if (importCaseId) importFromCase(); }, [importCaseId]);
 
   const exportToCase = () => {
     const c = cases.find(x => x.id === exportCaseId);

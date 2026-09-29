@@ -15,6 +15,11 @@ function newProgram() {
     // blank means "not specified", which computes exactly as before these existed.
     posBiomarkerUse: "", // "" | "selection" | "none"
     posDiseaseType: "",  // "" | "rare" | "chronicHighPrev"
+    // Read by the Tools and Simulation, never by the valuation: the trial
+    // tools open on these trials and the Target Dossier on this gene when the
+    // case is open (see caseToolDefaults in helpers.js).
+    trialIds: "",  // ClinicalTrials.gov IDs, comma-separated, lead trial first
+    target: "",    // gene symbol of the drug's target, e.g. SCN1A
     prv: { enabled: false, valueM: "150" }, // Priority Review Voucher — tied to this program's own approval
     launchYearOffset: "", // years from Case Year 0 — blank means use the R&D-computed timeline (consistent with every other override in this app); type a number to set it explicitly, including 0 for "launches immediately / already on market"
     revenueMode: "quick", // 'quick' | 'full' — quick starts every new program so a first valuation is fast
@@ -199,7 +204,16 @@ function ProgramEditor({ program, onChange, onDelete, discountRatePct, terminalV
           if (typed === "" || typed == null || isNaN(Number(typed)) || Number.isInteger(Number(typed))) return null;
           return h("div", { role: "note", style: { ...UI.warnNote, marginTop: 5 } },
             "The model counts whole years, so this is valued as a launch in year " + Math.round(Number(typed)) + ".");
-        })())
+        })()),
+      h("div", { style: { flex: "1 1 260px" } },
+        h("div", { style: UI.fieldLabel }, "Key trials (NCT numbers)"),
+        h("input", { "aria-label": "Key trials (NCT numbers)", value: program.trialIds || "", onChange: e => set("trialIds", e.target.value), placeholder: "e.g. NCT06872125 — lead trial first",
+          style: UI.input })),
+      h("div", { style: { flex: "1 1 140px" } },
+        h("div", { style: UI.fieldLabel }, "Target gene"),
+        h("input", { "aria-label": "Target gene", value: program.target || "", onChange: e => set("target", e.target.value), placeholder: "e.g. SCN1A",
+          style: UI.input })),
+      h("div", { style: { flex: "1 1 100%", ...UI.caption, marginTop: -2 } }, "Not used in the valuation. With this case open, the trial and science tools start on these.")
     )),
 
     // ── 0. R&D to Launch ──

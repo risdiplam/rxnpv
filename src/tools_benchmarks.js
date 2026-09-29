@@ -81,6 +81,9 @@ function MaPremiumTool({ cases, updateCase, activeCase }) {
     } catch (e) {}
   };
 
+  // Starts from the open case's Base fair value, reloaded when the case changes.
+  React.useEffect(() => { if (importCaseId) importFromCase(); }, [importCaseId]);
+
   const start = Number(startValue) || 0;
   const pct = premiumPct !== "" ? Number(premiumPct) : medianPremium;
   const takeout = start > 0 ? start * (1 + pct / 100) : null;

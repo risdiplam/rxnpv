@@ -9,12 +9,14 @@
 function CompanyLookupTool({ cases, updateCase, activeCase, onWatchTrial }) {
   const h = React.createElement;
   const [query, setQuery] = React.useState("");
+  const coFromCase = useCasePrefill(activeCase, caseToolDefaults(activeCase).company, query, setQuery);
   const [loading, setLoading] = React.useState(false);
   const [edgarResult, setEdgarResult] = React.useState(null);
   const [edgarError, setEdgarError] = React.useState(null);
   const [trialsResult, setTrialsResult] = React.useState(null);
   const [trialsError, setTrialsError] = React.useState(null);
   const [condQuery, setCondQuery] = React.useState("");
+  const condFromCase = useCasePrefill(activeCase, caseToolDefaults(activeCase).indication, condQuery, setCondQuery);
   const [competitors, setCompetitors] = React.useState(null);
   const [competitorsError, setCompetitorsError] = React.useState(null);
   const [competitorsLoading, setCompetitorsLoading] = React.useState(false);
@@ -113,6 +115,7 @@ function CompanyLookupTool({ cases, updateCase, activeCase, onWatchTrial }) {
           style: { padding: "7px 16px", borderRadius: 6, border: "1px solid var(--teal)", background: "var(--teal-bg)", color: "var(--teal)", fontFamily: "var(--mono)", fontSize: 12, fontWeight: 700, cursor: loading ? "default" : "pointer" }
         }, loading ? "Searching…" : "Search")
       ),
+      h(CaseFilledNote, { activeCase, filled: [coFromCase && "ticker"] }),
       !isDesktop && h("div", { style: { ...UI.caption, marginBottom: 8 } }, "EDGAR financials require the desktop app — trial pipeline search works either way."),
 
       edgarResult && h("div", { style: { padding: "10px 14px", borderRadius: 8, background: "var(--surface-2)", marginBottom: 10 } },
@@ -241,7 +244,7 @@ function CompanyLookupTool({ cases, updateCase, activeCase, onWatchTrial }) {
     ]),
     toolCard(h, [
       toolLabel(h, "Competitor search by indication"),
-      h("div", { style: { fontSize: 11, fontFamily: "var(--sans)", color: "var(--ink-2)", marginBottom: 10 } }, "Not tied to any case — a general research tool. Cross-references sponsors against EDGAR when running as the desktop app."),
+      h("div", { style: { fontSize: 11, fontFamily: "var(--sans)", color: "var(--ink-2)", marginBottom: 10 } }, "Who else is developing a drug in this indication. Cross-references sponsors against EDGAR when running as the desktop app."),
       h("div", { style: { display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10 } },
         h("input", { type: "text", "aria-label": "Indication or condition", value: condQuery, placeholder: "Indication / condition", onChange: e => setCondQuery(e.target.value),
           style: { flex: "1 1 220px", padding: "7px 10px", borderRadius: 6, border: "1.5px solid var(--rule)", background: "var(--surface)", color: "var(--ink-1)", fontFamily: "var(--mono)", fontSize: 13 } }),
@@ -249,6 +252,7 @@ function CompanyLookupTool({ cases, updateCase, activeCase, onWatchTrial }) {
           style: { padding: "7px 16px", borderRadius: 6, border: "1px solid var(--amber)", background: "var(--amber-bg)", color: "var(--amber)", fontFamily: "var(--mono)", fontSize: 12, fontWeight: 700, cursor: competitorsLoading ? "default" : "pointer" }
         }, competitorsLoading ? "Searching…" : "Search")
       ),
+      h(CaseFilledNote, { activeCase, filled: [condFromCase && "indication"] }),
       competitorsError && h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--red)", marginBottom: 8 } }, competitorsError),
       competitors && h("div", { style: { display: "flex", flexDirection: "column", gap: 6 } },
         competitors.studies.length === 0 && h("div", { style: UI.captionMd }, "No trials found for that indication."),
@@ -457,6 +461,7 @@ function CatalystCalendarTool({ cases, updateCase, activeCase }) {
 function RunwayTool({ cases, updateCase, activeCase }) {
   const h = React.createElement;
   const [companyName, setCompanyName] = React.useState("");
+  const runwayFromCase = useCasePrefill(activeCase, caseToolDefaults(activeCase).company, companyName, setCompanyName);
   const [pulling, setPulling] = React.useState(false);
   const [pullError, setPullError] = React.useState(null);
   const [pullResult, setPullResult] = React.useState(null);
@@ -508,6 +513,7 @@ function RunwayTool({ cases, updateCase, activeCase }) {
         h("button", { onClick: pull, disabled: pulling,
           style: { padding: "7px 16px", borderRadius: 6, border: "1px solid var(--teal)", background: "var(--teal-bg)", color: "var(--teal)", fontFamily: "var(--mono)", fontSize: 12, fontWeight: 700, cursor: pulling ? "default" : "pointer" } }, pulling ? "Pulling…" : "Pull from EDGAR")
       ),
+      h(CaseFilledNote, { activeCase, filled: [runwayFromCase && "ticker"] }),
       !isDesktop && h("div", { style: { ...UI.caption, marginBottom: 8 } }, "Requires the desktop app — use manual entry below in the meantime."),
       pullError && h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--red)", marginBottom: 10 } }, pullError),
 
