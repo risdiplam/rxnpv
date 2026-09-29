@@ -156,8 +156,6 @@ function useValuationSections({ theCase, onChange, goToTab }) {
     // presentation change, not a new number.
     show("overview") && (!error && scenarioResults && (() => {
       const price = theCase.currentPrice !== "" && theCase.currentPrice != null ? Number(theCase.currentPrice) : null;
-      const baseShare = baseResult && baseResult.equity.perShare;
-      const upsidePct = (price > 0 && baseShare != null) ? (baseShare / price - 1) * 100 : null;
       const showImplied = impliedSolved && impliedSolved.ok && !impliedSolved.degenerate;
       return h("div", { style: { marginBottom: 16, padding: "14px 16px", borderRadius: 10, background: "var(--surface-2)", border: "1.5px solid var(--rule)" } },
         h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-3)", marginBottom: 10 } }, "Price vs. model"),
@@ -165,21 +163,24 @@ function useValuationSections({ theCase, onChange, goToTab }) {
           h("div", null,
             h("div", { style: UI.caption }, "Current price"),
             h("div", { style: { fontSize: 22, fontFamily: "var(--mono)", fontWeight: 800, color: "var(--ink-1)" } }, price != null ? fmtShare(price) : "—")),
+          // Each scenario's move from today's price sits under its value — it
+          // used to be a second row of the same three numbers at the foot of
+          // the Overview.
           scenarioResults.map(s => h("div", { key: s.key },
             h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: s.preset.color, } }, s.preset.label + " fair value"),
             h("div", { style: { fontSize: 22, fontFamily: "var(--mono)", fontWeight: 800, color: s.preset.color } },
-              fmtShare(s.result.equity.perShare)))),
-          upsidePct != null && h("div", null,
-            h("div", { style: UI.caption }, "Base upside/downside"),
-            h("div", { style: { fontSize: 22, fontFamily: "var(--mono)", fontWeight: 800, color: upsidePct >= 0 ? "var(--green)" : "var(--red)" } },
-              (upsidePct >= 0 ? "+" : "") + upsidePct.toFixed(0) + "%")),
+              fmtShare(s.result.equity.perShare)),
+            price > 0 && s.result.equity.perShare != null && isFinite(s.result.equity.perShare) && h("div", { className: "pvm-move" + (s.result.equity.perShare >= price ? " up" : " down") },
+              (s.result.equity.perShare >= price ? "+" : "−") + Math.abs(Math.round((s.result.equity.perShare / price - 1) * 100)) + "% vs today"))),
+
           showImplied && theCase.programs.length === 1 && impliedSolved.baseAbsolutePct != null && h("div", null,
             h("div", { style: UI.caption }, "Your PoS"),
             h("div", { style: { fontSize: 22, fontFamily: "var(--mono)", fontWeight: 800, color: "var(--ink-1)" } }, impliedSolved.baseAbsolutePct.toFixed(0) + "%")),
           showImplied && theCase.programs.length === 1 && impliedSolved.impliedAbsolutePct != null && h("div", null,
             h("div", { style: UI.caption }, "Price implies"),
             h("div", { style: { fontSize: 22, fontFamily: "var(--mono)", fontWeight: 800, color: impliedSolved.impliedAbsolutePct >= impliedSolved.baseAbsolutePct ? "var(--green)" : "var(--red)" } },
-              impliedSolved.impliedAbsolutePct.toFixed(0) + "%"))
+              impliedSolved.impliedAbsolutePct.toFixed(0) + "%"),
+            h("div", { className: "pvm-move" }, impliedSolved.multiplierPct.toFixed(0) + "% of your odds"))
         ),
         (() => { const by = k => (scenarioResults.find(s => s.key === k) || { result: { equity: {} } }).result.equity.perShare;
           const r = readPriceVsScenarios(price, by("bear"), by("base"), by("bull"));
@@ -222,11 +223,11 @@ function useValuationSections({ theCase, onChange, goToTab }) {
         h(ExportableBlock, { title: (theCase.name || "Case") + " — range of outcomes per share" },
           h(OutcomeRangeStrip, { marks, band: [Math.min(by("bear"), by("bull")), Math.max(by("bear"), by("bull"))], label: "Range of outcomes per share: failure, scenarios, today's price and success" })),
         floor && h(Explain, readOutcomeRange(floor.perShare, success, price, one ? impliedSolved.impliedAbsolutePct : null)),
-        floor && h("div", { className: "prose", style: { ...UI.caption, marginTop: 8 } },
-          "If it fails: net cash " + fmtMoney(floor.netCash) + " − " + floor.stageLabel + " cost to the readout " + fmtMoney(floor.trialCost) + " (the company's share) − G&A to the readout " + fmtMoney(floor.gaToReadout) +
+        floor && h("div", { style: { marginTop: 8 } }, h(Note, { summary: "How “if it fails” is worked out" },
+          "Net cash " + fmtMoney(floor.netCash) + " − " + floor.stageLabel + " cost to the readout " + fmtMoney(floor.trialCost) + " (the company's share) − G&A to the readout " + fmtMoney(floor.gaToReadout) +
           " − " + floor.windDownYears + " year" + (floor.windDownYears === 1 ? "" : "s") + " of wind-down G&A " + fmtMoney(floor.windDown) + " = " + fmtMoney(floor.equity) + ", ÷ " + fmtNum(Math.round(floor.shares)) + " shares at that price" +
           (floor.cashShort ? " — cash runs out first, so without new money the equity is worth about nothing" : "") +
-          ". Before any new raise and not discounted; anything the platform or other assets might fetch is left out. The wind-down is set under Assumptions → Corporate G&A."),
+          ". Before any new raise and not discounted; anything the platform or other assets might fetch is left out. The wind-down is set under Assumptions → Corporate G&A.")),
         !floor && theCase.programs.length > 1 && h("div", { style: { ...UI.caption, marginTop: 8 } }, "No failure floor with more than one program — one failure leaves the others' value standing, which needs more than this arithmetic.")
       );
     })()),
@@ -644,9 +645,13 @@ function useValuationSections({ theCase, onChange, goToTab }) {
           // detailed box now show the exact same computation, never two.
           const solved = impliedSolved, solveError = impliedSolveError;
           if (solveError || !solved) return null;
+          // With one program, every figure here is already in "Price vs.
+          // model" at the top (your odds, the price's odds, and the ratio).
+          // The box stays for several programs, where only the ratio exists.
+          if (solved.ok && !solved.degenerate && theCase.programs.length === 1) return null;
           const caseLabel = theCase.name || "This case";
           if (!solved.ok) return h("div", { style: { marginTop: 16, padding: "12px 14px", borderRadius: 8, background: "var(--warn-bg)", border: "1px solid var(--warn)", fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-2)" } }, "Implied PoS: " + solved.error);
-          return h(ExportSection, { title: "What " + possessive(caseLabel) + " price implies", style: { marginTop: 16, padding: "14px 16px 14px 18px", borderRadius: 10, background: "var(--surface)", border: "1px solid var(--rule)", boxShadow: "inset 3px 0 0 var(--teal)" } },
+          return h(ExportSection, { title: "What " + possessive(caseLabel) + " price implies", style: { marginTop: 16, borderTop: "1px dashed var(--rule)", paddingTop: 14 } },
             h("div", { style: { fontSize: 13, fontFamily: "var(--display)", fontWeight: 700, color: "var(--ink-1)", marginBottom: 4 } }, "What " + possessive(caseLabel) + " price implies"),
             h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-2)", marginBottom: 10 } }, "The PoS the current price requires, given your assumptions — the reverse of fair value."),
             solved.degenerate
@@ -822,27 +827,8 @@ function useValuationSections({ theCase, onChange, goToTab }) {
           );
         })()),
 
-        // Current price vs. fair value — the standard write-up headline. Uses
-        // the case-level Current Price field (top of the case, near the name).
-        show("overview") && (theCase.currentPrice !== "" && theCase.currentPrice != null && h("div", { style: { marginTop: 16, padding: "12px 14px", borderRadius: 8, background: "var(--surface-2)", border: "1px solid var(--rule)" } },
-          h("div", { style: { display: "flex", gap: 24, flexWrap: "wrap", alignItems: "center" } },
-            h("div", null,
-              h("div", { style: UI.caption }, "Current price"),
-              h("div", { style: UI.stat }, fmtShare(Number(theCase.currentPrice)))),
-            scenarioResults.map(s => {
-              const fv = s.result.equity.perShare;
-              // Guard against a zero (or non-numeric) current price — dividing by
-              // it yields Infinity, which previously rendered as "+Infinity%".
-              const cp = Number(theCase.currentPrice);
-              const upside = (fv != null && cp > 0) ? ((fv / cp) - 1) * 100 : null;
-              return h("div", { key: s.key }, 
-                h("div", { style: UI.caption }, s.preset.label + " upside/downside"),
-                h("div", { style: { fontSize: 18, fontFamily: "var(--mono)", fontWeight: 700, color: upside == null ? "var(--ink-3)" : upside >= 0 ? "var(--green)" : "var(--red)" } },
-                  upside != null ? (upside >= 0 ? "+" : "") + upside.toFixed(0) + "%" : "—")
-              );
-            })
-          )
-        ))
+        // (The "Current price / Bear, Base, Bull upside" row that closed the
+        // Overview now sits under each value in "Price vs. model" at the top.)
       ))
   );
   };

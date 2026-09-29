@@ -172,6 +172,18 @@
   .xm-item:hover:not(:disabled) { border-color: var(--teal); }
   .xm-item.is-on { border-color: var(--teal); background: var(--teal-bg); color: var(--teal); }
   .xm-item.is-off, .xm-item:disabled { color: var(--ink-3); border-style: dashed; cursor: not-allowed; }
+  /* A chart inside a section: no button of its own (its menu opens from the
+     section's), and no row height until it has something to say. */
+  .chart-export-bar.in-section { margin-top: 0 !important; }
+  .chart-export-bar.in-section > .xm-trigger { display: none; }
+  .chart-export-bar.in-section:not(.is-active) { height: 0; }
+  .xm-chart { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+  .bench-line { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 1; overflow: hidden; }
+  .bench-line:focus-within { -webkit-line-clamp: unset; }
+  #rxnpv-export-root .bench-line, .report-snapshot .bench-line { display: block; -webkit-line-clamp: unset; overflow: visible; }
+  @media print { .bench-line { display: block; -webkit-line-clamp: unset; overflow: visible; } }
+  .pvm-move { font: 500 11px var(--mono); color: var(--ink-3); margin-top: 2px; }
+  .pvm-move.up { color: var(--green); } .pvm-move.down { color: var(--red); }
   .xm-case { display: flex; align-items: center; gap: 8px; font: 500 11px var(--sans); color: var(--ink-3); padding: 8px 4px 2px; }
   .xm-case select { flex: 1; min-height: 28px; padding: 3px 6px; border-radius: 6px; border: 1px solid var(--rule); background: var(--surface-2); color: var(--ink-1); font: 12px var(--sans); }
   /* ── Case sub-tabs ───────────────────────────────────────────────── */

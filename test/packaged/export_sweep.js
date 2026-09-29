@@ -273,13 +273,51 @@ app.whenReady().then(async () => {
   for (const t of ["How This Works", "Revenue Build", "Cost Structure", "R&D & Timeline", "Probability of Success", "Discount Rate", "Valuation & Dilution", "M&A Comps", "Trial Glossary"]) { await click(t, 600); await sweep("Reference · " + t); }
   await click("Portfolio", 800); await sweep("Portfolio");
 
+  // A single chart's "+ Report" / "+ Bundle", pressed the way a person reaches
+  // it: a chart inside a section has no button of its own on screen, so open
+  // the section's Export menu, pick the chart under "Just the chart", then
+  // press the button in the chart's own menu. A chart outside any section
+  // still shows its own "Export chart" button.
+  const pressChart = async (nth, label) => {
+    const how = await js(`(() => {
+      const ch = [...document.querySelectorAll("[data-export-chart]")].filter(__t.visible)[${nth}]; if (!ch) return "no chart";
+      document.querySelectorAll("[data-sweep-chart]").forEach(e => e.removeAttribute("data-sweep-chart"));
+      ch.setAttribute("data-sweep-chart", "1");
+      const own = [...ch.querySelectorAll(".chart-export-bar")].find(b => b.closest("[data-export-chart]") === ch);
+      if (!own) return "no bar";
+      if (!own.classList.contains("in-section")) { own.querySelector(".xm-trigger").click(); return "own"; }
+      const sec = ch.parentElement.closest("[data-export-section]");
+      const sbar = [...sec.querySelectorAll(".section-export-bar")].find(b => b.closest("[data-export-section]") === sec);
+      sbar.querySelector(".xm-trigger").click();
+      return "section";
+    })()`);
+    await sleep(400);
+    if (how === "section") {
+      const picked = await js(`(() => {
+        const ch = document.querySelector("[data-sweep-chart]");
+        const sec = ch.parentElement.closest("[data-export-section]");
+        const charts = [...sec.querySelectorAll("[data-export-chart]")].filter(c => c.parentElement.closest("[data-export-section]") === sec);
+        const menu = [...sec.querySelectorAll(".section-export-bar .xm-menu")].find(m => m.style.display === "block"); if (!menu) return false;
+        const item = [...menu.querySelectorAll(".xm-chart")][charts.indexOf(ch)]; if (!item) return false;
+        item.click(); return true; })()`);
+      if (!picked) return false;
+      await sleep(500);
+    } else if (how !== "own") return false;
+    return await js(`(() => {
+      const ch = document.querySelector("[data-sweep-chart]");
+      const own = [...ch.querySelectorAll(".chart-export-bar")].find(b => b.closest("[data-export-chart]") === ch);
+      const menu = own && own.querySelector(".xm-menu"); if (!menu || menu.style.display !== "block") return false;
+      const b = [...menu.querySelectorAll("button")].find(x => x.textContent.trim() === ${JSON.stringify(label)}); if (!b) return false;
+      b.click(); return true; })()`);
+  };
+
   // ── Together: a report built from sections AND single charts ──
   if (!ONLY || ONLY.includes("Report")) {
     const add = async (view, sub, kind) => {
       await click(view, 800); if (sub) { for (const s of sub) await click(s, 700); }
       if (view === "Simulation") await run();
-      return await js(`(() => { const cls = ${JSON.stringify(kind === "chart" ? ".chart-export-bar" : ".section-export-bar")};
-        const bar = [...document.querySelectorAll(cls)].find(__t.visible); if (!bar) return false;
+      if (kind === "chart") return await pressChart(0, "+ Report");
+      return await js(`(() => { const bar = [...document.querySelectorAll(".section-export-bar")].find(__t.visible); if (!bar) return false;
         const b = [...bar.querySelectorAll("button")].find(x => x.textContent.trim() === "+ Report"); if (!b) return false; b.click(); return true; })()`);
     };
     const adds = [
@@ -311,8 +349,8 @@ app.whenReady().then(async () => {
     const collect = async (view, sub, kind, nth) => {
       await click(view, 800); if (sub) { for (const x of sub) await click(x, 700); }
       if (view === "Simulation") await run();
-      return await js(`(() => { const cls = ${JSON.stringify(kind === "chart" ? ".chart-export-bar" : ".section-export-bar")};
-        const bar = [...document.querySelectorAll(cls)].filter(__t.visible)[${nth || 0}]; if (!bar) return false;
+      if (kind === "chart") return await pressChart(nth || 0, "+ Bundle");
+      return await js(`(() => { const bar = [...document.querySelectorAll(".section-export-bar")].filter(__t.visible)[${nth || 0}]; if (!bar) return false;
         const b = [...bar.querySelectorAll("button")].find(x => x.textContent.trim() === "+ Bundle"); if (!b) return false; b.click(); return true; })()`);
     };
     const got = [];

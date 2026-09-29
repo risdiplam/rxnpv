@@ -49,7 +49,7 @@ function findCurrentPriceInput(d){return [...d.querySelectorAll("input[type=numb
   console.log("Card present:", t.includes("Price vs. model"));
   console.log("Shows current price $10.00:", t.includes("$10.00"));
   console.log("Shows all three scenario fair values:", t.includes("Bear fair value") && t.includes("Base fair value") && t.includes("Bull fair value"));
-  console.log("Shows upside/downside:", t.includes("Base upside/downside"));
+  console.log("Shows upside/downside:", /% vs today/.test(t));
 
   clickBtn("Simulation"); await wait(500);
 

@@ -870,3 +870,18 @@ All three batch-2 mockups are built.
 **2. Tools start from the case.** Trial tools open on the program's trials (a new "Key trials" field; the sample carries EMPEROR), Target Dossier on its target gene (new field; SCN1A), Literature and Asset Program on the drug, Trial Explorer on the indication and phase, company tools on the ticker, Binary Event on the price / value if approved / failure floor / odds, Diluted Market Cap and M&A Premium on the case's capital structure and fair value, and the Peak Sales simulation on the Detailed revenue build (population × eligible, share × adherence spread Bear to Bull, US net price — for Stoke 12,560 / 75% / 60% / 35.7–66.3% / $300,000). A typed value is never overwritten; each tool says what came from the case. Tools about a drug on the market (FDA Lookup, Exclusivity, Launch tracker) stay blank until the program is approved or filed. The statistics calculators, Meta-Analysis, PK/PD, Reference Sheet and Portfolio stay case-independent.
 
 **3. Save to case.** Every Tools and Simulation result has "Save to case" in its Export menu. It lands in a new Saved tab in the case — out of the PDF until ticked in — with its inputs, so "Open in Tools / Simulation" puts the tool back exactly as it was. "+ Report" items appear there too: one list of saved work per case.
+
+## Phase 43 — A calmer screen, nothing taken away
+
+✅ From the user: "as more features have been added, the various screens and features have become more and more visually "busy" and UI heavy. without losing any features or their integrity, lets look for some low impact ways to make the app a bit less "busy.""
+
+Every change below hides or merges repetition; no number, chart, option or explanation was removed. The Overview on the sample case went from 6,101 to 5,491 pixels tall.
+
+- **One Export button per section.** A chart inside a section no longer shows its own "Export chart" button under the chart — two stacked buttons per chart was most of the Overview's clutter. Its menu is unchanged and opens from the section's menu under "Just the chart" (or "Just one chart" with a list when a section holds several). A chart that stands alone keeps its own button.
+- **Price vs. model says each move once.** The "% vs today" now sits under each of Bear, Base and Bull, and "N% of your odds" under Price implies. That replaced a separate Base upside stat, a bottom "Current price / upside" strip that repeated the same numbers, and a second implied-PoS box for single-program cases (still shown for multi-program cases, where it adds information).
+- **Workings behind a fold.** How the failure floor is worked out, why the Monte Carlo median differs from Base and what drives its spread, and the optional FDA-resubmission input now sit in the same "Note" folds the app already uses. They open with one click and print in full in exports.
+- **Quieter boxes.** The Monte Carlo and "what the price implies" blocks lost their filled, bordered boxes for a dashed rule, like the sections around them.
+- **Benchmark lines on one line.** The source line under each benchmarked input is clamped to one line, shows in full while you are in the field or hovering over it, and prints in full in exports, the report and saved snapshots.
+- **Sentence fix.** The Sensitivity reading listed drivers as "A and B and C and D"; it now reads "A, B, C and D each reach …" (a shared `andList()`, also used by the Sum-of-the-Parts reading).
+
+Verified: 14 suites, lint clean, UI audit zero findings in both themes and at 900px, the export sweep with only the six known ink-score flags. The sweep's report and bundle phase now reaches a single chart the way a person does (section menu → chart → "+ Report"/"+ Bundle"), and all five items render in both.

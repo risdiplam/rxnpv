@@ -4122,6 +4122,8 @@ section("Plain-English readings: each sentence matches the numbers under it");
   r = api.readTornado([{ label: "PoS", low: 0.7, high: 1.3 }, { label: "Peak share", low: 0.5, high: 1.6 }], 1, 1.5);
   ok("widest bar first: Peak share (1.1 wide vs 0.6)", r.text.startsWith("Peak share matters most") && r.text.includes("from $0.50 to $1.60"));
   ok("only Peak share reaches $1.50", r.verdict === "Only Peak share reaches today's $1.50 on its own.");
+  // Three of four reach 1.5 (widths 1.1, 0.95, 0.72; C at 0.2 tops out at 1.1): a comma list, plural verb.
+  ok("three reach -> 'A, B and E each reach … on their own'", api.readTornado([{ label: "C", low: 0.9, high: 1.1 }, { label: "A", low: 0.5, high: 1.6 }, { label: "E", low: 0.8, high: 1.52 }, { label: "B", low: 0.6, high: 1.55 }], 1, 1.5).verdict === "Only A, B and E each reach today's $1.50 on their own.");
   ok("nothing reaches -> says so", api.readTornado([{ label: "PoS", low: 0.7, high: 1.3 }], 1, 10).verdict.startsWith("No single input"));
   // Price BELOW base: reaching means the low end gets down to it.
   ok("price below base: low end at or under it counts", api.readTornado([{ label: "PoS", low: 0.7, high: 1.3 }], 1, 0.8).verdict.startsWith("Any one"));

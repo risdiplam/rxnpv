@@ -128,14 +128,17 @@ function OutcomeTreeSection({ theCase, discountRatePct, tv, baseValue, onChange 
       baseValue != null && h("div", { className: "mc-stat" }, h("div", { style: UI.caption }, "Model Base"),
         h("div", { style: { fontSize: 20, fontFamily: "var(--mono)", fontWeight: 700, color: "var(--ink-1)" } }, fmtShare(baseValue)))),
     h(Explain, readOutcomeTree(tree.gates, tree.weighted, baseValue)),
-    onChange && tree.gates[tree.gates.length - 1].key === "regulatory" && h("div", { className: "prose", style: { ...UI.caption, marginTop: 10 } },
+    // Optional, so it lives in a note — open by itself once a value is set.
+    onChange && tree.gates[tree.gates.length - 1].key === "regulatory" && h("details", { className: "note", style: { marginTop: 10 }, open: !!Number((theCase.outcomeTree || {}).resubmitFixPct) || undefined },
+      h("summary", null, "Optional: show FDA rejections that are fixed and approved a year later"),
+      h("div", { className: "note-body" },
       h("label", { style: { display: "inline-flex", alignItems: "center", gap: 6, flexWrap: "nowrap" } },
       h("span", null, "Optional: FDA rejections fixed and approved a year later"),
       h("input", { type: "number", min: 0, max: 100, step: 5, className: "rs-input", placeholder: "0", "aria-label": "Share of FDA rejections fixed on resubmission (%)",
         value: ((theCase.outcomeTree || {}).resubmitFixPct) == null ? "" : theCase.outcomeTree.resubmitFixPct,
         onChange: e => onChange({ ...theCase, outcomeTree: { ...(theCase.outcomeTree || {}), resubmitFixPct: e.target.value }, updatedAt: Date.now() }) }),
       h("span", null, "%")),
-      h("div", { style: { marginTop: 4 } }, "Blank or 0 leaves the branch off. The case's own odds do not change; this only says what a rejection turns into.")));
+      h("div", { style: { marginTop: 4 } }, "Blank or 0 leaves the branch off. The case's own odds do not change; this only says what a rejection turns into."))));
 }
 
 // ── Before the next readout: the three results as a table ──────────────────

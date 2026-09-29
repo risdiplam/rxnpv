@@ -142,7 +142,12 @@ function BenchField({ label, value, onChange, bench, suffix, placeholder, step, 
       }),
       suffix && h("span", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-3)", minWidth: 18 } }, suffix)
     ),
-    bench && h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginTop: 4, lineHeight: 1.5 } },
+    // One line: the benchmark value and the start of its source. The full
+    // source shows on hover (title), when the benchmark chip has keyboard
+    // focus, and always in exports and the report (see .bench-line in
+    // shell.html) — sources that wrapped to three or four lines under every
+    // field were most of the Assumptions tab's noise.
+    bench && h("div", { className: "bench-line", title: "Benchmark: " + bench.value + (suffix || "") + " · " + bench.source, style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginTop: 4, lineHeight: 1.5 } },
       "Benchmark: ",
       h("button", {
         onClick: () => onChange(String(bench.value)),
@@ -562,11 +567,33 @@ function ExportBar({ scope, title, heading, reportSection, source }) {
     document.addEventListener("mousedown", onDown); window.addEventListener("keydown", onKey);
     return () => { document.removeEventListener("mousedown", onDown); window.removeEventListener("keydown", onKey); };
   }, [open]);
+  // A chart inside a section no longer shows its own "Export chart" button —
+  // two stacked buttons per chart was most of the Overview's clutter. Its
+  // menu stays (same buttons, same place), opened from the section's menu,
+  // which lists the charts it holds under "Just one chart".
+  const [inSection, setInSection] = React.useState(false);
+  const [charts, setCharts] = React.useState([]);
+  React.useEffect(() => {
+    if (!isChart || !ref.current) return;
+    const s = !!closestExportSection(ref.current);
+    if (s !== inSection) setInSection(s);
+  });
+  const chartsInSection = () => {
+    const b = block();
+    if (!b || isChart) return [];
+    return Array.prototype.filter.call(b.querySelectorAll("[data-export-chart]"), ch => closestExportSection(ch) === b)
+      .map(ch => ({ el: ch, title: sectionTitleOf(ch) }));
+  };
+  const openChartMenu = (ch) => {
+    const trig = Array.prototype.find.call(ch.querySelectorAll(".chart-export-bar .xm-trigger"), t => closestChartBlock(t) === ch);
+    if (trig) { const bar = trig.parentNode; if (bar && bar.scrollIntoView) bar.scrollIntoView({ block: "nearest" }); trig.click(); }
+  };
   const toggle = () => {
     if (!open && trigRef.current) {
       const r = trigRef.current.getBoundingClientRect();
       setOpenUp((window.innerHeight - r.bottom) < 240 && r.top > 240);
     }
+    if (!open) setCharts(chartsInSection());
     setOpen(!open);
   };
   // Every action closes the menu so its result message shows by the button.
@@ -576,7 +603,7 @@ function ExportBar({ scope, title, heading, reportSection, source }) {
   const icon = h("svg", { width: 14, height: 14, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true" },
     h("path", { d: "M12 4v11M7 10l5 5 5-5" }), h("path", { d: "M5 20h14" }));
   return h("div", {
-    ref, "data-no-export": "", className: (isChart ? "chart-export-bar" : "section-export-bar") + (msg || busy ? " is-active" : ""),
+    ref, "data-no-export": "", className: (isChart ? "chart-export-bar" : "section-export-bar") + (isChart && inSection ? " in-section" : "") + (msg || busy || open ? " is-active" : ""),
     style: { position: "relative", display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 8, flexWrap: "wrap", marginTop: isChart ? 4 : 10 }
   },
     msg && h("span", { role: "status", style: { fontSize: 11, fontFamily: "var(--sans)", color: msg.tone === "ok" ? "var(--green)" : "var(--red)" } },
@@ -619,6 +646,10 @@ function ExportBar({ scope, title, heading, reportSection, source }) {
               : "Add " + (isChart ? "just this chart" : "this whole section") + " to " + possessive(target && target.name) + " report, to build a PDF of only what you choose",
           noCase ? { disabled: true, className: "xm-item is-off" } : (inReport ? { className: "xm-item is-on" } : null)),
         menuBtn("+ Bundle", "bundle", doBundle, "Collect " + (isChart ? "just this chart" : "this whole section") + " into your PDF bundle — then export everything you collected as one PDF, or each as its own PDF, from Bundle in the rail. No case needed.")),
+      charts.length > 0 && h("div", { className: "xm-group" },
+        h("div", { className: "xm-label" }, charts.length === 1 ? "Just the chart" : "Just one chart"),
+        charts.map((c, i) => h("button", { key: "ch" + i, type: "button", className: "xm-item xm-chart", title: "PNG, PDF, SVG or the report — just " + (c.title || "this chart"),
+          onClick: () => { setOpen(false); setTimeout(() => openChartMenu(c.el), 0); } }, (charts.length === 1 ? "Chart options" : (c.title || "Chart " + (i + 1))) + " →"))),
       cases.length > 1 && h("label", { className: "xm-case" }, "Report for",
         h("select", { "aria-label": "Case whose report this goes to", value: targetId || "", onChange: e => setPickedCaseId(e.target.value) },
           cases.map(c => h("option", { key: c.id, value: c.id }, c.name || "Untitled")))))
@@ -1219,7 +1250,7 @@ function MonteCarloBox({ theCase, discountRatePct, tv, baseValue }) {
     h("div", { style: { fontSize: 20, fontFamily: "var(--mono)", fontWeight: 700, color: color || "var(--ink-1)" } }, value),
     sub && h("div", { style: { ...UI.caption, marginTop: 2 } }, sub));
 
-  return h(ExportSection, { title: "Full-case Monte Carlo", style: { marginTop: 16, padding: "14px 16px", borderRadius: 10, background: "var(--surface-2)", border: "1.5px solid var(--teal)" } },
+  return h(ExportSection, { title: "Full-case Monte Carlo", style: { marginTop: 16, borderTop: "1px dashed var(--rule)", paddingTop: 14 } },
     h("div", { style: { fontSize: 13, fontFamily: "var(--display)", fontWeight: 700, color: "var(--ink-1)", marginBottom: 4 } }, "Full-case Monte Carlo"),
     h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-2)", marginBottom: 10, lineHeight: 1.6 } },
       "3,000 trials, sampling PoS, peak share, and discount rate continuously between your Bear and Bull bounds (Base as the most likely value) instead of only the three fixed points — a full fair-value distribution, not just three scenarios."),
@@ -1247,13 +1278,14 @@ function MonteCarloBox({ theCase, discountRatePct, tv, baseValue }) {
           ].filter(Boolean) }),
         h("div", { style: { ...UI.caption, marginTop: 4 } }, "Fair value per share across " + result.sortedValues.length.toLocaleString() + " simulations. P25 " + fmtShare(result.percentiles.p25) + " · P75 " + fmtShare(result.percentiles.p75) + (price != null ? ". Green bars are outcomes at or above today's price." : "."))),
       h(Explain, Object.assign({ onTint: true }, readMonteCarlo(result.sortedValues, result.percentiles.p10, result.percentiles.p90, theCase.currentPrice !== "" && theCase.currentPrice != null ? Number(theCase.currentPrice) : null, result.drivers))),
-      h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginTop: 10, lineHeight: 1.6 } },
-        "Median can differ from the Base-case point estimate above — that's expected, not a discrepancy: discounting is non-linear (a higher rate hurts value more than an equal-sized lower rate helps it), so averaging across a range captures that in a way three fixed points can't."),
-      h("div", { style: { marginTop: 12 } },
-        h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-2)", marginBottom: 6 } }, "What's driving the spread"),
+      // Secondary detail, one click away rather than always on screen.
+      h("div", { style: { marginTop: 10 } }, h(Note, { summary: "Why the median differs from Base, and what drives the spread" },
+        h("div", { style: { marginBottom: 8 } }, "Median can differ from the Base-case point estimate above — that's expected, not a discrepancy: discounting is non-linear (a higher rate hurts value more than an equal-sized lower rate helps it), so averaging across a range captures that in a way three fixed points can't."),
+      h("div", { style: { marginTop: 4 } },
+        h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-2)", marginBottom: 6 } }, "What's driving the spread (correlation with fair value)"),
         result.drivers.map(d => h("div", { key: d.key, style: { display: "flex", justifyContent: "space-between", fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-2)", marginBottom: 3 } },
           h("span", null, d.label), h("span", null, (d.correlation >= 0 ? "+" : "") + d.correlation.toFixed(2))))
-      )
+      )))
     )
   );
 }
@@ -1602,7 +1634,7 @@ function ReverseSolveBox({ theCase, discountRatePct, tv, options }) {
   // eleven-digit "$14,417,500,064" is easy to misread by a factor of ten.
   const fmtVal = (v, suffix) => suffix === "$" ? fmtMoney(v) : v.toFixed(suffix === "yr" ? 0 : 1) + suffix;
 
-  return h(ExportSection, { title: "What else " + possessive(caseLabel) + " price implies", style: { marginTop: 16, padding: "14px 16px 14px 18px", borderRadius: 10, background: "var(--surface)", border: "1px solid var(--rule)", boxShadow: "inset 3px 0 0 var(--teal)" } },
+  return h(ExportSection, { title: "What else " + possessive(caseLabel) + " price implies", style: { marginTop: 16, borderTop: "1px dashed var(--rule)", paddingTop: 14 } },
     h("div", { style: { fontSize: 13, fontFamily: "var(--display)", fontWeight: 700, color: "var(--ink-1)", marginBottom: 4 } }, "What else " + possessive(caseLabel) + " price implies"),
     h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-2)", marginBottom: 10 } }, "Same idea as Implied PoS above, holding every other assumption fixed and solving for this one instead."),
     options.length > 1 && h("div", { style: { display: "flex", gap: 6, marginBottom: 10 } },
@@ -1930,7 +1962,7 @@ function readSotp(parts, gaDrag) {
   const gross = pos.reduce((s, p) => s + p.npv, 0);
   const share = pos[0].npv / gross * 100;
   const text = (pos.length > 1 ? pos[0].name + " is " + pctWord(share) + " of the value the programs add. " : "") +
-    (neg.length ? neg.map(p => p.name).join(" and ") + (neg.length > 1 ? " subtract" : " subtracts") + " " + fmtMoney(-neg.reduce((s, p) => s + p.npv, 0)) + ": at current odds, expected costs outweigh expected revenue. " : "") +
+    (neg.length ? andList(neg.map(p => p.name)) + (neg.length > 1 ? " subtract" : " subtracts") + " " + fmtMoney(-neg.reduce((s, p) => s + p.npv, 0)) + ": at current odds, expected costs outweigh expected revenue. " : "") +
     "Shared G&A costs " + fmtMoney(-gaDrag) + " on top.";
   return { verdict: pos.length === 1 ? pos[0].name + " carries all of the value." : pos[0].name + " carries most of the value.", text };
 }
@@ -1959,8 +1991,12 @@ function readTornado(drivers, base, price) {
   const verdict = reach.length === 0
     ? "No single input, moved across its range, gets fair value to today's " + fmtShare(price) + "."
     : reach.length === sorted.length ? "Any one of these inputs, moved far enough, reaches today's " + fmtShare(price) + "."
-    : "Only " + reach.join(" and ") + (reach.length === 1 ? " reaches" : " reach") + " today's " + fmtShare(price) + " on its own.";
+    : "Only " + andList(reach) + (reach.length === 1 ? " reaches" : " each reach") + " today's " + fmtShare(price) + (reach.length === 1 ? " on its own." : " on their own.");
   return { verdict, text: lead };
+}
+// "A", "A and B", "A, B and C" — a list that reads as a sentence.
+function andList(items) {
+  return items.length < 2 ? items.join("") : items.slice(0, -1).join(", ") + " and " + items[items.length - 1];
 }
 
 // The two-way grid: how many of its combinations reach today's price.
