@@ -144,7 +144,7 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
   const sectionsBtn = [...d.querySelectorAll("button")].find(b => /^Sections \(/.test(b.textContent.trim()));
   click(sectionsBtn); await wait(300);
   const picker = d.getElementById("report-added-picker");
-  ok(picker && /1 of 1 included/.test(picker.textContent), "Report: the Sections panel lists the added section as included");
+  ok(picker && /1 of 1 in the report/.test(picker.textContent), "Report: the Sections panel lists the added section as included");
   const incBox = picker && picker.querySelector('input[type="checkbox"]');
   click(incBox); await wait(400);
   ok(!d.getElementById("report-added"), "Report: unticking it takes it out of the report");

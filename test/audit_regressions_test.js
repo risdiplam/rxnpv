@@ -438,6 +438,54 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
     click(btnT("Workspace")); await wait(300);
   }
 
+  // ── Save to case: kept in the case, out of the report, reopens as left ──
+  {
+    const btnT = t => [...d.querySelectorAll("button")].find(b => b.textContent.trim() === t);
+    const stokeCase = () => JSON.parse(w.localStorage.getItem("rxnpv_cases_v1")).find(c => c.name === "Stoke Therapeutics — sample case");
+    const before = (stokeCase().pinnedResults || []).length;
+    click(btnT("Tools")); await wait(400);
+    click(btnT("Valuation")); await wait(150); click(btnT("Binary Event")); await wait(500);
+    const today = d.querySelector('input[aria-label="Today"]');
+    Object.getOwnPropertyDescriptor(w.HTMLInputElement.prototype, "value").set.call(today, "21.5"); today.dispatchEvent(new w.Event("input", { bubbles: true })); await wait(200);
+    const card = today.closest("[data-export-section]");
+    const saveBtn = [...card.querySelectorAll("button")].find(b => b.textContent.trim() === "Save to case");
+    ok(!!saveBtn, "Save to case: offered in a tool's Export menu");
+    click(saveBtn); await wait(1200);
+    const after = stokeCase().pinnedResults || [];
+    const item = after[after.length - 1];
+    ok(after.length === before + 1 && item.included === false && item.reopen && item.reopen.view === "tools" && item.reopen.tool === "binaryEvent", "Save to case: stored in the case, not in the report, with where it came from");
+    ok(item && item.reopen.inputs.some(f => f.label === "Today" && f.value === "21.5"), "Save to case: the inputs as they were are stored");
+    click(btnT("Workspace")); await wait(400);
+    ok(!d.querySelector('#casepanel-overview [data-export-section] button') || ![...d.querySelectorAll("#casepanel-overview button")].some(b => b.textContent.trim() === "Save to case"), "Save to case: not offered on Workspace sections (they are the case)");
+    click(d.getElementById("casetab-saved")); await wait(300);
+    const panelS = d.getElementById("casepanel-saved");
+    ok(/Binary event — implied probability/.test(panelS.textContent) && /Tools · Valuation · Binary Event/.test(panelS.textContent), "Saved tab: lists the item with its source");
+    const inRep = panelS.querySelector('input[type=checkbox][aria-label^="Include Binary event"]');
+    ok(inRep && !inRep.checked, "Saved tab: not in the PDF report until ticked");
+    click(inRep); await wait(300);
+    ok(stokeCase().pinnedResults.slice(-1)[0].included === true, "Saved tab: ticking puts it in the report");
+    click([...panelS.querySelectorAll("button")].find(b => /Open in Tools/.test(b.textContent))); await wait(900);
+    ok((d.querySelector('input[aria-label="Today"]') || {}).value === "21.5", "Saved tab: Open in Tools reopens the tool with the saved inputs (" + (d.querySelector('input[aria-label="Today"]') || {}).value + ")");
+    // The same from a Simulation panel: back to its tab with its inputs.
+    click(btnT("Simulation")); await wait(600);
+    click([...d.querySelectorAll("#ts-root button")].find(b => b.textContent.trim() === "Peak Sales")); await wait(500);
+    const price = d.getElementById("priceA");
+    Object.getOwnPropertyDescriptor(w.HTMLInputElement.prototype, "value").set.call(price, "250000"); price.dispatchEvent(new w.Event("input", { bubbles: true }));
+    const simSave = [...price.closest(".panel").querySelectorAll("button")].find(b => b.textContent.trim() === "Save to case");
+    ok(!!simSave, "Save to case: offered on a Simulation panel");
+    if (simSave) { click(simSave); await wait(1200); }
+    const simItem = stokeCase().pinnedResults.slice(-1)[0];
+    ok(simItem && simItem.reopen && simItem.reopen.view === "simulation" && simItem.reopen.simTab === "peakSales" && simItem.reopen.inputs.some(f => f.id === "priceA" && f.value === "250000"), "Save to case: a simulation is saved with its tab and inputs");
+    click([...d.querySelectorAll("#ts-root button")].find(b => b.textContent.trim() === "PK/PD")); await wait(300);
+    click(btnT("Workspace")); await wait(300);
+    click(d.getElementById("casetab-saved")); await wait(300);
+    const simOpen = [...d.getElementById("casepanel-saved").querySelectorAll("button")].find(b => /Open in Simulation/.test(b.textContent));
+    click(simOpen); await wait(900);
+    ok((d.getElementById("priceA") || {}).value === "250000", "Saved tab: Open in Simulation returns to Peak Sales with the saved inputs");
+    click(btnT("Workspace")); await wait(300);
+    click(d.getElementById("casetab-overview")); await wait(200);
+  }
+
   // ── Assumptions section list: states come from the data, links are live ──
   {
     const find = (groups, id) => { for (const g of groups) for (const i of g.items) if (i.id === id) return i; return null; };

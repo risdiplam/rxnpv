@@ -225,7 +225,7 @@ function CaseFilledNote({ activeCase, filled }) {
   const h = React.createElement;
   const list = (filled || []).filter(Boolean);
   if (!activeCase || !list.length) return null;
-  return h("div", { className: "case-filled" }, "Started from " + activeCase.name + ": " + list.join(", ") + ". Type over any of it to use your own.");
+  return h("div", { className: "case-filled", "data-no-export": "" }, "Started from " + activeCase.name + ": " + list.join(", ") + ". Type over any of it to use your own.");
 }
 
 // ── Working in: the case every tool and simulation is tuned to ─────────────
@@ -295,6 +295,62 @@ const ReportContext = (typeof React !== "undefined" && React.createContext) ? Re
 
 const SNAPSHOT_MAX_STORED_BYTES = 400000;
 const PINNED_MAX_PER_CASE_V2 = 40;
+
+// ── Saving a tool's work into the case ────────────────────────────────────
+// A saved item is the same snapshot "+ Report" stores (theCase.pinnedResults),
+// plus `reopen`: which tool or simulation it came from and the inputs as they
+// were, so it can be opened again exactly as left. "Save to case" stores it
+// out of the report (included: false); "+ Report" stores it in. One list, so a
+// saved analysis is always one tick away from the PDF.
+// Inputs are keyed by id where the element has one (the Simulation side) and
+// by aria-label otherwise (the React tools); anything keyed neither way is
+// skipped rather than guessed at.
+function captureSectionInputs(root) {
+  if (!root) return [];
+  const out = [];
+  root.querySelectorAll("input, select, textarea").forEach(el => {
+    if (el.closest("[data-no-export]") || el.type === "file" || el.type === "button") return;
+    const id = el.id && !/^xm-/.test(el.id) ? el.id : null;
+    const label = el.getAttribute("aria-label");
+    if (!id && !label) return;
+    out.push({ id: id || undefined, label: id ? undefined : label, value: el.type === "checkbox" ? undefined : el.value, checked: el.type === "checkbox" ? el.checked : undefined });
+  });
+  return out.slice(0, 200);
+}
+function applySavedInputs(container, inputs) {
+  if (!container || !inputs) return 0;
+  let n = 0;
+  inputs.forEach(f => {
+    const el = f.id ? container.querySelector("#" + CSS.escape(f.id)) : Array.prototype.find.call(container.querySelectorAll("input, select, textarea"), e => e.getAttribute("aria-label") === f.label);
+    if (!el || el.disabled) return;
+    if (el.type === "checkbox") { if (f.checked != null && el.checked !== f.checked) { el.click(); n++; } return; }
+    if (f.value == null || el.value === f.value) return;
+    const proto = el.tagName === "SELECT" ? HTMLSelectElement.prototype : el.tagName === "TEXTAREA" ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+    Object.getOwnPropertyDescriptor(proto, "value").set.call(el, f.value);
+    el.dispatchEvent(new Event("input", { bubbles: true }));
+    el.dispatchEvent(new Event("change", { bubbles: true }));
+    n++;
+  });
+  return n;
+}
+// Where a section lives, for reopening it: a Tools tool (by id) or a
+// Simulation tab. Workspace sections are the case itself and need no reopen.
+function reopenInfoFor(block) {
+  let n = block;
+  while (n && n.getAttribute) {
+    const v = n.getAttribute("data-view");
+    if (v === "tools") {
+      const t = n.getAttribute("data-tool-id");
+      return t ? { view: "tools", tool: t, inputs: captureSectionInputs(block) } : null;
+    }
+    if (v === "simulation") {
+      const tab = typeof activeTab !== "undefined" ? activeTab : null;
+      return tab ? { view: "simulation", simTab: tab, simSub: tab === "trialStats" && typeof activeStatsSubtab !== "undefined" ? activeStatsSubtab : null, inputs: captureSectionInputs(block) } : null;
+    }
+    n = n.parentNode;
+  }
+  return null;
+}
 
 function exportContextOf(el) {
   let n = el;
@@ -449,8 +505,37 @@ function ExportBar({ scope, title, heading, reportSection, source }) {
     // Re-read once more after the async snapshot, for the same reason.
     const src2 = liveSource();
     const fresh = (src2.cases || []).find(c => c.id === targetId) || live;
-    src2.updateCase({ ...fresh, pinnedResults: pinnedResultsOf(fresh).concat([r.pin]), updatedAt: Date.now() });
+    const reopen = reopenInfoFor(b);
+    src2.updateCase({ ...fresh, pinnedResults: pinnedResultsOf(fresh).concat([reopen ? { ...r.pin, reopen } : r.pin]), updatedAt: Date.now() });
     flash({ tone: "ok", text: "Added to " + possessive(fresh.name || "case") + " report", caseId: fresh.id }, 9000);
+  };
+
+  // "Save to case": the same snapshot, kept in the case's Saved tab and out of
+  // the report until ticked in. Offered only in Tools and Simulation — a
+  // Workspace section is the case already.
+  const savable = (() => { let n = ref.current; while (n && n.getAttribute) { const v = n.getAttribute("data-view"); if (v) return v === "tools" || v === "simulation"; n = n.parentNode; } return false; })();
+  const doSave = async () => {
+    const src = liveSource();
+    const live = src && (src.cases || []).find(c => c.id === targetId);
+    if (!src || !live) return;
+    if (pinnedResultsOf(live).length >= PINNED_MAX_PER_CASE_V2) {
+      flash({ tone: "err", text: possessive(live.name || "This case") + " saved items are full (" + PINNED_MAX_PER_CASE_V2 + ") — remove one from its Saved tab first." }, 8000);
+      return;
+    }
+    const b = block();
+    setBusy("save");
+    const r = await buildSectionSnapshot(b, { title: blockTitle(), source: source || exportContextOf(b), heading: isChart && heading !== false ? blockTitle() : null });
+    setBusy(null);
+    if (!r.ok) { flash({ tone: "err", text: r.error }, 6000); return; }
+    if (r.pin.html.length > SNAPSHOT_MAX_STORED_BYTES) {
+      flash({ tone: "err", text: "That " + noun + " is too large to save (" + Math.round(r.pin.html.length / 1024) + "KB). Export it as a PDF instead." }, 8000);
+      return;
+    }
+    const src2 = liveSource();
+    const fresh = (src2.cases || []).find(c => c.id === targetId) || live;
+    const reopen = reopenInfoFor(b);
+    src2.updateCase({ ...fresh, pinnedResults: pinnedResultsOf(fresh).concat([{ ...r.pin, included: false, savedTo: "case", reopen: reopen || undefined }]), updatedAt: Date.now() });
+    flash({ tone: "ok", text: "Saved to " + (fresh.name || "the case") + " — see its Saved tab" }, 9000);
   };
 
   const btn = (text, kind, onClick, tip, extra) => h("button", Object.assign({
@@ -522,6 +607,10 @@ function ExportBar({ scope, title, heading, reportSection, source }) {
         isChart && hasSvg && menuBtn("SVG", "svg", () => doExport("svg"), "Just this chart as an editable vector SVG")),
       h("div", { className: "xm-group" },
         h("div", { className: "xm-label" }, "Collect"),
+        savable && menuBtn("Save to case", "save", noCase ? undefined : doSave,
+          noCase ? "Saved work belongs to a case — create one in Workspace first"
+            : "Keep " + (isChart ? "this chart" : "this result") + " in " + possessive(target && target.name) + " Saved tab, with its inputs, so you can open it again later. Not added to the PDF until you tick it in.",
+          noCase ? { disabled: true, className: "xm-item is-off" } : null),
         menuBtn(reportSection ? (inReport ? "✓ In report" : "+ Report") : "+ Report", "report",
           noCase ? undefined : doReport,
           noCase ? "Reports belong to a case — create one in Workspace first, then sections and charts can be added to its report"

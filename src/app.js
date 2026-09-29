@@ -105,6 +105,18 @@ function App() {
   // even when the target tab is the same as an earlier request.
   const [toolsNavRequest, setToolsNavRequest] = React.useState(null);
   const navigateToTools = (tab) => { setToolsNavRequest({ tab, requestId: Date.now() }); setView("tools"); };
+  // Reopen a saved analysis in the tool or simulation it came from.
+  const reopenSaved = (reopen) => {
+    if (!reopen) return;
+    if (reopen.view === "tools") { setToolsNavRequest({ tab: reopen.tool, restore: reopen.inputs, requestId: Date.now() }); setView("tools"); }
+    else if (reopen.view === "simulation") {
+      setView("simulation");
+      let tries = 0;
+      const go = () => { if (typeof simOpenSaved === "function" && simOpenSaved(reopen)) return; if (++tries < 20) setTimeout(go, 100); };
+      setTimeout(go, 50);
+    }
+    window.scrollTo(0, 0);
+  };
 
   React.useEffect(() => { setSaveFailed(!saveCases(cases)); }, [cases]);
   React.useEffect(() => {
@@ -261,11 +273,12 @@ function App() {
                     style: { padding: "7px 14px", borderRadius: 8, border: "none", background: "var(--teal-fill)", color: "var(--on-teal)", fontFamily: "var(--sans)", fontSize: 12.5, fontWeight: 600, cursor: "pointer", display: "inline-flex", alignItems: "center" } },
                     "Generate Report",
                     (() => {
-                      const n = pinnedResultsOf(activeCase).length;
+                      // Items saved to the case but not ticked into the report don't count.
+                      const n = pinnedResultsOf(activeCase).filter(p => p.included !== false).length;
                       return n ? h("span", { style: { marginLeft: 8, padding: "1px 7px", borderRadius: 10, background: "rgba(255,255,255,0.22)", fontSize: 11, fontWeight: 500 } }, n + " added") : null;
                     })())
                 ),
-                h(CaseView, { theCase: activeCase, onChange: updateCase, onDelete: () => deleteCase(activeCase.id), onNavigateToTools: navigateToTools })
+                h(CaseView, { theCase: activeCase, onChange: updateCase, onDelete: () => deleteCase(activeCase.id), onNavigateToTools: navigateToTools, onReopenSaved: reopenSaved })
               )
             : h("div", { style: { textAlign: "center", padding: "80px 20px", color: "var(--ink-3)" } },
                 h("div", { style: { fontFamily: "var(--display)", fontSize: 20, marginBottom: 8, color: "var(--ink-2)" } }, "No case open"),

@@ -33,7 +33,7 @@ const REPORT_SECTIONS = [
   // because adding one is an explicit act. The id stays "pinned" so existing
   // cases keep their saved choice; which added sections appear, and in what
   // order, is chosen per item in the Sections panel.
-  { id: "pinned",       label: "Added sections",           defaultOn: true,  group: "Appendices" }
+  { id: "pinned",       label: "Saved to this case",           defaultOn: true,  group: "Appendices" }
 ];
 
 function ReportView({ theCase, onBack, updateCase }) {
@@ -183,7 +183,7 @@ function ReportView({ theCase, onBack, updateCase }) {
             style: { padding: "1px 6px", minWidth: 26, minHeight: 26, borderRadius: 4, border: "1px solid " + rpt.rule, background: "transparent", color: disabled ? rpt.rule : rpt.ink2, fontFamily: "var(--mono)", fontSize: 10, cursor: disabled ? "default" : "pointer" } }, label);
           return h("div", { id: "report-added-picker", style: { marginTop: 12, paddingTop: 10, borderTop: "1px solid " + rpt.rule } },
             h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: rpt.ink3, marginBottom: 6 } },
-              "Added sections (" + pins.filter(p => p.included !== false).length + " of " + pins.length + " included · up to " + PINNED_MAX_PER_CASE_V2 + ")"),
+              "Saved to this case (" + pins.filter(p => p.included !== false).length + " of " + pins.length + " in the report · up to " + PINNED_MAX_PER_CASE_V2 + ")"),
             !pins.length && h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: rpt.ink3, lineHeight: 1.6 } },
               "None yet. Every section in Tools, Simulation, the Reference Sheet, Portfolio and the Workspace has a “+ Report” button — each one you click lands here, and you choose and order them."),
             h("div", { style: { display: "flex", flexDirection: "column", gap: 4 } },

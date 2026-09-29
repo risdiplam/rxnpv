@@ -44,7 +44,7 @@ function SimulationView({ cases, updateCase, activeCase, onSelectCase, onOpenWor
     }
   }, []);
 
-  return h("div", { "data-export-context": "Simulation", style: { minHeight: "100vh" } },
+  return h("div", { "data-view": "simulation", "data-export-context": "Simulation", style: { minHeight: "100vh" } },
     h("div", { className: "sim-case-bar", style: { maxWidth: "var(--app-max-width)", margin: "0 auto", padding: "20px 28px 0" } },
       h(CaseContextBar, { cases, activeCase, onSelectCase, onOpenWorkspace })),
     h("div", { id: "ts-root", ref: containerRef })

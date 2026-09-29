@@ -74,14 +74,23 @@ function ToolsView({ cases, updateCase, activeCase, navRequest, onSelectCase, on
   // Cross-view navigation arriving from outside ToolsView (e.g. Partnership
   // Economics -> Licensing Comps). requestId changes on every request even
   // if the target tab is the same as before, so this fires every time.
+  // A saved analysis being reopened carries its inputs; they are applied once
+  // the tool has rendered (and again shortly after, for tools that fill from
+  // the case on mount and would otherwise write over them).
+  const rootRef = React.useRef(null);
   React.useEffect(() => {
     if (navRequest && navRequest.tab) setTab(navRequest.tab);
+    if (navRequest && navRequest.restore) {
+      const apply = () => applySavedInputs(rootRef.current, navRequest.restore);
+      const t1 = setTimeout(apply, 60), t2 = setTimeout(apply, 400);
+      return () => { clearTimeout(t1); clearTimeout(t2); };
+    }
   }, [navRequest && navRequest.requestId]);
 
   const bench = workbenchForTool(tab);
 
   const toolEntry = bench.tools.find(([id]) => id === tab);
-  return h("div", { "data-export-context": "Tools · " + bench.label + (toolEntry ? " · " + toolEntry[1] : ""), style: { maxWidth: "var(--app-max-width)", margin: "0 auto", padding: "24px 28px 60px" } },
+  return h("div", { ref: rootRef, "data-view": "tools", "data-tool-id": tab, "data-export-context": "Tools · " + bench.label + (toolEntry ? " · " + toolEntry[1] : ""), style: { maxWidth: "var(--app-max-width)", margin: "0 auto", padding: "24px 28px 60px" } },
     h(CaseContextBar, { cases, activeCase, onSelectCase, onOpenWorkspace }),
     h("div", { style: { display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 } },
       TOOL_WORKBENCHES.map(w => h("button", { key: w.id,

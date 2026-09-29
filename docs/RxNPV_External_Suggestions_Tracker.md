@@ -860,3 +860,13 @@ All three batch-2 mockups are built.
 - Company revenue and P&L charts and their "Peak … in year 12" lines used year indexes while the new year-by-year chart used calendar years; all now use calendar years.
 - Compare Trials said "against weeks 14 and 14"; repeated weeks now read "week 14 for both the others".
 - The wind-down field stretched full width when it wrapped; it now matches the fields above it.
+
+## Phase 42 — Every feature tuned to the open case
+
+✅ From the user: "if you're within the stoke case, every feature is tuned to that case (aside from stuff that is broadly applicable like references and cues)", and "that way you can also save those into a case if you want."
+
+**1. One open case everywhere.** A "Working in" bar tops Tools and Simulation and switches the app's single open case (the one the Workspace shows). Tools used to carry their own case dropdowns, set once when the tool opened — so a tool could sit on a different case from the rest or stay on an old one after a switch. They all follow the bar now; the dropdown became a read-only chip so an exported card still names its case.
+
+**2. Tools start from the case.** Trial tools open on the program's trials (a new "Key trials" field; the sample carries EMPEROR), Target Dossier on its target gene (new field; SCN1A), Literature and Asset Program on the drug, Trial Explorer on the indication and phase, company tools on the ticker, Binary Event on the price / value if approved / failure floor / odds, Diluted Market Cap and M&A Premium on the case's capital structure and fair value, and the Peak Sales simulation on the Detailed revenue build (population × eligible, share × adherence spread Bear to Bull, US net price — for Stoke 12,560 / 75% / 60% / 35.7–66.3% / $300,000). A typed value is never overwritten; each tool says what came from the case. Tools about a drug on the market (FDA Lookup, Exclusivity, Launch tracker) stay blank until the program is approved or filed. The statistics calculators, Meta-Analysis, PK/PD, Reference Sheet and Portfolio stay case-independent.
+
+**3. Save to case.** Every Tools and Simulation result has "Save to case" in its Export menu. It lands in a new Saved tab in the case — out of the PDF until ticked in — with its inputs, so "Open in Tools / Simulation" puts the tool back exactly as it was. "+ Report" items appear there too: one list of saved work per case.

@@ -1642,6 +1642,17 @@ function peakSalesUntouched() {
   if (!peakSalesFilled) return true;
   return Object.keys(peakSalesFilled).every(id => { const e = document.getElementById(id); return !e || String(e.value) === String(peakSalesFilled[id]); });
 }
+// Opens a saved Simulation analysis: its tab (and Trial Statistics sub-tool),
+// then the inputs as they were saved. The results need a fresh run.
+function simOpenSaved(reopen) {
+  if (!reopen || !document.getElementById('ts-root')) return false;
+  activeTab = reopen.simTab || activeTab;
+  if (reopen.simSub) activeStatsSubtab = reopen.simSub;
+  renderApp();
+  setTimeout(() => applySavedInputs(document.getElementById('ts-root'), reopen.inputs), 50);
+  return true;
+}
+
 // Called by SimulationView when the open case changes.
 function simCaseChanged() {
   if (activeTab === 'peakSales' && document.getElementById('popA') && peakSalesUntouched()) renderApp();

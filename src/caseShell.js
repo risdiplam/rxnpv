@@ -121,9 +121,45 @@ function assumptionNavSections(theCase, program) {
   return groups;
 }
 
-const CASE_TABS = [["overview", "Overview"], ["assumptions", "Assumptions"], ["scenarios", "Scenarios"], ["evidence", "Evidence"], ["calibration", "Calibration"]];
+const CASE_TABS = [["overview", "Overview"], ["assumptions", "Assumptions"], ["scenarios", "Scenarios"], ["evidence", "Evidence"], ["calibration", "Calibration"], ["saved", "Saved"]];
 
-function CaseView({ theCase, onChange, onDelete, onNavigateToTools }) {
+// ── Saved: work kept in this case from Tools and Simulation ────────────────
+// Everything saved with "Save to case" or added with "+ Report" — one list
+// (theCase.pinnedResults). Each shows what it is and where it came from, can
+// be ticked into or out of the PDF report, reopened in its tool with the
+// inputs as they were, previewed, or removed.
+function SavedPanel({ theCase, onChange, onReopen }) {
+  const h = React.createElement;
+  const [openId, setOpenId] = React.useState(null);
+  const pins = pinnedResultsOf(theCase).slice().reverse();
+  const save = next => onChange({ ...theCase, pinnedResults: next, updatedAt: Date.now() });
+  const all = pinnedResultsOf(theCase);
+  const fmtWhen = t => t ? new Date(t).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" }) : "";
+  if (!pins.length) return h("div", { className: "saved-empty" },
+    h("div", { style: { fontFamily: "var(--display)", fontSize: 16, fontWeight: 600, color: "var(--ink-1)", marginBottom: 6 } }, "Nothing saved to this case yet"),
+    h("div", { className: "prose", style: UI.caption }, "In Tools or Simulation, open a result's Export menu and choose “Save to case”. It lands here with the inputs you used, so you can open it again exactly as you left it, and tick it into the PDF report when you want it there."));
+  return h("div", null,
+    h("div", { style: { fontFamily: "var(--display)", fontSize: 16, fontWeight: 600, color: "var(--ink-1)", marginBottom: 4 } }, "Saved to this case"),
+    h("div", { className: "prose", style: { ...UI.caption, marginBottom: 14 } }, pins.length + " saved · " + all.filter(p => p.included !== false).length + " in the PDF report · up to " + PINNED_MAX_PER_CASE_V2 + ". Newest first."),
+    pins.map(p => h("div", { key: p.id, className: "saved-item" },
+      h("div", { className: "saved-row" },
+        h("div", { style: { minWidth: 0, flex: "1 1 260px" } },
+          h("div", { className: "saved-title" }, p.title || "Untitled section"),
+          h("div", { className: "saved-meta" }, [p.source, fmtWhen(p.capturedAt)].filter(Boolean).join(" · "))),
+        h("label", { className: "saved-report" },
+          h("input", { type: "checkbox", checked: p.included !== false, "aria-label": "Include " + (p.title || "this section") + " in the PDF report",
+            onChange: () => save(all.map(x => x === p ? { ...x, included: x.included === false } : x)) }),
+          "In the PDF report"),
+        p.reopen && onReopen && h("button", { type: "button", className: "saved-btn", onClick: () => onReopen(p.reopen),
+          title: "Open the " + (p.reopen.view === "simulation" ? "simulation" : "tool") + " with the inputs you saved; run it again for fresh results" }, "Open in " + (p.reopen.view === "simulation" ? "Simulation" : "Tools") + " →"),
+        h("button", { type: "button", className: "saved-btn", "aria-expanded": openId === p.id, onClick: () => setOpenId(openId === p.id ? null : p.id) }, openId === p.id ? "Hide" : "Show"),
+        h(ConfirmXButton, { title: "Remove " + (p.title || "this item") + " from this case", label: "Remove", onConfirm: () => save(all.filter(x => x !== p)) })),
+      openId === p.id && h("div", { className: "saved-preview" }, p.kind === "html"
+        ? h(ReportSnapshot, { pin: p, dark: document.documentElement.getAttribute("data-theme") === "dark" })
+        : p.dataUrl ? h("img", { src: p.dataUrl, alt: p.title || "Saved section", style: { maxWidth: "100%" } }) : null))));
+}
+
+function CaseView({ theCase, onChange, onDelete, onNavigateToTools, onReopenSaved }) {
   const h = React.createElement;
   const [activeProgId, setActiveProgId] = React.useState(theCase.programs[0] && theCase.programs[0].id);
   const [confirmingDelete, setConfirmingDelete] = React.useState(false);
@@ -327,7 +363,8 @@ function CaseView({ theCase, onChange, onDelete, onNavigateToTools }) {
           "aria-controls": "casepanel-" + id, className: "case-tab" + (tab === id ? " on" : ""), onClick: () => setTab(id) },
         label,
         id === "evidence" && vs.flagCount > 0 && h("span", { className: "case-tab-count warn", title: vs.flagCount + " input" + (vs.flagCount > 1 ? "s" : "") + " worth a second look" }, String(vs.flagCount)),
-        id === "calibration" && openPredictions > 0 && h("span", { className: "case-tab-count", title: openPredictions + " open prediction" + (openPredictions > 1 ? "s" : "") }, String(openPredictions))))),
+        id === "calibration" && openPredictions > 0 && h("span", { className: "case-tab-count", title: openPredictions + " open prediction" + (openPredictions > 1 ? "s" : "") }, String(openPredictions)),
+        id === "saved" && pinnedResultsOf(theCase).length > 0 && h("span", { className: "case-tab-count", title: pinnedResultsOf(theCase).length + " saved" }, String(pinnedResultsOf(theCase).length))))),
 
     panel("overview",
       theCase.programs.length === 0 && h("div", { className: "empty-note" }, "This case has no programs yet. ",
@@ -471,6 +508,7 @@ function CaseView({ theCase, onChange, onDelete, onNavigateToTools }) {
     panel("calibration",
       theCase.programs.length > 0 && programPicker(false),
       editorFor("calibration")
-    )
+    ),
+    panel("saved", tab === "saved" && h(SavedPanel, { theCase, onChange: update, onReopen: onReopenSaved }))
   );
 }
