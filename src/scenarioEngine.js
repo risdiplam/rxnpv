@@ -5,10 +5,17 @@
 // share by construction — this is not an approximation), then costs/PoS/DCF
 // are re-run fresh on the rescaled figures so nothing compounds incorrectly.
 // ════════════════════════════════════════════════════════════════════════════
+// Bear and Bull vary the commercial assumptions and the odds, not the
+// discount rate. The rate is the company's cost of capital — market risk —
+// and does not change because a drug's prospects look worse; failure is
+// already in the odds. Raising it in Bear (it used to add 5 points, and cut
+// 2 in Bull) charged the same risk a second time. The field stays for anyone
+// who wants it; Sensitivity is the place to test the rate itself.
+// (docs/RxNPV_rNPV_Methodology_Review.md §0)
 const SCENARIO_PRESETS = {
-  bear: { label: "Bear", shareMultiplierPct: 70, posMultiplierPct: 70, discountRateAddPct: 5, color: "var(--red)" },
+  bear: { label: "Bear", shareMultiplierPct: 70, posMultiplierPct: 70, discountRateAddPct: 0, color: "var(--red)" },
   base: { label: "Base", shareMultiplierPct: 100, posMultiplierPct: 100, discountRateAddPct: 0, color: "var(--slate)" },
-  bull: { label: "Bull", shareMultiplierPct: 130, posMultiplierPct: 130, discountRateAddPct: -2, color: "var(--green)" }
+  bull: { label: "Bull", shareMultiplierPct: 130, posMultiplierPct: 130, discountRateAddPct: 0, color: "var(--green)" }
 };
 
 // Case-level Base-PoS control: a multiplier on top of whatever posMultiplierPct

@@ -582,7 +582,7 @@ function useValuationSections({ theCase, onChange, goToTab }) {
               h(BenchField, { label: "PoS multiplier", value: scenarioOv[key].posMultiplierPct, onChange: v => setScenarioOv(key, { posMultiplierPct: v }), suffix: "%",
                 bench: { value: SCENARIO_PRESETS[key].posMultiplierPct, source: "Standard benchmark — lower further if a bad outcome should mean worse odds than a flat 30% haircut" } }),
               h(BenchField, { label: "Discount rate adjustment", value: scenarioOv[key].discountRateAddPct, onChange: v => setScenarioOv(key, { discountRateAddPct: v }), suffix: "pp",
-                bench: { value: SCENARIO_PRESETS[key].discountRateAddPct, source: "Standard benchmark, added to your base discount rate" } }),
+                bench: { value: SCENARIO_PRESETS[key].discountRateAddPct, source: "Normally 0: the discount rate is the company's cost of capital, which does not change with the drug's prospects — failure is already in the odds, so moving the rate here charges that risk twice. Test the rate itself in Tools → Sensitivity." } }),
               (tv.enabled && (tv.method || "exitMultiple") === "exitMultiple") && h(BenchField, { label: "Exit multiple override", value: scenarioOv[key].exitMultiple, onChange: v => setScenarioOv(key, { exitMultiple: v }), suffix: "x",
                 help: "Optional — overrides the case's exit multiple just for " + label + ", instead of using the same multiple across all three scenarios." })
             ),
