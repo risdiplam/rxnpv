@@ -74,6 +74,53 @@ function distributeRnDCostByYear(riskAdjItems, launchYearOffset) {
   return out;
 }
 
+// ── How likely the company is still pursuing its programs, year by year ──
+// For each calendar year t (the twelve months [t, t+1)):
+//   active   = the share of that year the company is still running a
+//              program — still in development, launched, or inside the
+//              wind-down after a failure (windDownYears, the Corporate G&A
+//              card's "wind-down after a failed readout", blank = 1)
+//   launched = the probability at least one program has launched by then
+// Each program's stage gates come from its own risk-adjusted items: a gate
+// ends when its stage does, on the same (override-scaled, squeezed-to-fit)
+// calendar distributeRnDCostByYear bills R&D on, and fails with probability
+// reach(this stage) − reach(next) (the last against posToLaunch). Programs
+// are treated as independent. Used to charge corporate overhead only while
+// the company exists and to weight projected raises by the odds they happen
+// — practitioners weight overhead by the odds of still being in development,
+// exactly as they weight R&D (docs/RxNPV_rNPV_Methodology_Review.md).
+function computeCompanyActiveByYear(programs, windDownYears, totalYears) {
+  totalYears = totalYears || 25;
+  const W = windDownYears != null && windDownYears !== "" && isFinite(Number(windDownYears)) ? Math.max(0, Number(windDownYears)) : 1;
+  const perProgram = programs.map(p => {
+    const items = p.riskAdjItems || [];
+    const L = Math.max(0, Math.round(p.launchYearOffset || 0));
+    const window = Math.max(1, L);
+    const timeline = items.reduce((a, i) => a + (i.years || 0), 0);
+    const squeeze = timeline > window ? window / timeline : 1;
+    let cum = 0;
+    const gates = items.map((it, i) => {
+      cum += (it.years || 0) * squeeze;
+      const reach = it.posToReachStage != null ? it.posToReachStage : 1;
+      const next = i + 1 < items.length ? (items[i + 1].posToReachStage != null ? items[i + 1].posToReachStage : 1) : (p.posToLaunch != null ? p.posToLaunch : 1);
+      return { end: cum, failProb: Math.max(0, reach - next) };
+    });
+    const pos = p.posToLaunch != null ? p.posToLaunch : 1;
+    return { L, pos, gates };
+  });
+  const out = [];
+  for (let t = 0; t < totalYears; t++) {
+    let notActive = 1, notLaunched = 1;
+    perProgram.forEach(pp => {
+      const stopped = pp.gates.reduce((a, g) => a + g.failProb * (1 - Math.max(0, Math.min(1, g.end + W - t))), 0);
+      notActive *= Math.min(1, Math.max(0, stopped));
+      notLaunched *= 1 - (t >= pp.L ? pp.pos : 0);
+    });
+    out.push({ active: perProgram.length ? 1 - notActive : 0, launched: perProgram.length ? 1 - notLaunched : 0 });
+  }
+  return out;
+}
+
 // ── Company-level risk-adjusted cash flow by calendar year ──
 // programs: [{ id, launchYearOffset, pnl, riskAdjItems, posToLaunch }]
 function computeCompanyRiskAdjustedCF(programs, corporateGA, totalYears) {

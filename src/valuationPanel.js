@@ -533,7 +533,13 @@ function useValuationSections({ theCase, onChange, goToTab }) {
           "Model dilution path to launch"),
         dpInput.enabled && h("div", null,
           h("div", { style: UI.intro },
-            "Projects when cash would run out and models a raise there, at current price less the assumed discount — repeated as needed through to launch. Fixes the single most common retail valuation error: fair value per share on today's share count, without the dilution getting there usually costs."),
+            "Projects when cash would run out and models a raise there, repeated as needed. Each raise is counted with the odds it actually happens (none after a failed readout), and its cash goes into the value together with its new shares — the cash flows already pay for what the raises fund, so shares alone would charge those costs twice. Priced at this case's own value, raises leave value per share unchanged (the practitioners' convention); priced at today's price less a discount, they add value if investors pay more than the model thinks a share is worth, and cost value if they pay less."),
+          h("div", { style: { display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 10 } },
+            h("span", { style: UI.caption }, "Price raises at"),
+            h("select", { "aria-label": "Price projected raises at", value: dpInput.priceBasis === "fair" ? "fair" : "market", onChange: e => setDP({ priceBasis: e.target.value }),
+              style: { padding: "4px 8px", minHeight: 28, borderRadius: 5, border: "1px solid var(--rule)", background: "var(--surface)", color: "var(--ink-1)", fontFamily: "var(--mono)", fontSize: 12 } },
+              h("option", { value: "market" }, "today's price, less the discount"),
+              h("option", { value: "fair" }, "this case's own value (value-neutral)"))),
           h("div", { style: { display: "flex", gap: 16, flexWrap: "wrap" } },
             h(MillionsField, { label: "Minimum cash buffer", value: dpInput.minCashBufferM, onChange: v => setDP({ minCashBufferM: v }) }),
             h(BenchField, { label: "Each raise covers", value: dpInput.targetRunwayMonths, onChange: v => setDP({ targetRunwayMonths: v }), suffix: "mo",
@@ -544,9 +550,11 @@ function useValuationSections({ theCase, onChange, goToTab }) {
               help: "Ongoing dilution from stock-based comp, independent of whether a raise happens that year." })
           ),
           preview && h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-3)", marginTop: 10, lineHeight: 1.6 } },
-            "Base case: ", h("b", { style: { color: "var(--ink-2)" } }, "$" + preview.totalRaisedM.toFixed(0) + "M"), " raised across the path to launch, diluted shares growing from ",
+            "Base case, if the company carries on: ", h("b", { style: { color: "var(--ink-2)" } }, "$" + preview.totalRaisedM.toFixed(0) + "M"), " raised across the path to launch. Weighted by the odds each raise happens, ",
+            h("b", { style: { color: "var(--ink-2)" } }, "$" + ((preview.expectedCashRaised || 0) / 1e6).toFixed(0) + "M"), " of cash comes in and diluted shares grow from ",
             h("b", { style: { color: "var(--ink-2)" } }, Math.round(startingShares || 0).toLocaleString()), " to ",
-            h("b", { style: { color: "var(--ink-2)" } }, Math.round(preview.finalDilutedShares).toLocaleString()), " by then.")
+            h("b", { style: { color: "var(--ink-2)" } }, Math.round(preview.finalDilutedShares).toLocaleString()),
+            preview.priceBasis === "fair" ? ", at this case's own value per share." : ", at $" + (preview.raisePrice || 0).toFixed(2) + " a share.")
         )
       );
     })()),

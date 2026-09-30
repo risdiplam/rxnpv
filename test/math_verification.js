@@ -66,7 +66,7 @@ const EXPORTS = [
   "SCENARIO_PRESETS", "getEffectiveScenarioPreset", "applyBasePosAdjustment",
   "computeProgramValuation", "computeCaseValuation", "baseCaseFairValue", "computeProjectionRows", "computeSensitivityDrivers", "computeProgramRiskWaterfall",
   "computeEffectivePoS", "computeRnDToLaunch", "launchCurveForYears", "resolveLaunchYearOffset",
-  "computeFullCaseMonteCarlo", "solveImpliedPoSMultiplier", "solveImpliedVariable", "computeEquityBridgeSteps", "computeRedFlags", "quickModeTerritoryMismatch",
+  "computeFullCaseMonteCarlo", "solveImpliedPoSMultiplier", "solveImpliedVariable", "computeCompanyActiveByYear", "computeEquityBridgeSteps", "computeRedFlags", "quickModeTerritoryMismatch",
   "computePortfolioSummary", "shrinkBinaryResponseRate", "shrinkHazardRatio",
   "BINARY_SHRINKAGE_FACTOR", "HR_SHRINKAGE_FACTOR",
   "MODALITY_OPTIONS", "getCogsBenchmark", "getErosionDefaults", "resolveErosionParams",
@@ -4536,6 +4536,37 @@ section("Stoke, the whole case recomputed from its inputs (Bear, Base, Bull)");
     near("Stoke " + key + ": fair value per share equals the rebuild", app.equity.perShare, perShare, 1e-6);
     near("Stoke " + key + ": and is $" + expectPS[key], perShare, expectPS[key], 5e-5);
   }
+}
+report();
+
+section("Dilution path: raises bring their cash, counted with the odds they happen");
+{
+  // PepGen, path on. Before: shares were added without the cash they raise,
+  // so the costs those raises fund were charged twice (Base $1.38 -> $0.57).
+  // Now each year's raise R_y is weighted by the odds the company is still
+  // going that year (a_y), and its cash comes in with its shares:
+  //   per share = (E + sum R_y a_y) / (S + sum R_y a_y / p)
+  const pg = JSON.parse(fs.readFileSync(path.join(__dirname, "fixtures", "pepgen_case.json"), "utf8"));
+  const base = api.getEffectiveScenarioPreset(pg, "base");
+  const off = api.computeCaseValuation(pg, base, "base", 14, pg.terminalValue);
+  const on = JSON.parse(JSON.stringify(pg)); on.dilutionPath.enabled = true;
+  const dp = api.computeDilutionPath(on, base, 14, { fairPrice: off.equity.perShare });
+  const vals = on.programs.map(p => api.computeProgramValuation(p, base, null));
+  const a = api.computeCompanyActiveByYear(vals, on.corporateGA.windDownYears, 25);
+  const cash = dp.path.filter(r => r.year <= dp.horizonYear).reduce((s, r) => s + r.raiseAmount * a[r.year].active, 0);
+  near("expected cash = each raise x the odds the company is still going", dp.expectedCashRaised, cash, 1);
+  near("PepGen gates: still going in year 3 is 1 - 0.632 = 0.368", a[3].active, api.computeEffectivePoS(pg.programs[0], base).posStages[0].pos, 1e-9);
+  const r = api.computeCaseValuation(on, base, "base", 14, pg.terminalValue);
+  const p = 2.34 * 0.85;
+  near("market price: per share = (E + cash) / (S + cash / p)", r.equity.perShare, (off.equity.equityValue + cash) / (off.equity.dilutedShares + cash / p), 1e-6);
+  ok("market price: the raises add value when investors pay more than the model's value ($1.99 > $1.38)", r.equity.perShare > off.equity.perShare);
+  const fair = JSON.parse(JSON.stringify(on)); fair.dilutionPath.priceBasis = "fair";
+  near("fair-value price: value per share is unchanged (value-neutral)", api.computeCaseValuation(fair, base, "base", 14, pg.terminalValue).equity.perShare, off.equity.perShare, 1e-9);
+  // Stoke needs no raise: switching the path on changes nothing.
+  const st = JSON.parse(fs.readFileSync(path.join(__dirname, "fixtures", "stoke_sample_case.json"), "utf8"));
+  const stOn = JSON.parse(JSON.stringify(st)); stOn.dilutionPath.enabled = true;
+  const sb = api.getEffectiveScenarioPreset(stOn, "base");
+  near("Stoke (no raise needed): unchanged with the path on", api.computeCaseValuation(stOn, sb, "base", 12, st.terminalValue).equity.perShare, api.computeCaseValuation(st, sb, "base", 12, st.terminalValue).equity.perShare, 1e-9);
 }
 report();
 

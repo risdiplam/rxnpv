@@ -276,8 +276,6 @@ function computeCaseValuation(theCase, scenario, scenarioKey, discountRateBasePc
   const capStruct = theCase.capitalStructure || { mode: "simple", dilutedSharesSimple: "" };
   let capResult = computeCapitalStructure({ ...capStruct, currentPrice: theCase.currentPrice });
   capResult = applyFutureRaise(capResult, theCase.futureRaise, theCase.currentPrice);
-  const dilutionPath = computeDilutionPath(theCase, scenario, discountRateBasePct);
-  if (dilutionPath.enabled) capResult = { ...capResult, dilutedShares: dilutionPath.finalDilutedShares };
   let equity = computeEquityValue(npvResult.npv, capResult);
 
   // Priority Review Voucher — tied to a SPECIFIC program's approval (that's
@@ -298,6 +296,7 @@ function computeCaseValuation(theCase, scenario, scenarioKey, discountRateBasePc
     const newEquityValue = equity.equityValue + partnershipContribution;
     equity = { ...equity, equityValue: newEquityValue, perShare: equity.dilutedShares > 0 ? newEquityValue / equity.dilutedShares : null, partnershipValueAdded: partnershipContribution };
   }
+  ({ equity, capResult } = applyDilutionPath(theCase, scenario, discountRateBasePct, equity, capResult));
 
   return { programVals, calendar, discountRateUsed: discountRate, npvResult, capResult, equity };
 }
@@ -342,6 +341,7 @@ function computeEquityBridgeSteps(theCase, result) {
   const convFace = cap.mode === "simple" ? 0 : numOr(cap.convFace, 0);
   if (convFace > 0 && !capR.convertsInTheMoney) steps.push({ key: "convertible", label: "Convertible notes (not converting)", value: convFace, sign: -1 });
   if (capR._futureRaiseAmount) steps.push({ key: "raise", label: "Modeled future raise", value: capR._futureRaiseAmount, sign: 1 });
+  if (capR._dilutionRaisedAmount) steps.push({ key: "dilution", label: "Projected raises (dilution path)", value: capR._dilutionRaisedAmount, sign: 1 });
   const eq = result.equity || {};
   if (eq.prvValueAdded) steps.push({ key: "prv", label: "PRV (risk-adj.)", value: eq.prvValueAdded, sign: 1 });
   if (eq.partnershipValueAdded) steps.push({ key: "partnership", label: "Partnership (upfront + milestones)", value: eq.partnershipValueAdded, sign: 1 });
@@ -794,8 +794,6 @@ function computeSimpleMultipleValuation(theCase, scenario, scenarioKey, multiple
   const capStruct = theCase.capitalStructure || { mode: "simple", dilutedSharesSimple: "" };
   let capResult = computeCapitalStructure({ ...capStruct, currentPrice: theCase.currentPrice });
   capResult = applyFutureRaise(capResult, theCase.futureRaise, theCase.currentPrice);
-  const dilutionPath2 = computeDilutionPath(theCase, scenario, discountRateBasePct);
-  if (dilutionPath2.enabled) capResult = { ...capResult, dilutedShares: dilutionPath2.finalDilutedShares };
   let equity = computeEquityValue(npv, capResult);
 
   // A PRV is granted on approval whichever method values the asset (NEW-001).
@@ -814,6 +812,7 @@ function computeSimpleMultipleValuation(theCase, scenario, scenarioKey, multiple
     const newEquityValue = equity.equityValue + partnershipContribution;
     equity = { ...equity, equityValue: newEquityValue, perShare: equity.dilutedShares > 0 ? newEquityValue / equity.dilutedShares : null, partnershipValueAdded: partnershipContribution };
   }
+  ({ equity, capResult } = applyDilutionPath(theCase, scenario, discountRateBasePct, equity, capResult));
 
   // Shape matches computeCaseValuation's return where a field has a real
   // equivalent (equity, capResult, programVals with peakRevenue) so existing
@@ -821,6 +820,22 @@ function computeSimpleMultipleValuation(theCase, scenario, scenarioKey, multiple
   // unmodified. `calendar` has no equivalent here — there's no year-by-year
   // cash flow to show — so callers that need it must guard its absence.
   return { programVals, npvResult: { npv }, capResult, equity };
+}
+
+// Projected raises on top of the valued equity: their expected cash and
+// their expected shares together (see computeDilutionPath). Applied after the
+// PRV and partnership value so a "fair value" raise price is the full value
+// per share, which leaves value per share exactly unchanged.
+function applyDilutionPath(theCase, scenario, discountRateBasePct, equity, capResult) {
+  const dp = computeDilutionPath(theCase, scenario, discountRateBasePct, { fairPrice: equity.perShare });
+  if (!dp.enabled) return { equity, capResult };
+  const cash = dp.expectedCashRaised || 0;
+  const newShares = dp.finalDilutedShares;
+  const equityValue = equity.equityValue + cash;
+  return {
+    equity: { ...equity, equityValue, dilutedShares: newShares, perShare: newShares > 0 ? equityValue / newShares : null, dilutionRaisedValue: cash },
+    capResult: { ...capResult, dilutedShares: newShares, _dilutionRaisedAmount: cash }
+  };
 }
 
 // ── Implied PoS: given the case's current price, solve backwards for what
@@ -1051,7 +1066,8 @@ function computeForwardRunway(theCase) {
 // but still passes the scenario through, so Bear's lower revenue assumption
 // naturally shows more post-launch dilution than Bull without any separate
 // "risk-adjusted dilution" machinery needed on top.
-function computeDilutionPath(theCase, scenario, discountRateBasePct) {
+function computeDilutionPath(theCase, scenario, discountRateBasePct, opts) {
+  opts = opts || {};
   const capStruct = theCase.capitalStructure || { mode: "simple", dilutedSharesSimple: "" };
   // Start from the post-manual-raise cap table, not the raw one. Callers
   // OVERWRITE dilutedShares with this function's result, so building from the
@@ -1089,7 +1105,17 @@ function computeDilutionPath(theCase, scenario, discountRateBasePct) {
   // a near-zero price that would issue an absurd number of shares for any
   // real dollar amount raised. Found via testing: with no price set, this
   // was producing billions of shares from a $257M raise.
-  const raisePrice = numOr(theCase.currentPrice, 0) * (1 - discount);
+  // Price of each projected raise. "market" (the default): today's price less
+  // the discount. "fair": this case's own value per share, which makes the
+  // raises value-neutral — the convention when a model already charges every
+  // cost it has to fund (opts.fairPrice, passed by the valuation).
+  const priceBasis = dp.priceBasis === "fair" ? "fair" : "market";
+  const raisePrice = priceBasis === "fair" && opts.fairPrice > 0 ? opts.fairPrice : numOr(theCase.currentPrice, 0) * (1 - discount);
+  // A raise only happens while the company is still pursuing its programs:
+  // one sized for after a failed readout never takes place. Weight each year's
+  // raise by the odds the company is still going then (risked programs).
+  const riskedVals = theCase.programs.map(p => computeProgramValuation(p, scenario, null));
+  const active = computeCompanyActiveByYear(riskedVals, (theCase.corporateGA || {}).windDownYears, 25);
 
   // The manual raise's proceeds are real cash on hand before any projected
   // raise, so the runway projection has to see them too — otherwise the model
@@ -1098,6 +1124,7 @@ function computeDilutionPath(theCase, scenario, discountRateBasePct) {
   let shares = capResult0.dilutedShares;
   const path = [];
   let totalRaisedM = 0;
+  let expectedCashToHorizon = 0;
 
   const launchOffsets = theCase.programs.map(p => resolveLaunchYearOffset(p));
   // +3 years past launch, not launch itself — every calendar year up to
@@ -1119,16 +1146,25 @@ function computeDilutionPath(theCase, scenario, discountRateBasePct) {
       const need = (minBuffer - balance) + monthlyBurn * targetMonths;
       raiseAmount = Math.max(0, need);
       if (raiseAmount > 0) {
-        shares += raiseAmount / raisePrice;
+        // Planned on the path where the company carries on (balance, sizing);
+        // counted in the valuation with the odds it happens (shares, cash).
+        const odds = active[y] ? active[y].active : 1;
+        shares += raiseAmount * odds / raisePrice;
         balance += raiseAmount;
         totalRaisedM += raiseAmount / 1e6;
+        if (y <= horizonYear) expectedCashToHorizon += raiseAmount * odds;
       }
     }
     path.push({ year: y, flow, balanceEnd: balance, dilutedShares: shares, raiseAmount });
   }
 
   const atHorizon = path[Math.min(horizonYear, path.length - 1)];
-  return { enabled: true, finalDilutedShares: atHorizon ? atHorizon.dilutedShares : shares, path, totalRaisedM, horizonYear };
+  // The cash the new shares bring in goes into equity WITH them. It used to
+  // be left out: the cash flows already charge the costs these raises pay
+  // for, so adding the shares alone charged those costs twice (PepGen fell
+  // from $1.38 to $0.57 with the path switched on).
+  return { enabled: true, finalDilutedShares: atHorizon ? atHorizon.dilutedShares : shares, path, totalRaisedM,
+    expectedCashRaised: expectedCashToHorizon, raisePrice, priceBasis, horizonYear };
 }
 
 // Structured red-flag checks — cross-references a case's own inputs against
