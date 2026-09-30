@@ -616,3 +616,13 @@ if (typeof module !== "undefined" && module.exports) {
     resultsRedFlags, trUnescape, trNum, trRate, trMonthsBetweenDates
   };
 }
+
+// A registered p-value as a phrase. Sponsors file them as "0.0123", "<0.001"
+// or "=0.061" (Takeda's SKYLINE), so a blind "p = " + value printed
+// "p = =0.061". The operator the sponsor wrote is kept; "=" is supplied only
+// when there is none.
+function formatRegisteredP(p) {
+  const s = String(p == null ? "" : p).trim();
+  const m = /^([<>≤≥=]+)\s*(.+)$/.exec(s);
+  return m ? "p " + m[1] + " " + m[2] : "p = " + s;
+}

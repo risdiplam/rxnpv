@@ -176,9 +176,16 @@ function ReportView({ theCase, onBack, updateCase }) {
         // in order, remove them. Lives here rather than in the report body
         // because these are editing actions, not part of the document.
         (() => {
-          const pins = pinnedResultsOf(theCase);
+          // Worked examples live on the case's Saved tab and never print, so
+          // they are left out here; moving a section swaps it with the next
+          // section the list actually shows.
+          const all = pinnedResultsOf(theCase);
+          const pins = all.filter(p => !isWorkedExample(p));
           const save = next => updateCase({ ...theCase, pinnedResults: next, updatedAt: Date.now() });
-          const move = (i, by) => { const next = pins.slice(); const [x] = next.splice(i, 1); next.splice(i + by, 0, x); save(next); };
+          const move = (i, by) => {
+            const a = all.indexOf(pins[i]), b = all.indexOf(pins[i + by]);
+            const next = all.slice(); next[a] = pins[i + by]; next[b] = pins[i]; save(next);
+          };
           const arrow = (label, tip, disabled, onClick) => h("button", { type: "button", title: tip, "aria-label": tip, disabled, onClick,
             style: { padding: "1px 6px", minWidth: 26, minHeight: 26, borderRadius: 4, border: "1px solid " + rpt.rule, background: "transparent", color: disabled ? rpt.rule : rpt.ink2, fontFamily: "var(--mono)", fontSize: 10, cursor: disabled ? "default" : "pointer" } }, label);
           return h("div", { id: "report-added-picker", style: { marginTop: 12, paddingTop: 10, borderTop: "1px solid " + rpt.rule } },
@@ -189,12 +196,12 @@ function ReportView({ theCase, onBack, updateCase }) {
             h("div", { style: { display: "flex", flexDirection: "column", gap: 4 } },
               pins.map((pin, i) => h("div", { key: pin.id || i, style: { display: "flex", alignItems: "center", gap: 8, fontSize: 11, fontFamily: "var(--mono)", color: pin.included === false ? rpt.ink3 : rpt.ink2 } },
                 h("input", { type: "checkbox", checked: pin.included !== false, "aria-label": "Include " + (pin.title || "this section"),
-                  onChange: () => save(pins.map(x => x === pin ? { ...x, included: x.included === false } : x)) }),
+                  onChange: () => save(all.map(x => x === pin ? { ...x, included: x.included === false } : x)) }),
                 h("span", { style: { flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textDecoration: pin.included === false ? "line-through" : "none" } },
                   pin.title, pin.source ? h("span", { style: { color: rpt.ink3 } }, " · " + pin.source) : null),
                 arrow("↑", "Move up", i === 0, () => move(i, -1)),
                 arrow("↓", "Move down", i === pins.length - 1, () => move(i, 1)),
-                h(ConfirmXButton, { onConfirm: () => save(pins.filter(x => x !== pin)),
+                h(ConfirmXButton, { onConfirm: () => save(all.filter(x => x !== pin)),
                   title: "Remove this section from the report", style: { padding: "2px 8px", minWidth: 26, minHeight: 26, fontSize: 10 } })
               ))
             ));
@@ -413,7 +420,7 @@ function ReportView({ theCase, onBack, updateCase }) {
         // this page, so a section added in dark mode prints cleanly on a light
         // report. Older image pins still render as the images they are.
         inc("pinned") && (() => {
-          const pins = pinnedResultsOf(theCase).filter(p => p.included !== false);
+          const pins = pinnedResultsOf(theCase).filter(p => p.included !== false && !isWorkedExample(p));
           if (!pins.length) return null;
           const imgs = pins.filter(p => p.kind !== "html");
           const mism = imgs.filter(p => p.theme && p.theme !== (reportDark ? "dark" : "light"));

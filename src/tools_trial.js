@@ -169,7 +169,7 @@ function AssetProgramTool({ activeCase, onDecodeTrial, onWatchTrial }) {
           "Nobody holds a thesis about a trial; they hold one about an asset, and an asset is usually eight to forty trials across different sponsors, phases, indications and fates. Three things are invisible when you read them one at a time: how much of the program is randomized rather than single-arm, whether this is one focused indication or a platform being tried everywhere, and which trials were quietly stopped. ",
           "The checklist at the top is deliberately a set of counts with their own denominators and not a score. A single “evidence strength” number would need invented weights, and you would anchor on it instead of on the four facts underneath it.")),
       h("div", { style: { display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 } },
-        h("input", { type: "text", value: drug, placeholder: "drug or intervention name — e.g. sotatercept",
+        h("input", { type: "text", value: drug, placeholder: "drug name — add code names after a comma, e.g. zorevunersen, STK-001",
           "aria-label": "Drug or intervention name",
           onChange: e => setDrug(e.target.value), onKeyDown: e => { if (e.key === "Enter") run(); },
           style: { flex: "1 1 260px", padding: "9px 12px", borderRadius: 7, border: "1.5px solid var(--rule)", background: "var(--surface)", color: "var(--ink-1)", fontFamily: "var(--mono)", fontSize: 13 } }),
@@ -299,7 +299,7 @@ function TrialResultsPanels({ results, study }) {
     const bits = [];
     bits.push((a.paramType || "Estimate") + " " + (a.value != null ? a.value : "—"));
     if (a.lower != null && a.upper != null) bits.push("(" + (a.ciPct || "95") + "% CI " + a.lower + " – " + a.upper + ")");
-    if (a.pValue) bits.push("p " + (/^[<>=]/.test(a.pValue.trim()) ? a.pValue : "= " + a.pValue));
+    if (a.pValue) bits.push(formatRegisteredP(a.pValue));
     const compared = (a.groupIds || []).map(g => groupsById[g]).filter(Boolean);
     // A sponsor can register an analysis naming FEWER than two arms — DAPA-HF
     // files its primary hazard ratio against `["OG001"]` alone. Printing that

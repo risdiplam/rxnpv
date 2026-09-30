@@ -281,7 +281,7 @@ function compareTrialsResult(study, results) {
   const a = (primary.analyses || []).find(x => x.value != null);
   if (!a) return "Primary outcome posted without a comparison statistic";
   const ci = a.lower != null && a.upper != null ? " (" + (a.ciPct ? a.ciPct + "% " : "") + "CI " + a.lower + " to " + a.upper + ")" : "";
-  return (a.paramType || "Estimate") + ": " + a.value + ci + (a.pValue ? ", p = " + a.pValue : "");
+  return (a.paramType || "Estimate") + ": " + a.value + ci + (a.pValue ? ", " + formatRegisteredP(a.pValue) : "");
 }
 // Weeks from a registered time frame: "Week 28", "up to 14 weeks", "Day 99",
 // "6 months". The first time stated is taken; null when there is none.

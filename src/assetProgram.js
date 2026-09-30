@@ -53,9 +53,19 @@ function assetPhaseRank(phase) {
 // Does this study actually list the drug, or did the text search merely find
 // the word somewhere in it? Checks intervention names and their registered
 // other names (where brand names live), then the title as a last resort.
+// One drug, several names: a biotech asset is often registered under its code
+// name in early trials and its INN later (Stoke's MONARCH lists only
+// "STK-001"; EMPEROR lists "zorevunersen"). Names are separated by a comma,
+// semicolon or " or "; a slash is left alone, as it joins combination drugs.
+function assetProgramNames(input) {
+  return String(input || "").split(/\s*[,;]\s*|\s+or\s+/i).map(n => n.trim()).filter(Boolean);
+}
+
 function studyNamesIntervention(study, drugName) {
-  const needle = String(drugName || "").trim().toLowerCase();
-  if (!needle) return true;
+  const needles = assetProgramNames(drugName).map(n => n.toLowerCase());
+  if (!needles.length) return true;
+  if (needles.length > 1) return needles.some(n => studyNamesIntervention(study, n));
+  const needle = needles[0];
   const names = [];
   (study.interventionsDetailed || []).forEach(i => {
     if (i.name) names.push(i.name);
@@ -234,8 +244,10 @@ async function fetchAssetProgram(drugName, opts) {
     // A field list rather than the whole record: the unfiltered response for a
     // 50-trial programme is ~2.8MB, the filtered one is ~97KB, and everything
     // this view reads is in the filtered set.
+    // Several names are searched together (CT.gov reads OR), and a trial is
+    // kept if it lists any one of them.
     const data = await ctgovFetch({
-      "query.intr": name,
+      "query.intr": assetProgramNames(name).join(" OR "),
       "pageSize": String(Math.min(opts.pageSize || 100, 200)),
       "countTotal": "true",
       "format": "json",
@@ -253,7 +265,7 @@ async function fetchAssetProgram(drugName, opts) {
 
 if (typeof module !== "undefined" && module.exports) {
   module.exports = {
-    summarizeAssetProgram, describeEvidenceBase, studyNamesIntervention, assetPhaseRank,
+    summarizeAssetProgram, describeEvidenceBase, studyNamesIntervention, assetProgramNames, assetPhaseRank,
     fetchAssetProgram, ASSET_PROGRAM_FIELDS, ASSET_PHASE_ORDER, ASSET_PHASE_LABEL, ASSET_STOPPED_STATUSES
   };
 }

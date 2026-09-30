@@ -289,7 +289,15 @@ function calcRunwayFromFacts(facts) {
   if (!facts || !facts.facts || !facts.facts["us-gaap"]) return null;
   const ug = facts.facts["us-gaap"];
   const cashTags = ["CashAndCashEquivalentsAtCarryingValue", "CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalents", "Cash"];
-  const investmentTags = ["ShortTermInvestments", "MarketableSecuritiesCurrent", "AvailableForSaleSecuritiesCurrent"];
+  // Most biotechs hold the bulk of their cash as marketable securities, filed
+  // under several different tags, and some of it is long-dated. Stoke's
+  // Q2 2026 10-Q: $110.0M cash, $182.8M AvailableForSaleSecuritiesDebtSecurities-
+  // Current and $61.5M …Noncurrent — $354.3M in all, the figure the company
+  // reports. Reading only the first of three current tags found none of it and
+  // showed $110.0M. Long-term investments in general are left out on purpose
+  // (they can be equity stakes); only marketable debt securities count.
+  const investmentTags = ["ShortTermInvestments", "MarketableSecuritiesCurrent", "AvailableForSaleSecuritiesCurrent", "AvailableForSaleSecuritiesDebtSecuritiesCurrent", "HeldToMaturitySecuritiesCurrent"];
+  const longInvestmentTags = ["MarketableSecuritiesNoncurrent", "AvailableForSaleSecuritiesNoncurrent", "AvailableForSaleSecuritiesDebtSecuritiesNoncurrent", "HeldToMaturitySecuritiesNoncurrent"];
   const opLossTags = ["OperatingIncomeLoss", "NetIncomeLoss"];
   const pickLatest = (tag) => {
     const fact = ug[tag];
@@ -299,10 +307,14 @@ function calcRunwayFromFacts(facts) {
     all.sort((a, b) => (b.end || "").localeCompare(a.end || ""));
     return { value: all[0].val, end: all[0].end, form: all[0].form };
   };
-  let cash = null, invest = null;
+  let cash = null, invest = null, longInvest = null;
   for (const t of cashTags) { cash = pickLatest(t); if (cash) break; }
-  for (const t of investmentTags) { invest = pickLatest(t); if (invest) break; }
-  const totalCash = (cash?.value || 0) + (invest?.value || 0);
+  // Securities count only when they are dated with the cash figure, so a stale
+  // balance from an older filing is never added to a current one.
+  const sameDate = x => x && (!cash || x.end === cash.end) ? x : null;
+  for (const t of investmentTags) { invest = sameDate(pickLatest(t)); if (invest) break; }
+  for (const t of longInvestmentTags) { longInvest = sameDate(pickLatest(t)); if (longInvest) break; }
+  const totalCash = (cash?.value || 0) + (invest?.value || 0) + (longInvest?.value || 0);
   if (!totalCash) return null;
   let opLoss = null;
   for (const t of opLossTags) {
@@ -560,6 +572,31 @@ const CATALYST_KEYWORDS = [
   "New Drug Application", "Biologics License Application"
 ];
 
+// One EDGAR full-text search hit as a filing row. Pure, so it can be checked
+// against a real hit's shape (math_verification.js).
+function parseCatalystHit(h, cikPadded) {
+  const src = h._source || {};
+  const idParts = String(h._id || "").split(":");
+  const accessionRaw = idParts[0] || "";
+  const fileName = idParts[1] || "";
+  const accessionNoDashes = accessionRaw.replace(/-/g, "");
+  const filingUrl = accessionNoDashes && fileName
+    ? "https://www.sec.gov/Archives/edgar/data/" + parseInt(cikPadded, 10) + "/" + accessionNoDashes + "/" + fileName
+    : null;
+  // EDGAR full-text search names the filing type `form` (and `root_forms`,
+  // an array); `file_type` is the document within it, e.g. EX-99.1 for the
+  // press release attached to an 8-K. Reading `form_type` / `root_form`,
+  // which the live service does not send, printed every filing as "?".
+  const form = src.form || (src.root_forms || [])[0] || src.form_type || src.root_form || "?";
+  const doc = src.file_type && src.file_type !== form ? src.file_type : null;
+  return {
+    formType: doc ? form + " · " + doc : form,
+    fileDate: src.file_date || null,
+    entityName: (src.display_names || [])[0] || null,
+    filingUrl
+  };
+}
+
 async function searchCatalystFilings(cik, monthsBack) {
   monthsBack = monthsBack || 12;
   const cikPadded = String(cik).replace(/\D/g, "").padStart(10, "0");
@@ -576,22 +613,7 @@ async function searchCatalystFilings(cik, monthsBack) {
   const data = await edgarFetch(url);
   if (!data || !data.hits || !data.hits.hits) return { ok: false, hits: [] };
 
-  const hits = data.hits.hits.map(h => {
-    const src = h._source || {};
-    const idParts = String(h._id || "").split(":");
-    const accessionRaw = idParts[0] || "";
-    const fileName = idParts[1] || "";
-    const accessionNoDashes = accessionRaw.replace(/-/g, "");
-    const filingUrl = accessionNoDashes && fileName
-      ? "https://www.sec.gov/Archives/edgar/data/" + parseInt(cikPadded, 10) + "/" + accessionNoDashes + "/" + fileName
-      : null;
-    return {
-      formType: src.form_type || src.root_form || "?",
-      fileDate: src.file_date || null,
-      entityName: (src.display_names || [])[0] || null,
-      filingUrl
-    };
-  }).filter(h => h.filingUrl);
+  const hits = data.hits.hits.map(h => parseCatalystHit(h, cikPadded)).filter(h => h.filingUrl);
 
   return { ok: true, totalHits: (data.hits.total || {}).value || hits.length, hits };
 }

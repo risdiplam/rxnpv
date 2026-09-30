@@ -29,6 +29,7 @@ const SUITES = [
   ["export_test.js", "section export serialiser and sanitiser"],
   ["export_coverage_test.js", "every section has an export bar; + Report and the report builder"],
   ["backup_test.js", "backup, restore and the sample case"],
+  ["worked_examples_test.js", "every worked example in the sample case opens, fills and runs"],
   ["audit_regressions_test.js", "fixes from the September 2026 Muse audit (docs/RxNPV_MUSE_AUDIT.md)"],
   ["final_regression_pass.js", "core valuation paths and every top-level view"],
   ["final_sweep.js", "every Tools workbench and tool, Simulation tab, Reference Sheet tab"],

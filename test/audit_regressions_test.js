@@ -322,7 +322,7 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
     ok(w.readGlance(3, 40, 60, 10, 20, 25, null).text.includes("above even your Bull case"), "Glance: a price above Bull says so");
     const gl = [...panel.querySelectorAll("[data-export-section]")].find(e => e.getAttribute("data-export-section") === "The case at a glance");
     const gt = gl ? [...gl.querySelectorAll("svg text")].map(t => t.textContent) : [];
-    ok(!!gl && ["WHAT THE EVIDENCE SAYS", "ODDS OF REACHING LAUNCH", "65%", "price implies 55%", "Base $29.05", "today $24.80"].every(t => gt.includes(t)) && gt.some(t => /^\+\d+ more in the Evidence Log$/.test(t)), "Glance: evidence, odds and value panels render (" + gt.slice(0, 12).join(" | ") + ")");
+    ok(!!gl && ["WHAT THE EVIDENCE SAYS", "ODDS OF REACHING LAUNCH", "65%", "price implies 55%", "Base $28.84", "today $24.80"].every(t => gt.includes(t)) && gt.some(t => /^\+\d+ more in the Evidence Log$/.test(t)), "Glance: evidence, odds and value panels render (" + gt.slice(0, 12).join(" | ") + ")");
     ok(!!gl && gt.includes("Lead asset and mechanism") && gt.includes("Diagnosed 75%, treated 60%"), "Glance: the sample's high-confidence facts and its least certain judgment are shown");
     click([...gl.querySelectorAll("button")].find(b => b.textContent === "Hide")); await wait(200);
     ok(![...panel.querySelectorAll("[data-export-section]")].some(e => e.getAttribute("data-export-section") === "The case at a glance") && w.localStorage.getItem("rxnpv_glance_hidden") === "1", "Glance: Hide removes it and remembers");
@@ -336,8 +336,8 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
     ok(w.readOutcomeTree([{ label: "A", failProb: 0.2 }, { label: "B", failProb: 0.15 }], 1, 1).verdict === "The risk is spread across 2 gates.", "Tree: under 60% at one gate reads as spread");
     const tree = [...panel.querySelectorAll("[data-export-section]")].find(e => e.getAttribute("data-export-section") === "How the catalysts play out");
     const tt = tree ? [...tree.querySelectorAll("svg text, .tree-list")].map(t => t.textContent).join(" | ") : "";
-    ok(!!tree && ["Launches", "$43.24 a share", "≈$1.40 a share", "≈$0.74 a share", "positive · 80%", "approved · 81%"].every(t => tt.includes(t)) || (!!tree && /Phase 3 readout.*positive 80%.*≈\$1\.40/.test(tt)), "Tree: gates, odds and endings render (" + tt.slice(0, 160) + ")");
-    ok(!!tree && /0\.65 × \$43\.24/.test(tree.textContent), "Tree: the weighted sum is written out");
+    ok(!!tree && ["Launches", "$42.59 a share", "≈$1.40 a share", "positive · 80%", "approved · 81%", "resubmitted · 9%", "Approved a year late"].every(t => tt.includes(t)) || (!!tree && /Phase 3 readout.*positive 80%.*≈\$1\.40/.test(tt)), "Tree: gates, odds and endings render (" + tt.slice(0, 160) + ")");
+    ok(!!tree && /0\.65 × \$42\.59/.test(tree.textContent), "Tree: the weighted sum is written out");
 
     // Readout scenarios reading: price $20; clear $30 (+50%), modest $22 (+10%),
     // miss $2 (-90%); weighted $24 = +20%; miss chance 0.25 -> "one time in four".
@@ -358,7 +358,7 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
     const rng = [...panel.querySelectorAll("[data-export-section]")].find(e => e.getAttribute("data-export-section") === "The whole range, on one line");
     const rt = rng ? [...rng.querySelectorAll("svg text")].map(t => t.textContent) : [];
     ok(!!rng && ["If it fails", "≈$1.40", "If it works", "Today", "Bear", "Base", "Bull"].every(t => rt.includes(t)), "Range strip: floor, scenarios, today and success all marked (" + rt.join(" | ") + ")");
-    ok(!!rng && /paying 56% of the way from failure to success/.test(rng.textContent), "Range strip: the reading places the price between failure and success");
+    ok(!!rng && /paying 57% of the way from failure to success/.test(rng.textContent), "Range strip: the reading places the price between failure and success");
     ok(!!rng && /1 year of wind-down G&A \$95\.0M/.test(rng.textContent), "Range strip: the floor's arithmetic is written out");
 
     // Break-even and the value bridge, side by side.
@@ -366,7 +366,7 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
     ok(!!beSec && /The price needs about \$1\.1\dB of peak revenue/.test(beSec.textContent) && !!beSec.querySelector('svg[aria-label^="Fair value per share at each peak"]'), "Break-even: headline and chart (" + (beSec && beSec.textContent.slice(0, 60)) + ")");
     const br = d.getElementById("ws-bridge");
     ok(!!br && /The price is \$3\d\d\.\dM below what this case finds/.test(br.textContent) && !!br.querySelector('svg[aria-label^="Value bridge"]'), "Bridge: gap headline and waterfall");
-    ok(!!br && /= Equity value \$2\.35B ÷ [\d,]+ diluted shares = \$29\.05 a share/.test(br.textContent), "Bridge: the exact one-line version ends at the Base per-share value");
+    ok(!!br && /= Equity value \$2\.41B ÷ [\d,]+ diluted shares = \$28\.84 a share/.test(br.textContent), "Bridge: the exact one-line version ends at the Base per-share value");
     ok(!!br && /A 10-point gap/.test(br.textContent), "Bridge: the reading states the odds gap");
 
     // Monte Carlo: a histogram of every trial with labelled markers, not five bars.
@@ -374,7 +374,7 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
     const hist = panel.querySelector('svg[aria-label^="Histogram of 3,000"]');
     ok(!!hist && hist.querySelectorAll("rect").length >= 8, "Monte Carlo: histogram of every trial renders");
     const labels = hist ? [...hist.querySelectorAll("text")].map(t => t.textContent) : [];
-    ok(["P10 ", "Median ", "P90 ", "Today $24.80", "Base $29.05"].every(l => labels.some(t => t.startsWith(l))), "Monte Carlo: P10, median, P90, today and Base are all marked (" + labels.filter(t => /\s\$/.test(t)).join(" | ") + ")");
+    ok(["P10 ", "Median ", "P90 ", "Today $24.80", "Base $28.84"].every(l => labels.some(t => t.startsWith(l))), "Monte Carlo: P10, median, P90, today and Base are all marked (" + labels.filter(t => /\s\$/.test(t)).join(" | ") + ")");
     ok(/Above today's price/.test(panel.textContent), "Monte Carlo: states the share of trials above today's price");
   }
 
@@ -410,7 +410,7 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
     ok(valOf('input[aria-label="ClinicalTrials.gov ID"]') === "NCT06872125", "Case tools: the Decoder starts on the case's lead trial");
     ok(/^Started from Stoke Therapeutics — sample case: the lead trial\./.test((d.querySelector(".case-filled") || {}).textContent || ""), "Case tools: says the value came from the case");
     click(btnT("Compare Trials")); await wait(300);
-    ok(valOf('input[aria-label="ClinicalTrials.gov IDs to compare"]') === "NCT06872125", "Case tools: Compare Trials starts with the case's trials");
+    ok(valOf('input[aria-label="ClinicalTrials.gov IDs to compare"]') === "NCT06872125, NCT04442295, NCT04740476", "Case tools: Compare Trials starts with the case's trials");
     click(btnT("Asset Program")); await wait(300);
     ok(valOf('input[aria-label="Drug or intervention name"]') === "Zorevunersen", "Case tools: Asset Program starts on the drug");
     click(btnT("Trial Explorer")); await wait(300);
@@ -425,7 +425,7 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
     ok([...d.querySelectorAll('input[aria-label="Company name or ticker"]')].some(i => i.value === "STOK"), "Case tools: Company Lookup starts on the ticker");
     click(btnT("Valuation")); await wait(150); click(btnT("Binary Event")); await wait(500);
     const bf = l => valOf('input[aria-label="' + l + '"]');
-    ok(bf("Today") === "24.80" && bf("If it works") === "43.24" && bf("If it fails") === "1.40" && bf("Your PoS (%)") === "65", "Case tools: Binary Event starts from price, success, failure floor and odds (" + [bf("Today"), bf("If it works"), bf("If it fails"), bf("Your PoS (%)")].join(" / ") + ")");
+    ok(bf("Today") === "24.80" && bf("If it works") === "42.59" && bf("If it fails") === "1.40" && bf("Your PoS (%)") === "65", "Case tools: Binary Event starts from price, success, failure floor and odds (" + [bf("Today"), bf("If it works"), bf("If it fails"), bf("Your PoS (%)")].join(" / ") + ")");
     // Typing over a field keeps the typed value.
     const t = d.querySelector('input[aria-label="Today"]');
     Object.getOwnPropertyDescriptor(w.HTMLInputElement.prototype, "value").set.call(t, "20"); t.dispatchEvent(new w.Event("input", { bubbles: true })); await wait(200);

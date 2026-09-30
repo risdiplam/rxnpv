@@ -142,7 +142,11 @@ function stub(obj) {
   const lateV = w.computeCaseValuation(Object.assign({}, sc, { programs: [Object.assign({}, sc.programs[0], { posOverridePct: "100", launchYearOffset: "2" })] }), { label: "Base", shareMultiplierPct: 100, posMultiplierPct: 100, discountRateAddPct: 0 }, "base", 12, sc.terminalValue).equity.perShare;
   ok(trL && trL.late && Math.abs(trL.late.prob - tr.gates[1].failProb * 0.3) < 1e-12 && Math.abs(trL.late.value - lateV) < 1e-9, "tree: resubmission takes 30% of FDA rejections, valued a year late");
   ok(trL && Math.abs(trL.leaves.reduce((a, l) => a + l.prob, 0) - 1) < 1e-9 && trL.gates.every((g, i) => g.pass === tr.gates[i].pass) && lateV < tr.success, "tree: chances still sum to 1, gates unchanged, a late approval is worth less");
-  ok(tr.late === null, "tree: the branch is off by default");
+  const tr0 = w.computeOutcomeTree(Object.assign({}, sc, { outcomeTree: {} }), 12, sc.terminalValue);
+  ok(tr0.late === null, "tree: the branch is off by default (blank)");
+  // The sample sets it to 47% (Sacks et al., JAMA 2014: 71 of 151 first-cycle
+  // rejections approved on resubmission).
+  ok(tr.late && Math.abs(tr.late.prob - tr.gates[1].failProb * 0.47) < 1e-12, "tree: the sample's 47% resubmission branch");
 
   // Before the readout: odds after a positive readout = 0.65 / 0.8023 = 81.02%;
   // a clear win closes 40% of the gap: 81.02 + 0.4 × 18.98 = 88.61%. Chances:

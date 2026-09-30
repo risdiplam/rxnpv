@@ -494,7 +494,7 @@ function ExportBar({ scope, title, heading, reportSection, source }) {
         : { tone: "ok", text: "In " + possessive(live.name || "case") + " report", caseId: live.id }, 7000);
       return;
     }
-    const existing = pinnedResultsOf(live);
+    const existing = pinnedResultsOf(live).filter(p => !isWorkedExample(p));
     if (existing.length >= PINNED_MAX_PER_CASE_V2) {
       flash({ tone: "err", text: possessive(live.name || "This case") + " report already holds " + PINNED_MAX_PER_CASE_V2 + " added items — remove one there first.", caseId: live.id }, 8000);
       return;
@@ -523,7 +523,7 @@ function ExportBar({ scope, title, heading, reportSection, source }) {
     const src = liveSource();
     const live = src && (src.cases || []).find(c => c.id === targetId);
     if (!src || !live) return;
-    if (pinnedResultsOf(live).length >= PINNED_MAX_PER_CASE_V2) {
+    if (pinnedResultsOf(live).filter(p => !isWorkedExample(p)).length >= PINNED_MAX_PER_CASE_V2) {
       flash({ tone: "err", text: possessive(live.name || "This case") + " saved items are full (" + PINNED_MAX_PER_CASE_V2 + ") — remove one from its Saved tab first." }, 8000);
       return;
     }

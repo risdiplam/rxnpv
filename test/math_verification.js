@@ -73,7 +73,7 @@ const EXPORTS = [
   "COGS_BENCHMARKS", "EXCLUSIVITY_BENCHMARKS",
   "samplePrior", "priorQuantile", "simulateTimeToEventReplicate", "runAssuranceSimulation",
   "runPeakSalesSimulation", "driverSensitivity", "percentSpecToFraction", "percentSpecError", "renderIconArray",
-  "niceTicks", "formatTick", "renderLineChart", "renderHistogram", "renderForestPlot",
+  "niceTicks", "formatTick", "formatRegisteredP", "parseCatalystHit", "sponsorNameFromEntity", "renderLineChart", "renderHistogram", "renderForestPlot",
   "treasuryMethodShares", "ifConvertedShares", "computeEquityValue", "applyFutureRaise",
   "classifyCatalystFunding", "computeRunwayVsCatalysts", "monthsUntil", "parseCatalystDate", "RUNWAY_CUSHION_MONTHS_DEFAULT",
   "summarizeOrangeBookPatents", "isPediatricExtension", "parseFdaYyyymmdd",
@@ -93,7 +93,7 @@ const EXPORTS = [
   "decodeTrial", "decodeTrialRedFlags", "classifyAllocation", "classifyMasking", "classifyComparator", "classifyPrimaryEndpoint",
   "parseTrialResults", "parseResultOutcomes", "summarizeParticipantFlow", "summarizeAdverseEvents",
   "classifyPublication", "parseEpmcResult", "summarizeLiterature", "epmcClean",
-  "summarizeAssetProgram", "describeEvidenceBase", "studyNamesIntervention", "assetPhaseRank", "ASSET_PROGRAM_FIELDS",
+  "summarizeAssetProgram", "describeEvidenceBase", "studyNamesIntervention", "assetProgramNames", "assetPhaseRank", "ASSET_PROGRAM_FIELDS",
   "parseCmsPeriodLabel", "parseCmsAnnualRow", "parseCmsQuarterlyRow", "pickOverallRows",
   "mergeDrugSpendSeries", "addComparablePeriodGrowth", "impliedAnnualRunRate", "cmsSeriesFreshness", "indexToLaunch", "cmsNum", "CMS_DATASETS", "cmsNormalizeName", "cmsDisplayName",
   "normalizeActualEntry", "impliedAnnualFromActual", "modelYearForCalendar", "compareActualToModel", "actualVsModelSeries",
@@ -2197,6 +2197,15 @@ section("Charts stay valid at data extremes");
   }
 
   ok("an empty histogram is an empty svg, not a crash", api.renderHistogram([], {}) === "<svg></svg>");
+  // Lattice data: k/81 for k = 0..40, once each (a responder difference with
+  // 81 per arm). Raw width 40/81/30 = 0.0165 is 1.33 steps of 1/81, so bins
+  // become exactly one step wide, centred on the points: 41 bars of one count
+  // each. The old binning gave 30 bars of 1 or 2 — a saw-tooth from nothing.
+  {
+    const lat = []; for (let k = 0; k <= 40; k++) lat.push(k / 81);
+    const hs = [...api.renderHistogram(lat, {}).matchAll(/<rect [^>]*height="([\d.]+)"[^>]*opacity="0.85"/g)].map(m => m[1]);
+    ok("lattice data: one bar per step (41), all the same height", hs.length === 41 && hs.every(h => h === hs[0]));
+  }
   {
     // The Trial Outcome histogram from the UI audit: effects spanning -0.13 to
     // 0.45 were labelled only at min / mid / max. niceTicks(-0.13, 0.45, 6):
@@ -2526,6 +2535,21 @@ section("EDGAR — cash runway picks the standalone quarter, not year-to-date");
   const ar = api.calcRunwayFromFacts(annualFacts);
   near("an annual-only filer: $60M / ($48M/12) = 15.0 months", ar.runwayMonths, 15.0, 1e-9);
   near("the span used is reported as 12 months", ar.burnPeriodMonths, 12, 0);
+
+  // Stoke's Q2 2026 10-Q, as XBRL: cash $110.004M + available-for-sale debt
+  // securities $182.814M current + $61.502M noncurrent = $354.320M, the
+  // company's own "cash, cash equivalents and marketable securities". A stale
+  // noncurrent balance from an earlier date is not added.
+  const stok = { facts: { "us-gaap": {
+    CashAndCashEquivalentsAtCarryingValue: { units: { USD: [{ end: "2026-06-30", val: 110004000, form: "10-Q" }] } },
+    AvailableForSaleSecuritiesDebtSecuritiesCurrent: { units: { USD: [{ end: "2026-06-30", val: 182814000, form: "10-Q" }] } },
+    AvailableForSaleSecuritiesDebtSecuritiesNoncurrent: { units: { USD: [{ end: "2026-06-30", val: 61502000, form: "10-Q" }] } },
+    OperatingIncomeLoss: { units: { USD: [{ start: "2026-04-01", end: "2026-06-30", val: -65429000, form: "10-Q" }] } }
+  } } };
+  near("marketable securities, current and long-term, count as cash: $354.32M", api.calcRunwayFromFacts(stok).cashUSD, 354320000, 1e-6);
+  const stale = JSON.parse(JSON.stringify(stok));
+  stale.facts["us-gaap"].AvailableForSaleSecuritiesDebtSecuritiesNoncurrent.units.USD[0].end = "2025-12-31";
+  near("a securities balance dated differently from the cash is left out: $292.818M", api.calcRunwayFromFacts(stale).cashUSD, 292818000, 1e-6);
 }
 report();
 
@@ -3326,6 +3350,13 @@ section("Asset programme — the shape of an evidence base, never a score");
   ok("a brand name in otherNames matches the generic search",
     api.studyNamesIntervention(t({ interventions: ["Acmeda"], interventionsDetailed: [{ name: "Acmeda", otherNames: ["acmezumab"] }] }), "acmezumab"));
   ok("matching is case-insensitive", api.studyNamesIntervention(t({}), "ACMEZUMAB"));
+  // Several names for one drug: split on comma, semicolon or " or ", never on
+  // a slash (combination products). A trial listing any one of them matches.
+  ok("names: 'zorevunersen, STK-001' is two names", JSON.stringify(api.assetProgramNames("zorevunersen, STK-001")) === '["zorevunersen","STK-001"]');
+  ok("names: ' or ' and ';' also separate", api.assetProgramNames("a or b; c").length === 3);
+  ok("names: a slash joins, not separates", api.assetProgramNames("sofosbuvir/velpatasvir").length === 1);
+  ok("a study listing only the code name matches the name list",
+    api.studyNamesIntervention(t({ interventions: ["STK-001 - Single Ascending Doses"], interventionsDetailed: [{ name: "STK-001 - Single Ascending Doses", otherNames: [] }], title: "STK-001 in Dravet" }), "zorevunersen, STK-001"));
   ok("a drug named only in the title still matches, as the weakest case",
     api.studyNamesIntervention(t({ interventions: ["placebo"], interventionsDetailed: [{ name: "placebo", otherNames: [] }], title: "Acmezumab versus placebo" }), "acmezumab"));
 
@@ -4129,6 +4160,25 @@ section("Plain-English readings: each sentence matches the numbers under it");
   ok("price below base: low end at or under it counts", api.readTornado([{ label: "PoS", low: 0.7, high: 1.3 }], 1, 0.8).verdict.startsWith("Any one"));
 
   // Price grid 2x2 [[1,2],[3,4]] at price 2.5 -> 3 and 4 reach: 2 of 4.
+  // EDGAR full-text search hit, in the shape the live service returns (Stoke's
+  // 2022-12-02 8-K press release): the type is `form`, the document `file_type`.
+  {
+    const hit = { _id: "0001193125-22-297163:d428421dex991.htm", _source: { form: "8-K", root_forms: ["8-K"], file_type: "EX-99.1", file_date: "2022-12-02", display_names: ["Stoke Therapeutics, Inc.  (STOK)  (CIK 0001623526)"] } };
+    const r = api.parseCatalystHit(hit, "0001623526");
+    ok("EDGAR hit: type read from `form`, with the attached document", r.formType === "8-K · EX-99.1");
+    ok("EDGAR hit: filing URL built from the accession and file name", r.filingUrl === "https://www.sec.gov/Archives/edgar/data/1623526/000119312522297163/d428421dex991.htm");
+    ok("EDGAR hit: the main document shows just its form", api.parseCatalystHit({ _id: "a:b.htm", _source: { form: "10-Q", file_type: "10-Q" } }, "1").formType === "10-Q");
+  }
+  // SEC entity name → sponsor name for ClinicalTrials.gov.
+  ok("sponsor: 'Stoke Therapeutics, Inc.' → 'Stoke Therapeutics'", api.sponsorNameFromEntity("Stoke Therapeutics, Inc.") === "Stoke Therapeutics");
+  ok("sponsor: 'Madrigal Pharmaceuticals, Inc.' → 'Madrigal Pharmaceuticals'", api.sponsorNameFromEntity("Madrigal Pharmaceuticals, Inc.") === "Madrigal Pharmaceuticals");
+  ok("sponsor: 'argenx SE' → 'argenx'", api.sponsorNameFromEntity("argenx SE") === "argenx");
+  ok("sponsor: a name with no suffix is unchanged", api.sponsorNameFromEntity("Vertex Pharmaceuticals") === "Vertex Pharmaceuticals");
+  // Registered p-values keep the sponsor's operator; "=" only when none.
+  ok("p: plain value", api.formatRegisteredP("0.0123") === "p = 0.0123");
+  ok("p: '=0.061' (SKYLINE) is not doubled", api.formatRegisteredP("=0.061") === "p = 0.061");
+  ok("p: '<0.001' keeps its operator", api.formatRegisteredP("<0.001") === "p < 0.001");
+  ok("p: '< 0.0001' spacing normalised", api.formatRegisteredP("< 0.0001") === "p < 0.0001");
   ok("grid: 2 of 4 reach $2.50", api.readPriceGrid([[1, 2], [3, 4]], 2.5).verdict === "2 of the 4 combinations reach today's $2.50.");
   ok("grid: none reach, best corner $4.00", api.readPriceGrid([[1, 2], [3, 4]], 9).text.includes("$4.00"));
 

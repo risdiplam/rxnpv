@@ -108,7 +108,7 @@ function App() {
   // Reopen a saved analysis in the tool or simulation it came from.
   const reopenSaved = (reopen) => {
     if (!reopen) return;
-    if (reopen.view === "tools") { setToolsNavRequest({ tab: reopen.tool, restore: reopen.inputs, requestId: Date.now() }); setView("tools"); }
+    if (reopen.view === "tools") { setToolsNavRequest({ tab: reopen.tool, restore: reopen.inputs, run: reopen.run, requestId: Date.now() }); setView("tools"); }
     else if (reopen.view === "simulation") {
       setView("simulation");
       let tries = 0;
@@ -274,7 +274,7 @@ function App() {
                     "Generate Report",
                     (() => {
                       // Items saved to the case but not ticked into the report don't count.
-                      const n = pinnedResultsOf(activeCase).filter(p => p.included !== false).length;
+                      const n = pinnedResultsOf(activeCase).filter(p => p.included !== false && !isWorkedExample(p)).length;
                       return n ? h("span", { style: { marginLeft: 8, padding: "1px 7px", borderRadius: 10, background: "rgba(255,255,255,0.22)", fontSize: 11, fontWeight: 500 } }, n + " added") : null;
                     })())
                 ),

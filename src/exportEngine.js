@@ -170,6 +170,11 @@ async function exportChartAsSvg(container, name) {
 function pinnedResultsOf(theCase) {
   return (theCase && Array.isArray(theCase.pinnedResults)) ? theCase.pinnedResults : [];
 }
+// A worked example (the sample case ships them) is a saved item with inputs
+// and a note but no snapshot: it opens its tool and runs, and it never goes
+// into a PDF — there is nothing captured to print until someone runs it and
+// saves the result.
+function isWorkedExample(p) { return !!p && p.kind === "example"; }
 
 // ════════════════════════════════════════════════════════════════════════════
 // SECTION EXPORT — a whole card, not just its chart

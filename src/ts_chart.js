@@ -49,23 +49,43 @@ function renderHistogram(values, opts = {}) {
   } = opts;
 
   if (!values.length) return '<svg></svg>';
-  const min = Math.min(...values), max = Math.max(...values);
-  const range = max - min || 1;
-  const binWidth = range / bins;
-  const counts = new Array(bins).fill(0);
+  const rawMin = Math.min(...values), max = Math.max(...values);
+  // Discrete results — a responder-rate difference moves in steps of 1/n —
+  // binned at an arbitrary width put two lattice points in some bins and one
+  // in their neighbours: a saw-tooth that is an artefact of the binning, not
+  // the shape of the data. When every value sits on one lattice, each bin is
+  // a whole number of steps wide and centred on its points.
+  let min = rawMin, binWidth = (max - rawMin || 1) / bins, nBins = bins;
+  const grid = [...new Set(values.map(v => Math.round(v * 1e9)))].sort((x, y) => x - y);
+  if (max > rawMin && grid.length >= 3 && grid.length <= 600) {
+    let gap = Infinity;
+    for (let i = 1; i < grid.length; i++) gap = Math.min(gap, grid[i] - grid[i - 1]);
+    gap /= 1e9;
+    const onLattice = gap > 0 && grid.every(g => { const k = (g / 1e9 - rawMin) / gap; return Math.abs(k - Math.round(k)) < 1e-4; });
+    if (onLattice && gap < binWidth * 1.5) {
+      binWidth = Math.max(1, Math.round(binWidth / gap)) * gap;
+      min = rawMin - gap / 2;
+      nBins = Math.max(1, Math.ceil((max - min) / binWidth - 1e-9));
+    }
+  }
+  const range = max === rawMin ? 1 : nBins * binWidth;
+  const counts = new Array(nBins).fill(0);
   for (const v of values) {
-    let idx = Math.floor((v - min) / binWidth);
-    if (idx >= bins) idx = bins - 1;
+    let idx = Math.floor((v - min) / binWidth + 1e-9);
+    if (idx >= nBins) idx = nBins - 1;
     if (idx < 0) idx = 0;
     counts[idx]++;
   }
   const maxCount = Math.max(...counts, 1);
   const fmt = valueFormatter || formatNumber;
 
-  const marginLeft = 56, marginBottom = 40, marginTop = title ? 34 : 14, marginRight = 14;
+  // A marker label gets its own row under the title: placed in the title's
+  // row it ran into the title text ("prior mean" over "…across replicates").
+  const markerRow = markerValue != null && markerLabel ? 16 : 0;
+  const marginLeft = 56, marginBottom = 40, marginTop = (title ? 34 : 14) + markerRow, marginRight = 14;
   const plotW = width - marginLeft - marginRight;
   const plotH = height - marginTop - marginBottom;
-  const barW = plotW / bins;
+  const barW = plotW / nBins;
 
   // Y axis is scaled to a "nice" ceiling rather than the raw max count, so
   // the topmost gridline is a round number the reader can actually anchor on.
@@ -83,7 +103,7 @@ function renderHistogram(values, opts = {}) {
 
   const total = values.length;
   let bars = '';
-  for (let i = 0; i < bins; i++) {
+  for (let i = 0; i < nBins; i++) {
     const barH = (counts[i] / (yMax || 1)) * plotH;
     const x = marginLeft + i * barW;
     const y = marginTop + (plotH - barH);
@@ -95,10 +115,11 @@ function renderHistogram(values, opts = {}) {
   }
 
   let marker = '';
-  if (markerValue != null && markerValue >= min && markerValue <= max) {
+  if (markerValue != null && markerValue >= min && markerValue <= min + range) {
     const mx = marginLeft + ((markerValue - min) / range) * plotW;
     marker = `<line x1="${mx.toFixed(1)}" y1="${marginTop}" x2="${mx.toFixed(1)}" y2="${marginTop + plotH}" stroke="var(--amber)" stroke-width="2" stroke-dasharray="4,3" />` +
-             `<text x="${mx.toFixed(1)}" y="${marginTop - 6}" fill="var(--amber)" font-size="11" text-anchor="middle">${escapeXml(markerLabel)}</text>`;
+             // Anchored away from the edge it is near, so it never leaves the chart.
+             `<text x="${mx.toFixed(1)}" y="${marginTop - 6}" fill="var(--amber)" font-size="11" text-anchor="${mx < marginLeft + 60 ? 'start' : mx > marginLeft + plotW - 60 ? 'end' : 'middle'}">${escapeXml(markerLabel)}</text>`;
   }
 
   const axisLine = `<line x1="${marginLeft}" y1="${marginTop + plotH}" x2="${marginLeft + plotW}" y2="${marginTop + plotH}" stroke="var(--ink-2)" stroke-width="1" opacity="0.5" />`;
@@ -112,10 +133,10 @@ function renderHistogram(values, opts = {}) {
   // min / midpoint / max — three arbitrary decimals like -0.13, 0.16, 0.45
   // that gave the eye nothing to measure a bar against.
   let xTicks;
-  if (max === min) {
-    xTicks = `<text x="${(marginLeft + plotW / 2).toFixed(1)}" y="${marginTop + plotH + 18}" fill="var(--ink-2)" font-size="10" text-anchor="middle">${fmt(min)}</text>`;
+  if (max === rawMin) {
+    xTicks = `<text x="${(marginLeft + plotW / 2).toFixed(1)}" y="${marginTop + plotH + 18}" fill="var(--ink-2)" font-size="10" text-anchor="middle">${fmt(rawMin)}</text>`;
   } else {
-    const tv = niceTicks(min, max, 6).filter(v => v >= min && v <= max);
+    const tv = niceTicks(min, min + range, 6).filter(v => v >= min && v <= min + range);
     const xStep = tv.length > 1 ? tv[1] - tv[0] : range;
     const tfmt = valueFormatter || (v => formatTick(v, xStep));
     xTicks = tv.map(v => {
@@ -140,7 +161,9 @@ function renderLineChart(series, opts = {}) {
     width = 640, height = 280, xLabel = '', yLabel = '', title = '',
     markerX = null, markerLabel = '', xFormatter = null, yFormatter = null
   } = opts;
-  const marginLeft = 62, marginBottom = 40, marginTop = title ? 34 : 14, marginRight = 20;
+  // A marker label gets its own row under the title (see renderHistogram).
+  const markerRow = markerX != null && markerLabel ? 16 : 0;
+  const marginLeft = 62, marginBottom = 40, marginTop = (title ? 34 : 14) + markerRow, marginRight = 20;
   const plotW = width - marginLeft - marginRight;
   const plotH = height - marginTop - marginBottom;
 
@@ -213,7 +236,7 @@ function renderLineChart(series, opts = {}) {
   if (markerX != null && markerX >= xMin && markerX <= xMax) {
     const mx = sx(markerX);
     marker = `<line x1="${mx.toFixed(1)}" y1="${marginTop}" x2="${mx.toFixed(1)}" y2="${marginTop + plotH}" stroke="var(--amber)" stroke-width="2" stroke-dasharray="4,3" />` +
-      (markerLabel ? `<text x="${mx.toFixed(1)}" y="${marginTop - 6}" fill="var(--amber)" font-size="11" text-anchor="middle">${escapeXml(markerLabel)}</text>` : '');
+      (markerLabel ? `<text x="${mx.toFixed(1)}" y="${marginTop - 6}" fill="var(--amber)" font-size="11" text-anchor="${mx < marginLeft + 60 ? 'start' : mx > marginLeft + plotW - 60 ? 'end' : 'middle'}">${escapeXml(markerLabel)}</text>` : '');
   }
 
   const axisX = `<line x1="${marginLeft}" y1="${marginTop + plotH}" x2="${marginLeft + plotW}" y2="${marginTop + plotH}" stroke="var(--ink-2)" stroke-width="1" opacity="0.5" />`;
@@ -391,8 +414,16 @@ function renderForestPlot(rows, opts = {}) {
   const marginBottom = xLabel ? 40 : 26;
   const plotH = allRows.length * rowHeight;
   const height = marginTop + plotH + marginBottom;
-  const plotW = width - labelWidth - 30;
-  const plotLeft = labelWidth;
+  // The label column grows to fit the longest study name (≈6.4px a character
+  // at 11px), up to 45% of the width; a name longer than that is shortened
+  // with an ellipsis and kept whole in its hover title. A fixed 150px cut
+  // real trial names off at the left edge ("ine Study 1 (0.8 mg/kg/day)").
+  const CHAR_W = 6.4, maxLabelW = Math.round(width * 0.45);
+  const longest = allRows.reduce((m, r) => Math.max(m, String(r.label || '').length), 0);
+  const labelCol = Math.max(labelWidth, Math.min(maxLabelW, Math.ceil(longest * CHAR_W) + 14));
+  const fitLabel = t => { const str = String(t || ''); const room = Math.floor((labelCol - 14) / CHAR_W); return str.length <= room ? str : str.slice(0, Math.max(1, room - 1)).trimEnd() + '…'; };
+  const plotW = width - labelCol - 30;
+  const plotLeft = labelCol;
 
   const toPlotX = scale === 'log' ? (v => Math.log(Math.max(v, 1e-9))) : (v => v);
   const allVals = allRows.flatMap(r => [r.lower, r.upper])
@@ -415,8 +446,23 @@ function renderForestPlot(rows, opts = {}) {
     refLine = `<line x1="${rx.toFixed(1)}" y1="${marginTop}" x2="${rx.toFixed(1)}" y2="${marginTop + plotH}" stroke="var(--ink-2)" stroke-width="1" stroke-dasharray="3,3" opacity="0.6" />`;
   }
 
-  const tickVals = [domainLo, (domainLo + domainHi) / 2, domainHi];
-  const tickStep = Math.abs(tickVals[1] - tickVals[0]) || Math.abs(domainHi) || 1;
+  // Round-number ticks inside the drawn range: 1/2/5 steps on a linear axis,
+  // and 1-2-5 × 10ⁿ on a log axis (only powers of ten when that would crowd),
+  // so the reference line — 0 or 1 — is a labelled tick. Ticks at the data's
+  // own extremes read "1, 24, 47" on a ratio axis.
+  const inRange = v => toPlotX(v) >= plotLo - 1e-9 && toPlotX(v) <= plotHi + 1e-9;
+  let tickVals;
+  if (scale === 'log') {
+    const lo = Math.exp(plotLo), hi = Math.exp(plotHi), cand = [];
+    for (let e = Math.floor(Math.log10(lo)) - 1; e <= Math.ceil(Math.log10(hi)); e++) [1, 2, 5].forEach(m => cand.push(m * Math.pow(10, e)));
+    tickVals = cand.filter(inRange);
+    if (tickVals.length > 7) tickVals = tickVals.filter(v => Math.abs(Math.log10(v) - Math.round(Math.log10(v))) < 1e-9);
+    if (tickVals.length < 2) tickVals = [domainLo, domainHi];
+  } else {
+    tickVals = niceTicks(plotLo, plotHi, 5).filter(inRange);
+    if (tickVals.length < 2) tickVals = [domainLo, domainHi];
+  }
+  const tickStep = scale === 'log' ? Math.min(...tickVals.map(Math.abs).filter(v => v > 0)) : (Math.abs(tickVals[1] - tickVals[0]) || Math.abs(domainHi) || 1);
   const fmtVal = v => formatTick(v, tickStep);
 
   let rowsSvg = '';
@@ -428,7 +474,8 @@ function renderForestPlot(rows, opts = {}) {
     // x2. Order the endpoints so the glyph stays a diamond either way.
     const xa = sx(r.lower), xb = sx(r.upper);
     const x1 = Math.min(xa, xb), x2 = Math.max(xa, xb), xEst = sx(r.estimate);
-    const label = `<text x="${(labelWidth - 10).toFixed(1)}" y="${(cy + 4).toFixed(1)}" fill="var(--ink-1)" font-size="11" text-anchor="end">${escapeXml(r.label)}</text>`;
+    const shown = fitLabel(r.label);
+    const label = `<text x="${(labelCol - 10).toFixed(1)}" y="${(cy + 4).toFixed(1)}" fill="var(--ink-1)" font-size="11" text-anchor="end">${shown !== String(r.label) ? `<title>${escapeXml(r.label)}</title>` : ''}${escapeXml(shown)}</text>`;
     // Zero-width rows (a bare point estimate with no interval, e.g. the
     // Phase 2->3 before/after comparison) shouldn't claim a confidence
     // interval they don't have.
@@ -461,8 +508,8 @@ function renderForestPlot(rows, opts = {}) {
     return `<text x="${x.toFixed(1)}" y="${(axisY + 16).toFixed(1)}" fill="var(--ink-2)" font-size="10" text-anchor="middle">${fmtVal(v)}</text>`;
   }).join('');
 
-  const titleText = title ? `<text x="${(labelWidth + plotW / 2).toFixed(1)}" y="18" fill="var(--ink-1)" font-size="13" text-anchor="middle" font-weight="600">${escapeXml(title)}</text>` : '';
-  const xLabelText = xLabel ? `<text x="${(labelWidth + plotW / 2).toFixed(1)}" y="${height - 6}" fill="var(--ink-2)" font-size="11" text-anchor="middle">${escapeXml(xLabel)}</text>` : '';
+  const titleText = title ? `<text x="${(labelCol + plotW / 2).toFixed(1)}" y="18" fill="var(--ink-1)" font-size="13" text-anchor="middle" font-weight="600">${escapeXml(title)}</text>` : '';
+  const xLabelText = xLabel ? `<text x="${(labelCol + plotW / 2).toFixed(1)}" y="${height - 6}" fill="var(--ink-2)" font-size="11" text-anchor="middle">${escapeXml(xLabel)}</text>` : '';
 
   return `<svg viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">${titleText}${marginZoneRect}${axisLine}${refLine}${rowsSvg}${ticks}${xLabelText}</svg>`;
 }

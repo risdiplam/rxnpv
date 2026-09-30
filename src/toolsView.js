@@ -82,8 +82,17 @@ function ToolsView({ cases, updateCase, activeCase, navRequest, onSelectCase, on
     if (navRequest && navRequest.tab) setTab(navRequest.tab);
     if (navRequest && navRequest.restore) {
       const apply = () => applySavedInputs(rootRef.current, navRequest.restore);
-      const t1 = setTimeout(apply, 60), t2 = setTimeout(apply, 400);
-      return () => { clearTimeout(t1); clearTimeout(t2); };
+      // A worked example also presses the tool's own button (Decode, Look up,
+      // Compare …) once its inputs are in, so it opens showing a result.
+      const run = () => {
+        // Only the tool's own card: the tab row holds buttons like "Compare
+        // Trials" that would otherwise match "Compare".
+        const b = navRequest.run && rootRef.current && Array.prototype.find.call(rootRef.current.querySelectorAll("[data-export-section] button"),
+          x => !x.disabled && !x.closest("[data-no-export]") && x.textContent.trim().indexOf(navRequest.run) === 0);
+        if (b) b.click();
+      };
+      const t1 = setTimeout(apply, 60), t2 = setTimeout(apply, 400), t3 = setTimeout(run, 750);
+      return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
     }
   }, [navRequest && navRequest.requestId]);
 

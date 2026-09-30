@@ -998,9 +998,14 @@ function renderMetaStudyRow(id, index) {
         field('CI lower', numberInput('meta_lower_' + id, mode === 'ciRatio' ? 0.5 : 2, { step: '0.01' })),
         field('CI upper', numberInput('meta_upper_' + id, mode === 'ciRatio' ? 0.95 : 8, { step: '0.01' }))
       ]);
+  // The label field takes the row's free width: real trial names ("Fenfluramine
+  // Study 1504 (with stiripentol)") were cut off in a content-width box.
+  const labelField = field('Study label', el('input', { type: 'text', id: 'meta_label_' + id, value: 'Study ' + (index + 1), style: 'width:100%;box-sizing:border-box' }));
+  labelField.style.flex = '1 1 auto';
+  labelField.style.maxWidth = '520px';
   return el('div', { style: 'padding:10px 12px;border-radius:8px;background:var(--surface-2);margin-bottom:8px' }, [
     el('div', { style: 'display:flex;justify-content:space-between;align-items:center;margin-bottom:6px' }, [
-      field('Study label', el('input', { type: 'text', id: 'meta_label_' + id, value: 'Study ' + (index + 1) })),
+      labelField,
       metaStudyIds.length > 2 ? el('button', { style: 'margin-left:10px;padding:5px 10px;border-radius:6px;border:1px solid var(--red);background:transparent;color:var(--red);font-family:var(--mono);font-size:11px;cursor:pointer;white-space:nowrap', onclick: () => removeMetaStudy(id) }, '× Remove') : null
     ]),
     fields
@@ -1559,8 +1564,16 @@ function runTrialOutcome() {
   ]));
   const asRead = explainNode(readAssurance(result.pos * 100, sided));
   if (asRead) resultsDiv.appendChild(asRead);
+  // A binary prior is on the treated response rate, but each replicate's
+  // observed effect is the difference (treatment − control), so the marker
+  // sits at the difference the prior implies — at the prior mean itself it
+  // stood a whole control rate to the right of the distribution it describes.
+  const isBinary = endpointType === 'binary';
   const chartHtml = renderHistogram(result.observedEffects.filter(v => isFinite(v)), {
-    title: 'Simulated observed effect across replicates', xLabel: 'Observed effect', markerValue: priorMean, markerLabel: 'prior mean'
+    title: 'Simulated observed effect across replicates',
+    xLabel: isBinary ? 'Observed difference in response rate (treatment − control)' : 'Observed effect',
+    markerValue: isBinary ? priorMean - design.controlRate : priorMean,
+    markerLabel: isBinary ? 'difference the prior implies' : 'prior mean'
   });
   appendChartWithExport(resultsDiv, chartHtml, 'trial-outcome-assurance');
 
@@ -1648,8 +1661,27 @@ function simOpenSaved(reopen) {
   if (!reopen || !document.getElementById('ts-root')) return false;
   activeTab = reopen.simTab || activeTab;
   if (reopen.simSub) activeStatsSubtab = reopen.simSub;
+  // Meta-analysis rows are created by "+ Add study", so a saved analysis with
+  // more than two studies would reopen onto two rows and silently lose the
+  // rest. Recreate exactly the rows its inputs name before filling them.
+  if (activeTab === 'metaAnalysis') {
+    const ids = (reopen.inputs || []).map(f => /^meta_label_(\d+)$/.exec(f.id || '')).filter(Boolean).map(m => Number(m[1]));
+    if (ids.length >= 2) { metaStudyIds = ids; metaNextStudyId = Math.max.apply(null, ids) + 1; }
+  }
   renderApp();
-  setTimeout(() => applySavedInputs(document.getElementById('ts-root'), reopen.inputs), 50);
+  const root = () => document.getElementById('ts-root');
+  setTimeout(() => {
+    if (!root()) return;
+    // Twice: an endpoint or mode select redraws the fields that depend on it,
+    // and the second pass fills any that only exist after that redraw.
+    applySavedInputs(root(), reopen.inputs);
+    applySavedInputs(root(), reopen.inputs);
+    // A worked example runs itself, so it opens showing its result.
+    if (reopen.run) setTimeout(() => {
+      const b = root() && Array.prototype.find.call(root().querySelectorAll('button.runbtn'), x => x.textContent.trim() === reopen.run);
+      if (b) b.click();
+    }, 50);
+  }, 50);
   return true;
 }
 

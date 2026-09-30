@@ -47,10 +47,12 @@ function CompanyLookupTool({ cases, updateCase, activeCase, onWatchTrial }) {
     insiderSeq.current++;
     setLoading(true); setEdgarError(null); setTrialsError(null); setEdgarResult(null); setTrialsResult(null); setExportMsg(null);
     setInsiderResult(null); setInsiderError(null); setInsiderLoading(false);
-    const [edgarR, trialsR] = await Promise.all([
-      isDesktop ? pullEdgarFinancials(query.trim(), false) : Promise.resolve({ ok: false, error: "EDGAR requires the desktop app." }),
-      searchTrialsBySponsor(query.trim(), 20)
-    ]);
+    // EDGAR first, so the trial search can use the company's registered name:
+    // ClinicalTrials.gov knows sponsors by name, and a ticker ("STOK") found
+    // no trials at all for a company with three.
+    const edgarR = isDesktop ? await pullEdgarFinancials(query.trim(), false) : { ok: false, error: "EDGAR requires the desktop app." };
+    if (myReq !== searchSeq.current) return;
+    const trialsR = await searchTrialsBySponsor(edgarR.ok && edgarR.name ? sponsorNameFromEntity(edgarR.name) : query.trim(), 20);
     if (myReq !== searchSeq.current) return; // a newer search is already in flight
     if (edgarR.ok) setEdgarResult(edgarR); else setEdgarError(edgarR.error);
     if (trialsR.ok) setTrialsResult(trialsR); else setTrialsError(trialsR.error);
@@ -621,7 +623,7 @@ function RunwayVsCatalystTool({ cases, activeCase }) {
         h(CasePicker, { cases, selectedId: caseId, onChange: setCaseId }),
         h("label", { style: { display: "flex", alignItems: "center", gap: 6, fontFamily: "var(--mono)", fontSize: 11, color: "var(--ink-2)" } },
           "Cushion required at readout",
-          h("input", { type: "number", value: cushion, min: 0, step: 1, onChange: e => setCushion(e.target.value),
+          h("input", { type: "number", value: cushion, min: 0, step: 1, "aria-label": "Cushion required at readout (months)", onChange: e => setCushion(e.target.value),
             style: { width: 62, padding: "5px 8px", borderRadius: 6, border: "1.5px solid var(--rule)", background: "var(--surface)", color: "var(--ink-1)", fontFamily: "var(--mono)", fontSize: 12 } }),
           "mo")
       )
@@ -696,7 +698,11 @@ function RunwayVsCatalystTool({ cases, activeCase }) {
               h("div", { title: r.label + " — " + r.dateText, style: { position: "absolute", left: pct(r.monthsAway) + "%", top: 0, transform: "translateX(-50%)", display: "flex", flexDirection: "column", alignItems: "center" } },
                 h("div", { style: { width: 2, height: 8, background: STATUS[r.status].color } }),
                 h("div", { style: { width: 9, height: 9, borderRadius: "50%", background: STATUS[r.status].color, marginTop: -1 } })),
-              h("div", { style: { position: "absolute", left: "calc(" + pct(r.monthsAway) + "% + 10px)", top: 1, fontFamily: "var(--mono)", fontSize: 10, color: STATUS[r.status].color, whiteSpace: "nowrap" } },
+              // A catalyst in the right half puts its label to the left of its
+              // marker; placed to the right it ran off the edge of the card.
+              h("div", { style: Object.assign({ position: "absolute", top: 1, fontFamily: "var(--mono)", fontSize: 10, color: STATUS[r.status].color, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" },
+                  pct(r.monthsAway) > 50 ? { right: "calc(" + (100 - pct(r.monthsAway)) + "% + 10px)", maxWidth: "calc(" + pct(r.monthsAway) + "% - 10px)", textAlign: "right" }
+                    : { left: "calc(" + pct(r.monthsAway) + "% + 10px)", maxWidth: "calc(" + (100 - pct(r.monthsAway)) + "% - 10px)" }) },
                 r.label + " · " + r.dateText)
             ))
           ),

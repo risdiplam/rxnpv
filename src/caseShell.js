@@ -131,32 +131,70 @@ const CASE_TABS = [["overview", "Overview"], ["assumptions", "Assumptions"], ["s
 function SavedPanel({ theCase, onChange, onReopen }) {
   const h = React.createElement;
   const [openId, setOpenId] = React.useState(null);
-  const pins = pinnedResultsOf(theCase).slice().reverse();
-  const save = next => onChange({ ...theCase, pinnedResults: next, updatedAt: Date.now() });
   const all = pinnedResultsOf(theCase);
+  // The case's own saved results, newest first; then any worked examples, in
+  // the order they were written (the sample case ships one per tool).
+  const pins = all.filter(p => !isWorkedExample(p)).reverse();
+  const examples = all.filter(isWorkedExample);
+  const save = next => onChange({ ...theCase, pinnedResults: next, updatedAt: Date.now() });
   const fmtWhen = t => t ? new Date(t).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" }) : "";
-  if (!pins.length) return h("div", { className: "saved-empty" },
+  const whereTo = r => r.view === "simulation" ? "Simulation" : "Tools";
+  const heading = text => h("div", { style: { fontFamily: "var(--display)", fontSize: 16, fontWeight: 600, color: "var(--ink-1)", marginBottom: 4 } }, text);
+  if (!pins.length && !examples.length) return h("div", { className: "saved-empty" },
     h("div", { style: { fontFamily: "var(--display)", fontSize: 16, fontWeight: 600, color: "var(--ink-1)", marginBottom: 6 } }, "Nothing saved to this case yet"),
     h("div", { className: "prose", style: UI.caption }, "In Tools or Simulation, open a result's Export menu and choose “Save to case”. It lands here with the inputs you used, so you can open it again exactly as you left it, and tick it into the PDF report when you want it there."));
   return h("div", null,
-    h("div", { style: { fontFamily: "var(--display)", fontSize: 16, fontWeight: 600, color: "var(--ink-1)", marginBottom: 4 } }, "Saved to this case"),
-    h("div", { className: "prose", style: { ...UI.caption, marginBottom: 14 } }, pins.length + " saved · " + all.filter(p => p.included !== false).length + " in the PDF report · up to " + PINNED_MAX_PER_CASE_V2 + ". Newest first."),
-    pins.map(p => h("div", { key: p.id, className: "saved-item" },
-      h("div", { className: "saved-row" },
-        h("div", { style: { minWidth: 0, flex: "1 1 260px" } },
-          h("div", { className: "saved-title" }, p.title || "Untitled section"),
-          h("div", { className: "saved-meta" }, [p.source, fmtWhen(p.capturedAt)].filter(Boolean).join(" · "))),
-        h("label", { className: "saved-report" },
-          h("input", { type: "checkbox", checked: p.included !== false, "aria-label": "Include " + (p.title || "this section") + " in the PDF report",
-            onChange: () => save(all.map(x => x === p ? { ...x, included: x.included === false } : x)) }),
-          "In the PDF report"),
-        p.reopen && onReopen && h("button", { type: "button", className: "saved-btn", onClick: () => onReopen(p.reopen),
-          title: "Open the " + (p.reopen.view === "simulation" ? "simulation" : "tool") + " with the inputs you saved; run it again for fresh results" }, "Open in " + (p.reopen.view === "simulation" ? "Simulation" : "Tools") + " →"),
-        h("button", { type: "button", className: "saved-btn", "aria-expanded": openId === p.id, onClick: () => setOpenId(openId === p.id ? null : p.id) }, openId === p.id ? "Hide" : "Show"),
-        h(ConfirmXButton, { title: "Remove " + (p.title || "this item") + " from this case", label: "Remove", onConfirm: () => save(all.filter(x => x !== p)) })),
-      openId === p.id && h("div", { className: "saved-preview" }, p.kind === "html"
-        ? h(ReportSnapshot, { pin: p, dark: document.documentElement.getAttribute("data-theme") === "dark" })
-        : p.dataUrl ? h("img", { src: p.dataUrl, alt: p.title || "Saved section", style: { maxWidth: "100%" } }) : null))));
+    pins.length > 0 && h("div", { style: { marginBottom: examples.length ? 26 : 0 } },
+      heading("Saved to this case"),
+      h("div", { className: "prose", style: { ...UI.caption, marginBottom: 14 } }, pins.length + " saved · " + pins.filter(p => p.included !== false).length + " in the PDF report · up to " + PINNED_MAX_PER_CASE_V2 + ". Newest first."),
+      pins.map(p => h("div", { key: p.id, className: "saved-item" },
+        h("div", { className: "saved-row" },
+          h("div", { style: { minWidth: 0, flex: "1 1 260px" } },
+            h("div", { className: "saved-title" }, p.title || "Untitled section"),
+            h("div", { className: "saved-meta" }, [p.source, fmtWhen(p.capturedAt)].filter(Boolean).join(" · "))),
+          h("label", { className: "saved-report" },
+            h("input", { type: "checkbox", checked: p.included !== false, "aria-label": "Include " + (p.title || "this section") + " in the PDF report",
+              onChange: () => save(all.map(x => x === p ? { ...x, included: x.included === false } : x)) }),
+            "In the PDF report"),
+          p.reopen && onReopen && h("button", { type: "button", className: "saved-btn", onClick: () => onReopen(p.reopen),
+            title: "Open the " + (p.reopen.view === "simulation" ? "simulation" : "tool") + " with the inputs you saved; run it again for fresh results" }, "Open in " + whereTo(p.reopen) + " →"),
+          h("button", { type: "button", className: "saved-btn", "aria-expanded": openId === p.id, onClick: () => setOpenId(openId === p.id ? null : p.id) }, openId === p.id ? "Hide" : "Show"),
+          h(ConfirmXButton, { title: "Remove " + (p.title || "this item") + " from this case", label: "Remove", onConfirm: () => save(all.filter(x => x !== p)) })),
+        openId === p.id && h("div", { className: "saved-preview" }, p.kind === "html"
+          ? h(ReportSnapshot, { pin: p, dark: document.documentElement.getAttribute("data-theme") === "dark" })
+          : p.dataUrl ? h("img", { src: p.dataUrl, alt: p.title || "Saved section", style: { maxWidth: "100%" } }) : null)))),
+    examples.length > 0 && h("div", null,
+      heading("Worked examples"),
+      h("div", { className: "prose", style: { ...UI.caption, marginBottom: 14 } },
+        examples.length + " tools and simulations set up for this case, each with where its numbers come from. Opening one fills in the tool and runs it, so the result is always current. To put a result in the PDF, use “Save to case” on it."),
+      // Grouped by where they open — the Tools workbench, or Simulation — so
+      // thirty rows read as six short lists; each row then names its tool.
+      exampleGroups(examples).map(g => h("div", { key: g.name, className: "saved-group" },
+        h("div", { className: "saved-group-name" }, g.name),
+        g.items.map(({ p, tool }) => h("div", { key: p.id, className: "saved-item" },
+        h("div", { className: "saved-row" },
+          h("div", { style: { minWidth: 0, flex: "1 1 260px" } },
+            h("div", { className: "saved-title" }, p.title || "Worked example"),
+            h("div", { className: "saved-meta" }, tool)),
+          p.reopen && onReopen && h("button", { type: "button", className: "saved-btn", onClick: () => onReopen(p.reopen),
+            title: "Open " + (p.source || "the tool") + " with these inputs and run it" }, "Open in " + whereTo(p.reopen) + " →"),
+          p.note && h("button", { type: "button", className: "saved-btn", "aria-expanded": openId === p.id, onClick: () => setOpenId(openId === p.id ? null : p.id) }, openId === p.id ? "Hide" : "Why these inputs"),
+          h(ConfirmXButton, { title: "Remove " + (p.title || "this example") + " from this case", label: "Remove", onConfirm: () => save(all.filter(x => x !== p)) })),
+        openId === p.id && p.note && h("div", { className: "saved-preview prose", style: { ...UI.caption, color: "var(--ink-2)", lineHeight: 1.6 } }, p.note)))))));
+}
+// "Tools · Trial · Trial Decoder" → group "Tools · Trial", tool "Trial Decoder";
+// "Simulation · Trial Statistics · Fragility Index" → "Simulation", the rest.
+function exampleGroups(examples) {
+  const groups = [];
+  examples.forEach(p => {
+    const parts = String(p.source || "").split(" · ");
+    const n = parts[0] === "Tools" ? 2 : 1;
+    const name = parts.slice(0, n).join(" · ") || "Other", tool = parts.slice(n).join(" · ");
+    let g = groups.find(x => x.name === name);
+    if (!g) groups.push(g = { name, items: [] });
+    g.items.push({ p, tool });
+  });
+  return groups;
 }
 
 function CaseView({ theCase, onChange, onDelete, onNavigateToTools, onReopenSaved }) {

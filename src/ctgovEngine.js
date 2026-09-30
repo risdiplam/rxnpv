@@ -113,6 +113,17 @@ async function searchTrialsForDrug(drugName, limit) {
   } catch (e) { return { ok: false, error: e.message }; }
 }
 
+// An SEC entity name as ClinicalTrials.gov knows the sponsor: the legal
+// suffix dropped ("Stoke Therapeutics, Inc." → "Stoke Therapeutics"), since
+// sponsors register as "Stoke Therapeutics, Inc" or plain "Stoke Therapeutics"
+// and the search matches words.
+function sponsorNameFromEntity(name) {
+  let s = String(name || "").trim();
+  const suffix = /[,\s]+(inc\.?|incorporated|corp\.?|corporation|co\.?|ltd\.?|limited|llc|plc|n\.?v\.?|s\.?a\.?|ag|se|holdings?|group)$/i;
+  for (let i = 0; i < 3 && suffix.test(s); i++) s = s.replace(suffix, "").trim();
+  return s.replace(/[,\s]+$/, "") || String(name || "").trim();
+}
+
 // ── Search a company's own pipeline: all trials where they're the lead sponsor.
 // Used by the Reference Sheet's combined EDGAR + CT.gov company lookup. ──
 async function searchTrialsBySponsor(companyName, limit) {
