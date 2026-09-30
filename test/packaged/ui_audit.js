@@ -14,7 +14,7 @@
 //   · sideways scrolling, console errors
 // Screenshots of every stop go to the output folder for review by eye.
 //
-//   $E test/packaged/ui_audit.js --app=electron/dist/mac-arm64/RxNPV.app [--out=…] [--only=Tools]
+//   $E test/packaged/ui_audit.js --app=electron/dist/mac-arm64/RxNPV.app [--out=…] [--only=Tools] [--sample=stoke|pepgen]
 const { app, dialog, BrowserWindow } = require("electron");
 const path = require("path"), fs = require("fs"), os = require("os");
 
@@ -193,13 +193,21 @@ app.whenReady().then(async () => {
     fs.writeFileSync(path.join(OUT, "shots", (pass + "-" + name).replace(/[^a-z0-9]+/gi, "-").toLowerCase() + ".png"), Buffer.from(shot.data, "base64"));
   }
 
-  // One case with two programs, a price, a Monte Carlo run.
-  await click("+ New case", 700);
-  await js(`__t.setVal(__t.byLabel("Peak worldwide revenue")[0], "1000")`); await sleep(200);
-  await js(`__t.setVal(__t.byLabel("Fully diluted shares")[0], "100000000")`); await sleep(200);
-  await js(`__t.setVal(document.querySelector('input[aria-label="Case name"]'), "Audit Bio")`); await sleep(200);
-  await js(`(() => { const l = [...document.querySelectorAll("span")].find(n => n.textContent.trim() === "Current price"); return __t.setVal(l.parentElement.querySelector("input"), "10"); })()`); await sleep(300);
-  await click("+ Add program", 700);
+  // One case with two programs, a price, a Monte Carlo run — or, with
+  // --sample=stoke|pepgen, one of the finished sample cases, so every chart
+  // and tool is checked against a real, fully filled case.
+  if (args.sample) {
+    await click("Load sample case", 400);
+    await click(args.sample === "pepgen" ? "PepGen — DM1, Phase 2" : "Stoke — Dravet, Phase 3", 1500);
+    await js(`document.getElementById("casetab-overview") && document.getElementById("casetab-overview").click()`); await sleep(500);
+  } else {
+    await click("+ New case", 700);
+    await js(`__t.setVal(__t.byLabel("Peak worldwide revenue")[0], "1000")`); await sleep(200);
+    await js(`__t.setVal(__t.byLabel("Fully diluted shares")[0], "100000000")`); await sleep(200);
+    await js(`__t.setVal(document.querySelector('input[aria-label="Case name"]'), "Audit Bio")`); await sleep(200);
+    await js(`(() => { const l = [...document.querySelectorAll("span")].find(n => n.textContent.trim() === "Current price"); return __t.setVal(l.parentElement.querySelector("input"), "10"); })()`); await sleep(300);
+    await click("+ Add program", 700);
+  }
   await click("Run 3,000 trials", 5000);
 
   const run = async () => { await js(`(() => { document.querySelectorAll("#ts-root .runbtn").forEach(b => b.click()); return true; })()`); await sleep(2200); };

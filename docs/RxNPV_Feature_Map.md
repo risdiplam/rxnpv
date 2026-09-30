@@ -109,7 +109,7 @@ The app assumes pre-revenue. A user modelling an early-commercial name (launched
 
 | Tool | Status | Notes |
 |---|---|---|
-| M&A comps (68) · Peak Sales (38) · Licensing (15) | **BUILT** | With custom add/edit/delete |
+| M&A comps (77) · Peak Sales (42) · Licensing (19) | **BUILT** | With custom add/edit/delete; counts as of 2026-09-30 |
 | Reference Sheet (9 tabs, incl. Trial Glossary) | **BUILT** | |
 | Placebo-response benchmarks | **BUILT, thin** | Only ~2 therapeutic areas, and display-only — nothing computes with it. Expand if control-arm stress wants a default. |
 | Published PoS base rates | **BUILT** | With the deviate-from-benchmark red flag |
