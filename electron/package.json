@@ -19,6 +19,7 @@
       "main.js",
       "preload.js",
       "rxnpv.html",
+      "icon-dock.png",
       "vendor/**"
     ],
     "mac": {

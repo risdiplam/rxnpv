@@ -327,7 +327,21 @@ ipcMain.handle('edgar:fetch', async (event, url) => {
   }
 });
 
-app.whenReady().then(createWindow);
+// The Dock icon, set at runtime. macOS 26 draws its own darkened version of
+// a bundle icon when the system icon style is Dark or Tinted, unless the app
+// ships an Icon Composer icon with its own dark look — which needs Xcode's
+// actool to compile. An image set here is shown as it is, so the running
+// app's Dock tile keeps the blue ℞ whatever the icon style. (Finder and
+// Launchpad still show the system's version of icon.icns.)
+function setDockIcon() {
+  if (process.platform !== 'darwin' || !app.dock) return;
+  try {
+    const img = require('electron').nativeImage.createFromPath(path.join(__dirname, 'icon-dock.png'));
+    if (!img.isEmpty()) app.dock.setIcon(img);
+  } catch (e) { /* the bundle icon still shows */ }
+}
+
+app.whenReady().then(() => { setDockIcon(); createWindow(); });
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
 app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
 
