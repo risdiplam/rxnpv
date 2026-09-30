@@ -609,17 +609,29 @@ function computePartnershipContribution(theCase, r, scenario) {
     // and scenario-scaled — so a milestone moves with Bear/Bull and with a
     // typed PoS exactly as the asset does. A missing scenario means Base (100%).
     const eff = computeEffectivePoS(prog, scenario || { posMultiplierPct: 100 });
+    // Timing comes from the case's own calendar, the one its R&D costs,
+    // revenue and PRV run on: a launch milestone is paid in the launch year,
+    // a stage milestone when that stage starts on the override-scaled (and,
+    // like distributeRnDCostByYear, squeezed-to-fit) stage timeline. It used
+    // to read the raw benchmark timeline, so Stoke's approval milestone was
+    // discounted over 4.35 years for a launch the case puts in year 1 —
+    // $18M (~$0.22 a share) understated.
     const rndFull = computeRnDToLaunch(prog);
+    const launchYear = resolveLaunchYearOffset(prog);
+    const rndOv = prog.rndOverride || {};
+    const scale = rndOv.totalYears !== "" && rndOv.totalYears != null && rndFull.totalYears > 0 ? Number(rndOv.totalYears) / rndFull.totalYears : 1;
+    const window = Math.max(1, launchYear);
+    const squeeze = rndFull.totalYears * scale > window ? window / (rndFull.totalYears * scale) : 1;
     let cumYears = 0;
     const yearsToReachStage = {};
-    rndFull.items.forEach(item => { yearsToReachStage[item.key] = cumYears; cumYears += item.years; });
+    rndFull.items.forEach(item => { yearsToReachStage[item.key] = cumYears * scale * squeeze; cumYears += item.years; });
     partnership.milestones.forEach(m => {
       const valueM = numOr(m.valueM, 0);
       if (valueM <= 0) return;
       let posToGate, yearsToGate;
       if (m.gate === "launch") {
         posToGate = eff.posToLaunch;
-        yearsToGate = rndFull.totalYears;
+        yearsToGate = launchYear;
       } else {
         const stage = eff.posStages.find(s => s.key === m.gate);
         posToGate = stage ? stage.posToReachStage : 1; // gate already behind current phase -> certain

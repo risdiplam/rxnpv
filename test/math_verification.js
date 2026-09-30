@@ -3786,11 +3786,12 @@ report();
 
 section("FIN-002: partnership milestones use the program's effective PoS");
 {
-  // A milestone paid at approval is worth  face × P(launch) ÷ (1+r)^T,  where
-  // T is the R&D timeline to launch. So with everything else fixed:
+  // A milestone paid at approval is worth  face × P(launch) ÷ (1+r)^L,  where
+  // L is the case's launch year (the benchmark timeline rounded, when the
+  // launch year is blank). So with everything else fixed:
   //   · a 50% PoS override vs a 10% one gives exactly 0.50/0.10 = 5× the value;
   //   · a Bear PoS multiplier of 70% on a 50% override gives 0.35/0.50 = 0.7×;
-  //   · $100M × 0.35 ÷ 1.12^T in absolute terms.
+  //   · $100M × 0.35 ÷ 1.12^L in absolute terms.
   // On f49689f milestones re-read the raw benchmark, so every ratio was 1.
   const prog = (overridePct, milestones, extra) => Object.assign({
     id: "p1", name: "Asset", currentPhase: "phase2", therapeuticArea: "Oncology", modality: "smallMolecule",
@@ -3806,30 +3807,39 @@ section("FIN-002: partnership milestones use the program's effective PoS");
   const base = { label: "base", shareMultiplierPct: 100, posMultiplierPct: 100, discountRateAddPct: 0, color: "" };
   const bear = { label: "bear", shareMultiplierPct: 100, posMultiplierPct: 70, discountRateAddPct: 0, color: "" };
   const launchM = [{ label: "Approval", gate: "launch", valueM: "100" }];
-  const T = api.computeRnDToLaunch(prog("50", launchM)).totalYears;
+  const T = Math.round(api.computeRnDToLaunch(prog("50", launchM)).totalYears); // = L, the launch year the case uses
 
   const m50 = api.computePartnershipContribution(mkCase(prog("50", launchM)), 0.12, base);
   const m10 = api.computePartnershipContribution(mkCase(prog("10", launchM)), 0.12, base);
   near("a 50% override is worth exactly 5x a 10% override", m50 / m10, 5, 1e-9);
-  near("absolute: $100M x 0.50 / 1.12^T", m50, 100e6 * 0.50 / Math.pow(1.12, T), 1e-3);
+  near("absolute: $100M x 0.50 / 1.12^L", m50, 100e6 * 0.50 / Math.pow(1.12, T), 1e-3);
 
   const mBear = api.computePartnershipContribution(mkCase(prog("50", launchM)), 0.12, bear);
   near("a Bear 70% PoS multiplier scales the milestone by exactly 0.7", mBear / m50, 0.7, 1e-9);
-  near("absolute Bear: $100M x 0.35 / 1.12^T", mBear, 100e6 * 0.35 / Math.pow(1.12, T), 1e-3);
+  near("absolute Bear: $100M x 0.35 / 1.12^L", mBear, 100e6 * 0.35 / Math.pow(1.12, T), 1e-3);
 
-  // PRV and a launch milestone of equal face on one program: both are
-  // face × the SAME effective P(launch), discounted from launch — the PRV from
-  // the program's launch year L, the milestone from T. So
-  //   PRV / milestone = 1.12^(T − L)   exactly, and PRV = $150M × 0.35 / 1.12^L.
+  // PRV and a launch milestone of equal face on one program: both are face ×
+  // the SAME effective P(launch), discounted from the same launch year L = 5,
+  // so they are equal — $150M × 0.35 / 1.12^5 each. (They used to differ by
+  // 1.12^(T − L): the milestone read the benchmark timeline, not the launch
+  // year the case typed.)
   const both = prog("50", [{ label: "Approval", gate: "launch", valueM: "150" }], { launchYearOffset: "5", prv: { enabled: true, valueM: "150" } });
   const cv = api.computeCaseValuation(mkCase(both), bear, null, 12, { enabled: false });
   near("PRV = $150M x 0.35 / 1.12^5", cv.equity.prvValueAdded, 150e6 * 0.35 / Math.pow(1.12, 5), 1e-3);
-  near("PRV and milestone share one effective PoS: ratio is 1.12^(T-5)",
-    cv.equity.prvValueAdded / cv.equity.partnershipValueAdded, Math.pow(1.12, T - 5), 1e-9);
+  near("a launch milestone is paid in the same launch year as the PRV: equal values", cv.equity.partnershipValueAdded, cv.equity.prvValueAdded, 1e-3);
+  // With an R&D override the stage calendar is the scaled one the R&D costs
+  // run on: a filing milestone on a 3-year override of a T-year timeline is
+  // paid at (years before filing) × 3/T.
+  const rndItems = api.computeRnDToLaunch(prog("50", launchM)).items;
+  const Tfull = rndItems.reduce((a, i) => a + i.years, 0);
+  const beforeFiling = rndItems.filter(i => i.key !== "regulatory").reduce((a, i) => a + i.years, 0);
+  const ov = prog("50", [{ label: "Filing", gate: "regulatory", valueM: "100" }], { launchYearOffset: "3", rndOverride: { totalYears: "3", totalCostM: "" } });
+  const reachFiling = api.computeEffectivePoS(ov, base).posStages.find(st => st.key === "regulatory").posToReachStage;
+  near("a filing milestone on an overridden timeline is discounted over the scaled years", api.computePartnershipContribution(mkCase(ov), 0.12, base), 100e6 * reachFiling / Math.pow(1.12, beforeFiling * 3 / Tfull), 1e-3);
 
   // Simple Multiple calls the same function and must pass its scenario too.
   const sm = api.computeSimpleMultipleValuation(mkCase(prog("50", launchM)), bear, null, 3, 12);
-  near("Simple Multiple: milestone = $100M x 0.35 / 1.12^T", sm.equity.partnershipValueAdded, 100e6 * 0.35 / Math.pow(1.12, T), 1e-3);
+  near("Simple Multiple: milestone = $100M x 0.35 / 1.12^L", sm.equity.partnershipValueAdded, 100e6 * 0.35 / Math.pow(1.12, T), 1e-3);
 
   // A stage gate reads the rebuilt stage path: the milestone is paid with the
   // probability of REACHING its stage. The stages always multiply back to the
