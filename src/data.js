@@ -267,6 +267,18 @@ const REGULATORY_BENCHMARKS = {
   euJapanFilingFeeK: 300
 };
 
+// ── Ex-US launch lag behind the US ──
+// EMA approval follows FDA's by a median ~6 months (ASCO 2021, FDA vs EMA
+// approvals); EU patient access follows EMA approval by ~1.6 years on average
+// across 36 countries (EFPIA Patients W.A.I.T. 2025) — near zero in Germany,
+// ~1.5-2 years in France, Italy and Spain. Japan typically one to two years
+// behind the US. Weighted by market size (Europe ~25%, Japan ~10% of sales),
+// about 1.5 years.
+const EXUS_LAUNCH_LAG_BENCHMARK = {
+  years: 1.5,
+  source: "EMA ~6 mo after FDA (median); EU access ~1.6 yr after EMA (EFPIA W.A.I.T. 2025), Germany near 0; Japan 1–2 yr — ~1.5 yr weighted by market size"
+};
+
 // ── PoS by phase & therapeutic area (Tables 14-3, 14-4, 14-5), 3-source reconciliation ──
 const POS_BY_AREA = {
   source: "By-area breakdown: DiMasi(2010)/Hay(2014)/Thomas(2016), Tables 14-3/4/5 (Thomas 2016 column shown, most complete coverage). " +

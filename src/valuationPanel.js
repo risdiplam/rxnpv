@@ -100,6 +100,21 @@ function useValuationSections({ theCase, onChange, goToTab }) {
   } catch (e) { error = e.message; }
 
   const baseResult = scenarioResults && scenarioResults.find(s => s.key === "base").result;
+  // The same case with every program at literal 100% odds on the raw Base
+  // preset: what the model says the company is worth if the drug works. Shown
+  // beside the odds-weighted scenarios so Base never reads as the failure case,
+  // and used by the range strip and the Projections card's "If it works" view.
+  let successResult = null;
+  if (valMethod === "dcf" && !error && scenarioResults) {
+    try {
+      const drBase = discountRatePct !== "" ? Number(discountRatePct) : DISCOUNT_RATE_GUIDANCE.earlyBiotechSelfView[0];
+      successResult = computeCaseValuation({ ...theCase, programs: theCase.programs.map(p => ({ ...p, posOverridePct: "100" })) }, SCENARIO_PRESETS.base, "base", drBase,
+        { enabled: tv.enabled, method: tv.method, growthPct: tv.growthPct, exitMultiple: tv.exitMultiple });
+    } catch (e) { successResult = null; }
+  }
+  const successPerShare = successResult && successResult.equity && isFinite(successResult.equity.perShare) ? successResult.equity.perShare : null;
+  // Already approved (or 100% odds typed in): "if it works" is just Base.
+  const showSuccess = successPerShare != null && baseResult && baseResult.equity && Math.abs(successPerShare - baseResult.equity.perShare) >= 0.005;
 
   // Hoisted out of the detailed "What this case's price implies" box further
   // down so the prominent summary card at the top of this panel can use the
@@ -182,6 +197,11 @@ function useValuationSections({ theCase, onChange, goToTab }) {
             price > 0 && s.result.equity.perShare != null && isFinite(s.result.equity.perShare) && h("div", { className: "pvm-move" + (s.result.equity.perShare >= price ? " up" : " down") },
               (s.result.equity.perShare >= price ? "+" : "−") + Math.abs(Math.round((s.result.equity.perShare / price - 1) * 100)) + "% vs today"))),
 
+          showSuccess && h("div", { className: "pvm-works" },
+            h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--green)" } }, "If it works"),
+            h("div", { style: { fontSize: 22, fontFamily: "var(--mono)", fontWeight: 800, color: "var(--green)" } }, fmtShare(successPerShare)),
+            price > 0 && h("div", { className: "pvm-move" + (successPerShare >= price ? " up" : " down") },
+              (successPerShare >= price ? "+" : "−") + Math.abs(Math.round((successPerShare / price - 1) * 100)) + "% vs today")),
           showImplied && theCase.programs.length === 1 && impliedSolved.baseAbsolutePct != null && h("div", null,
             h("div", { style: UI.caption }, "Your PoS"),
             h("div", { style: { fontSize: 22, fontFamily: "var(--mono)", fontWeight: 800, color: "var(--ink-1)" } }, impliedSolved.baseAbsolutePct.toFixed(0) + "%")),
@@ -194,24 +214,31 @@ function useValuationSections({ theCase, onChange, goToTab }) {
         (() => { const by = k => (scenarioResults.find(s => s.key === k) || { result: { equity: {} } }).result.equity.perShare;
           const r = readPriceVsScenarios(price, by("bear"), by("base"), by("bull"));
           return r && h(Explain, Object.assign({ onTint: true }, r)); })(),
+        showSuccess && h("div", { className: "prose", style: { ...UI.caption, marginTop: 8 } },
+          "Bear, Base and Bull are each weighted by the odds of launch" + (theCase.programs.length === 1 && baseResult.programVals && baseResult.programVals[0] ? " (Base: " + Math.round(baseResult.programVals[0].posToLaunch * 100) + "%)" : "") +
+          " — the average across the ways it can go, not the failure case. \u201cIf it works\u201d is Base with the drug approved: the value if every remaining readout and the FDA go its way."),
         valMethod === "multiple" && h("div", { style: { ...UI.caption, marginTop: 8 } }, "Implied PoS is DCF-only — switch off Simple Multiple to see what the price requires."),
         price == null && h("div", { style: { ...UI.caption, marginTop: 8 } }, "Set a current price above to see upside/downside and implied PoS."),
         valMethod === "dcf" && price != null && theCase.programs.length > 1 && h("div", { style: { ...UI.caption, marginTop: 8 } }, "Implied PoS as a single absolute number needs one program — see \"as a multiple\" further down for the multi-program version.")
       );
     })()),
 
+    // The panels below value each OUTCOME on its own (works / fails at each
+    // gate) rather than the odds-weighted average above. A heading says so,
+    // so "if it fails" never reads as the model's view of the company.
+    show("overview") && (!error && scenarioResults && valMethod === "dcf" && theCase.programs.length === 1 && showSuccess && h("div", { style: { margin: "6px 0 10px" } },
+      h("div", { style: { fontSize: 15, fontFamily: "var(--display)", fontWeight: 600, color: "var(--ink-1)" } }, "What each outcome is worth"),
+      h("div", { className: "prose", style: { ...UI.caption, marginTop: 3 } }, "The figures above average over success and failure. These value each ending on its own — the drug approved, or stopped at each readout — with the odds of each, so you can see what a win and a miss would each mean for the share price."))),
+
     // The whole range on one line: what is left if the readout fails, your
     // three scenarios, today's price, and the value if the drug works.
     show("overview") && (!error && scenarioResults && valMethod === "dcf" && (() => {
-      const drBase = discountRatePct !== "" ? Number(discountRatePct) : DISCOUNT_RATE_GUIDANCE.earlyBiotechSelfView[0];
-      const tvParams = { enabled: tv.enabled, method: tv.method, growthPct: tv.growthPct, exitMultiple: tv.exitMultiple };
-      let success = null, floor = null;
-      try {
-        // Literal 100% odds on the raw Base preset — "works" means certain
-        // success, not certain relative to any case-level PoS adjustment.
-        success = computeCaseValuation({ ...theCase, programs: theCase.programs.map(p => ({ ...p, posOverridePct: "100" })) }, SCENARIO_PRESETS.base, "base", drBase, tvParams).equity.perShare;
-        floor = computeFailureFloor(theCase);
-      } catch (e) { return null; }
+      // Literal 100% odds on the raw Base preset (successResult, above) —
+      // "works" means certain success, not certain relative to any case-level
+      // PoS adjustment.
+      const success = successPerShare;
+      let floor = null;
+      try { floor = computeFailureFloor(theCase); } catch (e) { return null; }
       const price = theCase.currentPrice !== "" && theCase.currentPrice != null && Number(theCase.currentPrice) > 0 ? Number(theCase.currentPrice) : null;
       const by = k => scenarioResults.find(s => s.key === k).result.equity.perShare;
       // Nothing to place on a per-share line until there is a share count.
@@ -365,7 +392,7 @@ function useValuationSections({ theCase, onChange, goToTab }) {
           h("div", { style: { marginTop: 8 } },
             h(Note, { summary: "How the shield is applied" },
               h("div", { style: { lineHeight: 1.6 } },
-                "Projected loss years add to the shield; profits draw it down before any tax is charged. Ignores the 80%-of-income annual cap on post-2017 federal NOL use and any expiry of older losses — both would pull tax slightly forward, so this errs mildly optimistic.")))
+                "Tax is worked out for the world where the drug works — its own loss years add to the shield, its profits draw it down — and then weighted by the odds of launch, since a drug that fails earns nothing to tax. (With several programmes the odds-weighted flow is taxed instead, an approximation.) Ignores the 80%-of-income annual cap on post-2017 federal NOL use and any expiry of older losses — both would pull tax slightly forward, so this errs mildly optimistic.")))
         )
       );
     })()),
@@ -468,13 +495,13 @@ function useValuationSections({ theCase, onChange, goToTab }) {
             h(BenchField, { label: "Fully diluted shares outstanding", value: cap.dilutedSharesSimple, onChange: v => setCap({ dilutedSharesSimple: v }), placeholder: "e.g. 50000000" }),
             h(MillionsField, { label: "Cash & equivalents", value: cap.cash, onChange: v => setCap({ cash: v }) }),
             h(MillionsField, { label: "Debt", value: cap.debt, onChange: v => setCap({ debt: v }) }),
-            h(CashAsOfFields, { cap, setCap, theCase }),
-            h(CashAsOfFields, { cap, setCap, theCase })
+            h(CashAsOfFields, { cap, setCap, theCase, update })
           )
         : h("div", { style: { display: "flex", gap: 16, flexWrap: "wrap" } },
             h(BenchField, { label: "Basic shares outstanding", value: cap.basicShares, onChange: v => setCap({ basicShares: v }) }),
             h(MillionsField, { label: "Cash & equivalents", value: cap.cash, onChange: v => setCap({ cash: v }) }),
             h(MillionsField, { label: "Debt", value: cap.debt, onChange: v => setCap({ debt: v }) }),
+            h(CashAsOfFields, { cap, setCap, theCase, update }),
             h("div", { style: { flex: "1 1 100%", fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", margin: "4px 0" } }, "Options / warrants (treasury method — dilutive only if in the money; uses Current price above)"),
             h(BenchField, { label: "Options outstanding", value: cap.opts, onChange: v => setCap({ opts: v }) }),
             h(BenchField, { label: "Options avg strike", value: cap.optK, onChange: v => setCap({ optK: v }), suffix: "$" }),
@@ -648,7 +675,7 @@ function useValuationSections({ theCase, onChange, goToTab }) {
           ))
         )),
         show("scenarios") && (valMethod === "dcf" && theCase.programs.length === 1 && h(ReadoutScenariosSection, { theCase, discountRatePct, tv, baseValue: baseResult && baseResult.equity ? baseResult.equity.perShare : null, onChange })),
-        show("overview") && (valMethod === "dcf" && baseResult && h(ProjectionsCard, { theCase, result: baseResult })),
+        show("overview") && (valMethod === "dcf" && baseResult && h(ProjectionsCard, { theCase, result: baseResult, successResult: showSuccess ? successResult : null })),
 
         // Implied PoS — the reverse direction from everything else on this
         // panel: solve backwards from the current price to find what PoS the
@@ -871,16 +898,22 @@ function projectionsCsv(rows, startYear, npvResult) {
   lines.push("Dollar amounts in $M. Odds-weighted except 'Revenue if it works'. Year 0 is the twelve months from today.");
   return lines.join("\n");
 }
-function ProjectionsCard({ theCase, result }) {
+function ProjectionsCard({ theCase, result, successResult }) {
   const h = React.createElement;
   const [view, setView] = React.useState(() => { try { return localStorage.getItem(PROJECTION_VIEW_KEY) || "both"; } catch (e) { return "both"; } });
+  // "weighted": each year x the odds (what the valuation adds up). "works":
+  // the same case with the drug approved — the company's own P&L if it
+  // succeeds, which is what a reader usually means by "the projections".
+  const [world, setWorld] = React.useState("weighted");
   const [showAll, setShowAll] = React.useState(false);
   const [csvMsg, setCsvMsg] = React.useState(null);
   const pickView = v => { setView(v); try { localStorage.setItem(PROJECTION_VIEW_KEY, v); } catch (e) {} };
-  const rows = computeProjectionRows(result, theCase);
+  const works = world === "works" && successResult;
+  const shownResult = works ? successResult : result;
+  const rows = computeProjectionRows(shownResult, theCase);
   if (!rows.length) return null;
   const startYear = new Date().getFullYear();
-  const npv = result.npvResult;
+  const npv = shownResult.npvResult;
   const shown = showAll ? rows : rows.slice(0, PROJECTION_TABLE_ROWS);
   const isDesktop = typeof window !== "undefined" && window.electronAPI && window.electronAPI.isDesktop;
   const saveCsv = async () => {
@@ -895,12 +928,16 @@ function ProjectionsCard({ theCase, result }) {
     h("div", { className: "proj-head" },
       h("div", null,
         h("div", { style: { fontSize: 13, fontFamily: "var(--display)", fontWeight: 600, color: "var(--ink-1)", marginBottom: 4 } }, title),
-        h("div", { className: "prose", style: UI.caption }, "Base case. Bars are each year's odds-weighted cash flows; the pale top is the revenue you would add if success were certain. The line is the running total of present value. " + startYear + " is the next twelve months, counted the same way as “Launch in year”.")),
-      h("div", { className: "proj-toggle", role: "group", "aria-label": "Projection view", "data-no-export": "" },
-        [["both", "Chart + table"], ["chart", "Chart"], ["table", "Table"]].map(([k, l]) => h("button", { key: k, type: "button", "aria-pressed": view === k, className: view === k ? "on" : "", onClick: () => pickView(k) }, l)))),
-    view !== "table" && h(ExportableBlock, { title: (theCase.name || "Case") + " — year-by-year cash flows (Base case)" },
-      h(ProjectionChart, { rows, startYear, height: 300, label: "Year-by-year odds-weighted cash flows and running present value, base case" })),
-    view !== "chart" && h(ProjectionTable, { rows: shown, allCount: rows.length, startYear, npv,
+        works ? h("div", { className: "prose", style: UI.caption }, "Base case, if the drug is approved: every remaining trial is paid for in full and every year's sales arrive, with no odds applied. The line is the running total of present value — what the company is worth in that world, before cash and shares.")
+        : h("div", { className: "prose", style: UI.caption }, "Base case. Bars are each year's odds-weighted cash flows; the pale top is the revenue you would add if success were certain. The line is the running total of present value. " + startYear + " is the next twelve months, counted the same way as “Launch in year”.")),
+      h("div", { style: { display: "flex", flexDirection: "column", gap: 6, alignItems: "flex-end" } },
+        successResult && h("div", { className: "proj-toggle", role: "group", "aria-label": "Which world to show", "data-no-export": "" },
+          [["weighted", "× odds"], ["works", "If it works"]].map(([k, l]) => h("button", { key: k, type: "button", "aria-pressed": world === k, className: world === k ? "on" : "", onClick: () => setWorld(k) }, l))),
+        h("div", { className: "proj-toggle", role: "group", "aria-label": "Projection view", "data-no-export": "" },
+          [["both", "Chart + table"], ["chart", "Chart"], ["table", "Table"]].map(([k, l]) => h("button", { key: k, type: "button", "aria-pressed": view === k, className: view === k ? "on" : "", onClick: () => pickView(k) }, l))))),
+    view !== "table" && h(ExportableBlock, { title: (theCase.name || "Case") + " — year-by-year cash flows (Base case" + (works ? ", if it works)" : ")") },
+      h(ProjectionChart, { rows, startYear, height: 300, works: !!works, label: works ? "Year-by-year cash flows if the drug is approved and running present value, base case" : "Year-by-year odds-weighted cash flows and running present value, base case" })),
+    view !== "chart" && h(ProjectionTable, { rows: shown, allCount: rows.length, startYear, npv, works: !!works,
       footer: h(React.Fragment, null,
         rows.length > PROJECTION_TABLE_ROWS && h("button", { type: "button", className: "link-btn", "data-no-export": "", onClick: () => setShowAll(!showAll) },
           showAll ? "Show the first " + PROJECTION_TABLE_ROWS + " years" : "Show all " + rows.length + " years (to " + (startYear + rows[rows.length - 1].index) + ")"),
@@ -913,7 +950,9 @@ function ProjectionsCard({ theCase, result }) {
 // The year table on its own, shared by the Overview card and the report.
 // rows: the rows to show (possibly a first slice); footer: controls for the
 // left of the total line (the report passes none).
-function ProjectionTable({ rows, startYear, npv, footer, compact }) {
+// works: the rows are the if-it-works world, so the "× odds" revenue column
+// would only repeat the first — it is left out.
+function ProjectionTable({ rows, startYear, npv, footer, compact, works }) {
   const h = React.createElement;
   const hasPhase = rows.some(r => r.phase);
   const m = v => v === 0 ? "—" : fmtMoney(v, Math.abs(v) >= 1e9 ? 2 : 0);
@@ -921,8 +960,8 @@ function ProjectionTable({ rows, startYear, npv, footer, compact }) {
   // compact (the report's 800px page): R&D, COGS + S&M and G&A fold into one
   // "Costs" column and the discount factor is left out, so all of it prints.
   const cols = compact
-    ? [["Year", "l"], hasPhase && ["Phase", "l"], ["If it works"], ["× odds"], ["Costs"], ["Tax"], ["Cash flow"], ["Present value"], ["Running total"]]
-    : [["Year", "l"], hasPhase && ["Phase", "l"], ["Revenue if it works"], ["Revenue × odds"], ["R&D"], ["COGS + S&M"], ["G&A"], ["Tax"], ["Cash flow"], ["Discount"], ["Present value"], ["Running total"]];
+    ? [["Year", "l"], hasPhase && ["Phase", "l"], ["If it works"], !works && ["× odds"], ["Costs"], ["Tax"], ["Cash flow"], ["Present value"], ["Running total"]]
+    : [["Year", "l"], hasPhase && ["Phase", "l"], [works ? "Revenue" : "Revenue if it works"], !works && ["Revenue × odds"], ["R&D"], ["COGS + S&M"], ["G&A"], ["Tax"], ["Cash flow"], ["Discount"], ["Present value"], ["Running total"]];
   const shownCols = cols.filter(Boolean);
   const span = shownCols.length - 2;
   const cell = (v, cls) => h("td", { className: cls || "" }, v);
@@ -935,7 +974,7 @@ function ProjectionTable({ rows, startYear, npv, footer, compact }) {
           cell(String(startYear + r.index), "l"),
           hasPhase && cell(r.phase, "l phase"),
           cell(m(r.revenueIfWorks)),
-          cell(m(r.revenue)),
+          !works && cell(m(r.revenue)),
           compact ? cell(neg(costs), costs > 0 ? "neg" : "") : [
             h("td", { key: "rd", className: r.rnd > 0 ? "neg" : "" }, neg(r.rnd)),
             h("td", { key: "cm", className: r.commercialCosts > 0 ? "neg" : "" }, neg(r.commercialCosts)),
@@ -955,7 +994,7 @@ function ProjectionTable({ rows, startYear, npv, footer, compact }) {
 
 // Cash as of the balance-sheet date, carried forward to the valuation date
 // (effectiveCapitalStructure). Both fields optional; blank = no adjustment.
-function CashAsOfFields({ cap, setCap, theCase }) {
+function CashAsOfFields({ cap, setCap, theCase, update }) {
   const h = React.createElement;
   const eff = effectiveCapitalStructure(theCase);
   const inputStyle = { padding: "7px 10px", minHeight: 28, borderRadius: 6, border: "1.5px solid var(--rule)", background: "var(--surface)", color: "var(--ink-1)", fontFamily: "var(--mono)", fontSize: 13 };
@@ -964,6 +1003,11 @@ function CashAsOfFields({ cap, setCap, theCase }) {
       "Cash as of (balance-sheet date)",
       h("input", { type: "date", value: cap.cashAsOf || "", onChange: e => setCap({ cashAsOf: e.target.value }), style: inputStyle })),
     h(MillionsField, { label: "Monthly burn since then", value: cap.monthlyBurn || "", onChange: v => setCap({ monthlyBurn: v }) }),
+    // theCase.valuationDate: the day cash is carried forward to. Blank = today;
+    // a sample case sets it so its numbers do not drift day by day.
+    h("label", { style: { display: "flex", flexDirection: "column", gap: 4, fontSize: 12, fontFamily: "var(--sans)", color: "var(--ink-2)" } },
+      "Value as of (blank = today)",
+      h("input", { type: "date", value: theCase.valuationDate || "", onChange: e => update({ valuationDate: e.target.value }), style: inputStyle })),
     h("div", { style: { ...UI.caption, flex: "1 1 260px", lineHeight: 1.6 } },
       eff._spentSinceFiling
         ? "Carried forward " + eff._monthsSinceFiling.toFixed(1) + " months to " + (theCase.valuationDate || "today") + ": " + fmtMoney(eff._cashFiled) + " − " + fmtMoney(eff._spentSinceFiling) + " spent ≈ " + fmtMoney(Number(eff.cash)) + ". The valuation charges costs from today, so without this the months since the filing would be paid for twice."

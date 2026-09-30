@@ -240,7 +240,8 @@ function ReferenceSheet({ activeCase }) {
         h("div", null, h("b", null, "AWP"), " — ", PRICING_DEFS.AWP),
         h("div", null, h("b", null, "Retail"), " — ", PRICING_DEFS.Retail),
         h("div", { style: { marginTop: 8 } }, "US annual growth: ", h("b", null, PRICING_DEFS.usAnnualGrowth.join("-") + "%"), " base case, up to ", PRICING_DEFS.usAnnualGrowthHighCase + "%", " in high-pricing-power scenarios"),
-        h("div", null, "Ex-US price factor: ", h("b", null, PRICING_DEFS.exUSPriceFactor + "% of US"), " typical (see country table below)")
+        h("div", null, "Ex-US price factor: ", h("b", null, PRICING_DEFS.exUSPriceFactor + "% of US"), " typical (see country table below)"),
+        h("div", null, "Ex-US launch after the US: ", h("b", null, EXUS_LAUNCH_LAG_BENCHMARK.years + " years"), " — ", EXUS_LAUNCH_LAG_BENCHMARK.source, ". The ex-US ramp runs on the same curve, that much later; loss of exclusivity stays on the US calendar.")
       )
     ]),
     card([ label("Exact price interconversion (Table 4-1)"),
@@ -490,8 +491,8 @@ function ReferenceSheet({ activeCase }) {
     ]),
     card([ label("Simplifications, stated plainly") ,
       h("ul", { style: { fontSize: 12, fontFamily: "var(--sans)", color: "var(--ink-1)", lineHeight: 1.9, paddingLeft: 18, margin: 0 } },
-        h("li", null, "EBIT is used as a proxy for unlevered free cash flow — no tax, capex, or working-capital adjustment. Defensible for early-stage biotech (often NOL-shielded pre-profitability), but worth knowing if you're used to a fuller FCF build."),
-        h("li", null, "The flat pre-commercial G&A baseline is NOT risk-adjusted per-program — it's a real cost incurred during the trial period regardless of eventual outcome (standard rNPV practice: near-certain near-term costs aren't discounted by long-run success odds). The portion of G&A that scales toward mature commercial levels DOES respond to risk-adjusted revenue, so a low-probability asset correctly never gets modeled as scaling up to full commercial overhead."),
+        h("li", null, "EBIT is used as a proxy for unlevered free cash flow — no capex or working-capital adjustment (biotech is asset-light). Cash tax is optional: when on, it is worked out in the world where the drug works, after that world's own losses, and weighted by the odds of launch, because a failed drug has no profit to tax. Taxing the odds-weighted flow instead would let the failed worlds' losses shield the successful world's profits. With several programmes the app does tax the odds-weighted flow — an approximation, stated."),
+        h("li", null, "Corporate G&A is weighted by the odds the company is still there to pay it, the way practitioners weight R&D: before launch, the pre-commercial figure times the odds the programme is still in development (or in the wind-down after a failure, one year by default); after launch, G&A set by the revenue the drug has if it launched, times the odds it did. It used to be charged in full every year whether or not the drug had failed, which charged a company with a 15% chance of launch 25 years of overhead. With several programmes, the launched-world revenue is an average across the ways they can succeed — an approximation, stated."),
         h("li", null, "Terminal value is off by default. Exit Multiple (the default method when turned on) truncates cash flows at the peak-revenue year and discounts peak revenue x multiple back from that year — modeling an acquisition, not an indefinite continuation. Perpetuity Growth instead grows the final modeled year's cash flow forever, which usually overstates value for a single-asset case whose explicit window already runs through loss-of-exclusivity — better suited to an ongoing multi-program platform company."),
         h("li", null, "Sales force cost doesn't scale with the Bear/Bull share multiplier (team size is treated as a separate staffing decision) — only revenue, COGS, and marketing (tied to peak revenue) rescale.")
       )

@@ -143,10 +143,32 @@ function computeCompanyRiskAdjustedCF(programs, corporateGA, totalYears) {
     });
     calendar.push({ calendarYear: cy, revenue, riskAdjProductContribution, riskAdjRnDCost });
   }
-  const gaByYear = computeCorporateGA(calendar.map(c => c.revenue), corporateGA.preCommercialAnnualM, corporateGA.gaShareOfMatureSgaPct);
+  // Corporate overhead is weighted by the odds the company is still there to
+  // pay it, as R&D is (docs/RxNPV_rNPV_Methodology_Review.md, item A). Each
+  // year splits into three worlds:
+  //   still developing, or winding down after a failure  -> pre-commercial G&A
+  //   launched                                            -> G&A on the revenue
+  //                                                          it has if launched
+  //   stopped (failed, wind-down over)                    -> none
+  // "Revenue if launched" is the odds-weighted revenue over the odds of having
+  // launched: exact for one program; for several, an average across the
+  // launched worlds. Before this, overhead was charged in full every year
+  // whether or not the drug had failed, and on odds-weighted revenue — so a
+  // company with a 15% chance of launch paid pre-commercial G&A for 25 years.
+  // With certain odds (the unrisked runway, the dilution path) nothing
+  // changes: active = 1 throughout and launched = 1 from the launch year.
+  const odds = computeCompanyActiveByYear(programs, corporateGA.windDownYears, totalYears);
+  const preGA = computeCorporateGA([0], corporateGA.preCommercialAnnualM, corporateGA.gaShareOfMatureSgaPct)[0];
   calendar.forEach((c, i) => {
-    c.corporateGA = gaByYear[i];
-    c.riskAdjFCF = c.riskAdjProductContribution - c.riskAdjRnDCost - gaByYear[i];
+    const { active, launched } = odds[i];
+    const ifLaunched = launched > 0
+      ? computeCorporateGA([c.revenue / launched], corporateGA.preCommercialAnnualM, corporateGA.gaShareOfMatureSgaPct)[0]
+      : 0;
+    const ga = preGA * Math.max(0, active - launched) + ifLaunched * launched;
+    c.activeOdds = active;
+    c.launchedOdds = launched;
+    c.corporateGA = ga;
+    c.riskAdjFCF = c.riskAdjProductContribution - c.riskAdjRnDCost - ga;
   });
   return calendar;
 }
@@ -159,10 +181,17 @@ function computeCompanyRiskAdjustedCF(programs, corporateGA, totalYears) {
 // value once a product is actually selling — which matters most in terminal
 // value, typically the majority of a DCF's total.
 //
-// Deliberately simple in two ways, both stated rather than hidden:
-//   * It taxes the RISK-ADJUSTED flow, consistent with how every other line in
-//     this model is probability-weighted. Taxing an unrisked flow and then
-//     risk-adjusting would double-count the probability.
+// Which flow gets taxed. Tax is owed in the world where the drug works, on
+// that world's profit after that world's losses — so the expected tax is
+// P(launch) x the tax of the success-case flows, which is what practitioners
+// compute (docs/RxNPV_rNPV_Methodology_Review.md, item B). Taxing the
+// odds-weighted flow instead lets the failed worlds' losses shield the
+// success world's profits, which never happens. A single-program case is
+// taxed that way (taxSuccessWorld below); with several programs there are
+// many success worlds, and the case keeps taxing the odds-weighted flow —
+// an approximation, stated. This function taxes whatever calendar it is given.
+//
+// Deliberately simple in one more way, stated rather than hidden:
 //   * It ignores the 80%-of-taxable-income annual cap on post-2017 federal NOL
 //     usage, and any expiry of pre-2018 losses. Both would slightly ACCELERATE
 //     tax, so this is the mildly optimistic direction — noted so it isn't
@@ -189,6 +218,24 @@ function applyTaxToCalendar(calendar, taxation) {
     nolPool -= nolUsed;
     const tax = (preTax - nolUsed) * rate;
     return { ...c, preTaxFCF: preTax, nolUsed, tax, nolPoolEnd: nolPool, riskAdjFCF: preTax - tax };
+  });
+}
+
+// ── Expected tax for one program: P(launch) x the tax if it works ──
+// riskedCalendar: the odds-weighted calendar (untaxed). successCalendar: the
+// same program with certain odds (untaxed), so full R&D, full revenue and the
+// overhead of a company that launches. Each year's tax is the success world's
+// tax (with its own loss carryforward) times the odds of launch; the failed
+// worlds have no profit and pay none. Taxation off -> the risked calendar.
+function taxSuccessWorld(riskedCalendar, successCalendar, posToLaunch, taxation) {
+  if (!taxation || !taxation.enabled) return riskedCalendar;
+  const taxed = applyTaxToCalendar(successCalendar, taxation);
+  if (taxed === successCalendar) return riskedCalendar;
+  return riskedCalendar.map((c, i) => {
+    const w = taxed[i] || {};
+    const taxIfWorks = w.tax || 0;
+    const tax = taxIfWorks * posToLaunch;
+    return { ...c, preTaxFCF: c.riskAdjFCF, tax, taxIfWorks, nolPoolEnd: w.nolPoolEnd, riskAdjFCF: c.riskAdjFCF - tax };
   });
 }
 

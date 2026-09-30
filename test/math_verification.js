@@ -66,7 +66,7 @@ const EXPORTS = [
   "SCENARIO_PRESETS", "getEffectiveScenarioPreset", "applyBasePosAdjustment",
   "computeProgramValuation", "computeCaseValuation", "baseCaseFairValue", "computeProjectionRows", "computeSensitivityDrivers", "computeProgramRiskWaterfall",
   "computeEffectivePoS", "computeRnDToLaunch", "launchCurveForYears", "resolveLaunchYearOffset",
-  "computeFullCaseMonteCarlo", "solveImpliedPoSMultiplier", "solveImpliedVariable", "computeCompanyActiveByYear", "effectiveCapitalStructure", "computeEquityBridgeSteps", "computeRedFlags", "quickModeTerritoryMismatch",
+  "computeFullCaseMonteCarlo", "solveImpliedPoSMultiplier", "solveImpliedVariable", "computeCompanyActiveByYear", "computeCompanyRiskAdjustedCF", "EXUS_LAUNCH_LAG_BENCHMARK", "effectiveCapitalStructure", "computeEquityBridgeSteps", "computeRedFlags", "quickModeTerritoryMismatch",
   "computePortfolioSummary", "shrinkBinaryResponseRate", "shrinkHazardRatio",
   "BINARY_SHRINKAGE_FACTOR", "HR_SHRINKAGE_FACTOR",
   "MODALITY_OPTIONS", "getCogsBenchmark", "getErosionDefaults", "resolveErosionParams",
@@ -4483,14 +4483,17 @@ section("Stoke, the whole case recomputed from its inputs (Bear, Base, Bull)");
   //   Treated     15,700 x 75% x 60% x 80% = 5,652; x 60% share x 85% = 2,882.5 at peak
   //   US          $375,000 WAC x 80% = $300,000, +3% a year; 5-year median ramp
   //   Ex-US       140% of US patients x $187,500 (50% of the entered price), flat,
-  //               replaced by a 15% royalty on it
+  //               1.5 years behind the US curve, replaced by a 15% royalty on it
   //   LOE         year 12: 45% of volume x 65% of price
   //   Costs       COGS 10% and marketing 3% of peak US sales — on US sales only;
   //               50 specialty reps x $280,000 (+2%/yr), 30% in the year before launch
   //   R&D         $200M split by benchmark, x 70% (Biogen pays 30%), x odds of
   //               reaching each stage, all in year 0 (a 1.4-year timeline in a
   //               1-year window)
-  //   G&A $95M before revenue; tax 21% after a $301.7M NOL; discount 12% (+3 / -1)
+  //   G&A $95M before revenue, on revenue-if-launched after, each weighted by
+  //       the odds the company is in that state (developing / launched);
+  //       tax 21% of the success case's profit after a $301.7M NOL, x P(launch);
+  //       discount 12% (+3 / -1)
   //   Equity      NPV + $420M cash + PRV $190M x P(launch) / 1.12 + milestone
   //               $100M x P(launch) / 1.12 + $194M raise
   //   Shares      68,229,972 + 11,532,638 x (1 - 13.84 / 24.80) + 2,157,698
@@ -4502,7 +4505,7 @@ section("Stoke, the whole case recomputed from its inputs (Bear, Base, Bull)");
   const p = c.programs[0];
   const rnd = api.computeRnDToLaunch(p);
   const ramp = api.LAUNCH_CURVE_EXACT[5].median.map(x => x / 100);
-  const expectPS = { bear: 14.4113, base: 29.0502, bull: 45.9621 };
+  const expectPS = { bear: 14.9406, base: 28.7629, bull: 44.8640 };
   for (const [key, share, posMult, addPct] of [["bear", 70, 75, 3], ["base", 100, 100, 0], ["bull", 130, 120, -1]]) {
     const r = (12 + addPct) / 100, N = 25, L = 1;
     const eff = api.computeEffectivePoS(p, { posMultiplierPct: posMult });
@@ -4511,22 +4514,42 @@ section("Stoke, the whole case recomputed from its inputs (Bear, Base, Bull)");
     const peakPts = 15700 * 0.75 * 0.60 * 0.80 * 0.60 * (share / 100) * 0.85;
     const us = [], roy = [];
     for (let y = 1; y <= N; y++) {
-      const pts = peakPts * (y <= 5 ? ramp[y - 1] : 1), em = y <= 12 ? 1 : 0.45 * 0.65;
+      const R = k => k < 1 ? 0 : k <= 5 ? ramp[k - 1] : 1;
+      const pts = peakPts * R(y), em = y <= 12 ? 1 : 0.45 * 0.65;
+      // Ex-US launches 1.5 years after the US: each year sits halfway
+      // between the US curve's year y-2 and year y-1 (year 2 = half of year 1).
+      const exPts = peakPts * (R(y - 2) + R(y - 1)) / 2;
       us.push(pts * 300000 * Math.pow(1.03, y - 1) * em);
-      roy.push(pts * 1.40 * 187500 * em * 0.15);
+      roy.push(exPts * 1.40 * 187500 * em * 0.15);
     }
     const peakUS = Math.max(...us);
     const contrib = us.map((u, i) => u + roy[i] - 0.10 * u - (i < 12 ? 50 * 280000 * Math.pow(1.02, i) + 0.03 * peakUS : 0));
     const bCost = rnd.items.reduce((a, i) => a + i.costM, 0);
     const rd0 = rnd.items.reduce((a, i) => a + i.costM * (200 / bCost) * 0.70 * 1e6 * reach[i.key], 0) + 50 * 280000 * 0.30 * pos;
     const ga = v => v <= 0 ? 95e6 : v >= 400e6 ? v * 0.17 : 95e6 + (400e6 * 0.17 - 95e6) * v / 400e6;
+    // Overhead only while the company is still going. The stages (benchmark
+    // 3.1 + 1.25 years) are squeezed into the one-year window, so Phase 3's
+    // gate closes at 3.1 / 4.35 of a year and the FDA's at 1.0; after a
+    // failure the company winds down for one more year. Stopped share of year
+    // t = each gate's failure odds x the part of [t, t+1) past gate + 1 year.
+    const bYrs = rnd.items.reduce((a, i) => a + i.years, 0);
+    let cumB = 0;
+    const gates = rnd.items.map((it, j) => {
+      cumB += it.years;
+      return { cut: cumB / bYrs * 1 + 1, fail: reach[it.key] - (j + 1 < rnd.items.length ? reach[rnd.items[j + 1].key] : pos) };
+    });
+    const active = t => 1 - gates.reduce((a, g) => a + g.fail * Math.min(1, Math.max(0, t + 1 - g.cut)), 0);
+    // Tax: the success case's (all R&D, full sales), after its own losses, x P(launch).
+    const rdFull = rnd.items.reduce((a, i) => a + i.costM * (200 / bCost) * 0.70 * 1e6, 0) + 50 * 280000 * 0.30;
     let nol = 301.7e6, npv = 0;
     for (let t = 0; t < N; t++) {
-      const i = t - L;
-      const pre = (i >= 0 ? contrib[i] * pos : 0) - (t === 0 ? rd0 : 0) - ga(i >= 0 ? (us[i] + roy[i]) * pos : 0);
-      let tax = 0;
-      if (pre < 0) nol -= pre; else { const use = Math.min(nol, pre); nol -= use; tax = 0.21 * (pre - use); }
-      npv += (pre - tax) / Math.pow(1 + r, t + 1);
+      const i = t - L, launched = i >= 0 ? pos : 0;
+      const gaT = 95e6 * (active(t) - launched) + (i >= 0 ? launched * ga(us[i] + roy[i]) : 0);
+      const pre = (i >= 0 ? contrib[i] * pos : 0) - (t === 0 ? rd0 : 0) - gaT;
+      const ifWorks = (i >= 0 ? contrib[i] - ga(us[i] + roy[i]) : -95e6) - (t === 0 ? rdFull : 0);
+      let taxIfWorks = 0;
+      if (ifWorks < 0) nol -= ifWorks; else { const use = Math.min(nol, ifWorks); nol -= use; taxIfWorks = 0.21 * (ifWorks - use); }
+      npv += (pre - pos * taxIfWorks) / Math.pow(1 + r, t + 1);
     }
     const shares = 64526242 + 3703730 + 11532638 * (1 - 13.84 / 24.80) + 2157698 + 194e6 / 24.06;
     const perShare = (npv + 420e6 + (190e6 + 100e6) * pos / Math.pow(1 + r, L) + 194e6) / shares;
@@ -4593,6 +4616,88 @@ section("Cash is carried forward from the filing to the valuation date");
   ok("either field blank: no adjustment", api.effectiveCapitalStructure(pg) === pg.capitalStructure);
   const early = JSON.parse(JSON.stringify(c)); early.valuationDate = "2026-06-01";
   ok("a valuation date before the filing spends nothing", Number(api.effectiveCapitalStructure(early).cash) === 117238000);
+}
+report();
+
+section("Overhead is charged only while the company is still going");
+{
+  // With certain odds (the unrisked runway, the dilution path's cash walk)
+  // nothing changes: G&A is exactly computeCorporateGA of the revenue.
+  const pg = JSON.parse(fs.readFileSync(path.join(__dirname, "fixtures", "pepgen_case.json"), "utf8"));
+  const base = api.getEffectiveScenarioPreset(pg, "base");
+  const sure = pg.programs.map(p => api.computeProgramValuation({ ...p, posOverridePct: "100" }, base, null));
+  const calSure = api.computeCompanyRiskAdjustedCF(sure, pg.corporateGA, 25);
+  const old = api.computeCorporateGA(calSure.map(c => c.revenue), pg.corporateGA.preCommercialAnnualM, pg.corporateGA.gaShareOfMatureSgaPct);
+  ok("certain odds: every year's G&A equals the old formula", calSure.every((c, i) => Math.abs(c.corporateGA - old[i]) < 1e-6));
+  // Risked (15% to launch, launch in year 5): year 2 is $26M x 0.825 still
+  // going; from year 7 the failed worlds have wound down, leaving 15% x G&A on
+  // the revenue the launched drug has.
+  const risked = pg.programs.map(p => api.computeProgramValuation(p, base, null));
+  const cal = api.computeCompanyRiskAdjustedCF(risked, pg.corporateGA, 25);
+  near("year 2: $26M x the 82.5% still going", cal[2].corporateGA, 26e6 * cal[2].activeOdds, 1);
+  const ifLaunched = api.computeCorporateGA([cal[8].revenue / 0.15], pg.corporateGA.preCommercialAnnualM, pg.corporateGA.gaShareOfMatureSgaPct)[0];
+  near("year 8: 15% x G&A on the revenue if launched", cal[8].corporateGA, 0.15 * ifLaunched, 1);
+  ok("the old way charged $26M+ every year; now year 8 is under $26M", cal[8].corporateGA < 26e6);
+}
+report();
+
+section("Tax is owed where the drug works: P(launch) x the tax if it works");
+{
+  // PepGen Base, tax on (21%, $177.3M of losses carried in). The success case
+  // is the program at certain odds; its tax each year (after its own losses)
+  // times 15% is the expected tax. Checked year by year against a loop here.
+  const pg = JSON.parse(fs.readFileSync(path.join(__dirname, "fixtures", "pepgen_case.json"), "utf8"));
+  const base = api.getEffectiveScenarioPreset(pg, "base");
+  const r = api.computeCaseValuation(pg, base, "base", 14, pg.terminalValue);
+  const sure = api.computeProgramValuation({ ...pg.programs[0], posOverridePct: "100" }, base, "base");
+  const works = api.computeCompanyRiskAdjustedCF([sure], pg.corporateGA, 25);
+  let nol = 177.3e6; const expTax = works.map(c => {
+    const f = c.riskAdjFCF; if (f < 0) { nol -= f; return 0; }
+    const use = Math.min(nol, f); nol -= use; return 0.21 * (f - use) * 0.15;
+  });
+  ok("every year's tax = 15% x the success case's tax", r.calendar.every((c, i) => Math.abs((c.tax || 0) - expTax[i]) < 1));
+  ok("and the success case does pay tax in some year", expTax.some(t => t > 0));
+  const off = JSON.parse(JSON.stringify(pg)); off.taxation.enabled = false;
+  ok("tax off: no tax anywhere", api.computeCaseValuation(off, base, "base", 14, off.terminalValue).calendar.every(c => !c.tax));
+  // Two programs: no single success world, so the odds-weighted flow is taxed
+  // (the old method, kept and stated).
+  const two = JSON.parse(JSON.stringify(pg)); two.programs.push({ ...JSON.parse(JSON.stringify(pg.programs[0])), id: "p2" });
+  const vals = two.programs.map(p => api.computeProgramValuation(p, base, "base"));
+  const expected = api.applyTaxToCalendar(api.computeCompanyRiskAdjustedCF(vals, two.corporateGA, 25), two.taxation);
+  const got = api.computeCaseValuation(two, base, "base", 14, two.terminalValue).calendar;
+  ok("two programs: the odds-weighted flow is taxed", got.every((c, i) => Math.abs(c.riskAdjFCF - expected[i].riskAdjFCF) < 1e-6));
+}
+report();
+
+section("Ex-US launches after the US");
+{
+  // 1,000 US patients at peak on a 6-year median curve (11/31/58/76/89/100%),
+  // $10,000 US price flat, ex-US at 50% price and 100% of US patients:
+  // ex-US revenue at peak is 1,000 x 5,000 = $5,000,000.
+  //   lag 0:   ex-US year y = $5M x curve(y)            -> year 1 = $550,000
+  //   lag 1:   ex-US year y = $5M x curve(y - 1)        -> year 1 = 0, year 2 = $550,000
+  //   lag 1.5: ex-US year y = $5M x (curve(y-2) + curve(y-1)) / 2
+  //            year 2 = 5M x 0.11 / 2 = $275,000; year 3 = 5M x 0.42 / 2 = $1,050,000
+  const rb = lag => ({
+    population: { mode: "prevalence", prevalence: "1000", diagnosisRatePct: "100", treatmentRatePct: "100", eligiblePct: "100" },
+    adherencePct: "100", marketShare: { numDrugs: 1, orderOfEntry: 1, peakShareOverridePct: "100" },
+    launchCurve: { yearsToPeak: 6, profile: "median" },
+    pricing: { usAnnualPrice: "10000", usAnnualGrowthPct: "0", includeExUS: true, exUSPriceFactorPct: "50", exUSAnnualGrowthPct: "0", exUSPatientMultiplierPct: "100", exUSLaunchLagYears: lag },
+    exclusivity: { yearsToLOE: "8", modality: "smallMolecule", volumeRetainedPct: "40", priceDeclinePct: "50" }
+  });
+  const ex = lag => api.computeProgramRevenue(rb(lag), 12).years.map(y => y.exUSRevenue);
+  const us = lag => api.computeProgramRevenue(rb(lag), 12).years.map(y => y.usRevenue);
+  near("lag 0: year 1 ex-US = $5M x 11%", ex("0")[0], 550000, 1);
+  ok("lag 1: nothing ex-US in year 1, year 2 = the same-day year 1", ex("1")[0] === 0 && ex("1")[1] === ex("0")[0]);
+  near("lag 1.5: year 2 = half of curve year 1 = $275,000", ex("1.5")[1], 275000, 1);
+  near("lag 1.5: year 3 = the average of curve years 1 and 2 = $1,050,000", ex("1.5")[2], 1050000, 1);
+  ok("the US side is untouched by the lag", us("2").every((v, i) => v === us("0")[i]));
+  // LOE stays on the US calendar: at year 9 (after an 8-year LOE) both lags
+  // are at 40% volume x 50% price of a full ex-US year = $1,000,000.
+  near("after LOE ex-US erodes on the US calendar, lag or not", ex("1.5")[8], 5e6 * 0.4 * 0.5, 1);
+  ok("blank = the 1.5-year benchmark", ex("").every((v, i) => v === ex("1.5")[i]) && api.EXUS_LAUNCH_LAG_BENCHMARK.years === 1.5);
+  const legacy = rb(""); delete legacy.pricing.exUSLaunchLagYears;
+  ok("a case saved before the field existed reads the benchmark", api.getRevenueBuild({ revenueBuild: legacy }).pricing.exUSLaunchLagYears === "1.5");
 }
 report();
 
@@ -4676,13 +4781,18 @@ section("PepGen, the whole case recomputed from its inputs (Bear, Base, Bull)");
   //   Eligible     40,000 x 60% diagnosed x 55% treated x 75% eligible = 9,900
   //   On drug      9,900 x 23% peak share x 85% adherence = 1,935.45 at peak
   //   US price     $350,000 WAC x 80% realised = $280,000, +2% a year
-  //   Ex-US        180% of US patients x 50% of the ENTERED price = $175,000, flat
+  //   Ex-US        180% of US patients x 50% of the ENTERED price = $175,000, flat,
+  //                1.5 years behind the US curve (year y = halfway between the US
+  //                curve's years y-2 and y-1; the benchmark lag, left blank)
   //   After LOE    (year 10) 45% of volume x 65% of price, in one year
   //   Costs        COGS 12%; 60 specialty reps x $280,000 (+2%/yr) to LOE, 30% in
   //                the year before launch; marketing 3% of peak revenue to LOE
   //   Corporate    $26M a year before revenue; 17% (34% x 50%) of revenue above
-  //   G&A          $400M, straight line between — on odds-weighted revenue
-  //   Tax          21% after a $177.3M NOL that also collects every loss year
+  //   G&A          $400M, straight line between — on the revenue it has if
+  //                launched; before launch x the odds it is still developing (or
+  //                winding down, one year after a failure), after x P(launch)
+  //   Tax          21% of the success case's profit after a $177.3M NOL that also
+  //                collects every loss year of the success case, x P(launch)
   //   Discount     end of year: year t (2026 = 0) at 1/(1+r)^(t+1)
   //   Equity       NPV + $117.238M cash + $100M raise, over 69,259,517 +
   //                1,101,110 RSUs + 50,251,256 raise shares (options at $4.89 are
@@ -4692,7 +4802,7 @@ section("PepGen, the whole case recomputed from its inputs (Bear, Base, Bull)");
   const rnd = api.computeRnDToLaunch(p);
   const ramp = [11, 31, 58, 76, 89, 100].map(x => x / 100);
   near("the six-year median launch curve is the one typed here", 0, ramp.reduce((s, v, i) => s + Math.abs(v - api.launchCurveForYears(6, "median")[i] / 100), 0), 1e-12);
-  const expectPS = { bear: 0.3210, base: 1.4429, bull: 3.6444 };
+  const expectPS = { bear: 0.8408, base: 1.6861, bull: 3.4232 };
   for (const [key, share, posMult, addPct] of [["bear", 60, 60, 3], ["base", 100, 100, 0], ["bull", 140, 150, -1]]) {
     const r = (14 + addPct) / 100, N = 25, L = 5;
     const eff = api.computeEffectivePoS(p, { posMultiplierPct: posMult });
@@ -4701,26 +4811,47 @@ section("PepGen, the whole case recomputed from its inputs (Bear, Base, Bull)");
     const peakPts = 40000 * 0.60 * 0.55 * 0.75 * 0.23 * (share / 100) * 0.85;
     const rev = [];
     for (let y = 1; y <= N; y++) {
-      const pts = peakPts * (y <= 6 ? ramp[y - 1] : 1);
-      rev.push((pts * 280000 * Math.pow(1.02, y - 1) + pts * 1.8 * 175000) * (y <= 10 ? 1 : 0.45 * 0.65));
+      const R = k => k < 1 ? 0 : k <= 6 ? ramp[k - 1] : 1;
+      const pts = peakPts * R(y), exPts = peakPts * (R(y - 2) + R(y - 1)) / 2;
+      rev.push((pts * 280000 * Math.pow(1.02, y - 1) + exPts * 1.8 * 175000) * (y <= 10 ? 1 : 0.45 * 0.65));
     }
     const peakRev = Math.max(...rev);
     const contrib = rev.map((R, i) => R - 0.12 * R - (i < 10 ? 60 * 280000 * Math.pow(1.02, i) + 0.03 * peakRev : 0));
     const bCost = rnd.items.reduce((s2, i) => s2 + i.costM, 0), bYears = rnd.items.reduce((s2, i) => s2 + i.years, 0);
-    const rd = new Array(L).fill(0); let cur = 0;
+    const rd = new Array(L).fill(0), rdFull = new Array(L).fill(0); let cur = 0;
     rnd.items.forEach(i => {
-      const yrs = i.years * 4.5 / bYears, per = i.costM * (320 / bCost) * 1e6 * reach[i.key] / yrs, a = cur, b = cur + yrs;
-      for (let y = 0; y < L; y++) rd[y] += per * Math.max(0, Math.min(b, y + 1) - Math.max(a, y));
+      const yrs = i.years * 4.5 / bYears, full = i.costM * (320 / bCost) * 1e6 / yrs, a = cur, b = cur + yrs;
+      for (let y = 0; y < L; y++) {
+        const part = full * Math.max(0, Math.min(b, y + 1) - Math.max(a, y));
+        rd[y] += part * reach[i.key]; rdFull[y] += part;
+      }
       cur = b;
     });
     const ga = v => v <= 0 ? 26e6 : v >= 400e6 ? v * 0.17 : 26e6 + (400e6 * 0.17 - 26e6) * v / 400e6;
+    // Overhead only while the company is still going: each stage gate closes
+    // where its R&D ends on the 4.5-year calendar (Phase 2 at 2.7/7.05 x 4.5 =
+    // 1.72, Phase 3 at 3.70, the FDA at 4.5), fails with reach(this) -
+    // reach(next), and a failed company winds down for one more year.
+    let cumB = 0;
+    const gates = rnd.items.map((it, j) => {
+      cumB += it.years;
+      return { cut: cumB / bYears * 4.5 + 1, fail: reach[it.key] - (j + 1 < rnd.items.length ? reach[rnd.items[j + 1].key] : pos) };
+    });
+    const active = t => 1 - gates.reduce((a, g) => a + g.fail * Math.min(1, Math.max(0, t + 1 - g.cut)), 0);
+    if (key === "base") near("PepGen still going in year 2: 1 - 0.632 x (3 - 2.723) = 0.825", active(2), 1 - (1 - reach.phase3) * (3 - (2.7 / 7.05 * 4.5 + 1)), 1e-9);
+    // Tax is owed only where the drug works: the success case (all R&D paid,
+    // full revenue, overhead of a launched company) is taxed after its own
+    // losses, and that tax is weighted by P(launch).
     let nol = 177.3e6, npv = 0; const cf = [];
     for (let t = 0; t < N; t++) {
-      const i = t - L;
-      const pre = (i >= 0 ? contrib[i] * pos : 0) - (t < L ? rd[t] : 0) - (i === -1 ? 60 * 280000 * 0.3 * pos : 0) - ga(i >= 0 ? rev[i] * pos : 0);
-      let tax = 0;
-      if (pre < 0) nol -= pre; else { const use = Math.min(nol, pre); nol -= use; tax = 0.21 * (pre - use); }
-      cf.push(pre - tax); npv += (pre - tax) / Math.pow(1 + r, t + 1);
+      const i = t - L, launched = i >= 0 ? pos : 0;
+      const gaT = 26e6 * (active(t) - launched) + (i >= 0 ? launched * ga(rev[i]) : 0);
+      const pre = (i >= 0 ? contrib[i] * pos : 0) - (t < L ? rd[t] : 0) - (i === -1 ? 60 * 280000 * 0.3 * pos : 0) - gaT;
+      const ifWorks = (i >= 0 ? contrib[i] - ga(rev[i]) : -26e6) - (t < L ? rdFull[t] : 0) - (i === -1 ? 60 * 280000 * 0.3 : 0);
+      let taxIfWorks = 0;
+      if (ifWorks < 0) nol -= ifWorks; else { const use = Math.min(nol, ifWorks); nol -= use; taxIfWorks = 0.21 * (ifWorks - use); }
+      const flow = pre - pos * taxIfWorks;
+      cf.push(flow); npv += flow / Math.pow(1 + r, t + 1);
     }
     const shares = 69259517 + 1101110 + 100e6 / 1.99;
     const perShare = (npv + 117.238e6 + 100e6) / shares;

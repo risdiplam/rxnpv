@@ -267,10 +267,25 @@ function computeProgramValuation(program, scenario, scenarioKey) {
 // multiple override, if either is set on the case/program. Pass null for
 // synthetic/one-off scenarios (e.g. sensitivity perturbations) where no
 // override resolution should apply.
+// ── The case's cash-flow calendar, taxed ──
+// One program: expected tax = P(launch) x the tax if it works (taxSuccessWorld).
+// Several: the odds-weighted flow is taxed (there is no single success world).
+// Used by the valuation and by the SOTP, so the two stay on the same method.
+function taxedCaseCalendar(theCase, programVals, corpGA, scenario, scenarioKey) {
+  const risked = computeCompanyRiskAdjustedCF(programVals, corpGA, 25);
+  const tax = theCase.taxation;
+  if (!tax || !tax.enabled) return risked;
+  if (theCase.programs.length !== 1 || programVals.length !== 1 || !(programVals[0].posToLaunch < 1)) return applyTaxToCalendar(risked, tax);
+  const pv = programVals[0];
+  const prog = theCase.programs.find(p => p.id === pv.id) || theCase.programs[0];
+  const sure = computeProgramValuation({ ...prog, posOverridePct: "100" }, { ...scenario, posMultiplierPct: 100 }, scenarioKey);
+  return taxSuccessWorld(risked, computeCompanyRiskAdjustedCF([sure], corpGA, 25), pv.posToLaunch, tax);
+}
+
 function computeCaseValuation(theCase, scenario, scenarioKey, discountRateBasePct, terminalValueParams) {
   const programVals = theCase.programs.map(p => computeProgramValuation(p, scenario, scenarioKey));
   const corpGA = theCase.corporateGA || { preCommercialAnnualM: "", gaShareOfMatureSgaPct: "50" };
-  const calendar = applyTaxToCalendar(computeCompanyRiskAdjustedCF(programVals, corpGA, 25), theCase.taxation);
+  const calendar = taxedCaseCalendar(theCase, programVals, corpGA, scenario, scenarioKey);
   const discountRate = (discountRateBasePct != null && discountRateBasePct !== "" && !isNaN(Number(discountRateBasePct)) ? Number(discountRateBasePct) : DISCOUNT_RATE_GUIDANCE.earlyBiotechSelfView[0]) + scenario.discountRateAddPct;
 
   const scenOv = (scenarioKey && theCase.scenarioOverrides) ? theCase.scenarioOverrides[scenarioKey] : null;
@@ -689,7 +704,7 @@ function computeSOTPBreakdown(theCase, scenario, scenarioKey, discountRateBasePc
     // headline. Each program accumulates its own NOL shield, whereas real NOLs
     // pool company-wide — so with tax on, the parts are a slightly
     // conservative decomposition rather than an exact split of the whole.
-    const calendar = applyTaxToCalendar(computeCompanyRiskAdjustedCF([pv], zeroGA, 25), theCase.taxation);
+    const calendar = taxedCaseCalendar(theCase, [pv], zeroGA, scenario, scenarioKey);
     const scenOv = (scenarioKey && theCase.scenarioOverrides) ? theCase.scenarioOverrides[scenarioKey] : null;
     const effectiveTVParams = (scenOv && scenOv.exitMultiple !== "" && scenOv.exitMultiple != null)
       ? { ...terminalValueParams, exitMultiple: scenOv.exitMultiple } : terminalValueParams;
@@ -710,8 +725,8 @@ function computeSOTPBreakdown(theCase, scenario, scenarioKey, discountRateBasePc
   // With taxation off this is identical to the old behaviour.
   const corpGA = theCase.corporateGA || { preCommercialAnnualM: "", gaShareOfMatureSgaPct: "50" };
   const allProgramVals = theCase.programs.map(p => computeProgramValuation(p, scenario, scenarioKey));
-  const withGA = applyTaxToCalendar(computeCompanyRiskAdjustedCF(allProgramVals, corpGA, 25), theCase.taxation);
-  const withoutGA = applyTaxToCalendar(computeCompanyRiskAdjustedCF(allProgramVals, zeroGA, 25), theCase.taxation);
+  const withGA = taxedCaseCalendar(theCase, allProgramVals, corpGA, scenario, scenarioKey);
+  const withoutGA = taxedCaseCalendar(theCase, allProgramVals, zeroGA, scenario, scenarioKey);
   const gaOnlyCF = withGA.map((c, i) => c.riskAdjFCF - (withoutGA[i] ? withoutGA[i].riskAdjFCF : 0));
   const gaNPV = computeNPV(gaOnlyCF, discountRate, { enabled: false }, withGA.map(() => 0));
 

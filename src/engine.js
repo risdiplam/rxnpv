@@ -214,6 +214,21 @@ function computeProgramRevenue(rb, projectionYears) {
   const exUSFactor = (numOr(rb.pricing.exUSPriceFactorPct, 0)) / 100;
   const exUSGrowth = (numOr(rb.pricing.exUSAnnualGrowthPct, 0)) / 100;
   const exUSPatientPct = (rb.pricing.exUSPatientMultiplierPct !== "" && rb.pricing.exUSPatientMultiplierPct != null ? Number(rb.pricing.exUSPatientMultiplierPct) : 100) / 100; // ex-US patient pool relative to US pool (user-supplied, since epi data is region-specific)
+  // Ex-US markets launch after the US: EMA approval comes a median ~6 months
+  // after FDA's, and EU patients get access a further ~1.6 years after that on
+  // average (EFPIA W.A.I.T.), less in Germany, more in the south; Japan runs
+  // one to two years behind. Blank = the 1.5-year benchmark. The ex-US ramp is
+  // the US ramp shifted by the lag and read in between years, so a fractional
+  // lag works and a lag of 0 reproduces the same-day launch exactly.
+  const exUSLag = Math.max(0, numOr(rb.pricing.exUSLaunchLagYears, EXUS_LAUNCH_LAG_BENCHMARK.years));
+  const rampAt = t => {
+    if (t <= 0) return 0;
+    if (t >= yearsToPeak) return 1;
+    const k = Math.floor(t);
+    const lo = k === 0 ? 0 : ramp[k - 1] / 100;
+    const hi = ramp[k] / 100;
+    return lo + (hi - lo) * (t - k);
+  };
 
   const erosion = resolveErosionParams(rb.exclusivity);
 
@@ -234,7 +249,7 @@ function computeProgramRevenue(rb, projectionYears) {
       // factor to a US net price would discount twice. Ex-US markets have their
       // own gross-to-net, much smaller than the US's, and this does not model it.
       const exUSPrice = priceBasis.entered * exUSFactor * Math.pow(1 + exUSGrowth, y - 1);
-      const exUSPatients = patientsThisYear * exUSPatientPct;
+      const exUSPatients = peakPatients * rampAt(y - exUSLag) * exUSPatientPct;
       exUSRevenue = exUSPatients * exUSPrice;
     }
 
@@ -380,7 +395,7 @@ const DEFAULT_REVENUE_BUILD = {
   adherencePct: "",
   marketShare: { numDrugs: 2, orderOfEntry: 1, peakShareOverridePct: "" },
   launchCurve: { yearsToPeak: 6, profile: "median" },
-  pricing: { usAnnualPrice: "", priceBasis: "ASP", netPriceRealizationPct: "", usAnnualGrowthPct: "3", includeExUS: true, exUSPriceFactorPct: "50", exUSAnnualGrowthPct: "0", exUSPatientMultiplierPct: "100" },
+  pricing: { usAnnualPrice: "", priceBasis: "ASP", netPriceRealizationPct: "", usAnnualGrowthPct: "3", includeExUS: true, exUSPriceFactorPct: "50", exUSAnnualGrowthPct: "0", exUSPatientMultiplierPct: "100", exUSLaunchLagYears: "1.5" },
   exclusivity: { yearsToLOE: "13", modality: "smallMolecule", volumeRetainedPct: "", priceDeclinePct: "" }
 };
 

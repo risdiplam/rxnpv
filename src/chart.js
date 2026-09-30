@@ -180,7 +180,9 @@ const PROJECTION_PARTS = [
   { key: "ga", label: "Corporate G&A", color: "var(--ink-3)", opacity: 0.8 },
   { key: "tax", label: "Cash tax", color: "var(--warn)", opacity: 0.8 }
 ];
-function ProjectionChart({ rows, startYear, height, label }) {
+// works: the rows are the if-it-works world (no odds), so the legend and the
+// tooltip say plain "Revenue" and there is no revenue at risk to key.
+function ProjectionChart({ rows, startYear, height, label, works }) {
   const h = React.createElement;
   height = height || 300;
   const wrapRef = React.useRef(null);
@@ -220,7 +222,7 @@ function ProjectionChart({ rows, startYear, height, label }) {
 
   return h("div", { ref: wrapRef, style: { position: "relative" } },
     h("div", { className: "proj-legend" },
-      PROJECTION_PARTS.map(p => h("span", { key: p.key }, h("i", { style: { background: p.color, opacity: p.opacity || 1 } }), p.label)),
+      PROJECTION_PARTS.filter(p => !(works && p.key === "atRisk")).map(p => h("span", { key: p.key }, h("i", { style: { background: p.color, opacity: p.opacity || 1 } }), works && p.key === "revenue" ? "Revenue" : p.label)),
       h("span", null, h("i", { className: "proj-legend-line" }), "Running present value"),
       rows.some(r => r.isLaunch) && h("span", null, h("i", { className: "proj-legend-band launch" }), "Launch year"),
       rows.some(r => r.isLOE) && h("span", null, h("i", { className: "proj-legend-band loe" }), "Loss of exclusivity")),
@@ -258,7 +260,7 @@ function ProjectionChart({ rows, startYear, height, label }) {
         top: padT + 4, left: tipRight ? "auto" : (cx(hoverIdx) / W * 100) + "%", right: tipRight ? ((W - cx(hoverIdx)) / W * 100) + "%" : "auto",
         transform: tipRight ? "translate(-10px, 0)" : "translate(10px, 0)" } },
       h("div", { style: { color: "var(--ink-1)", fontWeight: 700, marginBottom: 3 } }, String(startYear + hr.index) + (hr.phase ? " · " + hr.phase : "")),
-      h("div", null, "Revenue × odds: " + fmtMoney(hr.revenue)),
+      h("div", null, (works ? "Revenue: " : "Revenue × odds: ") + fmtMoney(hr.revenue)),
       hr.revenueIfWorks > hr.revenue && h("div", null, "If it works: " + fmtMoney(hr.revenueIfWorks)),
       h("div", null, "Costs: " + fmtMoney(-costOf(hr))),
       h("div", { style: { color: "var(--ink-1)" } }, "Cash flow: " + fmtMoney(hr.fcf)),

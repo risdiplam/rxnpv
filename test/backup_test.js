@@ -85,7 +85,7 @@ function stub(obj) {
   ok(w.caseMissingInputs(pg).length === 0, "PepGen sample: nothing required is missing (" + w.caseMissingInputs(pg).join(", ") + ")");
   ok(pg.programs[0].evidenceLog.length >= 25 && pg.programs[0].evidenceLog.every(e => e.source && e.date && e.thesis && ["fact", "inference", "speculation"].includes(e.classification) && ["high", "moderate", "low"].includes(e.confidence)), "PepGen sample: every evidence entry has a source, date, reasoning and valid labels");
   const pgv = k => w.computeCaseValuation(pg, w.getEffectiveScenarioPreset(pg, k), k, 14, pg.terminalValue).equity.perShare;
-  ok([["bear", 0.3210], ["base", 1.4429], ["bull", 3.6444]].every(([k, v]) => Math.abs(pgv(k) - v) < 5e-5), "PepGen sample: Bear/Base/Bull are the independently rebuilt $0.2475 / $1.3767 / $3.5842 (" + ["bear", "base", "bull"].map(k => pgv(k).toFixed(4)).join(" / ") + ")");
+  ok([["bear", 0.8408], ["base", 1.6861], ["bull", 3.4232]].every(([k, v]) => Math.abs(pgv(k) - v) < 5e-5), "PepGen sample: Bear/Base/Bull are the independently rebuilt $0.2475 / $1.3767 / $3.5842 (" + ["bear", "base", "bull"].map(k => pgv(k).toFixed(4)).join(" / ") + ")");
   const fx = JSON.parse(require("fs").readFileSync(__dirname + "/fixtures/pepgen_case.json", "utf8"));
   ok(JSON.stringify(fx.programs[0].revenueBuild) === JSON.stringify(pg.programs[0].revenueBuild) && JSON.stringify(fx.capitalStructure.basicShares) === JSON.stringify(pg.capitalStructure.basicShares), "PepGen sample: revenue build and shares match the typed-in fixture");
 

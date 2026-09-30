@@ -516,9 +516,10 @@ function CaseView({ theCase, onChange, onDelete, onNavigateToTools, onReopenSave
             h("span", { style: { fontSize: 11, color: "var(--ink-3)" } }, "%")),
           h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginTop: 3 } }, "Judgment call, not a sourced figure — see help below")
         ),
-        // Read only by the failure floor on the Overview (computeFailureFloor):
-        // how long overhead keeps running after a failed readout before the
-        // company is wound down or restructured. Blank = one year.
+        // How long overhead keeps running after a failed readout before the
+        // company is wound down or restructured. Blank = one year. Read by the
+        // failure floor (computeFailureFloor) and by the valuation's overhead,
+        // which stops that long after each failure (computeCompanyActiveByYear).
         // Same width as the two fields above when it wraps under them.
         h("div", { style: { flex: "0 1 calc(50% - 6px)", minWidth: 200 } },
           h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-2)", marginBottom: 5 } }, "Wind-down after a failed readout"),
@@ -526,11 +527,12 @@ function CaseView({ theCase, onChange, onDelete, onNavigateToTools, onReopenSave
             h("input", { type: "number", min: 0, step: 0.5, value: corpGA.windDownYears == null ? "" : corpGA.windDownYears, placeholder: String(FAILURE_WIND_DOWN_YEARS_DEFAULT), onChange: e => updateCorpGA({ windDownYears: e.target.value }), "aria-label": "Wind-down after a failed readout (years of G&A)",
               style: { flex: 1, padding: "6px 9px", borderRadius: 6, border: "1.5px solid var(--rule)", background: "var(--surface)", color: "var(--ink-1)", fontFamily: "var(--mono)", fontSize: 12 } }),
             h("span", { style: { fontSize: 11, color: "var(--ink-3)" } }, "yrs")),
-          h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginTop: 3 } }, "Years of G&A a failure still costs; sets the Overview's failure floor")
+          h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginTop: 3 } }, "Years of G&A a failure still costs — in the valuation and the failure floor")
         ),
         h("div", { style: { flex: "1 1 100%" } },
           h(Note, { summary: "Why this split exists" },
-            "The " + SGA_BENCHMARKS.matureSgaPctOfRevenue + "% mature SG&A/revenue figure bundles G&A + Sales + Marketing. Sales & Marketing are already modeled per-program above, so this slider carves out the G&A-only share to avoid double-counting. 50% is a reasonable starting split, not a sourced number."))
+            "The " + SGA_BENCHMARKS.matureSgaPctOfRevenue + "% mature SG&A/revenue figure bundles G&A + Sales + Marketing. Sales & Marketing are already modeled per-program above, so this slider carves out the G&A-only share to avoid double-counting. 50% is a reasonable starting split, not a sourced number.",
+            h("div", { style: { marginTop: 8 } }, "How it is charged: overhead is weighted by the odds the company is still there to pay it, the same way R&D is. Before launch it is the pre-commercial figure times the odds the programme is still in development (or winding down after a failure); after launch it is set by the revenue the drug has if it launched, times the odds it did. A company that fails stops paying it once the wind-down ends.")))
       )),
       programPicker(true),
       editorFor("inputs")

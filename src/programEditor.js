@@ -30,7 +30,7 @@ function newProgram() {
       adherencePct: "",
       marketShare: { numDrugs: 2, orderOfEntry: 1, peakShareOverridePct: "" },
       launchCurve: { yearsToPeak: 6, profile: "median" },
-      pricing: { usAnnualPrice: "", priceBasis: "ASP", netPriceRealizationPct: "", usAnnualGrowthPct: "3", includeExUS: true, exUSPriceFactorPct: "50", exUSAnnualGrowthPct: "0", exUSPatientMultiplierPct: "100" },
+      pricing: { usAnnualPrice: "", priceBasis: "ASP", netPriceRealizationPct: "", usAnnualGrowthPct: "3", includeExUS: true, exUSPriceFactorPct: "50", exUSAnnualGrowthPct: "0", exUSPatientMultiplierPct: "100", exUSLaunchLagYears: "1.5" },
       exclusivity: { yearsToLOE: "13", modality: "smallMolecule", volumeRetainedPct: "", priceDeclinePct: "" }
     },
     costStructure: {
@@ -419,7 +419,10 @@ function ProgramEditor({ program, onChange, onDelete, discountRatePct, terminalV
         h(BenchField, { label: "Ex-US annual price growth", value: rb.pricing.exUSAnnualGrowthPct, onChange: v => set("revenueBuild.pricing.exUSAnnualGrowthPct", v), suffix: "%",
           bench: { value: 0, source: "Most ex-US markets: flat to slightly negative (UK spending caps, Germany post-€250M discounts, Japan ~2.8%/yr mandated cuts)" } }),
         h(BenchField, { label: "Ex-US patient pool vs US", value: rb.pricing.exUSPatientMultiplierPct, onChange: v => set("revenueBuild.pricing.exUSPatientMultiplierPct", v), suffix: "%",
-          help: "Region-specific — no generic benchmark. 100% = same patient count as US; adjust to your own estimate." })
+          help: "Region-specific — no generic benchmark. 100% = same patient count as US; adjust to your own estimate." }),
+        h(BenchField, { label: "Ex-US launch after the US", value: rb.pricing.exUSLaunchLagYears, onChange: v => set("revenueBuild.pricing.exUSLaunchLagYears", v), suffix: "yrs", placeholder: String(EXUS_LAUNCH_LAG_BENCHMARK.years),
+          bench: { value: EXUS_LAUNCH_LAG_BENCHMARK.years, source: EXUS_LAUNCH_LAG_BENCHMARK.source },
+          help: "Years between the US launch and ex-US patients starting on the drug. The ex-US ramp starts this much later on the same curve; loss of exclusivity stays on the US calendar. Blank = the benchmark; 0 = same-day launch." })
       )
     ),
 
