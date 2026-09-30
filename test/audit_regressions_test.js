@@ -359,7 +359,11 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
     // Readout scenarios reading: price $20; clear $30 (+50%), modest $22 (+10%),
     // miss $2 (-90%); weighted $24 = +20%; miss chance 0.25 -> "one time in four".
     const rr = w.readReadoutScenarios([{ value: 30, prob: 0.45 }, { value: 22, prob: 0.3 }, { value: 2, prob: 0.25 }], 24, 20, 25);
-    ok(rr && rr.verdict === "A win is worth +10% to +50%; a miss costs 90%." && rr.text.includes("$24.00 — 20% above today's price, against the Base case's $25.00") && rr.text.includes("one time in four"), "Readout: the reading states the moves and the weighted value");
+    ok(rr && rr.verdict === "A win is worth +10% to +50%; a miss costs 90%." && rr.text.includes("$24.00 — 20% above today's price, against the Base case's $25.00") && rr.text.includes("about one time in four"), "Readout: the reading states the moves and the weighted value");
+    // A 63% miss is "about six times in ten", not "one time in two" (PepGen);
+    // 28% is "about three times in ten", 5% "less than one time in ten".
+    const missSays = pm => (w.readReadoutScenarios([{ value: 30, prob: (1 - pm) / 2 }, { value: 22, prob: (1 - pm) / 2 }, { value: 2, prob: pm }], 10, 20, 25) || {}).text || "";
+    ok(missSays(0.632).includes("about six times in ten") && missSays(0.282).includes("about three times in ten") && missSays(0.05).includes("less than one time in ten") && missSays(0.5).includes("about one time in two"), "Readout: the miss frequency is said in words that match the chance");
     click(d.getElementById("casetab-scenarios")); await wait(300);
     const rsSec = [...d.querySelectorAll("[data-export-section]")].find(e => e.getAttribute("data-export-section") === "Before the next readout");
     ok(!!rsSec && /EMPEROR Phase 3 topline: what each result would do to the value/.test(rsSec.textContent) && /≈\$1\.40/.test(rsSec.textContent), "Readout: the table renders on Scenarios, named from the Calibration Log");

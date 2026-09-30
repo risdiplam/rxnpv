@@ -150,10 +150,19 @@ function readReadoutScenarios(rows, weighted, price, base) {
     text: "Weighted by these chances, " + fmtShare(weighted) + (base != null ? ", against the Base case's " + fmtShare(base) : "") + "." };
   const lo = Math.min(clear.value, modest.value), hi = Math.max(clear.value, modest.value);
   const winText = lo >= price ? "A win is worth " + move(lo) + " to " + move(hi) : hi >= price ? "A clear win is worth " + move(hi) + ", a modest one " + move(lo) : "Even a win is worth " + move(hi) + " at best";
+  // "One time in four" only when the chance really is near one in N; a 63%
+  // miss rounded to "one time in two" (PepGen). Otherwise say it in tenths.
+  const words = ["no", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten"];
   const oneIn = miss.prob > 0 ? Math.round(1 / miss.prob) : null;
+  const tenths = Math.round(miss.prob * 10);
+  const freq = !(miss.prob > 0) ? null
+    : oneIn >= 2 && oneIn <= 10 && Math.abs(miss.prob - 1 / oneIn) <= 0.03 ? "about one time in " + words[oneIn]
+    : miss.prob < 0.075 ? "less than one time in ten"
+    : tenths >= 10 ? "almost every time"
+    : "about " + words[tenths] + " time" + (tenths === 1 ? "" : "s") + " in ten";
   return { verdict: winText + "; a miss " + (miss.value < price ? "costs " + Math.abs(Math.round((miss.value / price - 1) * 100)) + "%" : "still clears today's price") + ".",
     text: "Weighted by these chances, the three come to " + fmtShare(weighted) + " — " + Math.abs(Math.round((weighted / price - 1) * 100)) + "% " + (weighted >= price ? "above" : "below") + " today's price" +
-      (base != null ? ", against the Base case's " + fmtShare(base) : "") + "." + (oneIn && oneIn > 1 ? " The miss happens about one time in " + (["", "", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten"][oneIn] || oneIn) + " in this case, so the question the price is asking is whether that is too generous." : "") };
+      (base != null ? ", against the Base case's " + fmtShare(base) : "") + "." + (freq ? " The miss happens " + freq + " in this case, so the question the price is asking is whether that is too generous." : "") };
 }
 
 function ReadoutScenariosSection({ theCase, discountRatePct, tv, baseValue, onChange }) {
