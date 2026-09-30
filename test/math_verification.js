@@ -66,7 +66,7 @@ const EXPORTS = [
   "SCENARIO_PRESETS", "getEffectiveScenarioPreset", "applyBasePosAdjustment",
   "computeProgramValuation", "computeCaseValuation", "baseCaseFairValue", "computeProjectionRows", "computeSensitivityDrivers", "computeProgramRiskWaterfall",
   "computeEffectivePoS", "computeRnDToLaunch", "resolveLaunchYearOffset",
-  "computeFullCaseMonteCarlo", "solveImpliedPoSMultiplier", "computeEquityBridgeSteps", "computeRedFlags", "quickModeTerritoryMismatch",
+  "computeFullCaseMonteCarlo", "solveImpliedPoSMultiplier", "solveImpliedVariable", "computeEquityBridgeSteps", "computeRedFlags", "quickModeTerritoryMismatch",
   "computePortfolioSummary", "shrinkBinaryResponseRate", "shrinkHazardRatio",
   "BINARY_SHRINKAGE_FACTOR", "HR_SHRINKAGE_FACTOR",
   "MODALITY_OPTIONS", "getCogsBenchmark", "getErosionDefaults", "resolveErosionParams",
@@ -3952,6 +3952,46 @@ section("FIN-007: implied PoS is expressed against the override baseline");
   const c2 = JSON.parse(JSON.stringify(c)); c2.programs[0].posOverridePct = String(sol.impliedAbsolutePct);
   const ps = api.computeCaseValuation(c2, { label: "b", shareMultiplierPct: 100, posMultiplierPct: 100, discountRateAddPct: 0, color: "" }, null, 12, tv).equity.perShare;
   near("valuing at the implied PoS reproduces the $12 price", ps, 12, 1e-4);
+}
+report();
+
+section("Implied PoS and implied share keep a modelled raise, as the headline does");
+{
+  // The FIN-007 fixture ($12 price, 10M shares) with a $50M raise at $8:
+  // 50,000,000 / 8 = 6,250,000 new shares, 16,250,000 in all. Fair value per
+  // share = (equity before the raise + 50M) / 16.25M, so it equals $12 when
+  // equity before the raise = 12 x 16,250,000 - 50,000,000 = $145,000,000 —
+  // not the $120M (12 x 10M) the solver used to aim for by dropping the raise.
+  // Found on the PepGen case: typing its implied PoS back in showed $2.19
+  // against a $2.34 price.
+  const c = {
+    name: "IPR", currentPrice: "12",
+    capitalStructure: { mode: "simple", dilutedSharesSimple: "10000000", cash: "20000000", debt: "0" },
+    corporateGA: { preCommercialAnnualM: "0", gaShareOfMatureSgaPct: "0" },
+    futureRaise: { enabled: true, amountM: "50000000", priceOverride: "8" },
+    programs: [{ id: "p1", name: "Asset", currentPhase: "phase2", therapeuticArea: "Oncology", modality: "smallMolecule",
+      revenueMode: "quick", quickRevenue: { peakRevenue: "800000000", yearsToPeak: "6", profile: "median" }, posOverridePct: "30" }]
+  };
+  const tv = { enabled: false };
+  const flat = { label: "b", shareMultiplierPct: 100, posMultiplierPct: 100, discountRateAddPct: 0, color: "" };
+  const sol = api.solveImpliedPoSMultiplier(c, 12, tv);
+  ok("solves without hitting a range limit", sol.ok && !sol.degenerate);
+  const c2 = JSON.parse(JSON.stringify(c)); c2.programs[0].posOverridePct = String(sol.impliedAbsolutePct);
+  const r2 = api.computeCaseValuation(c2, flat, null, 12, tv);
+  near("at the implied PoS the headline per-share value is the $12 price", r2.equity.perShare, 12, 1e-4);
+  near("the modelled raise adds 6,250,000 shares", r2.equity.dilutedShares, 16250000, 1e-6);
+  const noRaise = JSON.parse(JSON.stringify(c2)); noRaise.futureRaise = null;
+  near("equity before the raise at that PoS is $145,000,000, worked longhand", api.computeCaseValuation(noRaise, flat, null, 12, tv).equity.equityValue, 145000000, 50);
+  // A raise AT the price is value-neutral at the break-even point:
+  // (12 x 10M + R) / (10M + R/12) = 12 for any R — so the answer must equal
+  // the no-raise answer.
+  const atPrice = JSON.parse(JSON.stringify(c)); atPrice.futureRaise.priceOverride = "";
+  const none = JSON.parse(JSON.stringify(c)); none.futureRaise = null;
+  near("a raise at today's price leaves the implied PoS unchanged", api.solveImpliedPoSMultiplier(atPrice, 12, tv).impliedAbsolutePct, api.solveImpliedPoSMultiplier(none, 12, tv).impliedAbsolutePct, 1e-6);
+  // The same for the implied peak revenue (Quick mode).
+  const v = api.solveImpliedVariable(c, 12, tv, "peakRevenue");
+  const c3 = JSON.parse(JSON.stringify(c)); c3.programs[0].quickRevenue.peakRevenue = String(v.impliedValue);
+  near("at the implied peak revenue the headline is the $12 price too", api.computeCaseValuation(c3, flat, null, 12, tv).equity.perShare, 12, 1e-4);
 }
 report();
 

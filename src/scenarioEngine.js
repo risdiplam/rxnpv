@@ -783,16 +783,21 @@ function solveImpliedPoSMultiplier(theCase, discountRateBasePct, terminalValuePa
   const capResult = computeCapitalStructure({ ...capStruct, currentPrice: theCase.currentPrice });
   if (!capResult.dilutedShares || capResult.dilutedShares <= 0) return { ok: false, error: "Set diluted shares first." };
 
-  const targetEquityValue = Number(theCase.currentPrice) * capResult.dilutedShares;
+  // "What the price implies" means the value at which THIS case's fair value
+  // per share equals the price, so it solves on the same per-share figure the
+  // headline shows — including a modelled future raise. It used to drop the
+  // raise and compare equity with today's market cap, which is the same answer
+  // when the raise is priced at today's price but not when it is at a
+  // discount: PepGen's $100M at $1.99 gave an implied PoS of 22.5%, and typing
+  // 22.5% into the case then showed a fair value of $2.19 against a $2.34
+  // price, while the break-even chart beside it (which keeps the raise) asked
+  // for more peak revenue than the implied share did.
+  const targetEquityValue = Number(theCase.currentPrice);
 
   const equityAt = (posMultiplierPct) => {
     const scenario = { label: "implied", shareMultiplierPct: 100, posMultiplierPct, discountRateAddPct: 0, color: "" };
-    // Solving for what TODAY's price implies must use today's actual capital
-    // structure — a modeled future raise is a hypothetical overlay on the
-    // forward-looking valuation, not something priced into the market today.
-    const caseForSolve = theCase.futureRaise ? { ...theCase, futureRaise: null } : theCase;
-    const r = computeCaseValuation(caseForSolve, scenario, null, discountRateBasePct, terminalValueParams);
-    return r.equity.equityValue;
+    const r = computeCaseValuation(theCase, scenario, null, discountRateBasePct, terminalValueParams);
+    return r.equity.perShare;
   };
 
   const atZero = equityAt(0);
@@ -852,12 +857,12 @@ function solveImpliedVariable(theCase, discountRateBasePct, terminalValueParams,
   const capStruct = theCase.capitalStructure || { mode: "simple", dilutedSharesSimple: "" };
   const capResult = computeCapitalStructure({ ...capStruct, currentPrice: theCase.currentPrice });
   if (!capResult.dilutedShares || capResult.dilutedShares <= 0) return { ok: false, error: "Set diluted shares first." };
-  const targetEquityValue = Number(theCase.currentPrice) * capResult.dilutedShares;
+  // Per share against the price, raise included — see solveImpliedPoSMultiplier.
+  const targetEquityValue = Number(theCase.currentPrice);
 
-  const equityAtCase = (caseForSolve0) => {
-    const caseForSolve = caseForSolve0.futureRaise ? { ...caseForSolve0, futureRaise: null } : caseForSolve0;
+  const equityAtCase = (caseForSolve) => {
     const scenario = { label: "implied", shareMultiplierPct: 100, posMultiplierPct: 100, discountRateAddPct: 0, color: "" };
-    return computeCaseValuation(caseForSolve, scenario, null, discountRateBasePct, terminalValueParams).equity.equityValue;
+    return computeCaseValuation(caseForSolve, scenario, null, discountRateBasePct, terminalValueParams).equity.perShare;
   };
 
   // Launch year is handled separately from the two continuous variables
