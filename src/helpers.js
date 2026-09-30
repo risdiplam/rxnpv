@@ -1650,8 +1650,8 @@ function ReverseSolveBox({ theCase, discountRatePct, tv, options }) {
     h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-2)", marginBottom: 10 } }, "Same idea as Implied PoS above, holding every other assumption fixed and solving for this one instead."),
     options.length > 1 && h("div", { style: { display: "flex", gap: 6, marginBottom: 10 } },
       options.map(o => h("button", {
-        key: o.key, onClick: () => setVariable(o.key),
-        style: { padding: "4px 10px", borderRadius: 6, border: "1px solid " + (variable === o.key ? "var(--amber)" : "var(--rule)"), background: variable === o.key ? "var(--amber)" : "transparent", color: variable === o.key ? "var(--on-teal)" : "var(--ink-2)", fontFamily: "var(--mono)", fontSize: 10, fontWeight: 600, cursor: "pointer" }
+        key: o.key, onClick: () => setVariable(o.key), "aria-pressed": variable === o.key,
+        style: { padding: "4px 10px", minHeight: 26, borderRadius: 6, border: "1px solid " + (variable === o.key ? "var(--amber)" : "var(--rule)"), background: variable === o.key ? "var(--amber)" : "transparent", color: variable === o.key ? "var(--on-teal)" : "var(--ink-2)", fontFamily: "var(--mono)", fontSize: 10, fontWeight: 600, cursor: "pointer" }
       }, o.label))
     ),
     solveError || !solved ? h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-2)" } }, "Couldn't solve: " + (solveError || "unknown error"))

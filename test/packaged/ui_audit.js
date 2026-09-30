@@ -92,7 +92,9 @@ window.__t = {
       }
     });
     // Charts.
-    [...document.querySelectorAll("svg")].filter(s => vis(s) && s.getBoundingClientRect().width >= 120).forEach(s => {
+    // A graphic marked aria-hidden is decorative on purpose (its values are
+    // written out beside it, as in the readout table's bars), so it needs no name.
+    [...document.querySelectorAll("svg")].filter(s => vis(s) && s.getBoundingClientRect().width >= 120 && s.getAttribute("aria-hidden") !== "true").forEach(s => {
       const named = s.getAttribute("aria-label") || s.getAttribute("aria-labelledby") || s.querySelector("title") || s.getAttribute("role") === "img" && s.getAttribute("aria-label");
       if (!named) out.push({ type: "chart with no accessible name", text: (s.closest("[data-export-chart]") || {}).getAttribute ? s.closest("[data-export-chart]").getAttribute("data-export-chart") : "", where: where(s) });
       s.querySelectorAll("text").forEach(t => { const h = t.getBoundingClientRect().height; if (h > 0 && h < 8) out.push({ type: "chart text drawn under 8px", text: t.textContent.slice(0, 30), detail: h.toFixed(1) + "px", where: where(s) }); });

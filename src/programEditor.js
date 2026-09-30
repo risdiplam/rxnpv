@@ -316,7 +316,7 @@ function ProgramEditor({ program, onChange, onDelete, discountRatePct, terminalV
       program.posBiomarkerUse === "selection" && (() => {
         const bp = eligibleHelper.biomarkerPrevalence, tr = eligibleHelper.testingRate;
         const computed = (bp !== "" && tr !== "") ? (Number(bp) * Number(tr) / 100) : null;
-        const fieldStyle = { width: 90, padding: "5px 8px", borderRadius: 5, border: "1px solid var(--rule)", background: "var(--surface)", color: "var(--ink-1)", fontFamily: "var(--mono)", fontSize: 11 };
+        const fieldStyle = { width: 90, minHeight: 28, padding: "5px 8px", borderRadius: 5, border: "1px solid var(--rule)", background: "var(--surface)", color: "var(--ink-1)", fontFamily: "var(--mono)", fontSize: 12 };
         return h("div", { style: { flex: "1 1 100%", marginTop: 8, padding: "10px 12px", borderRadius: 8, background: "var(--surface-2)" } },
           h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginBottom: 8, lineHeight: 1.6 } },
             "This program uses a selection biomarker — optional helper to build the eligible % from its two parts:"),
@@ -670,7 +670,7 @@ function ProgramEditor({ program, onChange, onDelete, discountRatePct, terminalV
               // entirely, so this navigation had no non-mouse route at all.
               role: "button", tabIndex: 0,
               onKeyDown: (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onNavigateToTools("licensing"); } },
-              style: { color: "var(--teal)", cursor: "pointer", textDecoration: "underline" } }, "Tools → Licensing Comps"), "."),
+              style: { color: "var(--teal)", cursor: "pointer", textDecoration: "underline", display: "inline-flex", alignItems: "center", minHeight: 24 } }, "Tools → Licensing Comps"), "."),
           // Quick mode hides the territory choice (it has no split to apply it
           // to), which hid the consequence too: an ex-US deal was silently
           // treated as worldwide.
@@ -682,8 +682,8 @@ function ProgramEditor({ program, onChange, onDelete, discountRatePct, terminalV
             h("div", { style: { ...UI.caption, marginBottom: 4 } }, "Territory partnered"),
             h("div", { style: { display: "flex", gap: 6 } },
               ["us", "exUS", "global"].map(t => h("button", {
-                key: t, onClick: () => setPartnership({ territory: t }),
-                style: { padding: "3px 10px", borderRadius: 5, border: "1px solid " + (partnership.territory === t ? "var(--teal)" : "var(--rule)"), background: partnership.territory === t ? "var(--teal-bg)" : "transparent", color: partnership.territory === t ? "var(--teal)" : "var(--ink-2)", fontFamily: "var(--mono)", fontSize: 10, cursor: "pointer" }
+                key: t, onClick: () => setPartnership({ territory: t }), "aria-pressed": partnership.territory === t,
+                style: { padding: "3px 10px", minHeight: 26, borderRadius: 5, border: "1px solid " + (partnership.territory === t ? "var(--teal)" : "var(--rule)"), background: partnership.territory === t ? "var(--teal-bg)" : "transparent", color: partnership.territory === t ? "var(--teal)" : "var(--ink-2)", fontFamily: "var(--mono)", fontSize: 10, cursor: "pointer" }
               }, t === "us" ? "US" : t === "exUS" ? "Ex-US" : "Global"))
             )
           ),

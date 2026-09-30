@@ -66,7 +66,14 @@ function OutcomeTreeChart({ tree, price, label }) {
     const x1 = a.x + a.w, y1 = a.y, x2 = b.x, y2 = b.y, mx = (x1 + x2) / 2;
     const pw = text ? measureLabel(text, 12, 600) + 16 : 0;
     // Never closer than 10px to either box, wherever `at` would put it.
-    const lx = Math.min(x2 - pw / 2 - 10, Math.max(x1 + pw / 2 + 10, x1 + (x2 - x1) * (at || 0.5))), ly = y1 + (y2 - y1) * ((lx - x1) / ((x2 - x1) || 1));
+    let lx = Math.min(x2 - pw / 2 - 10, Math.max(x1 + pw / 2 + 10, x1 + (x2 - x1) * (at || 0.5))), ly = y1 + (y2 - y1) * ((lx - x1) / ((x2 - x1) || 1));
+    // Too little room between the boxes for the pill (gate to gate, where
+    // they sit close side by side): the clamps above then pushed it back past
+    // the source box and it floated under it, detached from its line. Put it
+    // on the curve's midpoint instead — the steep stretch between the two
+    // boxes, where there is vertical room — when that clears both boxes.
+    const boxHalf = 20 + 2 * 17 / 2 + 11 + 10;
+    if (text && x2 - x1 < pw + 20 && Math.abs(y2 - y1) / 2 >= boxHalf) { lx = mx; ly = (y1 + y2) / 2; }
     edges.push(h("g", { key },
       h("path", { d: "M" + x1 + "," + y1 + " C" + mx + "," + y1 + " " + mx + "," + y2 + " " + x2 + "," + y2, fill: "none", stroke: color, strokeWidth: 1.6 }),
       text && h("rect", { x: lx - pw / 2, y: ly - 11, width: pw, height: 22, rx: 11, fill: "var(--surface)", stroke: color }),
