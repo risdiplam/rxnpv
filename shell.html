@@ -295,6 +295,10 @@
   .proj-table.compact { font-size: 11px; }
   .proj-table.compact th, .proj-table.compact td { padding-left: 6px; padding-right: 6px; }
   .proj-table tfoot td { border-bottom: 0; border-top: 1.5px solid var(--ink-2); font-weight: 600; padding-top: 7px; }
+  /* A tfoot repeats on every printed page, so a table split across pages
+     printed "Enterprise value" under a partial running total (PepGen's
+     report: 2046, −$54M, then the −$51.2M total). Printed once, at the end. */
+  @media print { .proj-table tfoot, .rs-table tfoot { display: table-row-group; } }
   .explain { display: flex; gap: 9px; align-items: flex-start; margin-top: 12px; padding: 9px 12px; border-radius: 8px; background: var(--surface-2);
     font: 400 12.5px/1.55 var(--sans); color: var(--ink-2); max-width: var(--prose-width); }
   .explain.on-tint { background: var(--surface); }

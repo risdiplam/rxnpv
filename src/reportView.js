@@ -96,7 +96,16 @@ function ReportView({ theCase, onBack, updateCase }) {
     ? { bg: "#15181D", ink1: "#E6EAF0", ink2: "#A7B0BD", ink3: "#939DAB", rule: "#2A313B", teal: "#8D9BFF", onTeal: "#0B0D10", amber: "#E0B25C", red: "#F2766E", surface2: "#1D2229" }
     : { bg: "#FFFFFF", ink1: "#15181D", ink2: "#4D5663", ink3: "#5E6776", rule: "#DADEE4", teal: "#4353E0", onTeal: "#FFFFFF", amber: "#8A5B00", red: "#B8322B", surface2: "#F1F3F5" };
   usePrintBackground(rpt.bg);
-  const revenueSeries = (baseResult && baseResult.calendar) ? [{ name: "Company revenue", color: rpt.teal, points: baseResult.calendar.map(c => ({ v: c.revenue, label: new Date().getFullYear() + c.calendarYear })) }] : [];
+  // Two lines, named: revenue if the drug works (what the Workspace revenue
+  // card and the Peak Rev. column show) and the same weighted by the odds of
+  // reaching launch (what the valuation discounts). The report used to plot
+  // only the second under a plain "revenue" title — $190M at peak for PepGen
+  // directly under a table saying $1.26B.
+  const yr0 = new Date().getFullYear();
+  const revenueSeries = (baseResult && baseResult.calendar) ? [
+    { name: "If it works", color: rpt.teal, points: baseResult.calendar.map(c => ({ v: (baseResult.programVals || []).reduce((a, pv) => { const row = pv.pnl && pv.pnl[c.calendarYear - (pv.launchYearOffset || 0)]; return a + (row ? row.revenue : 0); }, 0), label: yr0 + c.calendarYear })) },
+    { name: "Weighted by the odds of launch", color: "var(--amber)", points: baseResult.calendar.map(c => ({ v: c.revenue, label: yr0 + c.calendarYear })) }
+  ] : [];
 
   const doExport = async () => {
     if (!window.electronAPI || !window.electronAPI.exportPDF) { setExportMsg("PDF export requires the desktop app."); return; }
@@ -267,13 +276,17 @@ function ReportView({ theCase, onBack, updateCase }) {
             }))
           ),
           h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: rpt.ink3, marginTop: 10 } },
-            "Discount rate: " + (theCase.discountRatePct || "15") + "% · Diluted shares: " + (theCase.capitalStructure ? fmtNum(computeCapitalStructure(theCase.capitalStructure).dilutedShares) : "—"))
+            // The count the valuation divides by (options by the treasury
+            // method, any modelled raise included) — it printed PepGen's basic
+            // 69,259,517 against the 120,611,883 its per-share value uses.
+            "Discount rate: " + (theCase.discountRatePct || "15") + "% · Diluted shares: " + (baseResult && baseResult.equity ? fmtNum(baseResult.equity.dilutedShares) : theCase.capitalStructure ? fmtNum(computeCapitalStructure(theCase.capitalStructure).dilutedShares) : "—") +
+              (baseResult && baseResult.capResult && baseResult.capResult._futureRaiseNewShares ? " (incl. the modelled raise)" : ""))
         ),
 
         // Revenue chart (DCF-only — Simple Multiple doesn't compute year-by-year cash flows)
         inc("revenueChart") && (valMethod === "dcf" ? h("div", { style: cardStyle },
           h("div", { style: { fontSize: 13, fontWeight: 700, marginBottom: 10, color: rpt.ink2 } }, "Company Revenue Projection (Base Case)"),
-          h(RevenueChart, { series: revenueSeries, height: 200, xPrefix: "", xAxisPrefix: "", label: "Company revenue projection, base case, by year" })
+          h(RevenueChart, { series: revenueSeries, showLegend: true, height: 200, xPrefix: "", xAxisPrefix: "", label: "Company revenue by year, base case: if the drug works, and weighted by the odds of launch" })
         ) : h("div", { style: cardStyle },
           h("div", { style: { fontSize: 13, fontWeight: 700, marginBottom: 10, color: rpt.ink2 } }, "Company Revenue Projection"),
           h("div", { style: { fontSize: 11, color: rpt.ink3 } }, "Not shown — this case uses Simple Multiple valuation, which doesn't build a year-by-year revenue projection. Switch to DCF mode to see this chart.")
