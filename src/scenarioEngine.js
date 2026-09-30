@@ -118,21 +118,48 @@ function computeEffectivePoS(program, scenario) {
   // purely by modality — the override was not fully in control of the number.
   //
   // Distributing the adjustment evenly across transitions in log space keeps
-  // the product exactly on target (k^n x rawCum = target) while leaving the
-  // first stage at 1.0. Each stage is still capped, so an extreme target can
-  // fall short of its own request rather than fabricating a certainty.
+  // the product on target (k^n x rawCum = target) while leaving the first
+  // stage at 1.0.
+  //
+  // The stages must ALWAYS multiply back to posToLaunch: revenue is weighted
+  // by posToLaunch and each stage's R&D by the odds of reaching it, so if the
+  // two disagree the model charges costs at one set of odds and books revenue
+  // at another. They used to disagree whenever a stage hit the 99% cap — the
+  // excess was simply dropped. Every "if it works" run (posOverridePct 100:
+  // the outcome tree's launch ending, the forward runway, the unrisked risk
+  // waterfall) got stages of 69% x 99% x 99% on PepGen, so Phase 3's $230M was
+  // charged at 69% in a world where the drug certainly launches; Stoke's Bull
+  // asked for 84.5% and charged costs at 81%. Now a capped stage hands its
+  // excess to the stages below the cap, and only a target no set of 99%
+  // stages can reach (above 0.99^n — a literal 100% is the usual one) takes
+  // every stage past 99%, evenly.
   const posStages = (() => {
     const stages = posBase.stages;
     if (!stages.length) return [];
     const factor = effectiveMultiplierPct / 100;
     if (Math.abs(factor - 1) < 1e-12) return stages.map(s => ({ ...s }));
-    const k = Math.pow(Math.max(factor, 0), 1 / stages.length);
+    const n = stages.length;
+    const target = clamp01(stages.reduce((a, s) => a * s.pos, 1) * Math.max(factor, 0));
+    const CAP = 0.99;
+    let pos;
+    if (target >= Math.pow(CAP, n)) {
+      pos = stages.map(() => Math.pow(target, 1 / n));
+    } else {
+      const prodAt = k => stages.reduce((a, s) => a * Math.min(CAP, s.pos * k), 1);
+      let k = Math.pow(Math.max(factor, 0), 1 / n);
+      if (prodAt(k) < target * (1 - 1e-12)) {
+        let lo = k, hi = k;
+        while (prodAt(hi) < target) hi *= 2;
+        for (let i = 0; i < 100; i++) { const mid = (lo + hi) / 2; if (prodAt(mid) < target) lo = mid; else hi = mid; }
+        k = hi;
+      }
+      pos = stages.map(s => clamp01(Math.min(CAP, s.pos * k)));
+    }
     let cum = 1;
-    return stages.map(s => {
+    return stages.map((s, i) => {
       const reach = cum;
-      const scaledPos = clamp01(Math.min(0.99, s.pos * k));
-      cum *= scaledPos;
-      return { ...s, pos: scaledPos, posToReachStage: clamp01(reach) };
+      cum *= pos[i];
+      return { ...s, pos: pos[i], posToReachStage: clamp01(reach) };
     });
   })();
   return { posBase, posToLaunch, posStages };
@@ -1208,14 +1235,26 @@ function computeRedFlags(theCase) {
   // through as $0, which would make every brand-new, not-yet-filled-out case
   // "flag" on a runway of zero. That's not a real tension, just an empty form.
   if (programs.length > 0 && theCase.capitalStructure && theCase.capitalStructure.cash !== "" && theCase.capitalStructure.cash != null) {
-    const runway = computeForwardRunway(theCase);
+    // A modelled future raise is money the case already counts on, so the
+    // runway is measured with it too (it has no date, so it is added up
+    // front). Without this the flag told a case with a $100M raise modelled
+    // that its financing was "not yet reflected in the capital structure".
+    const fr = theCase.futureRaise;
+    const raiseAmt = fr && fr.enabled ? numOr(fr.amountM, 0) : 0;
+    const runway0 = computeForwardRunway(theCase);
+    const runway = raiseAmt > 0
+      ? computeForwardRunway({ ...theCase, capitalStructure: { ...theCase.capitalStructure, cash: String(numOr(theCase.capitalStructure.cash, 0) + raiseAmt) } })
+      : runway0;
     if (runway.runwayYears != null) {
       const launchTimelines = programs.map(p => ({ name: p.drugName || p.name || "Program", years: resolveLaunchYearOffset(p) }));
       const nearest = launchTimelines.reduce((min, cur) => cur.years < min.years ? cur : min, launchTimelines[0]);
       if (nearest && runway.runwayYears < nearest.years) {
+        const withRaise = raiseAmt > 0 && runway0.runwayYears != null;
         flags.push({
           programId: null, programName: null, severity: runway.runwayYears < nearest.years * 0.7 ? "high" : "medium",
-          message: `Modeled cash runway (${runway.runwayYears.toFixed(1)} years) is shorter than the time to ${nearest.name}'s own modeled launch (${nearest.years.toFixed(1)} years) — reaching that catalyst as modeled would require financing not yet reflected in the capital structure.`
+          message: withRaise
+            ? `Modeled cash runway (${runway0.runwayYears.toFixed(1)} years, ${runway.runwayYears.toFixed(1)} with the modeled ${fmtMoney(raiseAmt)} raise) is shorter than the time to ${nearest.name}'s own modeled launch (${nearest.years.toFixed(1)} years) — reaching launch as modeled would need more financing than the raise already in the case.`
+            : `Modeled cash runway (${runway.runwayYears.toFixed(1)} years) is shorter than the time to ${nearest.name}'s own modeled launch (${nearest.years.toFixed(1)} years) — reaching that catalyst as modeled would require financing not yet reflected in the capital structure.`
         });
       }
     }

@@ -3827,16 +3827,28 @@ section("FIN-002: partnership milestones use the program's effective PoS");
   const sm = api.computeSimpleMultipleValuation(mkCase(prog("50", launchM)), bear, null, 3, 12);
   near("Simple Multiple: milestone = $100M x 0.35 / 1.12^T", sm.equity.partnershipValueAdded, 100e6 * 0.35 / Math.pow(1.12, T), 1e-3);
 
-  // A stage gate reads the rebuilt stage path. The override factor f is spread
-  // evenly across the n stage transitions (k = f^(1/n)), so the probability of
-  // REACHING stage j scales by k^j, and 50% vs 10% differs by 5^(j/n).
+  // A stage gate reads the rebuilt stage path: the milestone is paid with the
+  // probability of REACHING its stage. The stages always multiply back to the
+  // override; the factor is spread evenly in log space, and a stage that would
+  // pass 99% is held there with its excess spread over the others.
+  // Benchmark stages here (Oncology Phase 2, small molecule): P2 0.25161,
+  // P3 0.41135, filing 0.884; product 0.091494.
+  //   10%: k = (0.10 / 0.091494)^(1/3) = 1.03010, filing 0.884 x 1.03010 =
+  //        0.91061 < 99%, nothing capped -> reach(filing) = 0.10 / 0.91061 = 0.109819
+  //   50%: k = (0.50 / 0.091494)^(1/3) = 1.7612 would put filing at 1.557, so it
+  //        holds at 0.99 -> reach(filing) = 0.50 / 0.99 = 0.505051 (P2 0.5558 and
+  //        P3 0.9087 carry the rest, both under the cap)
+  // The even split used to ignore the cap and drop the excess, which charged
+  // stage costs at lower odds than the revenue (see the next section).
   const stages = api.computePoSWeighting(prog("50", launchM)).stages;
   const j = stages.findIndex(st => st.key === "regulatory");
   const regM = [{ label: "Filing", gate: "regulatory", valueM: "100" }];
   const r50 = api.computePartnershipContribution(mkCase(prog("50", regM)), 0.12, base);
   const r10 = api.computePartnershipContribution(mkCase(prog("10", regM)), 0.12, base);
   ok("the fixture has a regulatory stage after the current one", j > 0);
-  near("a stage-gate milestone scales by 5^(j/n) between 50% and 10% overrides", r50 / r10, Math.pow(5, j / stages.length), 1e-9);
+  const reach10 = 0.10 / (0.884 * Math.pow(0.10 / (0.2516091205211726 * 0.4113528399311532 * 0.884), 1 / 3));
+  near("reach(filing) at 10% is 0.109819, worked longhand", reach10, 0.109819, 1e-6);
+  near("a filing milestone at 50% vs 10% is (0.50/0.99) / 0.109819", r50 / r10, (0.50 / 0.99) / reach10, 1e-9);
 
   // No override, Base scenario: unchanged from before (benchmark odds).
   const plain = api.computePartnershipContribution(mkCase(prog("", launchM)), 0.12, base);
@@ -3952,6 +3964,40 @@ section("FIN-007: implied PoS is expressed against the override baseline");
   const c2 = JSON.parse(JSON.stringify(c)); c2.programs[0].posOverridePct = String(sol.impliedAbsolutePct);
   const ps = api.computeCaseValuation(c2, { label: "b", shareMultiplierPct: 100, posMultiplierPct: 100, discountRateAddPct: 0, color: "" }, null, 12, tv).equity.perShare;
   near("valuing at the implied PoS reproduces the $12 price", ps, 12, 1e-4);
+}
+report();
+
+section("Stage odds always multiply back to the odds asked for");
+{
+  // Revenue is weighted by posToLaunch and each stage's cost by the odds of
+  // reaching it; the two must describe the same path. A stage past the 99% cap
+  // used to lose its excess, so "certain success" (a 100% override, used by
+  // every "if it works" figure) ran on PepGen as 69% x 99% x 99% = 67.9% — its
+  // $230M Phase 3 charged at 69% in a world where the drug surely launches.
+  const pg = JSON.parse(fs.readFileSync(path.join(__dirname, "fixtures", "pepgen_case.json"), "utf8")).programs[0];
+  const prod = e => e.posStages.reduce((a, st) => a * st.pos, 1);
+  const cert = api.computeEffectivePoS({ ...pg, posOverridePct: "100" }, { posMultiplierPct: 100 });
+  near("PepGen at 100%: the stages multiply to 1", prod(cert), 1, 1e-12);
+  ok("PepGen at 100%: every stage is reached for certain", cert.posStages.every(st => Math.abs(st.posToReachStage - 1) < 1e-12));
+  // Where no stage reaches the cap nothing changes: PepGen's Base 15% keeps
+  // its gates 36.79% / 56.86% / 71.71% (product 0.1500).
+  const b = api.computeEffectivePoS(pg, { posMultiplierPct: 100 });
+  near("PepGen Base: stages multiply to 15%", prod(b), 0.15, 1e-12);
+  near("PepGen Base: the Phase 2 gate is still 36.79%", b.posStages[0].pos, 0.3679, 5e-5);
+  // A capped stage passes its excess on. A 2-stage program whose second stage
+  // would pass 99%: P3 0.718, filing 0.905 (product 0.650); asking for 84.5%
+  // (x1.3): an even split gives filing 0.905 x 1.3^(1/2) = 1.032 > 0.99, so
+  // filing holds at 0.99 and P3 = 0.845 / 0.99 = 0.853535.
+  const two = { id: "t", name: "T", currentPhase: "phase3", therapeuticArea: "Neurology", modality: "smallMolecule",
+    revenueMode: "quick", quickRevenue: { peakRevenue: "500000000", yearsToPeak: "6", profile: "median" } };
+  const raw = api.computePoSWeighting(two);
+  const f = 0.845 / raw.posToLaunch * 100;
+  const t = api.computeEffectivePoS(two, { posMultiplierPct: f });
+  near("asking for 84.5%: the stages multiply to 84.5%", prod(t), 0.845, 1e-12);
+  if (raw.stages[1].pos * Math.sqrt(f / 100) > 0.99) {
+    near("the capped stage holds at 99%", t.posStages[1].pos, 0.99, 1e-12);
+    near("and the other takes 0.845 / 0.99", t.posStages[0].pos, 0.845 / 0.99, 1e-12);
+  } else ok("fixture: the filing stage reaches the cap at 84.5%", false);
 }
 report();
 
