@@ -591,6 +591,11 @@ function ProgramEditor({ program, onChange, onDelete, discountRatePct, terminalV
       if (wfError) return null;
       return h(ExportSection, { nav: "waterfall", title: "Risk waterfall — " + (program.drugName || program.name || "this asset"), style: { marginTop: 14, padding: "12px 14px", borderRadius: 8, background: "var(--surface)", border: "1px solid var(--rule)" } },
         h("div", { style: { fontSize: 11, fontFamily: "var(--display)", fontWeight: 600, color: "var(--ink-1)", marginBottom: 4 } }, "Risk waterfall — this asset only"),
+        // Stated because the numbers are not comparable with the headline
+        // otherwise: the case valuation charges corporate G&A and (if on) tax;
+        // this does neither, so on PepGen it read $177M against a case NPV
+        // of -$51M plus $217M of G&A.
+        h("div", { style: { ...UI.caption, marginBottom: 6 } }, "Before corporate G&A and tax — the asset's own revenue, commercial costs and R&D, so it will not add up to the case's enterprise value."),
         h(Note, { summary: "What \"unrisked\" means, and why it can look worse" },
           "\"Unrisked\" means 100% PoS on both sides — the full peak revenue AND the full R&D cost paid with certainty, not just revenue scaled up. For early-stage assets this can come out more negative than the risk-adjusted number: paying the full R&D cost for certain can outweigh a distant, heavily time-discounted payoff — that's a real feature of rNPV, not an error.",
           valuationMethod === "multiple" && " This waterfall always uses the full DCF/cost-structure math, regardless of the case's Simple Multiple setting — it's a diagnostic, not the number driving your headline valuation while Simple Multiple is active."),
