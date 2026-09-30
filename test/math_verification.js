@@ -4539,6 +4539,20 @@ section("Stoke, the whole case recomputed from its inputs (Bear, Base, Bull)");
 }
 report();
 
+section("Portfolio runway: unknown, runs out, or never runs out");
+{
+  // Three different states that used to collapse into two (a blank cash
+  // field read as 0.0 years in red; a case turning cash-positive as "—").
+  const stoke = JSON.parse(fs.readFileSync(path.join(__dirname, "fixtures", "stoke_sample_case.json"), "utf8"));
+  const pepgen = JSON.parse(fs.readFileSync(path.join(__dirname, "fixtures", "pepgen_case.json"), "utf8"));
+  const noCash = JSON.parse(JSON.stringify(pepgen)); noCash.capitalStructure.cash = "";
+  const [st, pg, nc] = api.computePortfolioSummary([stoke, pepgen, noCash]);
+  ok("Stoke: cash never runs out in the projection", st.runwayOutlasts === true && st.runwayYears == null);
+  ok("PepGen: runs out after ~1.5 years (1.72-year Phase 2 at $43.5M a year plus $26M G&A, then Phase 3)", pg.runwayOutlasts === false && Math.abs(pg.runwayYears - 1.534) < 0.01);
+  ok("no cash entered: unknown, not zero", nc.runwayYears == null && nc.runwayOutlasts === false);
+}
+report();
+
 section("Condition searches drop hits CT.gov matched only through a synonym");
 {
   // Shapes as the v2 API returns them (fields trimmed). CT.gov expands

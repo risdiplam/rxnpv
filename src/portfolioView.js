@@ -43,7 +43,7 @@ function PortfolioView({ cases }) {
           h("td", { style: { padding: "8px 10px", color: "var(--ink-2)" } }, fmtPrice(s.price)),
           h("td", { style: { padding: "8px 10px", color: "var(--ink-2)" } }, fmtPrice(s.fairValue)),
           h("td", { style: { padding: "8px 10px", color: s.upsidePct == null ? "var(--ink-3)" : s.upsidePct >= 0 ? "var(--green)" : "var(--red)", fontWeight: 600 } }, fmtPct(s.upsidePct)),
-          h("td", { style: { padding: "8px 10px", color: s.runwayYears != null && s.runwayYears < 1 ? "var(--red)" : "var(--ink-2)" } }, fmtYears(s.runwayYears)),
+          h("td", { style: { padding: "8px 10px", color: s.runwayYears != null && s.runwayYears < 1 ? "var(--red)" : "var(--ink-2)" }, title: s.runwayOutlasts ? "The modelled cash balance never runs out within the 25-year projection" : undefined }, s.runwayOutlasts ? "doesn't run out" : fmtYears(s.runwayYears)),
           h("td", { style: { padding: "8px 10px", color: "var(--ink-2)" } }, s.modeledPoSPct != null ? s.modeledPoSPct.toFixed(0) + "%" : "—"),
           h("td", { style: { padding: "8px 10px", color: "var(--ink-2)" } }, s.impliedPoSPct != null ? s.impliedPoSPct.toFixed(0) + "%" : "—")
         )))
@@ -79,20 +79,20 @@ function PortfolioView({ cases }) {
         h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginBottom: 12 } }, "Under 12 months flagged — worth checking against any near-term catalyst."),
         (() => {
           const withRunway = valid.filter(s => s.runwayYears != null).sort((a, b) => a.runwayYears - b.runwayYears);
-          // runwayYears is null both for "no cash entered" (computeForwardRunway
-          // only zeroes it when startingCash<=0) AND for a well-funded case whose
-          // cash never runs out inside the 25yr projection window — the same
-          // null either way, so the empty-state message can't claim it's the
-          // former without checking, or it's simply wrong for the latter case.
-          if (!withRunway.length) return h("div", { style: UI.captionMd },
-            "No cases with a runway inside the 25-year projection window yet — either no cash entered, or the modeled runway runs past 25 years.");
+          // runwayYears is null when no cash is entered; runwayOutlasts marks a
+          // case whose modelled cash never runs out (computePortfolioSummary).
+          const outlast = valid.filter(s => s.runwayOutlasts);
+          const outlastNote = outlast.length > 0 && h("div", { style: { ...UI.caption, marginTop: 6 } },
+            andList(outlast.map(s => s.name)) + (outlast.length === 1 ? ": its" : ": their") + " modelled cash never runs out within the projection.");
+          if (!withRunway.length) return h("div", null, h("div", { style: UI.captionMd },
+            outlast.length ? "No case runs out of cash within the 25-year projection." : "No case has cash entered yet."), outlastNote);
           const maxRunway = Math.max(...withRunway.map(s => s.runwayYears), 1);
           return withRunway.map(s => h("div", { key: s.id, style: { marginBottom: 8 } },
             h("div", { style: { display: "flex", justifyContent: "space-between", fontSize: 11, fontFamily: "var(--mono)", color: s.runwayYears < 1 ? "var(--red)" : "var(--ink-2)", marginBottom: 2 } },
               h("span", null, s.name), h("span", null, fmtYears(s.runwayYears))),
             h("div", { style: { height: 6, borderRadius: 3, background: "var(--surface-2)" } },
               h("div", { style: { height: "100%", borderRadius: 3, width: Math.max(2, s.runwayYears / maxRunway * 100) + "%", background: s.runwayYears < 1 ? "var(--red)" : "var(--amber)" } }))
-          ));
+          )).concat(outlastNote ? [h("div", { key: "outlast" }, outlastNote)] : []);
         })()
       )
     ),

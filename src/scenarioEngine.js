@@ -1443,6 +1443,8 @@ function computePortfolioSummary(cases) {
         modeledPoSPct = Math.max(0, Math.min(100, rawPct * (baseScenario.posMultiplierPct / 100)));
       }
 
+      const cashRaw = (theCase.capitalStructure || {}).cash;
+      const cashEntered = cashRaw !== "" && cashRaw != null;
       let impliedPoSPct = null;
       if (valMethod === "dcf" && theCase.programs && theCase.programs.length === 1 && price > 0) {
         const solved = solveImpliedPoSMultiplier(theCase, discountRateBasePct, tv);
@@ -1452,7 +1454,12 @@ function computePortfolioSummary(cases) {
       return {
         id: theCase.id, name: theCase.name || "Untitled case", error: null,
         price, fairValue, upsidePct,
-        runwayYears: runway.runwayYears,
+        // null = no cash entered (unknown); runwayOutlasts = cash entered and
+        // the modelled balance never runs out inside the projection. Both
+        // used to collapse: a blank cash field read as 0.0 years (in red) and
+        // a case that turns cash-positive (Stoke) as a bare dash.
+        runwayYears: cashEntered ? runway.runwayYears : null,
+        runwayOutlasts: cashEntered && runway.runwayYears == null,
         programName: primaryProgram ? (primaryProgram.drugName || primaryProgram.name) : null,
         therapeuticArea: primaryProgram ? primaryProgram.therapeuticArea : null,
         modality: primaryProgram ? primaryProgram.modality : null,
