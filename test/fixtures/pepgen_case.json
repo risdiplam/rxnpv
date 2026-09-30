@@ -1,0 +1,335 @@
+{
+ "id": "case_munpsask_1",
+ "name": "PepGen (PEPG)",
+ "ticker": "PEPG",
+ "createdAt": 1790749112996,
+ "updatedAt": 1790749204678,
+ "programs": [
+  {
+   "id": "prog_munpsask_2",
+   "name": "PGN-EDODM1",
+   "drugName": "PGN-EDODM1",
+   "indication": "Myotonic dystrophy type 1 — adults",
+   "therapeuticArea": "Neurology",
+   "modality": "smallMolecule",
+   "currentPhase": "phase2",
+   "posOverridePct": "15",
+   "posBiomarkerUse": "selection",
+   "posDiseaseType": "rare",
+   "trialIds": "NCT06667453, NCT06204809, NCT07220603",
+   "target": "DMPK",
+   "prv": {
+    "enabled": false,
+    "valueM": "150"
+   },
+   "launchYearOffset": "5",
+   "revenueMode": "full",
+   "quickRevenue": {
+    "peakRevenue": "1257000000",
+    "yearsToPeak": "6",
+    "profile": "median",
+    "scenarioOverrides": {
+     "bear": {
+      "peakRevenue": "754000000"
+     },
+     "bull": {
+      "peakRevenue": "1760000000"
+     }
+    }
+   },
+   "revenueBuild": {
+    "population": {
+     "mode": "prevalence",
+     "prevalence": "40000",
+     "incidence": "450",
+     "diseaseDurationYears": "55",
+     "diagnosisRatePct": "60",
+     "treatmentRatePct": "55",
+     "eligiblePct": "75"
+    },
+    "adherencePct": "85",
+    "marketShare": {
+     "numDrugs": 4,
+     "orderOfEntry": 3,
+     "peakShareOverridePct": "23"
+    },
+    "launchCurve": {
+     "yearsToPeak": "6",
+     "profile": "median"
+    },
+    "pricing": {
+     "usAnnualPrice": "350000",
+     "priceBasis": "WAC",
+     "netPriceRealizationPct": "80",
+     "usAnnualGrowthPct": "2",
+     "includeExUS": true,
+     "exUSPriceFactorPct": "50",
+     "exUSAnnualGrowthPct": "0",
+     "exUSPatientMultiplierPct": "180"
+    },
+    "exclusivity": {
+     "yearsToLOE": "10",
+     "modality": "smallMolecule",
+     "volumeRetainedPct": "45",
+     "priceDeclinePct": "35"
+    }
+   },
+   "costStructure": {
+    "cogsPct": "12",
+    "reps": {
+     "primaryCare": "0",
+     "specialty": "60",
+     "hospital": "0"
+    },
+    "marketingPctOfPeak": "3"
+   },
+   "rndOverride": {
+    "totalYears": "4.5",
+    "totalCostM": "320"
+   },
+   "evidenceLog": [
+    {
+     "id": "ev_munptxbj_994",
+     "label": "Lead asset and mechanism",
+     "classification": "fact",
+     "confidence": "high",
+     "source": "PepGen 10-K FY2025 (filed 2026-03-04); Q2 2026 results release (2026-08-06)",
+     "date": "2026-09-30",
+     "thesis": "PGN-EDODM1 is a phosphorodiamidate morpholino oligonucleotide carried into muscle by PepGen's EDO cell-penetrating peptide. It binds the CUG repeat expansion in DMPK transcripts so they stop sequestering MBNL1, restoring normal splicing without knocking DMPK down. FDA Orphan Drug and Fast Track; EMA orphan designation. PepGen stopped its DMD program (PGN-EDO51) in May 2025 after CONNECT1, so this is a single-asset company."
+    },
+    {
+     "id": "ev_munptxy7_998",
+     "label": "FREEDOM single-dose data: 12% / 29% / 54% splicing correction",
+     "classification": "fact",
+     "confidence": "high",
+     "source": "8-K Ex. 99.1, 2025-09-24 (FREEDOM-DM1, NCT06204809)",
+     "date": "2026-09-30",
+     "thesis": "Mean splicing correction on the 22-gene panel at day 28 after one dose: 12.3% at 5 mg/kg (n=6), 29.1% at 10 mg/kg (n=4), 53.7% at 15 mg/kg (n=6), greater than dose-proportional, with muscle concentrations rising the same way. One transient kidney-biomarker elevation at 15 mg/kg met the protocol's dose-limiting-toxicity definition; no serious treatment-related events. Splicing is a mechanism biomarker, not a functional benefit."
+    },
+    {
+     "id": "ev_munptykx_1002",
+     "label": "FREEDOM2 5 mg/kg: splicing no better than placebo",
+     "classification": "fact",
+     "confidence": "high",
+     "source": "8-K Ex. 99.1, 2026-03-30 (FREEDOM2-DM1, NCT06667453)",
+     "date": "2026-09-30",
+     "thesis": "Four doses of 5 mg/kg every four weeks (n=6) against placebo (n=2): mean splicing correction 7.3% vs 6.8%; 22.9% excluding one patient whose splicing worsened 70.8%. A vHOT trend in favour, no improvement in the 10-metre walk/run or grip strength, no serious adverse events, no renal events. The first multi-dose result did not reproduce the single-dose splicing signal at this dose."
+    },
+    {
+     "id": "ev_munptz7l_1006",
+     "label": "FREEDOM2 design, timeline and the partial clinical hold",
+     "classification": "fact",
+     "confidence": "high",
+     "source": "Q2 2026 results release; August 2026 corporate presentation; ClinicalTrials.gov NCT06667453",
+     "date": "2026-09-30",
+     "thesis": "Randomised 6:2, double-blind, placebo-controlled multiple-ascending-dose study, ~24 adults, doses every four weeks, escalating 5 → 10 → 12.5 mg/kg. The 10 mg/kg cohort is fully enrolled; data expected in November 2026. The DSMB cleared the 12.5 mg/kg cohort; results expected 1H 2027, then an end-of-Phase-2 meeting on the registrational design. The corporate presentation refers to a partial FDA clinical hold on FREEDOM2: it is enrolling in Canada, the UK and South Korea, not the US."
+    },
+    {
+     "id": "ev_munptzub_1010",
+     "label": "HARBOR failure: the field's first Phase 3 missed on vHOT",
+     "classification": "fact",
+     "confidence": "high",
+     "source": "Novartis media release, 2026-09-08 (HARBOR, NCT06411288)",
+     "date": "2026-09-30",
+     "thesis": "Novartis's del-desiran (acquired with Avidity) missed its primary endpoint, video hand-opening time, in a ~150-patient Phase 3 in DM1, with activity claimed on secondary and exploratory measures. It is the first registrational read-out in DM1, and on the very functional measure PepGen cites from FREEDOM2 — a read-through on endpoint choice and on how much splicing correction translates into function."
+    },
+    {
+     "id": "ev_munpu0h1_1014",
+     "label": "Competition: third of about four disease-modifying drugs",
+     "classification": "inference",
+     "confidence": "moderate",
+     "source": "Dyne Q2 2026 results (BLA for accelerated approval Q3 2027, launch 1H 2028); ClinicalTrials.gov NCT05481879, NCT06185764, NCT06138743",
+     "date": "2026-09-30",
+     "thesis": "Dyne's z-basivarsen (DYNE-101) has Breakthrough designation, a 71-patient registrational expansion cohort reading out Q1 2027 and a confirmatory Phase 3 dosing since July 2026 — about three years ahead of PepGen. Del-desiran's path is uncertain after HARBOR. Vertex's VX-670 and Sarepta's SRP-1003 (ARO-DM1) are in Phase 1/2. PepGen launching around 2031 would be third of about four: the model's order-of-entry benchmark gives 23%, typed explicitly."
+    },
+    {
+     "id": "ev_munpu13r_1018",
+     "label": "PoS to launch: 15% (benchmark 38%)",
+     "classification": "inference",
+     "confidence": "moderate",
+     "source": "Judgment; app benchmark (Neurology Phase 2, rare + selection biomarker, Thomas 2016 overlap rule); price-implied ~22.5%",
+     "date": "2026-09-30",
+     "thesis": "The benchmark for a rare, genetically selected Phase 2 neurology program is 37.8%. Cut to 15% for three program-specific reasons: the only multi-dose data so far show splicing no better than placebo; HARBOR has just failed on vHOT; and FREEDOM2 carries a partial US clinical hold. The price implies about 22.5%, so the market is less pessimistic than this case. The November 10 mg/kg data are the next test of it."
+    },
+    {
+     "id": "ev_munpu1qh_1022",
+     "label": "US prevalence 40,000; 9,900 treatable adults",
+     "classification": "inference",
+     "confidence": "moderate",
+     "source": "PepGen 10-K FY2025 (1 in 8,000; ~40,000 US, 75,000 Europe, 15,000 Japan); Johnson et al., Neurology 2021 (1 in 2,100 genetic carriers)",
+     "date": "2026-09-30",
+     "thesis": "The company's 40,000 is a clinical-prevalence figure; genetic screening suggests many more carriers, about half symptomatic. Diagnosed 60% (DM1 is under-diagnosed; symptoms can start after 50), treated 55% (a monthly IV infusion), eligible 75% (adult, non-congenital — FREEDOM2 enrols adults): 40,000 × 60% × 55% × 75% ≈ 9,900. The least certain part of the build after peak share."
+    },
+    {
+     "id": "ev_munpu2d5_1026",
+     "label": "Price: $350K a year WAC, 80% realised",
+     "classification": "inference",
+     "confidence": "low",
+     "source": "Judgment; no approved DM1 disease-modifier; Spinraza maintenance WAC ~$375–400K; Sarepta's exon-skipping PMOs weight-based, ~$300K+ for adults",
+     "date": "2026-09-30",
+     "thesis": "Weight-based IV dosing every four weeks, like the PMO class it belongs to. No DM1 drug has a disclosed price, so this rests on analogs, and Dyne's launch in 2028 will set the real anchor before PepGen's. Entered as WAC with 80% realised (Medicaid and commercial rebates for an adult specialty drug)."
+    },
+    {
+     "id": "ev_munpu2zt_1030",
+     "label": "Ex-US: 180% of US patients at 50% of list",
+     "classification": "inference",
+     "confidence": "low",
+     "source": "PepGen 10-K FY2025; the app's Table 4-2 list-price factor",
+     "date": "2026-09-30",
+     "thesis": "Europe and Japan together have about 90,000 patients to the US's 40,000 (225%), cut to 180% for slower reimbursement and access. Priced at 50% of the US list price — the app's convention compares list prices and does not model ex-US gross-to-net."
+    },
+    {
+     "id": "ev_munpu3mi_1034",
+     "label": "Launch in year 5 (2031); $320M of R&D over 4.5 years",
+     "classification": "inference",
+     "confidence": "moderate",
+     "source": "Q2 2026 10-Q (R&D $12.5M in Q2, cash guidance into Q4 2027); timeline judgment",
+     "date": "2026-09-30",
+     "thesis": "FREEDOM2 completes in 1H 2027, then an end-of-Phase-2 meeting, a registrational trial around 2028–2030, filing about 2030 and approval about 2031 — year 5. R&D runs ~$50M a year today and would rise to ~$80M a year for a registrational trial plus commercial manufacturing: about $320M in all, entered as an override because the Phase 2 is already mostly paid for."
+    },
+    {
+     "id": "ev_munpu496_1038",
+     "label": "Loss of exclusivity: 10 years from launch",
+     "classification": "inference",
+     "confidence": "moderate",
+     "source": "PepGen 10-K FY2025, Intellectual property and the OUI/MRC licence",
+     "date": "2026-09-30",
+     "thesis": "The licensed composition-of-matter patent (US 12,465,646) and related applications expire 2039–2042 before extensions; orphan exclusivity gives 7 years from a 2031 approval. About 2041 is a middle reading. Erosion is set halfway between the app's small-molecule and biologic benchmarks (45% of volume kept, 35% price decline), as no oligonucleotide has yet faced generic competition. The licence also carries a low-single-digit royalty above £20–30M of sales, which is folded into the 12% COGS."
+    },
+    {
+     "id": "ev_munpu4vu_1042",
+     "label": "Balance sheet",
+     "classification": "fact",
+     "confidence": "high",
+     "source": "Q2 2026 10-Q (filed 2026-08-06)",
+     "date": "2026-09-30",
+     "thesis": "$117.2M of cash, equivalents and marketable securities at June 30, 2026; no debt. 69,259,517 shares outstanding at August 2, 2026. Options 8,139,082 at a $4.89 weighted strike — all out of the money at $2.34, so they add nothing by the treasury method. 1,101,110 unvested RSUs, entered as zero-strike warrants. Federal NOLs $177.3M. The company guides cash into Q4 2027."
+    },
+    {
+     "id": "ev_munpu5il_1046",
+     "label": "Cash burn: $5.7M a month",
+     "classification": "fact",
+     "confidence": "high",
+     "source": "Q2 2026 10-Q, statement of cash flows",
+     "date": "2026-09-30",
+     "thesis": "Cash used in operations was $34.2M in H1 2026, $5.7M a month; Q2 R&D $12.5M and G&A $6.4M (so G&A runs ~$26M a year). $117.2M at that rate lasts about 20 months, but spending rises with the 12.5 mg/kg cohort and registrational preparation, which is why the company says Q4 2027."
+    },
+    {
+     "id": "ev_munpu65a_1050",
+     "label": "A $100M raise at $1.99; the dilution path left off",
+     "classification": "inference",
+     "confidence": "moderate",
+     "source": "Judgment; runway guidance into Q4 2027",
+     "date": "2026-09-30",
+     "thesis": "Cash runs out before a registrational trial could even start, so a raise is certain: $100M at $1.99 (15% below $2.34) is modelled as the next financing (50M shares). The dilution-path inputs are filled but switched off: that tool prices every projected raise at today's price, so for a company whose launch is five years away it issued about 225M shares and took Base to $0.25 — raises made after positive data would be priced far higher."
+    },
+    {
+     "id": "ev_munpu6s1_1054",
+     "label": "Share price $2.34",
+     "classification": "fact",
+     "confidence": "high",
+     "source": "Close on 2026-09-29 (stockanalysis.com)",
+     "date": "2026-09-30",
+     "thesis": "Down 9.7% that day and about 60% year to date, after the March 5 mg/kg data and HARBOR's failure on September 8. At $2.34 the market capitalisation is ~$162M against $117M of cash — an enterprise value of about $45M for the program. Update the price before relying on the upside figure."
+    },
+    {
+     "id": "ev_munpu7ep_1058",
+     "label": "What the model says (snapshot)",
+     "classification": "inference",
+     "confidence": "moderate",
+     "source": "This case, 2026-09-30",
+     "date": "2026-09-30",
+     "thesis": "At $2.34: Base fair value ~$1.38 (about 41% below the price), Bear ~$0.25, Bull ~$3.58, after the modelled $100M raise; peak revenue ~$1.26B in Base ($648M US). The price implies ~22.5% odds of launch against this case's 15%. If PGN-EDODM1 is approved it is worth ~$10.19 a share on Base inputs. The failure floor reads $0 because the model charges the whole benchmark-proportioned Phase 2 cost (~$75M) as still to come, although FREEDOM2 is mostly paid for — a real ~$60M would likely remain after a Phase 2 failure (~$0.85 a share)."
+    }
+   ],
+   "calibrationLog": [
+    {
+     "id": "cal_munpu9ja_1065",
+     "catalystLabel": "FREEDOM2 10 mg/kg data, through to approval (PoS to launch)",
+     "catalystDate": "2026-11",
+     "yourPoS": 15,
+     "marketImpliedPoS": 23,
+     "outcome": "pending",
+     "notes": "Both figures are the probability of reaching launch. Market-implied is this case's own reverse-solve at $2.34 on 2026-09-30. The November data are the first multi-dose look at 10 mg/kg; a positive read should move both figures up."
+    }
+   ],
+   "partnership": {
+    "enabled": false,
+    "territory": "exUS",
+    "royaltyPct": "",
+    "upfrontM": "",
+    "costSharingPct": "",
+    "milestones": []
+   }
+  }
+ ],
+ "currentPrice": "2.34",
+ "corporateGA": {
+  "preCommercialAnnualM": "26",
+  "gaShareOfMatureSgaPct": "50",
+  "windDownYears": "1"
+ },
+ "discountRatePct": "14",
+ "terminalValue": {
+  "enabled": false,
+  "method": "exitMultiple",
+  "growthPct": "0",
+  "exitMultiple": "4"
+ },
+ "taxation": {
+  "enabled": true,
+  "effectiveRatePct": "21",
+  "startingNOLM": "177300000"
+ },
+ "capitalStructure": {
+  "mode": "detailed",
+  "dilutedSharesSimple": "",
+  "basicShares": "69259517",
+  "cash": "117238000",
+  "debt": "0",
+  "opts": "8139082",
+  "optK": "4.89",
+  "war": "1101110",
+  "warK": "0",
+  "convFace": "0",
+  "convPrice": "0"
+ },
+ "scenarioOverrides": {
+  "bear": {
+   "shareMultiplierPct": "60",
+   "posMultiplierPct": "60",
+   "discountRateAddPct": "3",
+   "exitMultiple": "3"
+  },
+  "bull": {
+   "shareMultiplierPct": "140",
+   "posMultiplierPct": "150",
+   "discountRateAddPct": "-1",
+   "exitMultiple": "5"
+  }
+ },
+ "valuationMethod": "dcf",
+ "futureRaise": {
+  "enabled": true,
+  "amountM": "100000000",
+  "priceOverride": "1.99"
+ },
+ "dilutionPath": {
+  "enabled": false,
+  "minCashBufferM": "40000000",
+  "targetRunwayMonths": "18",
+  "discountToMarketPct": "15",
+  "sbcAnnualGrowthPct": "0"
+ },
+ "basePosAdjustmentPct": "100",
+ "readoutScenarios": {
+  "clearOfWinsPct": "30",
+  "clearPosPct": "64",
+  "clearSharePct": "110",
+  "modestPosPct": "41",
+  "modestSharePct": "70"
+ },
+ "outcomeTree": {
+  "resubmitFixPct": "47"
+ }
+}

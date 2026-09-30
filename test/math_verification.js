@@ -65,7 +65,7 @@ const EXPORTS = [
   "POS_MODIFIERS", "POS_REGULATORY", "POS_REGULATORY_MODIFIERS",
   "SCENARIO_PRESETS", "getEffectiveScenarioPreset", "applyBasePosAdjustment",
   "computeProgramValuation", "computeCaseValuation", "baseCaseFairValue", "computeProjectionRows", "computeSensitivityDrivers", "computeProgramRiskWaterfall",
-  "computeEffectivePoS", "computeRnDToLaunch", "resolveLaunchYearOffset",
+  "computeEffectivePoS", "computeRnDToLaunch", "launchCurveForYears", "resolveLaunchYearOffset",
   "computeFullCaseMonteCarlo", "solveImpliedPoSMultiplier", "solveImpliedVariable", "computeEquityBridgeSteps", "computeRedFlags", "quickModeTerritoryMismatch",
   "computePortfolioSummary", "shrinkBinaryResponseRate", "shrinkHazardRatio",
   "BINARY_SHRINKAGE_FACTOR", "HR_SHRINKAGE_FACTOR",
@@ -4415,6 +4415,76 @@ section("Trial comparison");
 section("Possessive names");
 {
   ok("possessive: Stoke's, Biologics', blank case's", api.possessive("Stoke") === "Stoke's" && api.possessive("Edge two-programs") === "Edge two-programs'" && api.possessive("") === "'s");
+}
+report();
+
+section("PepGen, the whole case recomputed from its inputs (Bear, Base, Bull)");
+{
+  // test/fixtures/pepgen_case.json is the PepGen case exactly as it was typed
+  // into the packaged app's own fields by test/packaged/case_fill.js. Below,
+  // every year of every scenario is rebuilt from those inputs with formulas
+  // written out here. Only benchmark LOOKUPS come from the app: each stage's
+  // benchmark duration and cost (to split the $320M / 4.5-year override), the
+  // stage odds under the 15% override, and the six-year median launch curve.
+  //   Eligible     40,000 x 60% diagnosed x 55% treated x 75% eligible = 9,900
+  //   On drug      9,900 x 23% peak share x 85% adherence = 1,935.45 at peak
+  //   US price     $350,000 WAC x 80% realised = $280,000, +2% a year
+  //   Ex-US        180% of US patients x 50% of the ENTERED price = $175,000, flat
+  //   After LOE    (year 10) 45% of volume x 65% of price, in one year
+  //   Costs        COGS 12%; 60 specialty reps x $280,000 (+2%/yr) to LOE, 30% in
+  //                the year before launch; marketing 3% of peak revenue to LOE
+  //   Corporate    $26M a year before revenue; 17% (34% x 50%) of revenue above
+  //   G&A          $400M, straight line between — on odds-weighted revenue
+  //   Tax          21% after a $177.3M NOL that also collects every loss year
+  //   Discount     end of year: year t (2026 = 0) at 1/(1+r)^(t+1)
+  //   Equity       NPV + $117.238M cash + $100M raise, over 69,259,517 +
+  //                1,101,110 RSUs + 50,251,256 raise shares (options at $4.89 are
+  //                out of the money at $2.34) = 120,611,883
+  const c = JSON.parse(fs.readFileSync(path.join(__dirname, "fixtures", "pepgen_case.json"), "utf8"));
+  const p = c.programs[0];
+  const rnd = api.computeRnDToLaunch(p);
+  const ramp = [11, 31, 58, 76, 89, 100].map(x => x / 100);
+  near("the six-year median launch curve is the one typed here", 0, ramp.reduce((s, v, i) => s + Math.abs(v - api.launchCurveForYears(6, "median")[i] / 100), 0), 1e-12);
+  const expectPS = { bear: 0.2475, base: 1.3767, bull: 3.5842 };
+  for (const [key, share, posMult, addPct] of [["bear", 60, 60, 3], ["base", 100, 100, 0], ["bull", 140, 150, -1]]) {
+    const r = (14 + addPct) / 100, N = 25, L = 5;
+    const eff = api.computeEffectivePoS(p, { posMultiplierPct: posMult });
+    const reach = {}; eff.posStages.forEach(st => { reach[st.key] = st.posToReachStage; });
+    const pos = eff.posToLaunch;
+    const peakPts = 40000 * 0.60 * 0.55 * 0.75 * 0.23 * (share / 100) * 0.85;
+    const rev = [];
+    for (let y = 1; y <= N; y++) {
+      const pts = peakPts * (y <= 6 ? ramp[y - 1] : 1);
+      rev.push((pts * 280000 * Math.pow(1.02, y - 1) + pts * 1.8 * 175000) * (y <= 10 ? 1 : 0.45 * 0.65));
+    }
+    const peakRev = Math.max(...rev);
+    const contrib = rev.map((R, i) => R - 0.12 * R - (i < 10 ? 60 * 280000 * Math.pow(1.02, i) + 0.03 * peakRev : 0));
+    const bCost = rnd.items.reduce((s2, i) => s2 + i.costM, 0), bYears = rnd.items.reduce((s2, i) => s2 + i.years, 0);
+    const rd = new Array(L).fill(0); let cur = 0;
+    rnd.items.forEach(i => {
+      const yrs = i.years * 4.5 / bYears, per = i.costM * (320 / bCost) * 1e6 * reach[i.key] / yrs, a = cur, b = cur + yrs;
+      for (let y = 0; y < L; y++) rd[y] += per * Math.max(0, Math.min(b, y + 1) - Math.max(a, y));
+      cur = b;
+    });
+    const ga = v => v <= 0 ? 26e6 : v >= 400e6 ? v * 0.17 : 26e6 + (400e6 * 0.17 - 26e6) * v / 400e6;
+    let nol = 177.3e6, npv = 0; const cf = [];
+    for (let t = 0; t < N; t++) {
+      const i = t - L;
+      const pre = (i >= 0 ? contrib[i] * pos : 0) - (t < L ? rd[t] : 0) - (i === -1 ? 60 * 280000 * 0.3 * pos : 0) - ga(i >= 0 ? rev[i] * pos : 0);
+      let tax = 0;
+      if (pre < 0) nol -= pre; else { const use = Math.min(nol, pre); nol -= use; tax = 0.21 * (pre - use); }
+      cf.push(pre - tax); npv += (pre - tax) / Math.pow(1 + r, t + 1);
+    }
+    const shares = 69259517 + 1101110 + 100e6 / 1.99;
+    const perShare = (npv + 117.238e6 + 100e6) / shares;
+    const app = api.computeCaseValuation(c, api.getEffectiveScenarioPreset(c, key), key, 14, c.terminalValue);
+    near(key + ": NPV equals the independent rebuild", app.npvResult.npv, npv, 25);
+    near(key + ": diluted shares are 120,611,883", app.equity.dilutedShares, shares, 0.5);
+    near(key + ": fair value per share equals the rebuild", app.equity.perShare, perShare, 1e-6);
+    near(key + ": and is the $" + expectPS[key] + " the case showed", perShare, expectPS[key], 5e-5);
+    const rows = api.computeProjectionRows(app, c);
+    ok(key + ": every one of the 25 years' cash flow within $1 of the rebuild", rows.length === N && rows.every((row, t) => Math.abs(row.fcf - cf[t]) < 1));
+  }
 }
 report();
 
