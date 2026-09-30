@@ -885,3 +885,33 @@ Every change below hides or merges repetition; no number, chart, option or expla
 - **Sentence fix.** The Sensitivity reading listed drivers as "A and B and C and D"; it now reads "A, B, C and D each reach …" (a shared `andList()`, also used by the Sum-of-the-Parts reading).
 
 Verified: 14 suites, lint clean, UI audit zero findings in both themes and at 900px, the export sweep with only the six known ink-score flags. The sweep's report and bundle phase now reaches a single chart the way a person does (section menu → chart → "+ Report"/"+ Bundle"), and all five items render in both.
+
+## Phase 44 — The Stoke sample, filled in completely
+
+✅ From the user: "go back into the stoke therapeutics example case, and fill out EVERY field across valuation, simulation, tools, etc. we want to have a fully built case that can essentially function as an example of how everything is supposed to look when done correctly… it needs to be as accurate and complete as you can possibly get it, no shortcuts."
+
+**Research, all from primary sources.** The Q1 and Q2 2026 10-Qs, the FY2025 10-K, the Aug 3 2026 424B5, ClinicalTrials.gov results records for every Dravet Phase 3 with posted results (fenfluramine Studies 1, 3 and 1504, cannabidiol GWPCARE1 and 2, soticlestat SKYLINE), EMPEROR's registration, the NEJM 2026 Phase 1/2 paper and Stoke's AES 2024 poster (responders counted bar by bar from its waterfall: 8 of 10 multi-dose 70 mg patients), the Fintepla label, nusinersen's FDA clinical pharmacology review, and Sacks et al. (JAMA 2014) on resubmissions.
+
+**Corrections to the sample.** The August prospectus supplement is a fresh $200M ATM, not the ~$134M left of an older one — now modelled as $194M net at $24.06 after Cantor's 3%. The extra EMPEROR patients outside the US filing are ~30 in Europe plus a China cohort, not China alone. The options count was right but its date was not: 11,532,638 is June 30, 2026; the $13.84 strike is December's.
+
+**Every field filled.** Dilution path on (no scenario needs a raise after the ATM; 0% share creep because stock compensation is already in the reported costs), readout scenarios from the Dravet record (3 of 5 positive Phase 3s were clear wins), a 47% resubmission branch, terminal-value multiples kept for reference with TV off, Napkin peaks with a note on why Napkin needs the partnership off to compare, the incidence fields as the "label stops at 17" alternative (Base about $7 — the label evidence, Fintepla and Epidiolex labelled by minimum age only, is why the case uses all ages), explicit peak share, wind-down, simple-mode shares, zero convertible, cash burn. Base moves from $29.05 to $28.84; price-implied odds stay at 55%.
+
+**30 worked examples.** One for every Tools tool and Simulation tab, each set up for this case with a note on where every number comes from, listed on the Saved tab by workbench. Opening one fills the tool and runs it, so the result is always current; they never enter the PDF. All 30 opened in the packaged app with live data and were looked at.
+
+**Bugs the examples exposed, fixed:**
+- Reopening a saved meta-analysis in a fresh session kept only two study rows.
+- Forest plots cut long study names off at the left, and labelled a log axis "1, 24, 47".
+- Histograms of discrete results (a responder difference moves in steps of 1/81) drew a saw-tooth; bins now align to the steps.
+- The trial-outcome chart marked "prior mean" at the treated response rate on an axis of treated-minus-control differences.
+- Chart marker labels sat in the title's row and ran into it (histogram and line charts).
+- Compare Trials printed "p = =0.061" (Takeda files "=0.061"); one shared `formatRegisteredP()`.
+- Catalyst Calendar typed every filing "?" — EDGAR renamed the field.
+- EDGAR cash left out marketable securities ($110.0M of Stoke's $354.3M).
+- Company Lookup searched ClinicalTrials.gov for the sponsor "STOK" and found nothing.
+- Asset Program missed trials registered under a code name.
+- Runway vs. Catalyst ran a late catalyst's label off the card.
+
+**Proposed, not added:** UCB–Zogenix, Spinraza, Epidiolex and Fintepla sales, and the Stoke–Biogen licence (`docs/comps_candidates/2026-09-28-dravet.md`).
+
+Verified: 15 suites (new: `worked_examples_test.js`), 1,232 math checks, lint clean, UI audit zero findings, export sweep with only the known ink-score flags.
+
