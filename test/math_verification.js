@@ -4539,6 +4539,25 @@ section("Stoke, the whole case recomputed from its inputs (Bear, Base, Bull)");
 }
 report();
 
+section("After a positive readout, its gate is passed");
+{
+  // "Value if the Phase 2 readout is a clear win" must treat Phase 2 as
+  // passed: Phase 3 then starts for certain and is paid in full. It used to
+  // keep Phase 2 pending and just raise the overall odds, so PepGen's $230M
+  // Phase 3 was weighted at ~60% inside the clear-win value ($7.21, now $6.74).
+  const pg = JSON.parse(fs.readFileSync(path.join(__dirname, "fixtures", "pepgen_case.json"), "utf8")).programs[0];
+  const e = api.computeEffectivePoS({ ...pg, posOverridePct: "64", _passedStages: 1 }, { posMultiplierPct: 100 });
+  ok("the readout stage passes for certain", e.posStages[0].pos === 1);
+  near("Phase 3 is reached for certain", e.posStages[1].posToReachStage, 1, 1e-12);
+  near("the later stages carry the 64%", e.posStages[1].pos * e.posStages[2].pos, 0.64, 1e-12);
+  const pv = api.computeProgramValuation({ ...pg, posOverridePct: "64", _passedStages: 1 }, { label: "b", shareMultiplierPct: 100, posMultiplierPct: 100, discountRateAddPct: 0, color: "" }, null);
+  near("so Phase 3's R&D is weighted at 1", pv.riskAdjItems.find(i => i.key === "phase3").posToReachStage, 1, 1e-12);
+  // No marker, no change: the Base stages are untouched.
+  const base = api.computeEffectivePoS(pg, { posMultiplierPct: 100 });
+  near("without the marker PepGen's Phase 2 gate is still 36.79%", base.posStages[0].pos, 0.3679, 5e-5);
+}
+report();
+
 section("Portfolio runway: unknown, runs out, or never runs out");
 {
   // Three different states that used to collapse into two (a blank cash

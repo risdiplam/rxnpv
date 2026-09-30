@@ -140,28 +140,39 @@ function computeEffectivePoS(program, scenario) {
   // excess to the stages below the cap, and only a target no set of 99%
   // stages can reach (above 0.99^n — a literal 100% is the usual one) takes
   // every stage past 99%, evenly.
+  // program._passedStages (internal, set by the readout scenarios): that many
+  // leading stages are already known to have succeeded — they pass for
+  // certain and the odds asked for are spread over the stages after them.
+  // Without it "value after a positive Phase 2" kept Phase 2 as a pending
+  // gate, so Phase 3's cost was weighted at the odds of starting it (~60% on
+  // PepGen) in a scenario defined by Phase 2 having worked.
+  const passed = Math.max(0, Math.min(posBase.stages.length, Math.floor(Number(program._passedStages) || 0)));
   const posStages = (() => {
     const stages = posBase.stages;
     if (!stages.length) return [];
     const factor = effectiveMultiplierPct / 100;
-    if (Math.abs(factor - 1) < 1e-12) return stages.map(s => ({ ...s }));
-    const n = stages.length;
+    if (Math.abs(factor - 1) < 1e-12 && !passed) return stages.map(s => ({ ...s }));
     const target = clamp01(stages.reduce((a, s) => a * s.pos, 1) * Math.max(factor, 0));
+    const rest = stages.slice(passed), n = rest.length;
     const CAP = 0.99;
     let pos;
-    if (target >= Math.pow(CAP, n)) {
-      pos = stages.map(() => Math.pow(target, 1 / n));
+    if (!n) {
+      pos = [];
+    } else if (target >= Math.pow(CAP, n)) {
+      pos = rest.map(() => Math.pow(target, 1 / n));
     } else {
-      const prodAt = k => stages.reduce((a, s) => a * Math.min(CAP, s.pos * k), 1);
-      let k = Math.pow(Math.max(factor, 0), 1 / n);
+      const restRaw = rest.reduce((a, s) => a * s.pos, 1);
+      const prodAt = k => rest.reduce((a, s) => a * Math.min(CAP, s.pos * k), 1);
+      let k = restRaw > 0 ? Math.pow(target / restRaw, 1 / n) : 0;
       if (prodAt(k) < target * (1 - 1e-12)) {
-        let lo = k, hi = k;
+        let lo = k, hi = Math.max(k, 1e-9);
         while (prodAt(hi) < target) hi *= 2;
         for (let i = 0; i < 100; i++) { const mid = (lo + hi) / 2; if (prodAt(mid) < target) lo = mid; else hi = mid; }
         k = hi;
       }
-      pos = stages.map(s => clamp01(Math.min(CAP, s.pos * k)));
+      pos = rest.map(s => clamp01(Math.min(CAP, s.pos * k)));
     }
+    pos = stages.slice(0, passed).map(() => 1).concat(pos);
     let cum = 1;
     return stages.map((s, i) => {
       const reach = cum;
@@ -575,7 +586,9 @@ function computeReadoutScenarios(theCase, discountRateBasePct, terminalValuePara
     clearOfWinsPct: Math.max(0, Math.min(100, num(s.clearOfWinsPct, READOUT_DEFAULTS.clearOfWinsPct)))
   };
   const program = theCase.programs[0];
-  const valueAt = (posPct, sharePct) => computeCaseValuation({ ...theCase, programs: [{ ...program, posOverridePct: String(posPct) }] },
+  // The readout is known to have gone well, so its gate is passed
+  // (_passedStages: 1) and posPct is the odds of the stages after it.
+  const valueAt = (posPct, sharePct) => computeCaseValuation({ ...theCase, programs: [{ ...program, posOverridePct: String(posPct), _passedStages: 1 }] },
     { ...SCENARIO_PRESETS.base, shareMultiplierPct: sharePct }, "base", discountRateBasePct, terminalValueParams).equity.perShare;
   const pWin = g.pass, clearOf = set.clearOfWinsPct / 100;
   const rows = [
