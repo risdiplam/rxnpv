@@ -4,13 +4,48 @@ Written at the user's request after the PepGen pass: *"we need to step back and 
 
 ---
 
+## 0. Second pass — research verdict (read this first)
+
+The user asked for significant research before any change, and pointed to three guides (Lofotr, DrugPatentWatch, Ambrosia Ventures). They disagree with each other, so I went on to primary and academic sources: Damodaran (NYU), the Alacrita white paper with the measured cost of capital of public biotechs and big-pharma IPR&D disclosures, Lo & Thakor's cost-of-capital work (*Nature Biotechnology* 2017), the Analysis Group practitioner guide, Bluestar BioAdvisors' worked models, the WIPO guide, EFPIA's access data and a 2026 *Drug Discovery Today* paper. **This pass corrects one thing I said in the first pass (the discount rate) and confirms the rest.**
+
+**How the discount rate and the probability of success are meant to combine.** They carry different risks, and each risk must be counted once:
+- **The probabilities carry the chance the drug fails.** Clinical failure is specific to the asset and uncorrelated with the market.
+- **The discount rate carries the cost of capital** — the return investors require for market-wide risk, which for a small, loss-making, equity-funded company legitimately includes financing and illiquidity risk. It must not *also* carry the chance of failure. Damodaran: squeezing failure into the discount rate "doesn't work"; value the company as if it survives, then bring in the probability of failure.
+- **The very high rates (20–50%) are for plain NPV, with no probabilities** — a survey of 242 practitioners using plain NPV averaged 40% early, 27% mid, 20% late stage. Using those rates *and* probabilities is the double count (DrugPatentWatch: "the single most common valuation error in the sector"). Lofotr's table, which pairs stage rates of 20–40% with probabilities, does exactly this.
+- **What the rate should be with rNPV:** the measured cost of capital of public biotechs was ~17.7% preclinical, **13.3–13.6% clinical-stage**, 8.7% commercial (Alacrita, 2012 study); big pharma's rNPV rates for acquired pipeline assets, disclosed with explicit probabilities, are Pfizer 13.5%, AstraZeneca 13.0%, J&J 12.2%, Allergan 11.5%, Roche 10.0%; Lo & Thakor's CAPM estimates run up to ~16% for high-beta biotechs.
+
+**So RxNPV already has this right.** Stoke at 12% and PepGen at 14% (both clinical-stage) sit in the measured range, with the probabilities carrying failure. My first-pass suggestion to move to ~10.5% was wrong — that is a large pharma's rate. The app's 15% guidance is at the top of the clinical-stage range and could say so. One real residue: **Bear adds +3 points to the rate** on top of a lower PoS — the cost of capital does not change because the drug's prospects look worse, so that part is a double count.
+
+**Verdict on every item:**
+
+| | Item | Verdict | Evidence |
+|---|---|---|---|
+| ✓ | Revenue and commercial costs × P(launch); R&D × P(reaching the phase); current phase at 100% | **Already right** | Every source |
+| ✓ | Discount rate 12–15% with probabilities | **Already right** | Measured biotech cost of capital; big-pharma IPR&D disclosures |
+| ✓ | Horizon through LOE, no terminal value by default | **Already right** | Bluestar ("terminal value… usually a small portion"), WIPO |
+| ✓ | Success-case SG&A ~20% of sales (reps + marketing + G&A) | **Already right** | 20–30% single-product; Bluestar 5% G&A + 15% promotion |
+| ✗ | Corporate G&A charged in every outcome for 25 years | **Deviates** | Bluestar and BayBridge weight overhead by the odds of being in development, like R&D; sell-side deducts overhead only "during the development period" |
+| ✗ | Tax on the odds-weighted flow | **Deviates** | Bluestar: taxes and loss carry-over inside the success-case annual cash flow, *then* risk-adjusted; Analysis Group and BayBridge tax the success-case profit |
+| ✗ | Dilution path adds shares without the cash | **Deviates — double count** | Two consistent approaches exist: model every cost and divide by today's shares (or add a raise's cash *with* its shares), *or* leave the funding costs out and dilute instead. The app models the costs *and* dilutes |
+| ✗ | Bear raises the discount rate | **Deviates — double count** | Cost of capital does not vary with the scenario; vary share, price, timing and PoS |
+| ✗ | Benchmark R&D ($4M / $13M / $40M for Phases 1/2/3) | **Far too low** | Analysis Group, DiMasi-based: $20.8M / $53.8M / $240M (2023 dollars) — 4–6× higher; ours are trial-only costs |
+| ~ | Ex-US sells from the US launch day | **Gap** | EMA approval ~6 months after FDA (median); EU access ~580–600 days after EMA approval (EFPIA W.A.I.T.) — a 1.5–2 year lag |
+| ~ | Cash from the filing, costs from today | **Internal mismatch, small** | Sources use the latest balance sheet; the fix is to align the dates, not a convention |
+| ~ | Year-end discounting | **Convention** | Banks use mid-year; worth 3–5% of value |
+
+**Inputs, not engine (the PepGen case is mine):** PoS 15% against a 37.8% benchmark and a 24% market-implied figure is the biggest single driver of PepGen reading bearish. Its ex-US sales are ~94% of US sales; the usual split is US ~65% / Europe ~25% / Japan ~10% (ex-US ~54% of US).
+
+**Where that leaves the engine's bias.** Of the confirmed deviations, overhead (A), the dilution path (D) and Bear's rate (F) push values *down*; tax (B), benchmark R&D (G), ex-US lag (H) and the cash date (C) push them *up*. The 2026 *Drug Discovery Today* paper (Yeon et al.) argues traditional rNPV implementations undervalue development-stage drugs for reasons of the same kind — how and when risk is applied, and how the cost of failure is charged.
+
+---
+
 ## 1. How specialists build an rNPV
 
 The conventions below are the ones the sources agree on. Where a source gives a number it is quoted.
 
 1. **Build the asset's cash flow as if the drug works, then weight it by the odds.** Sales, cost of goods, sales and marketing, operating overhead and *tax* are modelled for the success case; that whole commercial stream is multiplied by the probability of launch. (Chandra & Mazumdar, *Biotech Asset Valuation Methods: A Practitioner's Guide*, J. Investment Management 2024 — Analysis Group: first-year sales $850M, operating costs 38% of sales, tax 20%, "after-tax cash flow" discounted and then multiplied by the 11.8% probability the drug is commercialised.)
 2. **Weight each development cost by the odds of incurring it.** The current phase at 100%; each later phase by the probability of reaching it. (Same source, Table 4; WIPO guide: "we modulate costs by the cumulative probability, as subsequent costs of development will not be incurred if the project fails".)
-3. **Discount at a cost of capital, not at a risk-loaded rate.** Technical risk is already in the probabilities. Chandra & Mazumdar use 10.5%; the WIPO guide 10% ("the discount rate should not reflect the drug's specific risk profile… as these factors have been incorporated into the set of cash flows and probabilities"); a practitioner drug-valuation model uses 13% as a blended rate; a survey of large biotechs found a median of 10%. Loading the rate with clinical risk *as well as* using probabilities double-counts it.
+3. **Discount at a cost of capital, not at a risk-loaded rate.** Technical risk is already in the probabilities. (§0 has the fuller evidence: for a clinical-stage biotech the measured cost of capital is ~13%.) Chandra & Mazumdar use 10.5%; the WIPO guide 10% ("the discount rate should not reflect the drug's specific risk profile… as these factors have been incorporated into the set of cash flows and probabilities"); a practitioner drug-valuation model uses 13% as a blended rate; a survey of large biotechs found a median of 10%. Loading the rate with clinical risk *as well as* using probabilities double-counts it.
 4. **Tax is charged on the profits of the success case.** A flat rate on profits in each model above; the probability weighting comes after.
 5. **Corporate overhead is handled one of two ways, and neither charges it forever.** Either it sits inside the product's cash flow (SG&A as a share of sales once selling; administrative cost as an uplift on R&D before launch, e.g. R&D × 1.25 — so it is risk-weighted like the R&D it supports), or, in a sum-of-the-parts, it is deducted as the present value of the overhead "required to operate the company during the development period".
 6. **Company value = sum of the asset rNPVs + net cash − corporate costs, divided by today's diluted shares.** Future financing is not deducted as dilution: raising money at a fair price does not change value per share. Where an analyst does model a raise, the cash and the shares go in together.
@@ -23,7 +58,7 @@ The conventions below are the ones the sources agree on. Where a source gives a 
 |---|---|---|
 | Success-case commercial flow × P(launch) | Yes — product contribution × posToLaunch | Matches |
 | Development cost × P(reach phase), current phase at 100% | Yes (and, since tonight, stages always multiply back to the stated odds) | Matches |
-| Discount at a cost of capital (~10–13%) | App guidance 15%; PepGen 14%, Stoke 12%; Bear adds +3pp | **Deviates** — part double-count of risk |
+| Discount at a cost of capital (clinical-stage biotech ~13%) | App guidance 15%; PepGen 14%, Stoke 12%; Bear adds +3pp | **Matches**, except Bear's +3pp (§0) |
 | Tax on success-case profit, then weighted | Tax on the odds-weighted flow, against the full loss carryforward | **Deviates** — tax understated |
 | Overhead not charged forever | Corporate G&A charged at full rate every year for 25 years, in every outcome; after launch it is sized from odds-weighted revenue | **Deviates** — overhead over-counted |
 | Future financing: cash and shares together, or not at all | Dilution path adds shares but not the cash they raise; manual raise adds both | **Deviates** — dilution path double-counts costs |
@@ -40,7 +75,7 @@ The conventions below are the ones the sources agree on. Where a source gives a 
 | **B** | Tax taxed on the odds-weighted flow | too bullish | −$0.25 | −$0.47 |
 | **C** | Cash from the last filing, costs charged from today (one quarter counted twice) | too bullish | −$0.14 | −$0.70 |
 | **D** | Dilution path adds shares without the cash they raise | too bearish (when on) | $1.38 → $0.57 | none (no raise needed) |
-| **E** | Discount rate 12–15% on top of the probabilities (vs ~10.5%) | too bearish | +$0.46 at 10.5% | +$2.89 at 10.5% |
+| **E** | ~~Discount rate 12–15% on top of the probabilities~~ — **withdrawn in the second pass:** 12–15% is the measured cost of capital of clinical-stage biotechs; the probabilities carry failure, the rate carries market risk (§0) | — | (+$0.46 at 10.5%, for reference only) | (+$2.89 at 10.5%) |
 | **F** | Bear stacks a lower PoS, lower share *and* a higher discount rate | too bearish in Bear | — | — |
 | **G** | Benchmark R&D is trial cost only (no manufacturing, staff, extensions) — only when the user does not override it | too bullish | $1.38 → $2.16 | $29.07 → $30.07 |
 | **H** | Ex-US sells from day one | too bullish | −$0.12 per year of lag | −$0.30 per year |
@@ -81,8 +116,8 @@ The engine issues are real but second-order: A and E make every case too bearish
 5. **F — scenarios:** keep the discount rate the same across Bear/Base/Bull; vary it only in sensitivity.
 
 **Defaults and guidance:**
-6. **E — discount rate guidance:** move the benchmark to the 10–12% practitioners use with rNPV, and say why (risk is in the probabilities).
-7. **G — R&D default:** when the user has not overridden it, warn, and offer the company's reported R&D run-rate (from EDGAR) × years to launch.
+6. **E — discount rate guidance (revised):** keep 12–15% for clinical-stage companies — it matches the measured cost of capital — and state the rule in the app: the probabilities carry failure, the rate carries market risk, so never pair a 20–50% rate with probabilities.
+7. **G — R&D default:** the benchmark is 4–6× below DiMasi-based phase costs. Replace it with the DiMasi-based figures, and offer the company's reported R&D run-rate (from EDGAR) × years to launch.
 8. **H — ex-US lag:** a new input, default one year.
 
 **Presentation:**
@@ -95,7 +130,19 @@ The engine issues are real but second-order: A and E make every case too bearish
 
 ---
 
-### Sources
+### Sources (second pass)
+- Your three: [Lofotr — rNPV valuation](https://lofotrinvestors.com/rnpv-valuation-biotech); [DrugPatentWatch — Valuation of pharma companies](https://www.drugpatentwatch.com/blog/valuation-of-pharma-companies-5-key-considerations-2/); [Ambrosia Ventures — Biotech valuation methods](https://ambrosiaventures.co/insights/guides/biotech-valuation-methods).
+- [Alacrita — Valuing Pharmaceutical Assets: When to Use NPV vs rNPV](https://www.alacrita.com/whitepapers/valuing-pharmaceutical-assets-when-to-use-npv-vs-rnpv) (biotech WACC by stage; NPV-rate survey; big-pharma IPR&D rates).
+- A. Damodaran, [Valuing Young, Start-up and Growth Companies](https://pages.stern.nyu.edu/~adamodar/pdfiles/papers/younggrowth.pdf).
+- Thakor et al., [Just how good an investment is the biopharmaceutical sector?](https://www.nature.com/articles/nbt.4023), *Nature Biotechnology* 35 (2017).
+- Hartmann & Hassan, [Application of real options analysis for pharmaceutical R&D project valuation](https://www.researchgate.net/publication/222568571_Application_of_Real_Options_Analysis_for_Pharmaceutical_RD_Project_Valuation-Empirical_Results_from_a_Survey), *Research Policy* 35 (2006).
+- [Bluestar BioAdvisors — Approaches to Financial Valuation of Biopharmaceutical Assets](https://bluestarbioadvisors.com/thought-pieces/docs/bluestar-bioadvisors-valuation-case-studies-2018-07.pdf) (2018).
+- [EFPIA Patients W.A.I.T. Indicator](https://www.efpia.eu/media/mnfdwzax/efpia-patients-wait-indicator-2025.pdf); FDA–EMA approval gap: [ASCO 2021](https://ascopubs.org/doi/10.1200/JCO.2021.39.15_suppl.1575).
+- Yeon et al., [Revisiting risk-adjusted Net Present Value](https://pubmed.ncbi.nlm.nih.gov/42264429/), *Drug Discovery Today* 31 (2026).
+- [Biotech Today — Biotech valuation: a practical guide](https://biotechtoday.substack.com/p/biotech-valuation-a-practical-guide) (the dilute-instead-of-cost approach).
+- [Wall Street Prep — Mid-year convention](https://www.wallstreetprep.com/knowledge/mid-year-convention/).
+
+### Sources (first pass)
 - A. Chandra & S. Mazumdar, [Biotech Asset Valuation Methods: A Practitioner's Guide](https://www.analysisgroup.com/globalassets/insights/publishing/2024-biotech-asset-valuation-methods.pdf), *Journal of Investment Management*, Q1 2024 (Analysis Group).
 - WIPO, [Intellectual Property Valuation in Biotechnology and Pharmaceuticals — 3. The income approach](https://www.wipo.int/web-publications/intellectual-property-valuation-in-biotechnology-and-pharmaceuticals/en/3-the-income-approach.html).
 - BayBridgeBio, [How to calculate the value of drugs and biotech companies](https://www.baybridgebio.com/drug_valuation.html).
