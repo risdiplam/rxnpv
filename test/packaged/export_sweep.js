@@ -22,7 +22,7 @@
 // the output folder for review by eye.
 //
 //   E=electron/node_modules/electron/dist/Electron.app/Contents/MacOS/Electron
-//   $E test/packaged/export_sweep.js --app=electron/dist/mac-arm64/RxNPV.app --pdfpages=<compiled pdf_pages> [--only=Simulation]
+//   $E test/packaged/export_sweep.js --app=electron/dist/mac-arm64/RxNPV.app --pdfpages=<compiled pdf_pages> [--only=Simulation] [--case=<case.json>]
 const { app, dialog, BrowserWindow, nativeImage } = require("electron");
 const path = require("path"), fs = require("fs"), os = require("os");
 const { execFileSync } = require("child_process");
@@ -193,13 +193,28 @@ app.whenReady().then(async () => {
   }
 
   // ── Workspace ──
-  await click("+ New case", 700);
-  await js(`__t.setVal(__t.byLabel("Peak worldwide revenue")[0], "1000")`); await sleep(200);
-  await js(`__t.setVal(__t.byLabel("Fully diluted shares")[0], "100000000")`); await sleep(200);
-  await js(`__t.setVal(document.querySelector('input[aria-label="Case name"]'), "Sweep Bio")`); await sleep(200);
-  await js(`(() => { const l = [...document.querySelectorAll("span")].find(n => n.textContent.trim() === "Current price"); return __t.setVal(l.parentElement.querySelector("input"), "10"); })()`); await sleep(300);
-  await click("+ Add program", 700);
-  await js(`__t.setVal(__t.byLabel("Peak worldwide revenue")[1], "600")`); await sleep(300);
+  if (args.case) {
+    // --case=<file.json>: sweep a real stored case (e.g. the one case_fill.js
+    // typed in) instead of the built-in two-program Napkin case. A
+    // single-program Full-model case shows sections the built-in one cannot —
+    // the case at a glance, the outcome tree, the readout scenarios.
+    const theCase = JSON.parse(fs.readFileSync(path.resolve(args.case), "utf8"));
+    await js(`localStorage.setItem("rxnpv_cases_v1", ${JSON.stringify(JSON.stringify([theCase]))}); location.reload(); true`);
+    await sleep(2500);
+    await js(PAGE_HELPERS);
+    const opened = await js(`(() => { const b = [...document.querySelectorAll("button, [role=button]")].find(x => x.textContent.includes(${JSON.stringify(theCase.name)})); if (b) b.click(); return !!b; })()`);
+    console.log("seeded case " + theCase.name + (opened ? "" : " (not found in the case list)"));
+    await sleep(1200);
+  } else {
+    await click("+ New case", 700);
+    await js(`__t.setVal(__t.byLabel("Peak worldwide revenue")[0], "1000")`); await sleep(200);
+    await js(`__t.setVal(__t.byLabel("Fully diluted shares")[0], "100000000")`); await sleep(200);
+    await js(`__t.setVal(document.querySelector('input[aria-label="Case name"]'), "Sweep Bio")`); await sleep(200);
+    await js(`(() => { const l = [...document.querySelectorAll("span")].find(n => n.textContent.trim() === "Current price"); return __t.setVal(l.parentElement.querySelector("input"), "10"); })()`); await sleep(300);
+    await click("+ Add program", 700);
+    await js(`__t.setVal(__t.byLabel("Peak worldwide revenue")[1], "600")`); await sleep(300);
+  }
+  await js(`document.getElementById("casetab-overview") && document.getElementById("casetab-overview").click()`); await sleep(600);
   await click("Run 3,000 trials", 6000);
   // Every Workspace sub-tab is swept; hidden tabs have no size on screen, so
   // each is opened before its sections are exported and compared.

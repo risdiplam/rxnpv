@@ -136,6 +136,58 @@ async function searchTrialsBySponsor(companyName, limit) {
   } catch (e) { return { ok: false, error: e.message }; }
 }
 
+// ── Is a search hit actually about the condition searched? ──
+// CT.gov expands a condition query with synonyms and abbreviations, which
+// usually helps and sometimes badly does not: "Myotonic dystrophy type 1"
+// is expanded through "DM1" to T-DM1 (trastuzumab emtansine), so 18 of 23
+// Phase 2 trials with posted results for that query were breast- and
+// gastric-cancer trials — and the analog board would have read their hazard
+// ratios as the DM1 reference class. A hit is kept when its registered
+// conditions, keywords, titles or MeSH terms contain at least half of the
+// query's real words (four letters or more, not a generic word like "type",
+// "adults" or "disease"). A one-word query is left alone: it may be an
+// abbreviation CT.gov expands on purpose (NSCLC, ALS), with nothing to check
+// the hits against. Callers show how many were dropped.
+const CTGOV_CONDITION_GENERIC = new Set(["type", "types", "disease", "diseases", "disorder", "disorders", "syndrome", "syndromes",
+  "adult", "adults", "adolescent", "adolescents", "pediatric", "paediatric", "child", "children", "patient", "patients", "people",
+  "with", "without", "from", "chronic", "acute", "severe", "mild", "moderate", "early", "late", "onset", "stage",
+  "primary", "secondary", "advanced", "refractory", "relapsed", "treatment", "therapy", "other", "related", "associated"]);
+
+function conditionQueryWords(query) {
+  return String(query || "").toLowerCase().split(/[^a-z0-9]+/)
+    .filter(t => t.length >= 4 && /[a-z]/.test(t) && !CTGOV_CONDITION_GENERIC.has(t));
+}
+
+function studyConditionText(study) {
+  const p = (study && study.protocolSection) || {};
+  const cm = p.conditionsModule || {}, id = p.identificationModule || {};
+  const mesh = (((study && study.derivedSection) || {}).conditionBrowseModule || {}).meshes || [];
+  return [].concat(cm.conditions || [], cm.keywords || [], id.briefTitle || [], id.officialTitle || [], mesh.map(m => m.term || ""))
+    .join(" | ").toLowerCase();
+}
+
+// Raw v2 study records in, { kept, dropped, checked } out.
+function filterStudiesByCondition(studies, query) {
+  studies = studies || [];
+  const words = conditionQueryWords(query);
+  const oneWord = String(query || "").trim().split(/\s+/).filter(Boolean).length <= 1;
+  if (!words.length || oneWord) return { kept: studies, dropped: 0, checked: false, words };
+  // At least half the words (both, for a two-word query), matched on a stem
+  // so "dystrophies" counts for "dystrophy": one shared word let a general
+  // muscular-dystrophy study through as a DM1 competitor.
+  const stems = words.map(w => w.length > 5 ? w.replace(/(ies|es|s|y)$/, "") : w);
+  const need = stems.length <= 2 ? stems.length : Math.ceil(stems.length / 2);
+  const kept = studies.filter(st => { const t = studyConditionText(st); return stems.filter(w => t.includes(w)).length >= need; });
+  return { kept, dropped: studies.length - kept.length, checked: true, words };
+}
+
+// One line for a results panel; null when nothing was dropped.
+function conditionDropNote(dropped, query) {
+  if (!dropped) return null;
+  return dropped + " search hit" + (dropped === 1 ? "" : "s") + " left out: ClinicalTrials.gov matched " + (dropped === 1 ? "it" : "them") +
+    " to \u201c" + String(query).trim() + "\u201d through a synonym, but " + (dropped === 1 ? "its" : "their") + " registered conditions and titles never name it.";
+}
+
 // ── Search the competitive landscape by indication/condition, optionally
 // excluding a drug name (your own program) so results are truly competitors. ──
 async function searchCompetitorLandscape(condition, excludeDrugName, limit) {
@@ -145,9 +197,10 @@ async function searchCompetitorLandscape(condition, excludeDrugName, limit) {
     const data = await ctgovFetch({
       "query.cond": condition.trim(),
       "pageSize": String(limit),
-      "fields": "NCTId,BriefTitle,OverallStatus,Phase,LeadSponsorName,LeadSponsorClass,Condition,InterventionName,EnrollmentCount,StartDate"
+      "fields": "NCTId,BriefTitle,OfficialTitle,OverallStatus,Phase,LeadSponsorName,LeadSponsorClass,Condition,Keyword,ConditionMeshTerm,InterventionName,EnrollmentCount,StartDate"
     });
-    let studies = (data.studies || []).map(parseStudy);
+    const rel = filterStudiesByCondition(data.studies, condition);
+    let studies = rel.kept.map(parseStudy);
     if (excludeDrugName && excludeDrugName.trim()) {
       const excl = excludeDrugName.trim().toLowerCase();
       studies = studies.filter(s => !s.interventions.some(i => i.toLowerCase().includes(excl)) && !s.title.toLowerCase().includes(excl));
@@ -160,7 +213,7 @@ async function searchCompetitorLandscape(condition, excludeDrugName, limit) {
       seen.add(key);
       return true;
     });
-    return { ok: true, studies, totalCount: data.totalCount || studies.length };
+    return { ok: true, studies, totalCount: data.totalCount || studies.length, droppedUnrelated: rel.dropped };
   } catch (e) { return { ok: false, error: e.message }; }
 }
 

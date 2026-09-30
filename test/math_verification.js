@@ -81,7 +81,7 @@ const EXPORTS = [
   "applyTaxToCalendar", "computeMoleculeTypePoSRatios", "POS_BY_MOLECULE",
   "computeProgramValuation",
   "revenueChartYScale", "niceAxisTicks", "histogramBins", "spreadLabels", "localDateStamp", "selectPeakSalesCompWindow",
-  "readPriceVsScenarios", "readMonteCarlo", "readCashFlow", "readSotp", "readRiskWaterfall", "readTornado", "readPriceGrid", "readInterval", "readPValue", "readSingleArm", "readAssurance", "readPeakSalesRange", "readBinaryImplied", "readPremium", "readForwardRunway", "readBreakEven", "readPriceGap", "readOutcomeRange", "possessive", "aNum", "compareTrials", "compareTrialsWeeks", "readTrialComparison",
+  "readPriceVsScenarios", "readMonteCarlo", "readCashFlow", "readSotp", "readRiskWaterfall", "readTornado", "readPriceGrid", "readInterval", "readPValue", "readSingleArm", "readAssurance", "readPeakSalesRange", "readBinaryImplied", "readPremium", "readForwardRunway", "readBreakEven", "readPriceGap", "readOutcomeRange", "possessive", "aNum", "filterStudiesByCondition", "conditionQueryWords", "conditionDropNote", "compareTrials", "compareTrialsWeeks", "readTrialComparison",
   "measureStorage", "STORAGE_ASSUMED_QUOTA_BYTES", "STORAGE_WARN_FRACTION", "STORAGE_CRITICAL_FRACTION",
   "computeTreatedPopulation", "launchCurveForYears", "erosionMultiplier", "computeProgramRevenue",
   "resolveNetPrice", "aspPctOfBasis", "PRICE_BASIS_OPTIONS", "getRevenueBuild", "PRICING_CONVERSION_MATRIX", "priceBasisArticle",
@@ -4458,6 +4458,36 @@ section("Trial comparison");
   const same = api.compareTrials([st("A", "PLACEBO_COMPARATOR", "Week 14", 1), st("B", "PLACEBO_COMPARATOR", "Week 15", 2)]);
   ok("compare: a week apart is not a difference", !same.designDiff && !same.timeDiff);
 }
+section("Condition searches drop hits CT.gov matched only through a synonym");
+{
+  // Shapes as the v2 API returns them (fields trimmed). CT.gov expands
+  // "Myotonic dystrophy type 1" through "DM1" to T-DM1 (trastuzumab
+  // emtansine): live, 18 of 23 Phase 2 trials with results were cancer trials.
+  const rec = (id, title, conds, kw, mesh) => ({ protocolSection: { identificationModule: { nctId: id, briefTitle: title },
+    conditionsModule: { conditions: conds, keywords: kw || [] } }, derivedSection: mesh ? { conditionBrowseModule: { meshes: mesh.map(t => ({ term: t })) } } : undefined });
+  const hits = [
+    rec("NCT06667453", "A Clinical Study of PGN-EDODM1 in People With Myotonic Dystrophy Type 1", ["Myotonic Dystrophy 1"]),
+    rec("NCT00829166", "A Study of Trastuzumab Emtansine Versus Capecitabine + Lapatinib", ["Breast Cancer"], [], ["Breast Neoplasms"]),
+    rec("NCT01853748", "T-DM1 vs Paclitaxel/Trastuzumab for Breast (ATEMPT Trial)", ["Breast Cancer"]),
+    rec("NCT05027269", "Study of AOC 1001 in Adult DM1 Patients", ["DM1"], ["Steinert disease"], ["Myotonic Dystrophy"]),
+    rec("NCT00674843", "The Efficacy of Using Far Infrared Radiation to Manage Muscular Dystrophies", ["Muscular Dystrophies"]),
+  ];
+  ok("query words: generic words and '1' are not evidence", JSON.stringify(api.conditionQueryWords("Myotonic dystrophy type 1 — adults")) === '["myotonic","dystrophy"]');
+  const r = api.filterStudiesByCondition(hits, "Myotonic dystrophy type 1");
+  ok("DM1: both T-DM1 cancer trials and the general muscular-dystrophy study dropped, both DM1 trials kept (one only through its MeSH term)",
+    r.checked && r.dropped === 3 && r.kept.map(k => k.protocolSection.identificationModule.nctId).join() === "NCT06667453,NCT05027269");
+  const one = api.filterStudiesByCondition(hits, "NSCLC");
+  ok("a one-word query (an abbreviation CT.gov expands on purpose) is left alone", !one.checked && one.dropped === 0 && one.kept.length === 5);
+  // Half the words, on stems: a trial registering only the MeSH form
+  // "Carcinoma, Non-Small-Cell Lung" still matches small + cell + lung (3 of 4).
+  const lung = api.filterStudiesByCondition([rec("NCT1", "Drug X in NSCLC", ["NSCLC"], [], ["Carcinoma, Non-Small-Cell Lung"])], "non-small cell lung cancer");
+  ok("NSCLC trial registered by its MeSH term is kept for 'non-small cell lung cancer'", lung.kept.length === 1);
+  ok("'dystrophies' counts for 'dystrophy'", api.filterStudiesByCondition([rec("NCT2", "Myotonic dystrophies registry", ["Myotonic Dystrophies"])], "myotonic dystrophy type 1").kept.length === 1);
+  ok("only generic words: nothing to check against, left alone", !api.filterStudiesByCondition(hits, "chronic disease type 2").checked);
+  ok("the note counts and names the query", api.conditionDropNote(2, "Myotonic dystrophy type 1").startsWith("2 search hits left out: ClinicalTrials.gov matched them to \u201cMyotonic dystrophy type 1\u201d") && api.conditionDropNote(0, "x") === null);
+}
+report();
+
 section("Possessive names");
 {
   ok("possessive: Stoke's, Biologics', blank case's", api.possessive("Stoke") === "Stoke's" && api.possessive("Edge two-programs") === "Edge two-programs'" && api.possessive("") === "'s");

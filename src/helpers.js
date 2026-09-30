@@ -1342,7 +1342,7 @@ function CompetitorScanBox({ indication, drugName, currentNumDrugs, onApplyNumDr
         const industry = lateStage.filter(s => (s.sponsorClass || "").toUpperCase() === "INDUSTRY");
         const pairs = [...new Set(industry.map(s => (s.sponsor || "?") + " — " + (s.interventions[0] || s.title)))];
         const excludedNonIndustry = lateStage.length - industry.length;
-        setResult({ total: r.studies.length, lateStage: lateStage.length, excludedNonIndustry, pairs, totalCount: r.totalCount });
+        setResult({ total: r.studies.length, lateStage: lateStage.length, excludedNonIndustry, pairs, totalCount: r.totalCount, droppedUnrelated: r.droppedUnrelated || 0, query: indication.trim() });
       }
     } catch (e) { setError(e.message); }
     setLoading(false);
@@ -1362,7 +1362,8 @@ function CompetitorScanBox({ indication, drugName, currentNumDrugs, onApplyNumDr
         " distinct industry-sponsored late-stage (Phase 2/3) sponsor+drug pairs, from ", String(result.total), " trials scanned",
         result.totalCount > result.total ? " (of " + result.totalCount + " matching CT.gov records)" : "", ".",
         result.excludedNonIndustry > 0 && h("span", { style: { color: "var(--ink-3)" } },
-          " " + result.excludedNonIndustry + " academic/government-sponsored late-stage trial" + (result.excludedNonIndustry > 1 ? "s" : "") + " excluded — real science, but not a product launching into this market.")),
+          " " + result.excludedNonIndustry + " academic/government-sponsored late-stage trial" + (result.excludedNonIndustry > 1 ? "s" : "") + " excluded — real science, but not a product launching into this market."),
+        result.droppedUnrelated > 0 && h("span", { style: { color: "var(--ink-3)" } }, " " + conditionDropNote(result.droppedUnrelated, result.query))),
       result.pairs.length > 0 && h("div", { style: { marginTop: 6, maxHeight: 150, overflowY: "auto", paddingLeft: 10, borderLeft: "2px solid var(--rule)" } },
         result.pairs.slice(0, 12).map((p, i) => h("div", { key: i, style: { fontSize: 10, color: "var(--ink-3)" } }, p)),
         result.pairs.length > 12 && h("div", { style: { fontSize: 10, color: "var(--ink-3)", fontStyle: "italic" } }, "+" + (result.pairs.length - 12) + " more")),

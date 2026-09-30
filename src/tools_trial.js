@@ -833,6 +833,7 @@ function TrialWatchTool({ activeCase, initialNctId, onConsumedInitialNctId }) {
       ctSummary && h("div", { style: { padding: "10px 14px", borderRadius: 8, background: "var(--surface-2)" } },
         h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", fontWeight: 700, color: "var(--ink-2)", marginBottom: 6 } },
           ctSummary.totalMatched + " matching trials on ClinicalTrials.gov (showing " + ctSummary.sampleSize + ")"),
+        ctSummary.droppedUnrelated > 0 && h("div", { style: { ...UI.caption, marginBottom: 6 } }, conditionDropNote(ctSummary.droppedUnrelated, ctSummary.query.condition)),
         h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-2)", lineHeight: 1.7 } },
           ctSummary.medianDurationMonths != null && h("div", null, "Median start-to-completion: " + ctSummary.medianDurationMonths + " months"),
           ctSummary.medianEnrollment != null && h("div", null, "Median enrollment: " + ctSummary.medianEnrollment)
@@ -860,7 +861,8 @@ function TrialWatchTool({ activeCase, initialNctId, onConsumedInitialNctId }) {
           effects && h("div", null,
             h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-2)", lineHeight: 1.7, marginBottom: 8 } },
               h("div", null, effects.sampleSize + " trials read \u00B7 " + effects.withPostedResults + " posted results \u00B7 " +
-                h0(effects.withExtractableEffect) + " with a structured primary effect estimate")),
+                h0(effects.withExtractableEffect) + " with a structured primary effect estimate"),
+              effects.droppedUnrelated > 0 && h("div", { style: { color: "var(--ink-3)" } }, conditionDropNote(effects.droppedUnrelated, (effects.query && effects.query.condition) || ctCondition))),
             Object.keys(effects.summaryByScale).length === 0
               ? h("div", { style: { fontSize: 10.5, fontFamily: "var(--sans)", color: "var(--ink-3)", lineHeight: 1.6 } },
                   "None of these trials registered a primary effect estimate in a form that can be read without guessing. That is common \u2014 many sponsors post results as narrative tables only \u2014 and it is reported here rather than hidden.")

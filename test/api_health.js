@@ -99,6 +99,22 @@ const CHECKS = [
     const r = await api.fetchHistoricalComps("Dravet syndrome", "PHASE3");
     return [["returns studies", r && r.studies && r.studies.length >= 20, r && r.totalMatched], ["status landscape", r && r.statusLandscape && r.statusLandscape.length > 0, r && r.statusLandscape && r.statusLandscape.length]];
   }],
+  ["ctgov", "DM1 searches exclude T-DM1 (trastuzumab emtansine) trials", async () => {
+    // CT.gov expands "myotonic dystrophy type 1" through "DM1" to T-DM1; on
+    // 2026-09-30, 18 of 23 Phase 2 trials with results for this query were
+    // breast/gastric cancer trials. Every kept hit must be about DM1.
+    // (Kept hits may name DM1 only in keywords or MeSH terms, so the test is
+    // for what must not be there, not for what must.)
+    const dm = s => !/trastuzumab|t-dm1|emtansine|breast|gastric/i.test([s.title, (s.conditions || []).join(" ")].join(" "));
+    const e = await api.fetchAnalogEffects("Myotonic dystrophy type 1", "PHASE2");
+    const c = await api.fetchHistoricalComps("Myotonic dystrophy type 1", "PHASE2");
+    const k = await api.searchCompetitorLandscape("Myotonic dystrophy type 1", "PGN-EDODM1", 40); must(k);
+    const cancerRows = [].concat(...Object.values((e && e.byScale) || {})).filter(r => /trastuzumab|t-dm1|breast/i.test(r.outcomeTitle || "") );
+    return [["analog board: cancer trials dropped", e && e.droppedUnrelated >= 10, e && e.droppedUnrelated],
+      ["analog board: no breast-cancer effects left", cancerRows.length === 0, cancerRows.length],
+      ["comps: nothing about trastuzumab left", c && c.studies.every(s => !/trastuzumab|t-dm1/i.test(s.title || "")), c && c.studies.filter(s => /trastuzumab|t-dm1/i.test(s.title || "")).map(s => s.nctId).join(",")],
+      ["competitors: no T-DM1 or cancer trials", k.studies.every(dm), k.studies.filter(s => !dm(s)).map(s => s.nctId + " " + s.title).slice(0, 3).join("; ")]];
+  }],
   ["openfda", "Drugs@FDA: Fintepla", async () => {
     // NDA212102, UCB, first approved 2020-06-25.
     const r = await api.searchDrugApproval("Fintepla"); must(r);
@@ -133,6 +149,18 @@ const CHECKS = [
       // Cash used in operations, H1 2026: $117.167M over 6 months → $58.58M a quarter, 18.1 months of runway.
       ["burn from operating cash flow, ≈$58.58M a quarter", r.burnBasis === "cash used in operations" && near(r.quarterlyBurnUSD, 58583500, 1000), r.burnBasis + " " + r.quarterlyBurnUSD],
       ["runway ≈18.1 months", near(r.runwayMonths, 18.14, 0.05), r.runwayMonths]];
+  }],
+  ["edgar", "Financials: PEPG (Q2 2026 10-Q)", async () => {
+    // 10-Q for Jun 30, 2026: cash, equivalents and marketable securities
+    // $117.238M; 69,259,517 shares at Aug 2, 2026; 8,139,082 options at a
+    // $4.89 weighted strike; cash used in operations $34.232M in H1 → $17.116M
+    // a quarter → 117.238 / 17.116 x 3 = 20.55 months.
+    const r = await api.pullEdgarFinancials("PEPG", true); must(r);
+    return [["cash & securities $117.238M", near(r.cash, 117238000, 1000), r.cash],
+      ["basic shares 69,259,517 at 2026-08-02", r.basicShares === 69259517 && r.basicSharesAsOf === "2026-08-02", r.basicShares + " " + r.basicSharesAsOf],
+      ["options 8,139,082 @ $4.89", r.options && r.options.count === 8139082 && near(r.options.avgStrike, 4.89, 0.001), r.options && r.options.count],
+      ["burn $17.116M a quarter from operating cash flow", r.burnBasis === "cash used in operations" && near(r.quarterlyBurnUSD, 17116000, 1000), r.quarterlyBurnUSD],
+      ["runway ≈20.5 months", near(r.runwayMonths, 20.55, 0.05), r.runwayMonths]];
   }],
   ["edgar", "Catalyst filings: STOK", async () => {
     const r = await api.searchCatalystFilings("0001623526", 12); must(r);

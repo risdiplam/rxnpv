@@ -43,14 +43,19 @@ async function fetchHistoricalComps(condition, phase, opts = {}) {
   const params = {
     'query.cond': condition,
     'aggFilters': 'phase:' + (TS_PHASE_TO_AGGFILTER[phase] || phase),
-    'fields': 'NCTId,BriefTitle,OverallStatus,Phase,StartDate,CompletionDate,EnrollmentCount,LeadSponsorName,InterventionName,PrimaryOutcomeMeasure',
+    'fields': 'NCTId,BriefTitle,OfficialTitle,Condition,Keyword,ConditionMeshTerm,OverallStatus,Phase,StartDate,CompletionDate,EnrollmentCount,LeadSponsorName,InterventionName,PrimaryOutcomeMeasure',
     'pageSize': String(opts.pageSize || 100),
     'format': 'json'
   };
   if (opts.intervention) params['query.intr'] = opts.intervention;
 
   const data = await tsCtgovFetch(params);
-  return summarizeStudiesResponse(data, { condition, phase, intervention: opts.intervention || null });
+  // Hits CT.gov matched only through a synonym (T-DM1 for "myotonic
+  // dystrophy type 1") are dropped and counted — see filterStudiesByCondition.
+  const rel = filterStudiesByCondition(data.studies, condition);
+  const out = summarizeStudiesResponse({ ...data, studies: rel.kept }, { condition, phase, intervention: opts.intervention || null });
+  out.droppedUnrelated = rel.dropped;
+  return out;
 }
 
 function parseHistoricalStudy(s) {
@@ -322,5 +327,8 @@ async function fetchAnalogEffects(condition, phase, opts = {}) {
   };
   if (opts.intervention) params['query.intr'] = opts.intervention;
   const data = await tsCtgovFetch(params);
-  return extractAnalogEffects(data, { condition, phase, intervention: opts.intervention || null });
+  const rel = filterStudiesByCondition(data.studies, condition);
+  const out = extractAnalogEffects({ ...data, studies: rel.kept }, { condition, phase, intervention: opts.intervention || null });
+  out.droppedUnrelated = rel.dropped;
+  return out;
 }
