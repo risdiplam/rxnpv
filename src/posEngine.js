@@ -39,34 +39,48 @@ function computePoSModifiers(program) {
   if (bm && POS_MODIFIER_AXES.biomarkerUse[bm]) chosen.push(POS_MODIFIER_AXES.biomarkerUse[bm]);
   if (dt && POS_MODIFIER_AXES.diseaseType[dt]) chosen.push(POS_MODIFIER_AXES.diseaseType[dt]);
 
-  const ratios = { phase1: 1, phase2: 1, phase3: 1 };
-  let regulatoryDeltaPct = 0;
   const applied = [];
-
   chosen.forEach(key => {
     const row = POS_MODIFIERS[key];
     if (!row) return;
     const perPhase = {};
-    ["phase1", "phase2", "phase3"].forEach(ph => {
-      const r = row[ph] / POS_MODIFIERS.baseline[ph];
-      perPhase[ph] = r;
-      ratios[ph] *= r;
-    });
+    ["phase1", "phase2", "phase3"].forEach(ph => { perPhase[ph] = row[ph] / POS_MODIFIERS.baseline[ph]; });
     const regDelta = (POS_REGULATORY_MODIFIERS.thomas2016 || {})[key];
-    if (regDelta != null) regulatoryDeltaPct += regDelta;
     applied.push({ key, label: POS_MODIFIER_LABELS[key] || key, perPhase, regulatoryDeltaPct: regDelta != null ? regDelta : 0 });
   });
+
+  // Combining the two axes. Thomas publishes each attribute's cohort on its
+  // own — never the joint cell — and the cohorts overlap heavily (a rare
+  // disease is usually a genetically defined one). Multiplying the two lifts
+  // assumes they are independent, which they are not: it put a Phase 2
+  // neurology program that is both rare and biomarker-selected at 74% odds of
+  // launch, where Thomas's own rare-disease cohort goes from Phase 2 to
+  // approval about 34% of the time (50.6% × 73.6% × ~92%). So when both
+  // attributes push the same way, the STRONGER single effect is used — the
+  // most the published data supports, and a lower bound on the true joint
+  // lift. When they push opposite ways they are allowed to offset (product).
+  // The same rule applies to the additive regulatory deltas.
+  const combine = (vals, neutral, join) => {
+    if (!vals.length) return neutral;
+    if (vals.length === 1) return vals[0];
+    const up = vals.every(v => v >= neutral), down = vals.every(v => v <= neutral);
+    if (up) return Math.max.apply(null, vals);
+    if (down) return Math.min.apply(null, vals);
+    return vals.reduce(join);
+  };
+  const ratios = {};
+  ["phase1", "phase2", "phase3"].forEach(ph => {
+    ratios[ph] = combine(applied.map(a => a.perPhase[ph]), 1, (x, y) => x * y);
+  });
+  const regulatoryDeltaPct = combine(applied.map(a => a.regulatoryDeltaPct), 0, (x, y) => x + y);
 
   return {
     applied,
     ratios,
     regulatoryDeltaPct,
-    // Both axes set at once multiplies two ratios, which assumes the two
-    // effects are independent. Thomas 2016 doesn't publish the joint cell, and
-    // the categories plainly overlap in practice (rare diseases are often
-    // biomarker-defined), so that assumption likely overstates the combined
-    // lift. Flagged rather than silently corrected — the size of the overlap
-    // isn't something this app can honestly estimate.
+    // Both axes set: the stronger same-direction effect is used (above). The
+    // true joint effect is unknown and may be somewhat higher, which is why
+    // this stays flagged.
     compoundedAxes: applied.length > 1,
     source: POS_MODIFIERS.source
   };

@@ -556,14 +556,16 @@ function ProgramEditor({ program, onChange, onDelete, discountRatePct, terminalV
             if (w.capBound) {
               return h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--red)", marginTop: 6, lineHeight: 1.6, paddingLeft: 8, borderLeft: "2px solid var(--red)" } },
                 "Modifiers computed past 100% and were capped at 99% on ", w.cappedStages, " stage", w.cappedStages > 1 ? "s" : "",
-                " (peak ", w.maxUncappedPct.toFixed(0), "%). Multiplying ", w.axesApplied,
-                " adjustments together assumes they're independent, and at this combination they clearly aren't — a rare disease is often biomarker-defined, and both correlate with modality. The capped number is a floor on the absurdity, not a real estimate: set an explicit override below instead of trusting it.");
+                " (peak ", w.maxUncappedPct.toFixed(0), "%): an area with a high base rate, lifted by the attribute and molecule-type adjustments, leaves the range the sources support. The capped number is not a real estimate — set an explicit override below instead of trusting it.");
             }
             if (w.axesApplied > 1) {
               return h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--warn)", marginTop: 6, lineHeight: 1.6, paddingLeft: 8, borderLeft: "2px solid var(--warn)" } },
-                w.axesApplied, " adjustments are being multiplied together (", 
+                w.axesApplied, " adjustments are in play (",
                 [mods.applied.map(a => a.label.toLowerCase()), w.moleculeType.applied ? ["molecule type"] : []].flat().join(", "),
-                "), which assumes they're independent. The source doesn't publish the combined cell, and these categories overlap in practice, so this likely overstates the combined lift. Consider an explicit override below instead.");
+                "). ", mods.applied.length > 1
+                  ? "The two attributes overlap (rare diseases are usually biomarker-defined) and the source never publishes them together, so the stronger single effect is used, not both multiplied — the true combination is unknown. "
+                  : "",
+                "Consider an explicit override below if you have a program-specific reason.");
             }
             return null;
           })()

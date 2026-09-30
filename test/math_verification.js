@@ -550,6 +550,31 @@ section("Valuation engine");
   const both = api.computePoSWeighting({ ...base, posBiomarkerUse: "selection", posDiseaseType: "rare" });
   ok("no stage PoS reaches or exceeds 100%", both.stages.every(s => s.pos < 1));
   ok("compounding both axes is flagged", both.modifiers.compoundedAxes === true);
+  // Both attributes pushing the same way: the STRONGER single effect, not the
+  // product. Oncology Phase 2 = 24.6%. Rare: 50.6/30.7 = 1.64821; biomarker:
+  // 46.7/30.7 = 1.52117 → max 1.64821 → 24.6 × 1.64821 = 40.546%. (The old
+  // product rule gave 24.6 × 2.50722 = 61.68%.) Regulatory: max(+3.9, +9.2)
+  // = +9.2 → 88.4 + 9.2 = 97.6% (was 101.5, clamped).
+  near("both lifts: Phase 2 uses the stronger one (40.546%, not 61.68%)", both.stages.find(s => s.key === "phase2").pos * 100, 24.6 * (50.6 / 30.7), 1e-9);
+  near("both lifts: Phase 3 = 40.1 × max(73.6, 76.5)/58.1 = 52.799%", both.stages.find(s => s.key === "phase3").pos * 100, 40.1 * (76.5 / 58.1), 1e-9);
+  near("both lifts: regulatory = 88.4 + max(3.9, 9.2) = 97.6%", both.stages.find(s => s.key === "regulatory").pos * 100, 97.6, 1e-9);
+  // Both pulling down: the stronger drag. Chronic/high-prevalence 27.7/30.7 =
+  // 0.90228, no biomarkers 28.8/30.7 = 0.93811 → min 0.90228 → 24.6 × 0.90228 = 22.196%.
+  // Regulatory deltas point opposite ways (+1.9, −1.4) → they offset: +0.5.
+  const drag = api.computePoSWeighting({ ...base, posBiomarkerUse: "none", posDiseaseType: "chronicHighPrev" });
+  near("both drags: Phase 2 uses the stronger drag (22.196%)", drag.stages.find(s => s.key === "phase2").pos * 100, 24.6 * (27.7 / 30.7), 1e-9);
+  near("opposite regulatory deltas offset: 88.4 + 1.9 − 1.4 = 88.9%", drag.stages.find(s => s.key === "regulatory").pos * 100, 88.9, 1e-9);
+  // A lift and a drag (rare + no biomarkers) offset: product 1.64821 × 0.93811.
+  const mixed = api.computePoSWeighting({ ...base, posBiomarkerUse: "none", posDiseaseType: "rare" });
+  near("a lift and a drag offset: 24.6 × 1.64821 × 0.93811 = 38.036%", mixed.stages.find(s => s.key === "phase2").pos * 100, 24.6 * (50.6 / 30.7) * (28.8 / 30.7), 1e-9);
+  // The case that exposed it: Neurology Phase 2, rare + biomarker, small molecule.
+  // Phase 2: 29.7 × 1.64821 × (31.4/30.7 = 1.02280) = 50.070%;
+  // Phase 3: 57.3 × (76.5/58.1 = 1.31670) × (59.6/58.1 = 1.02582) = 77.394%;
+  // regulatory 97.6% → launch = 0.50070 × 0.77394 × 0.976 = 37.82%, in line with
+  // Thomas's rare-disease cohort from Phase 2 (~34%), not the 74% the product gave.
+  const neuro = api.computePoSWeighting({ therapeuticArea: "Neurology", currentPhase: "phase2", modality: "smallMolecule", posBiomarkerUse: "selection", posDiseaseType: "rare" });
+  near("Neurology Ph2 rare + biomarker + NME: 37.82% to launch (was 74%)", neuro.posToLaunch * 100,
+    29.7 * (50.6 / 30.7) * (31.4 / 30.7) * 57.3 * (76.5 / 58.1) * (59.6 / 58.1) * 97.6 / 1e4, 1e-9);
 }
 // Treasury-stock method, hand-worked:
 //   1,000,000 options at $5 strike, share price $10.

@@ -1180,9 +1180,9 @@ function computeRedFlags(theCase) {
     }
 
     // 6. Both PoS-modifier axes set at once, with no explicit override.
-    // computePoSModifiers multiplies the two ratios, which assumes the
-    // attributes are independent — a real assumption the source doesn't
-    // support, and one that compounds into every downstream number. Only
+    // computePoSModifiers uses the stronger of the two same-direction effects
+    // (the source never publishes the joint cell), so the combined benchmark
+    // is a floor on the true joint lift and worth a deliberate look. Only
     // flagged while the computed value is actually in use; typing an explicit
     // override is exactly the intended resolution, so it stops flagging then.
     if ((program.posOverridePct === "" || program.posOverridePct == null)) {
@@ -1192,7 +1192,7 @@ function computeRedFlags(theCase) {
         const withoutMods = computePoSWeighting({ ...program, posBiomarkerUse: "", posDiseaseType: "" }).posToLaunch * 100;
         flags.push({
           programId: program.id, programName: progName, severity: "medium",
-          message: `Two PoS attributes are set at once (${mods.applied.map(a => a.label.toLowerCase()).join(" + ")}), lifting cumulative PoS from ${withoutMods.toFixed(1)}% to ${withMods.toFixed(1)}%. Their effects are multiplied on an independence assumption the source doesn't publish, and these categories overlap in practice — worth setting an explicit PoS override instead if that combined figure looks generous.`
+          message: `Two PoS attributes are set at once (${mods.applied.map(a => a.label.toLowerCase()).join(" + ")}), lifting cumulative PoS from ${withoutMods.toFixed(1)}% to ${withMods.toFixed(1)}%. The source publishes each attribute's cohort on its own, never the two together, and they overlap in practice (rare diseases are usually biomarker-defined), so the stronger single effect is used rather than both multiplied. Set an explicit PoS override if you have a reason to think the combination is better or worse than that.`
         });
       }
     }

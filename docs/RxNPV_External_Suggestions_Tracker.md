@@ -925,3 +925,11 @@ Verified: 15 suites (new: `worked_examples_test.js`), 1,232 math checks, lint cl
 
 Verified: 15 suites, 1,242 math checks, lint clean; both fixes looked at in the installed app.
 
+## Phase 46 — Reliable data connections, and a PoS benchmark that could not be right
+
+✅ From the user: "i notice that pretty much every other time we run something, an API is messed up. we really need to get to the bottom of that and make sure the connections are fully functional and data is being extracted accurately into the app… check all of the math."
+
+**The API failures were retries that did not exist.** Seven of the eight integrations never retried, so an intermittent 500 from openFDA or EDGAR's search, or a 503 from Europe PMC — each seen live while the Stoke sample was built — was a failed lookup on screen. The eighth (EDGAR) retried everything, 404s included. `netEngine.js` `resilientFetch` is now the one door every integration goes through: retry what a second try can fix (no connection, a timeout once, 408/425/429/5xx), honour Retry-After, never retry an answer. main.js applies the same rules to EDGAR. `test/net_test.js` pins the rules; `npm run apihealth` checks every live source through the app's own parsers for reachability AND extraction accuracy against hand-verified figures — 51/51 over three rounds. EDGAR's burn now uses cash used in operations rather than operating loss (Stoke: 18.1 months of runway, not 16.2).
+
+**The PoS benchmark multiplied overlapping evidence.** Building the PepGen case, a Phase 2 neurology program marked rare and biomarker-selected got a 74% benchmark chance of launch; Stoke's Phase 3 got 97%. The app multiplied two Thomas 2016 lifts (rare ×1.65, biomarker ×1.52) and added both regulatory bonuses, although Thomas publishes each cohort on its own and they overlap heavily — Thomas's own rare-disease cohort reaches approval from Phase 2 about 34% of the time. When both attributes push the same way the stronger single effect is now used (a lower bound on the joint effect; opposite effects still offset). PepGen's benchmark is 37.8%. Cases with an explicit PoS override keep their total odds; only how those odds split between stages moves — Stoke's Phase 3 gate is now 72% and its approval-after-a-positive-readout 91% (was 80% / 81%), and the sample's readout odds were updated to match.
+
