@@ -132,7 +132,15 @@ const CHECKS = [
     const r = await api.fetchDrugLabel("fenfluramine");
     if (!r || !r.found) throw new Error("label not found");
     return [["Dravet, 2 years and older", /Dravet/.test(r.indicationsAndUsage) && /2 years of age and older/.test(r.indicationsAndUsage), (r.indicationsAndUsage || "").slice(0, 80)],
-      ["boxed warning present", /VALVULAR HEART DISEASE/.test(r.boxedWarning || ""), !!r.boxedWarning]];
+      ["boxed warning present", /VALVULAR HEART DISEASE/.test(r.boxedWarning || ""), !!r.boxedWarning],
+      // openFDA's field is warnings_and_cautions; the app read a name that
+      // does not exist and showed no Warnings & Precautions on any label.
+      ["warnings & precautions present", /Valvular Heart Disease|Pulmonary Arterial Hypertension/i.test(r.warningsAndPrecautions || ""), (r.warningsAndPrecautions || "").slice(0, 60)]];
+  }],
+  ["openfda", "Label: Vyondys 53 kidney warning", async () => {
+    const r = await api.fetchDrugLabel("Vyondys 53");
+    if (!r || !r.found) throw new Error("label not found");
+    return [["Kidney Toxicity in warnings & precautions", /Kidney Toxicity/i.test(r.warningsAndPrecautions || ""), (r.warningsAndPrecautions || "").slice(0, 60)]];
   }],
   ["openfda", "FAERS: fenfluramine", async () => {
     const r = await api.fetchAdverseEventSummary("fenfluramine");

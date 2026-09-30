@@ -93,7 +93,11 @@ async function fetchDrugLabel(drugName) {
     indicationsAndUsage: firstOrNull(r.indications_and_usage),
     boxedWarning: firstOrNull(r.boxed_warning),
     adverseReactionsSummary: firstOrNull(r.adverse_reactions),
-    warningsAndPrecautions: firstOrNull(r.warnings_and_precautions)
+    // openFDA names this section warnings_and_cautions on current-format
+    // labels and warnings on older ones; "warnings_and_precautions" is not a
+    // field it has, which left the section blank on every label (seen looking
+    // up Vyondys 53, whose kidney-toxicity warning never showed).
+    warningsAndPrecautions: firstOrNull(r.warnings_and_cautions) || firstOrNull(r.warnings)
   };
 }
 

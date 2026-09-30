@@ -35,8 +35,9 @@ const SKIP = new Set(["fdmc"]);
   const click = el => el && el.dispatchEvent(new w.MouseEvent("click", { bubbles: true }));
   const btn = (t, root) => [...(root || d).querySelectorAll("button")].find(b => b.textContent.trim() === t);
 
-  click(btn("Load sample case")); await wait(900);
-  const theCase = () => JSON.parse(w.localStorage.getItem("rxnpv_cases_v1") || "[]").find(c => /sample case/.test(c.name));
+  click(btn("Load sample case")); await wait(200); click(btn("Stoke — Dravet, Phase 3")); await wait(900);
+  const caseNamed = re => JSON.parse(w.localStorage.getItem("rxnpv_cases_v1") || "[]").find(c => re.test(c.name));
+  const theCase = () => caseNamed(/^Stoke.*sample case/);
   const examples = (theCase().pinnedResults || []).filter(p => p.kind === "example");
   ok(examples.length >= 30, "the sample ships a worked example for every tool and simulation (" + examples.length + ")");
   const tools = new Set(examples.filter(p => p.reopen.view === "tools").map(p => p.reopen.tool));
@@ -55,6 +56,7 @@ const SKIP = new Set(["fdmc"]);
   ok(!!why && items[0].querySelector(".saved-preview") && items[0].querySelector(".saved-preview").textContent === examples[0].note, "'Why these inputs' shows the example's note");
 
   // Open each one and check it landed.
+  const openAll = async (examples) => {
   for (let i = 0; i < examples.length; i++) {
     const ex = examples[i], r = ex.reopen;
     if (r.view === "tools" && SKIP.has(r.tool)) { console.log("skip " + ex.title); continue; }
@@ -79,6 +81,8 @@ const SKIP = new Set(["fdmc"]);
     }
     ok(where && misses.length === 0 && ran, ex.source + " — " + ex.title + (misses.length ? " [not set: " + misses.join(", ") + "]" : "") + (where ? "" : " [wrong place]") + note);
   }
+  };
+  await openAll(examples);
 
   // Examples never reach the report or its section picker.
   click(btn("Workspace")); await wait(300);
@@ -89,6 +93,15 @@ const SKIP = new Set(["fdmc"]);
   const listed = picker ? examples.filter(ex => picker.textContent.includes(ex.title)).map(ex => ex.title) : ["no picker"];
   ok(!!picker && /\(0 of 0 in the report/.test(picker.textContent), "the picker counts no saved sections (" + (picker ? picker.textContent.slice(0, 60) : "") + ")");
   ok(!!picker && listed.length === 0, "the report's section picker does not list them" + (listed.length ? " (" + listed.slice(0, 3).join(" | ") + " … " + (picker ? picker.textContent.slice(0, 200) : "") + ")" : ""));
+
+  // The PepGen sample (second in the chooser): its examples open and run too.
+  click(btn("Workspace")); await wait(300);
+  click(btn("Load sample case")); await wait(200); click(btn("PepGen — DM1, Phase 2")); await wait(900);
+  const pg = caseNamed(/^PepGen.*sample case/);
+  const pgEx = ((pg && pg.pinnedResults) || []).filter(p => p.kind === "example");
+  ok(!!pg && pgEx.length >= 20 && pgEx.every(p => p.included === false && p.note && p.note.length > 80 && p.reopen), "the PepGen sample loads with its worked examples (" + pgEx.length + ")");
+  ok(!!pg && pg.programs[0].evidenceLog.length >= 25 && pg.programs[0].calibrationLog.length === 1, "and its evidence log and calibration entry");
+  await openAll(pgEx);
 
   console.log("\nErrors:", errors.length);
   [...new Set(errors)].forEach(e => console.log("  " + e));

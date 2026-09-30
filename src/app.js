@@ -139,11 +139,16 @@ function App() {
     setView("workspace");
   };
   // A finished, sourced example (sampleCase.js), always added as a new case.
-  const loadSampleCase = () => {
-    const c = sampleCaseStoke();
+  // Two of them, deliberately unlike each other: Stoke (Phase 3, well funded,
+  // the model finds upside) and PepGen (Phase 2, single asset, the model finds
+  // the price too high).
+  const [showSamples, setShowSamples] = React.useState(false);
+  const loadSampleCase = (which) => {
+    const c = which === "pepgen" ? sampleCasePepGen() : sampleCaseStoke();
     setCases(prev => [...prev, c]);
     setActiveCaseId(c.id);
     setView("workspace");
+    setShowSamples(false);
   };
   const [showBackup, setShowBackup] = React.useState(false);
   const autoBackup = useAutoBackup(true);
@@ -239,7 +244,10 @@ function App() {
         h("button", { onClick: createCase, style: { width: "100%", marginTop: 10, padding: "8px 10px", borderRadius: 7, border: "1px dashed var(--ink-3)", background: "transparent", color: "var(--ink-2)", fontFamily: "var(--mono)", fontSize: 12, cursor: "pointer", flexShrink: 0 } }, "+ New case"),
         h("div", { style: { marginTop: 18, display: "flex", flexDirection: "column", gap: 6, flexShrink: 0 } },
           activeCase && h("button", { onClick: () => duplicateCase(activeCase.id), style: smallBtnStyle() }, "Duplicate case"),
-          h("button", { onClick: loadSampleCase, style: smallBtnStyle(), title: "Adds a complete, sourced example case (Stoke Therapeutics) — your own cases are not touched" }, "Load sample case"),
+          h("button", { onClick: () => setShowSamples(v => !v), "aria-expanded": showSamples, style: smallBtnStyle(), title: "Adds a complete, sourced example case — your own cases are not touched" }, "Load sample case"),
+          showSamples && h("div", { style: { display: "flex", flexDirection: "column", gap: 4, paddingLeft: 10, borderLeft: "2px solid var(--rule)" } },
+            h("button", { onClick: () => loadSampleCase("stoke"), style: smallBtnStyle(), title: "Stoke Therapeutics — zorevunersen, Dravet syndrome, Phase 3" }, "Stoke — Dravet, Phase 3"),
+            h("button", { onClick: () => loadSampleCase("pepgen"), style: smallBtnStyle(), title: "PepGen — PGN-EDODM1, myotonic dystrophy type 1, Phase 2" }, "PepGen — DM1, Phase 2")),
           // Backup status is always visible: the one place a user would
           // notice that nothing is protecting their work.
           h("button", { type: "button", className: "side-link", onClick: () => setShowBackup(true), style: { marginTop: 4 } },
@@ -283,7 +291,8 @@ function App() {
             : h("div", { style: { textAlign: "center", padding: "80px 20px", color: "var(--ink-3)" } },
                 h("div", { style: { fontFamily: "var(--display)", fontSize: 20, marginBottom: 8, color: "var(--ink-2)" } }, "No case open"),
                 h("div", { style: { fontFamily: "var(--mono)", fontSize: 13, marginBottom: 20 } }, "Create a case to start building a bottoms-up revenue model."),
-                h("button", { onClick: loadSampleCase, style: { padding: "10px 22px", marginRight: 10, borderRadius: 8, border: "1px solid var(--rule)", background: "var(--surface)", color: "var(--ink-1)", fontFamily: "var(--mono)", fontSize: 13, cursor: "pointer" } }, "Open the sample case"),
+                h("button", { onClick: () => loadSampleCase("stoke"), style: { padding: "10px 22px", marginRight: 10, borderRadius: 8, border: "1px solid var(--rule)", background: "var(--surface)", color: "var(--ink-1)", fontFamily: "var(--mono)", fontSize: 13, cursor: "pointer" } }, "Open the Stoke sample"),
+                h("button", { onClick: () => loadSampleCase("pepgen"), style: { padding: "10px 22px", marginRight: 10, borderRadius: 8, border: "1px solid var(--rule)", background: "var(--surface)", color: "var(--ink-1)", fontFamily: "var(--mono)", fontSize: 13, cursor: "pointer" } }, "Open the PepGen sample"),
                 h("button", { onClick: createCase, style: { padding: "10px 22px", borderRadius: 8, border: "1px solid var(--teal)", background: "var(--teal-bg)", color: "var(--teal)", fontFamily: "var(--mono)", fontSize: 13, fontWeight: 700, cursor: "pointer" } }, "+ New case")
               )
         )

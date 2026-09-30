@@ -308,7 +308,8 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
 
   // ── Projections card: table ends at the enterprise value; view toggle remembered ──
   {
-    click([...d.querySelectorAll("button")].find(b => b.textContent.trim() === "Load sample case")); await wait(500);
+    click([...d.querySelectorAll("button")].find(b => b.textContent.trim() === "Load sample case")); await wait(200);
+    click([...d.querySelectorAll("button")].find(b => b.textContent.trim() === "Stoke — Dravet, Phase 3")); await wait(500);
     click(d.getElementById("casetab-overview")); await wait(300);
     const panel = d.getElementById("casepanel-overview");
     const table = panel && panel.querySelector(".proj-table");

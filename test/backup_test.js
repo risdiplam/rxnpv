@@ -77,6 +77,18 @@ function stub(obj) {
   ok(rep.getItem("rxnpv_edgar_cache") === "{\"keep\":1}", "replace: caches are left alone");
   ok(rep.getItem("rxnpv_secnav_hidden") === "1" && rep.getItem("rxnpv_theme") === "dark", "replace: backup prefs applied, other prefs kept");
 
+  // ── The PepGen sample: the same inputs as the case typed into the app
+  // (test/fixtures/pepgen_case.json), which math_verification rebuilds year
+  // by year to $0.2475 / $1.3767 / $3.5842. ──
+  const pg = w.sampleCasePepGen();
+  ok(pg.ticker === "PEPG" && pg.programs.length === 1 && pg.programs[0].drugName === "PGN-EDODM1", "PepGen sample: one program, PGN-EDODM1");
+  ok(w.caseMissingInputs(pg).length === 0, "PepGen sample: nothing required is missing (" + w.caseMissingInputs(pg).join(", ") + ")");
+  ok(pg.programs[0].evidenceLog.length >= 25 && pg.programs[0].evidenceLog.every(e => e.source && e.date && e.thesis && ["fact", "inference", "speculation"].includes(e.classification) && ["high", "moderate", "low"].includes(e.confidence)), "PepGen sample: every evidence entry has a source, date, reasoning and valid labels");
+  const pgv = k => w.computeCaseValuation(pg, w.getEffectiveScenarioPreset(pg, k), k, 14, pg.terminalValue).equity.perShare;
+  ok([["bear", 0.2475], ["base", 1.3767], ["bull", 3.5842]].every(([k, v]) => Math.abs(pgv(k) - v) < 5e-5), "PepGen sample: Bear/Base/Bull are the independently rebuilt $0.2475 / $1.3767 / $3.5842 (" + ["bear", "base", "bull"].map(k => pgv(k).toFixed(4)).join(" / ") + ")");
+  const fx = JSON.parse(require("fs").readFileSync(__dirname + "/fixtures/pepgen_case.json", "utf8"));
+  ok(JSON.stringify(fx.programs[0].revenueBuild) === JSON.stringify(pg.programs[0].revenueBuild) && JSON.stringify(fx.capitalStructure.basicShares) === JSON.stringify(pg.capitalStructure.basicShares), "PepGen sample: revenue build and shares match the typed-in fixture");
+
   // ── The sample case ──
   const sc = w.sampleCaseStoke();
   ok(sc.ticker === "STOK" && sc.programs.length === 1 && sc.programs[0].drugName === "Zorevunersen", "sample: Stoke, one program, zorevunersen");
@@ -166,7 +178,7 @@ function stub(obj) {
   // ── In the app ──
   click(btn("+ New case")); await wait(300);
   const before = JSON.parse(w.localStorage.getItem("rxnpv_cases_v1") || "[]");
-  click(btn("Load sample case")); await wait(500);
+  click(btn("Load sample case")); await wait(200); click(btn("Stoke — Dravet, Phase 3")); await wait(500);
   const after = JSON.parse(w.localStorage.getItem("rxnpv_cases_v1") || "[]");
   ok(after.length === before.length + 1 && after.some(c => c.name === "Stoke Therapeutics — sample case"), "Load sample case adds one case");
   ok(before.every(bc => after.some(ac => ac.id === bc.id && JSON.stringify(ac) === JSON.stringify(bc))), "loading the sample leaves existing cases byte-for-byte unchanged");
