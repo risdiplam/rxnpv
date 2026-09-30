@@ -284,7 +284,10 @@ function ReportView({ theCase, onBack, updateCase }) {
         ),
 
         // Revenue chart (DCF-only — Simple Multiple doesn't compute year-by-year cash flows)
-        inc("revenueChart") && (valMethod === "dcf" ? h("div", { style: cardStyle },
+        // Theme-scoped like the year-by-year card, so the chart's legend takes
+        // the report page's ink, not the app's (dark mode printed light-grey
+        // legend text on the white page: 2.2:1).
+        inc("revenueChart") && (valMethod === "dcf" ? h("div", { style: cardStyle, className: reportDark ? "theme-scope-dark" : "theme-scope-light" },
           h("div", { style: { fontSize: 13, fontWeight: 700, marginBottom: 10, color: rpt.ink2 } }, "Company Revenue Projection (Base Case)"),
           h(RevenueChart, { series: revenueSeries, showLegend: true, height: 200, xPrefix: "", xAxisPrefix: "", label: "Company revenue by year, base case: if the drug works, and weighted by the odds of launch" })
         ) : h("div", { style: cardStyle },
