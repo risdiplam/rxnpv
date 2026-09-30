@@ -26,6 +26,7 @@ if (!fs.existsSync(built)) {
 
 const SUITES = [
   ["math_verification.js", "engine math against hand-derived values"],
+  ["net_test.js", "network retries: what is retried, what is not, and how long it waits"],
   ["export_test.js", "section export serialiser and sanitiser"],
   ["export_coverage_test.js", "every section has an export bar; + Report and the report builder"],
   ["backup_test.js", "backup, restore and the sample case"],

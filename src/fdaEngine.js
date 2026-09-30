@@ -28,17 +28,10 @@
 const FDA_BASE = "https://api.fda.gov/drug/drugsfda.json";
 
 async function fdaFetch(url) {
-  const ctl = new AbortController();
-  const timeout = setTimeout(() => ctl.abort(), 15000);
-  try {
-    const res = await fetch(url, { signal: ctl.signal });
-    clearTimeout(timeout);
-    if (!res.ok) throw new Error("HTTP " + res.status);
-    return await res.json();
-  } catch (e) {
-    clearTimeout(timeout);
-    throw e;
-  }
+  // "HTTP 404" stays in the message: callers read it as "no matches".
+  const res = await resilientFetch(url, { timeoutMs: 15000, label: "openFDA" });
+  if (!res.ok) throw new Error("HTTP " + res.status);
+  return await res.json();
 }
 
 // Search Drugs@FDA by brand name — returns approval info for the best match.

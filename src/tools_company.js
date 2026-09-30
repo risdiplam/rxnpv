@@ -513,7 +513,7 @@ function RunwayTool({ cases, updateCase, activeCase }) {
       h("div", { style: { marginBottom: 10 } },
         h(Note, { summary: 'New here? Trailing vs. forward runway' },
           h("div", { style: { lineHeight: 1.6 } }, 'Two different numbers, both useful. Trailing runway divides the last reported cash balance by recent actual burn from EDGAR filings — it answers "at the rate they have really been spending, how long does the money last?" Forward runway instead uses this case\'s own modeled R&D and G&A costs, which is the right basis when you expect spending to change: a company about to start a Phase 3 will burn far more than its trailing rate implies. Neither knows about an ATM facility, an undrawn credit line, or partnership milestone cash, all of which extend the line.'))),
-      h("div", { style: { fontSize: 11, fontFamily: "var(--sans)", color: "var(--ink-2)", marginBottom: 12 } }, "Latest reported cash + quarterly operating burn from the most recent 10-Q, converted to a runway estimate."),
+      h("div", { style: { fontSize: 11, fontFamily: "var(--sans)", color: "var(--ink-2)", marginBottom: 12 } }, "Latest reported cash and marketable securities, and the cash the business used in operations (from the cash-flow statement — operating loss only when that is not tagged), converted to a runway estimate."),
       h("div", { style: { display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10 } },
         h("input", { type: "text", value: companyName, placeholder: "Company name or ticker", "aria-label": "Company name or ticker", onChange: e => setCompanyName(e.target.value),
           style: { flex: "1 1 220px", padding: "7px 10px", borderRadius: 6, border: "1.5px solid var(--rule)", background: "var(--surface)", color: "var(--ink-1)", fontFamily: "var(--mono)", fontSize: 13 } }),
@@ -530,7 +530,8 @@ function RunwayTool({ cases, updateCase, activeCase }) {
           h("div", null, h("div", { style: UI.caption }, "Cash & investments"),
             h("div", { style: UI.stat }, pullResult.cash != null ? fmtMoney(pullResult.cash) : "n/a")),
           h("div", null, h("div", { style: UI.caption }, "Quarterly burn"),
-            h("div", { style: UI.stat }, pullResult.quarterlyBurnUSD != null ? fmtMoney(pullResult.quarterlyBurnUSD) : "n/a")),
+            h("div", { style: UI.stat }, pullResult.quarterlyBurnUSD != null ? fmtMoney(pullResult.quarterlyBurnUSD) : "n/a"),
+            pullResult.burnBasis && h("div", { style: UI.caption }, pullResult.burnBasis + (pullResult.burnPeriodMonths ? ", " + pullResult.burnPeriodMonths + " months" + (pullResult.burnPeriodEnd ? " to " + pullResult.burnPeriodEnd : "") + (pullResult.burnPeriodMonths !== 3 ? ", per quarter" : "") : ""))),
           h("div", null, h("div", { style: UI.caption }, "Runway"),
             h("div", { style: { fontSize: 22, fontFamily: "var(--mono)", fontWeight: 800, color: pullResult.runwayMonths != null && pullResult.runwayMonths < 12 ? "var(--red)" : "var(--green)" } },
               pullResult.runwayMonths != null ? pullResult.runwayMonths.toFixed(0) + " mo" : "n/a"))

@@ -39,18 +39,7 @@ const TS_FDA_TIMEOUT_MS = 15000;
 async function tsFdaFetch(path, params) {
   if (typeof fetch === 'undefined') throw new Error('No fetch available in this environment');
   const qs = tsFdaQueryString(params);
-  const ctl = typeof AbortController !== 'undefined' ? new AbortController() : null;
-  const timer = ctl ? setTimeout(() => ctl.abort(), TS_FDA_TIMEOUT_MS) : null;
-  let res;
-  try {
-    res = await fetch(`${FDA_API_ROOT}${path}?${qs}`, ctl ? { signal: ctl.signal } : undefined);
-  } catch (e) {
-    if (timer) clearTimeout(timer);
-    throw new Error(e && e.name === 'AbortError'
-      ? 'openFDA did not respond within 15 seconds'
-      : 'Could not reach openFDA: ' + ((e && e.message) || 'network error'));
-  }
-  if (timer) clearTimeout(timer);
+  const res = await resilientFetch(`${FDA_API_ROOT}${path}?${qs}`, { timeoutMs: TS_FDA_TIMEOUT_MS, label: 'openFDA' });
   if (!res.ok) {
     if (res.status === 404) return { results: [], meta: { results: { total: 0 } } }; // openFDA 404s on zero matches
     throw new Error(`openFDA API error: ${res.status} ${res.statusText}`);

@@ -18,7 +18,7 @@ const fs = require("fs");
 const path = require("path");
 
 const SRC = path.join(__dirname, "..", "src");
-const FILES = ["data.js", "ts_ctgovEngine.js", "ctgovEngine.js", "trialDecoder.js", "trialResults.js"];
+const FILES = ["data.js", "netEngine.js", "ts_ctgovEngine.js", "ctgovEngine.js", "trialDecoder.js", "trialResults.js"];
 global.window = {}; global.localStorage = { getItem: () => null, setItem: () => {}, removeItem: () => {} };
 const combined = FILES.map(f => fs.readFileSync(path.join(SRC, f), "utf8")).join("\n\n");
 const api = new Function(combined + "\nreturn { fetchStudyByNctId, decodeTrial };")();

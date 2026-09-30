@@ -27,7 +27,7 @@ const FILES = [
   "data.js", "engine.js", "costEngine.js", "rdEngine.js", "posEngine.js",
   "dcfEngine.js", "capitalEngine.js", "scenarioEngine.js", "helpers.js",
   "ts_statsEngine.js", "ts_simulationEngine.js", "ts_peakSalesEngine.js", "ts_pkpdEngine.js",
-  "ts_chart.js", "edgarEngine.js", "ctgovEngine.js", "trialDecoder.js", "trialResults.js", "openTargetsEngine.js", "literatureEngine.js", "assetProgram.js", "cmsEngine.js", "commercialEngine.js", "ts_ctgovEngine.js", "fdaEngine.js", "chart.js", "ts_fdaEngine.js"
+  "ts_chart.js", "netEngine.js", "edgarEngine.js", "ctgovEngine.js", "trialDecoder.js", "trialResults.js", "openTargetsEngine.js", "literatureEngine.js", "assetProgram.js", "cmsEngine.js", "commercialEngine.js", "ts_ctgovEngine.js", "fdaEngine.js", "chart.js", "ts_fdaEngine.js"
 ];
 global.React = { createElement: () => null, useState: () => [null, () => {}], useEffect: () => {}, Fragment: "F", Component: class {} };
 global.document = { createElement: () => ({ style: {} }), getElementById: () => null };
@@ -2547,6 +2547,21 @@ section("EDGAR — cash runway picks the standalone quarter, not year-to-date");
     OperatingIncomeLoss: { units: { USD: [{ start: "2026-04-01", end: "2026-06-30", val: -65429000, form: "10-Q" }] } }
   } } };
   near("marketable securities, current and long-term, count as cash: $354.32M", api.calcRunwayFromFacts(stok).cashUSD, 354320000, 1e-6);
+  // No cash-flow tag here, so the burn falls back to operating loss ($65.429M a quarter).
+  ok("without a cash-flow tag, burn is the operating loss", api.calcRunwayFromFacts(stok).burnBasis === "operating loss");
+  // With one: $117.167M used over the six months to Jun 30 → $19.528M a month,
+  // $58.584M a quarter; runway 354.32 / 19.5278 = 18.14 months.
+  const stokCF = JSON.parse(JSON.stringify(stok));
+  stokCF.facts["us-gaap"].NetCashProvidedByUsedInOperatingActivities = { units: { USD: [
+    { start: "2026-01-01", end: "2026-06-30", val: -117167000, form: "10-Q" },
+    { start: "2025-01-01", end: "2025-06-30", val: 106405000, form: "10-Q" }] } };
+  const rcf = api.calcRunwayFromFacts(stokCF);
+  ok("with a cash-flow tag, burn is cash used in operations over its 6-month span", rcf.burnBasis === "cash used in operations" && rcf.burnPeriodMonths === 6);
+  near("quarterly burn $58.584M (117.167 / 6 × 3)", rcf.quarterlyBurnUSD, 58583500, 1);
+  near("runway 18.14 months", rcf.runwayMonths, 354320000 / (117167000 / 6), 1e-9);
+  // A positive operating cash flow is not a burn: fall back to operating loss.
+  const pos = JSON.parse(JSON.stringify(stokCF)); pos.facts["us-gaap"].NetCashProvidedByUsedInOperatingActivities.units.USD[0].val = 5000000;
+  ok("a cash inflow is not used as burn", api.calcRunwayFromFacts(pos).burnBasis === "operating loss");
   const stale = JSON.parse(JSON.stringify(stok));
   stale.facts["us-gaap"].AvailableForSaleSecuritiesDebtSecuritiesNoncurrent.units.USD[0].end = "2025-12-31";
   near("a securities balance dated differently from the cash is left out: $292.818M", api.calcRunwayFromFacts(stale).cashUSD, 292818000, 1e-6);

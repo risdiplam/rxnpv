@@ -25,26 +25,13 @@ const OT_TIMEOUT_MS = 15000;
 
 async function openTargetsQuery(query, variables) {
   if (typeof fetch === "undefined") throw new Error("No fetch available in this environment");
-  const ctl = typeof AbortController !== "undefined" ? new AbortController() : null;
-  const timer = ctl ? setTimeout(() => ctl.abort(), OT_TIMEOUT_MS) : null;
-  let res;
-  try {
-    res = await fetch(OPENTARGETS_API, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ query, variables }),
-      signal: ctl ? ctl.signal : undefined
-    });
-  } catch (e) {
-    if (timer) clearTimeout(timer);
-    // Same discipline as every other integration here: a reachability problem
-    // must never be presentable as "no evidence found". Those are opposite
-    // conclusions and the difference matters more here than almost anywhere.
-    throw new Error(e && e.name === "AbortError"
-      ? "Open Targets did not respond within 15 seconds"
-      : "Could not reach Open Targets: " + ((e && e.message) || "network error"));
-  }
-  if (timer) clearTimeout(timer);
+  // Same discipline as every other integration here: a reachability problem
+  // must never be presentable as "no evidence found" — resilientFetch throws.
+  // A GraphQL query only reads, so retrying the POST is safe.
+  const res = await resilientFetch(OPENTARGETS_API, {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ query, variables }), timeoutMs: OT_TIMEOUT_MS, label: "Open Targets"
+  });
   if (!res.ok) throw new Error("Open Targets API error: " + res.status + " " + res.statusText);
   const body = await res.json();
   if (body.errors && body.errors.length) throw new Error("Open Targets rejected the query: " + body.errors[0].message);

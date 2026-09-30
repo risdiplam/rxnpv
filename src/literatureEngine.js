@@ -35,20 +35,9 @@ const EPMC_TIMEOUT_MS = 15000;
 async function europePmcFetch(params) {
   if (typeof fetch === "undefined") throw new Error("No fetch available in this environment");
   const qs = new URLSearchParams(params).toString();
-  const ctl = typeof AbortController !== "undefined" ? new AbortController() : null;
-  const timer = ctl ? setTimeout(() => ctl.abort(), EPMC_TIMEOUT_MS) : null;
-  let res;
-  try {
-    res = await fetch(EUROPEPMC_API + "?" + qs, ctl ? { signal: ctl.signal } : undefined);
-  } catch (e) {
-    if (timer) clearTimeout(timer);
-    // Same rule as every other integration here: a reachability failure must
-    // never be presentable as "no papers found".
-    throw new Error(e && e.name === "AbortError"
-      ? "Europe PMC did not respond within 15 seconds"
-      : "Could not reach Europe PMC: " + ((e && e.message) || "network error"));
-  }
-  if (timer) clearTimeout(timer);
+  // Same rule as every other integration here: a reachability failure must
+  // never be presentable as "no papers found" — resilientFetch throws for it.
+  const res = await resilientFetch(EUROPEPMC_API + "?" + qs, { timeoutMs: EPMC_TIMEOUT_MS, label: "Europe PMC" });
   if (!res.ok) throw new Error("Europe PMC API error: " + res.status + " " + res.statusText);
   return res.json();
 }

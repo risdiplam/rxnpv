@@ -1,14 +1,15 @@
 {
   "name": "rxnpv-tests",
   "private": true,
-  "description": "jsdom-based functional tests for RxNPV. Not a real browser — see README.md for what this can and can't verify.",
+  "description": "jsdom-based functional tests for RxNPV. Not a real browser \u2014 see README.md for what this can and can't verify.",
   "scripts": {
     "setup": "node setup.js",
     "test": "node run_all.js",
     "test:dev": "node run_all.js --dev",
     "canary": "node live_canary.js",
     "packaged": "../electron/node_modules/electron/dist/Electron.app/Contents/MacOS/Electron packaged/packaged_check.js",
-    "lint": "node lint.js"
+    "lint": "node lint.js",
+    "apihealth": "node api_health.js"
   },
   "dependencies": {
     "jsdom": "^30.0.1",

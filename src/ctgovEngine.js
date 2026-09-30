@@ -10,15 +10,11 @@ const CTGOV_BASE = "https://clinicaltrials.gov/api/v2/studies";
 
 async function ctgovFetch(params) {
   const qs = new URLSearchParams(params).toString();
-  const ctl = new AbortController();
-  const timeout = setTimeout(() => ctl.abort(), 15000);
   try {
-    const res = await fetch(CTGOV_BASE + "?" + qs, { signal: ctl.signal });
-    clearTimeout(timeout);
+    const res = await resilientFetch(CTGOV_BASE + "?" + qs, { timeoutMs: 15000, label: "ClinicalTrials.gov" });
     if (!res.ok) throw new Error("HTTP " + res.status);
     return await res.json();
   } catch (e) {
-    clearTimeout(timeout);
     throw new Error("ClinicalTrials.gov fetch failed: " + e.message);
   }
 }
@@ -194,11 +190,8 @@ async function enrichSponsorsWithPublicStatus(studies) {
 async function fetchStudyByNctId(nctId) {
   const id = String(nctId || "").trim().toUpperCase();
   if (!/^NCT\d{8}$/.test(id)) return { ok: false, error: "That doesn't look like a valid NCT ID (expected format: NCT followed by 8 digits)." };
-  const ctl = new AbortController();
-  const timeout = setTimeout(() => ctl.abort(), 15000);
   try {
-    const res = await fetch(CTGOV_BASE + "/" + id, { signal: ctl.signal });
-    clearTimeout(timeout);
+    const res = await resilientFetch(CTGOV_BASE + "/" + id, { timeoutMs: 15000, label: "ClinicalTrials.gov" });
     if (res.status === 404) return { ok: false, error: "No study found for " + id + " on ClinicalTrials.gov." };
     if (!res.ok) throw new Error("HTTP " + res.status);
     const study = await res.json();
@@ -209,7 +202,6 @@ async function fetchStudyByNctId(nctId) {
     // protocol shape and has no business carrying an adverse-event table.
     return { ok: true, study: parseStudy(study), results: parseTrialResults(study) };
   } catch (e) {
-    clearTimeout(timeout);
     return { ok: false, error: "ClinicalTrials.gov fetch failed: " + e.message };
   }
 }

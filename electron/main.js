@@ -309,21 +309,33 @@ ipcMain.handle('edgar:fetch', async (event, url) => {
   if (!/(^|\.)sec\.gov$/.test(parsed.hostname)) {
     throw new Error('edgar:fetch only allows sec.gov URLs, got: ' + parsed.hostname);
   }
-  const ctl = new AbortController();
-  const timeout = setTimeout(() => ctl.abort(), 20000);
-  try {
-    const res = await fetch(url, {
-      signal: ctl.signal,
-      headers: { 'User-Agent': EDGAR_USER_AGENT, 'Accept-Encoding': 'gzip, deflate' }
-    });
+  // Transient failures are retried here, by the same rules as the renderer's
+  // resilientFetch (src/netEngine.js): no connection, a timeout (once), 429
+  // and 5xx, up to two retries with growing waits or SEC's own Retry-After.
+  // EDGAR's full-text search in particular answers 500 intermittently.
+  const RETRY = [408, 425, 429, 500, 502, 503, 504];
+  let timeouts = 0;
+  for (let attempt = 0; ; attempt++) {
+    const ctl = new AbortController();
+    const timeout = setTimeout(() => ctl.abort(), 20000);
+    let res = null, err = null;
+    try {
+      res = await fetch(url, { signal: ctl.signal, headers: { 'User-Agent': EDGAR_USER_AGENT, 'Accept-Encoding': 'gzip, deflate' } });
+    } catch (e) { err = e; }
     clearTimeout(timeout);
-    const text = await res.text();
-    let json = null;
-    try { json = JSON.parse(text); } catch (e) { /* some endpoints return non-JSON; caller handles */ }
-    return { ok: res.ok, status: res.status, json, text: json ? null : text };
-  } catch (e) {
-    clearTimeout(timeout);
-    throw new Error('EDGAR fetch failed: ' + e.message);
+    const isTimeout = !!err && err.name === 'AbortError';
+    if (isTimeout) timeouts++;
+    const retryable = err ? (!isTimeout || timeouts < 2) : RETRY.includes(res.status);
+    if (!retryable || attempt >= 2) {
+      if (err) throw new Error('EDGAR fetch failed: ' + (isTimeout ? 'no response within 20 seconds' : err.message));
+      const text = await res.text();
+      let json = null;
+      try { json = JSON.parse(text); } catch (e) { /* some endpoints return non-JSON; caller handles */ }
+      return { ok: res.ok, status: res.status, json, text: json ? null : text };
+    }
+    const ra = res && Number(res.headers.get('Retry-After'));
+    const wait = ra > 0 ? Math.min(8000, ra * 1000) : Math.round(700 * Math.pow(2.5, attempt) * (0.85 + Math.random() * 0.3));
+    await new Promise(r => setTimeout(r, wait));
   }
 });
 

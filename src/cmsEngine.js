@@ -56,18 +56,7 @@ const CMS_STALENESS_MONTHS = 15;
 async function cmsFetch(datasetId, params) {
   if (typeof fetch === "undefined") throw new Error("No fetch available in this environment");
   const qs = new URLSearchParams(params).toString();
-  const ctl = typeof AbortController !== "undefined" ? new AbortController() : null;
-  const timer = ctl ? setTimeout(() => ctl.abort(), CMS_TIMEOUT_MS) : null;
-  let res;
-  try {
-    res = await fetch(CMS_API + datasetId + "/data?" + qs, ctl ? { signal: ctl.signal } : undefined);
-  } catch (e) {
-    if (timer) clearTimeout(timer);
-    throw new Error(e && e.name === "AbortError"
-      ? "CMS did not respond within 20 seconds"
-      : "Could not reach CMS: " + ((e && e.message) || "network error"));
-  }
-  if (timer) clearTimeout(timer);
+  const res = await resilientFetch(CMS_API + datasetId + "/data?" + qs, { timeoutMs: CMS_TIMEOUT_MS, label: "CMS" });
   // A 404 here almost certainly means CMS has retired this dataset id for a
   // newer release, which is a different problem from the drug not being found.
   if (res.status === 404) throw new Error("This CMS dataset is no longer published at the address the app has for it, which usually means CMS released a new version. The data below cannot be refreshed until that is updated.");

@@ -24,7 +24,7 @@ Practical implication for how work should be sequenced: don't let more than one 
 
 ## Architecture — read this before touching the build
 
-**This is not built with a real bundler.** No webpack, no esbuild, no Vite, no ES module imports/exports anywhere. It's 48 plain JavaScript files, concatenated in a specific order into one giant inline `<script>` block inside `shell.html`, producing `electron/rxnpv.html` — the single file the Electron shell actually loads.
+**This is not built with a real bundler.** No webpack, no esbuild, no Vite, no ES module imports/exports anywhere. It's 49 plain JavaScript files, concatenated in a specific order into one giant inline `<script>` block inside `shell.html`, producing `electron/rxnpv.html` — the single file the Electron shell actually loads.
 
 This was a pragmatic choice made out of necessity: the app was originally built entirely inside a Claude chat conversation, in a sandboxed environment with no real bundler tooling available. It works, it's been thoroughly tested in that form, and **changing it is a legitimate future improvement but a real, deliberate architecture decision** — not something to fix in passing while doing something else. If you do it, do it as its own isolated change with full re-verification, not bundled into a feature or bug fix.
 
@@ -53,7 +53,7 @@ Quit the running app first if using `--install` — it overwrites the app bundle
 ### Project layout
 
 ```
-src/            48 source modules — see MODULE_ORDER in build.js for the authoritative list/order
+src/            49 source modules — see MODULE_ORDER in build.js for the authoritative list/order
 shell.html      HTML template with a __SCRIPT__ placeholder
 build.js        reassembles src/ into electron/rxnpv.html
 electron/       main.js, preload.js, package.json (electron-builder config), icon.icns/icon.svg, vendor/ (React UMD builds, committed)
@@ -147,6 +147,12 @@ A deliberate product decision made in September 2026: **not every feature has to
 - **Asset Program view** (Tools → Live research). Every registered trial for one drug at once, by phase, with the trials that stopped and their registered reasons broken out. Carries the **evidence-base checklist** — "18 of 37 with a registered allocation are randomised · 11 blinded · 15 with posted results · largest n=815" — which is deliberately a set of counts with their own denominators and **never a composite score**: invented weights would be false precision, and a reader would anchor on the number instead of the four facts under it. Two honesty mechanics worth keeping: CT.gov's `query.intr` is a loose text search that returns other drugs' trials, so every hit is re-checked against its own registered intervention names (including `otherNames`, where brand names live) and the drops are counted on screen; and the `fields` list is a named constant with a test asserting its contents, because omitting `HasResults` from it once made the checklist state, in a full sentence, that no trial in the programme had posted results — for a drug with sixteen that had.
 - **Literature shelf** (Europe PMC). Previously declined as duplicating Google Scholar; reversed in September 2026 for one specific reason — a general search engine cannot tell you *what kind* of paper it just handed you, and Europe PMC returns MEDLINE's own publication types on every record. A primary randomised trial report, a meta-analysis, a narrative review, a conference abstract and an unreviewed preprint arrive already separated, and the composition of a result set ("4 primary papers, 15 reviews") is more informative than any single title. Two entry points: a standalone search tab, and a "what has been published about this trial" panel in the Decoder that searches the NCT number. **On the name, because it misleads:** Europe PMC is *not* a European database — its `MED` source is MEDLINE/PubMed in full, plus PMC full text, plus bioRxiv/medRxiv/Research Square preprints. Verified live: 96 of 100 records in a broad query come from MED. Adding a second general literature API alongside it would return the same MEDLINE records twice, which is why there is one.
 - **Trial Glossary** (Reference Sheet). The vocabulary the decoder assumes, each term with a "why it matters" line, plus what each phase can and cannot establish.
+
+### One fetch for every integration (`netEngine.js`, September 2026)
+
+`resilientFetch(url, { method, headers, body, timeoutMs, label, retries })` is the only way the renderer reaches an external service; every integration's wrapper (ctgovFetch, fdaFetch, tsCtgovFetch, tsFdaFetch, europePmcFetch, cmsFetch, openTargetsQuery, fetchStudyByNctId) goes through it, and main.js's `edgar:fetch` applies the same rules in the main process. It retries what a second try can fix — no connection, a timeout (once), 408/425/429/5xx — up to twice, ~0.7s then ~1.75s with jitter, or the server's Retry-After (capped at 8s); it never retries 400/403/404, which each caller interprets itself (openFDA's 404 means "no matches"). It returns the Response, so every existing error message is unchanged. **Why:** seven of eight integrations never retried, so an intermittent 500 from openFDA or EDGAR search, or a 503 from Europe PMC, showed as a failed lookup although the same request a moment later succeeded; the eighth (EDGAR) retried everything, 404s included. A new integration must use it. `test/net_test.js` pins the rules; `npm run apihealth` (test/api_health.js) checks every live source for both reachability and extraction accuracy against hand-verified figures.
+
+**EDGAR burn is cash used in operations** (`NetCashProvidedByUsedInOperatingActivities`, its year-to-date span divided out), not operating loss, which includes non-cash stock compensation and overstated Stoke's burn by ~12% (16 vs 18 months of runway). Operating loss is the fallback when the cash-flow tag is missing; the Cash Runway tool shows which basis it used.
 
 ### Six API lessons, all found only by calling the live service
 

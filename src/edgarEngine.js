@@ -102,16 +102,17 @@ async function edgarFetch(url, retries) {
   if (typeof window === "undefined" || !window.electronAPI || !window.electronAPI.edgarFetch) {
     throw new Error("EDGAR features require the RxNPV desktop app (no browser CORS workaround is used here).");
   }
+  // Transient failures (no connection, 429, 5xx) are retried in the main
+  // process (electron/main.js, the same rules as resilientFetch). A status
+  // that comes back here is an answer — a 404 is not retried, since it cannot
+  // succeed; only a thrown bridge error is tried again.
   let lastErr;
   for (let attempt = 0; attempt <= retries; attempt++) {
-    try {
-      const res = await window.electronAPI.edgarFetch(url);
-      if (!res.ok) throw new Error("HTTP " + res.status);
-      return res.json;
-    } catch (e) {
-      lastErr = e;
-      if (attempt < retries) await new Promise(r => setTimeout(r, 800));
-    }
+    let res;
+    try { res = await window.electronAPI.edgarFetch(url); }
+    catch (e) { lastErr = e; if (attempt < retries) await new Promise(r => setTimeout(r, 800)); continue; }
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    return res.json;
   }
   throw lastErr;
 }
@@ -129,14 +130,11 @@ async function edgarFetchText(url, retries) {
   }
   let lastErr;
   for (let attempt = 0; attempt <= retries; attempt++) {
-    try {
-      const res = await window.electronAPI.edgarFetch(url);
-      if (!res.ok) throw new Error("HTTP " + res.status);
-      return res.text != null ? res.text : (res.json != null ? JSON.stringify(res.json) : "");
-    } catch (e) {
-      lastErr = e;
-      if (attempt < retries) await new Promise(r => setTimeout(r, 800));
-    }
+    let res;
+    try { res = await window.electronAPI.edgarFetch(url); }
+    catch (e) { lastErr = e; if (attempt < retries) await new Promise(r => setTimeout(r, 800)); continue; }
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    return res.text != null ? res.text : (res.json != null ? JSON.stringify(res.json) : "");
   }
   throw lastErr;
 }
@@ -316,6 +314,25 @@ function calcRunwayFromFacts(facts) {
   for (const t of longInvestmentTags) { longInvest = sameDate(pickLatest(t)); if (longInvest) break; }
   const totalCash = (cash?.value || 0) + (invest?.value || 0) + (longInvest?.value || 0);
   if (!totalCash) return null;
+  // Burn is the cash the business actually used: operating cash flow from the
+  // cash-flow statement, which excludes non-cash stock compensation. Operating
+  // loss includes it, so it overstates burn — Stoke's Q2 2026 operating loss
+  // ($65.4M a quarter) gave a 16-month runway where the cash it really used
+  // ($117.2M over six months, $19.5M a month) gives 18. A 10-Q reports cash
+  // flow year-to-date only, so the span is read from the fact and divided out.
+  // Operating loss remains the fallback for a filer that does not tag it.
+  const pickLatestSpan = (tag) => {
+    const fact = ug[tag];
+    if (!fact || !fact.units || !fact.units.USD) return null;
+    const spans = fact.units.USD
+      .filter(p => (p.form === "10-Q" || p.form === "10-K") && p.val != null)
+      .map(p => ({ p, months: periodMonths(p) }))
+      .filter(x => x.months != null);
+    if (!spans.length) return null;
+    spans.sort((a, b) => (b.p.end || "").localeCompare(a.p.end || "") || (a.months - b.months));
+    return { value: spans[0].p.val, end: spans[0].p.end, start: spans[0].p.start, months: spans[0].months };
+  };
+  const opCash = pickLatestSpan("NetCashProvidedByUsedInOperatingActivities");
   let opLoss = null;
   for (const t of opLossTags) {
     const fact = ug[t];
@@ -333,12 +350,18 @@ function calcRunwayFromFacts(facts) {
     opLoss = { value: spans[0].p.val, end: spans[0].p.end, months: spans[0].months };
     break;
   }
-  if (!opLoss || opLoss.value >= 0) return { cashUSD: totalCash, debtUSD: extractDebt(ug), runwayMonths: null, asOf: cash?.end || invest?.end, note: "operating loss not available" };
-  const monthlyBurn = Math.abs(opLoss.value) / opLoss.months;
+  // The cash-flow figure is used when it is a burn and is at least as recent
+  // as the operating loss (the same filing, normally).
+  const useCash = opCash && opCash.value < 0 && (!opLoss || (opCash.end || "") >= (opLoss.end || ""));
+  const burn = useCash ? opCash : opLoss;
+  if (!burn || burn.value >= 0) return { cashUSD: totalCash, debtUSD: extractDebt(ug), runwayMonths: null, asOf: cash?.end || invest?.end, note: "operating loss not available" };
+  const monthlyBurn = Math.abs(burn.value) / burn.months;
   return {
     cashUSD: totalCash, debtUSD: extractDebt(ug),
     quarterlyBurnUSD: monthlyBurn * 3,          // normalised, whatever span was reported
-    burnPeriodMonths: opLoss.months,            // what the filing actually reported
+    burnPeriodMonths: burn.months,              // what the filing actually reported
+    burnBasis: useCash ? "cash used in operations" : "operating loss",
+    burnPeriodEnd: burn.end || null,
     runwayMonths: totalCash / monthlyBurn,
     asOf: cash?.end || invest?.end
   };
@@ -574,6 +597,7 @@ async function pullEdgarFinancials(companyName, force) {
     cash: runway ? runway.cashUSD : null, debt: runway ? runway.debtUSD : null,
     asOf: runway ? runway.asOf : null,
     quarterlyBurnUSD: runway ? runway.quarterlyBurnUSD : null,
+    burnBasis: runway ? runway.burnBasis || null : null, burnPeriodMonths: runway ? runway.burnPeriodMonths || null : null, burnPeriodEnd: runway ? runway.burnPeriodEnd || null : null,
     runwayMonths: runway ? runway.runwayMonths : null,
     runwayNote: runway ? runway.note : null,
     options: options ? { count: options.count, avgStrike: options.avgStrike, priceFound: options.priceFound, asOf: options.asOf || null } : null,

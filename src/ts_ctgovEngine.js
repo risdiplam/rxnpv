@@ -22,18 +22,7 @@ const TS_CTGOV_TIMEOUT_MS = 15000;
 async function tsCtgovFetch(params) {
   if (!FETCH_FN) throw new Error('No fetch available in this environment (node needs a polyfill for live calls)');
   const qs = new URLSearchParams(params).toString();
-  const ctl = typeof AbortController !== 'undefined' ? new AbortController() : null;
-  const timer = ctl ? setTimeout(() => ctl.abort(), TS_CTGOV_TIMEOUT_MS) : null;
-  let res;
-  try {
-    res = await fetch(`${TS_CTGOV_BASE}?${qs}`, ctl ? { signal: ctl.signal } : undefined);
-  } catch (e) {
-    if (timer) clearTimeout(timer);
-    throw new Error(e && e.name === 'AbortError'
-      ? 'ClinicalTrials.gov did not respond within 15 seconds'
-      : 'Could not reach ClinicalTrials.gov: ' + ((e && e.message) || 'network error'));
-  }
-  if (timer) clearTimeout(timer);
+  const res = await resilientFetch(`${TS_CTGOV_BASE}?${qs}`, { timeoutMs: TS_CTGOV_TIMEOUT_MS, label: 'ClinicalTrials.gov' });
   if (!res.ok) throw new Error(`ClinicalTrials.gov API error: ${res.status} ${res.statusText}`);
   return res.json();
 }
