@@ -484,9 +484,9 @@ function useValuationSections({ theCase, onChange, goToTab }) {
 
     // Future dilution scenario — an optional overlay, applied identically
     // across Bear/Base/Bull so dilution risk shows up consistently, not just
-    // in one scenario. Excluded from the Implied PoS solver on purpose (see
-    // scenarioEngine.js) since that question is about today's actual share
-    // count, not a hypothetical future one.
+    // in one scenario. The implied-PoS and other reverse-solvers include it
+    // too, so "the price implies X" is the X at which this fair value equals
+    // the price (see solveImpliedPoSMultiplier).
     show("inputs") && ((() => {
       const fr = theCase.futureRaise || { enabled: false, amountM: "", priceOverride: "" };
       const setFR = (patch) => update({ futureRaise: { ...fr, ...patch } });
