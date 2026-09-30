@@ -78,7 +78,8 @@ function CompanyLookupTool({ cases, updateCase, activeCase, onWatchTrial }) {
     const cap = c.capitalStructure || { mode: "simple" };
     const patch = { cash: edgarResult.cash != null ? String(edgarResult.cash) : cap.cash, debt: edgarResult.debt != null ? String(edgarResult.debt) : cap.debt };
     if (cap.mode === "simple") {
-      patch.dilutedSharesSimple = edgarResult.dilutedShares != null ? String(edgarResult.dilutedShares) : (edgarResult.basicShares != null ? String(edgarResult.basicShares) : cap.dilutedSharesSimple);
+      const fd = edgarFullyDilutedShares(edgarResult, c.currentPrice);
+      patch.dilutedSharesSimple = fd ? String(fd.shares) : cap.dilutedSharesSimple;
     } else {
       patch.basicShares = edgarResult.basicShares != null ? String(edgarResult.basicShares) : cap.basicShares;
       if (edgarResult.options && edgarResult.options.count != null) patch.opts = String(edgarResult.options.count);
@@ -124,12 +125,16 @@ function CompanyLookupTool({ cases, updateCase, activeCase, onWatchTrial }) {
         h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", fontWeight: 700, color: "var(--ink-2)", marginBottom: 6 } }, "EDGAR financials"),
         h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-2)", lineHeight: 1.7 } },
           h("div", null, "✓ ", h("b", { style: { color: "var(--teal)" } }, edgarResult.name), " · CIK ", edgarResult.cik, edgarResult.ticker ? " · " + edgarResult.ticker : ""),
-          h("div", null, "Basic shares: ", edgarResult.basicShares != null ? fmtNum(edgarResult.basicShares) : "n/a", " · Diluted: ", edgarResult.dilutedShares != null ? fmtNum(edgarResult.dilutedShares) : "n/a"),
-          h("div", null, "Cash: ", edgarResult.cash != null ? fmtMoney(edgarResult.cash) : "n/a", " · Debt: ", edgarResult.debt != null ? fmtMoney(edgarResult.debt) : "n/a"),
+          // Every figure carries its own date: they come from different
+          // filings (options are usually only tagged in the 10-K).
+          h("div", null, "Basic shares: ", edgarResult.basicShares != null ? fmtNum(edgarResult.basicShares) + edgarAsOf(edgarResult.basicSharesAsOf) : "n/a"),
+          edgarResult.dilutedShares != null && h("div", { title: "The weighted-average share count used for earnings per share. A loss-making company excludes options and warrants from it, so it is not a fully diluted count; the export builds that from basic shares, options and warrants instead." },
+            "Weighted-average diluted, for EPS: ", fmtNum(edgarResult.dilutedShares), edgarAsOf(edgarResult.dilutedSharesAsOf), " — not a fully diluted count"),
+          h("div", null, "Cash & marketable securities: ", edgarResult.cash != null ? fmtMoney(edgarResult.cash) + edgarAsOf(edgarResult.asOf) : "n/a", " · Debt: ", edgarResult.debt != null ? fmtMoney(edgarResult.debt) : "n/a"),
           (edgarResult.options || edgarResult.warrants) && h("div", null,
-            edgarResult.options && edgarResult.options.count != null && ("Options: " + fmtNum(edgarResult.options.count) + (edgarResult.options.priceFound ? " @ avg $" + edgarResult.options.avgStrike.toFixed(2) : " (strike not tagged)")),
+            edgarResult.options && edgarResult.options.count != null && ("Options: " + fmtNum(edgarResult.options.count) + (edgarResult.options.priceFound ? " @ avg $" + edgarResult.options.avgStrike.toFixed(2) : " (strike not tagged)") + edgarAsOf(edgarResult.options.asOf)),
             edgarResult.options && edgarResult.warrants ? " · " : "",
-            edgarResult.warrants && edgarResult.warrants.count != null && ("Warrants: " + fmtNum(edgarResult.warrants.count) + (edgarResult.warrants.priceFound ? " @ avg $" + edgarResult.warrants.avgStrike.toFixed(2) : " (strike not tagged)"))
+            edgarResult.warrants && edgarResult.warrants.count != null && ("Warrants: " + fmtNum(edgarResult.warrants.count) + (edgarResult.warrants.priceFound ? " @ avg $" + edgarResult.warrants.avgStrike.toFixed(2) : " (strike not tagged)") + edgarAsOf(edgarResult.warrants.asOf))
           ),
           edgarResult.sourceFilingUrl && h("div", { style: { marginTop: 4 } }, h(ExternalLink, { href: edgarResult.sourceFilingUrl, style: { fontSize: 10 } }, "→ View source filing" + (edgarResult.sourceFilingLabel ? " (" + edgarResult.sourceFilingLabel + ")" : "")))
         ),

@@ -415,6 +415,32 @@ function extractSharesOutstanding(facts) {
   return null;
 }
 
+// A fully diluted share count from an EDGAR pull, for a simple-mode case.
+// EDGAR's "diluted" figure is the weighted-average count used for earnings
+// per share — for a loss-making company it excludes every option and warrant
+// as anti-dilutive, and it is a period average, not a period-end count.
+// Written into "fully diluted shares" it understated Stoke by ~17M shares
+// (64.5M against ~82M). Built instead from period-end basic shares plus
+// options and warrants: by the treasury method when a price is known, all of
+// them when not (the conservative count). Null without basic shares.
+// " (as of Jun 30, 2026)" for an EDGAR period-end date, or nothing.
+function edgarAsOf(iso) {
+  if (!iso || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return "";
+  const d = new Date(iso + "T12:00:00");
+  return " (as of " + d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) + ")";
+}
+
+function edgarFullyDilutedShares(r, price) {
+  if (!r || r.basicShares == null) return null;
+  const opts = r.options || {}, war = r.warrants || {};
+  const p = Number(price);
+  if (p > 0) {
+    const cap = computeCapitalStructure({ mode: "detailed", basicShares: r.basicShares, opts: opts.count, optK: opts.avgStrike, war: war.count, warK: war.avgStrike, currentPrice: p });
+    return { shares: Math.round(cap.dilutedShares), method: "treasury" };
+  }
+  return { shares: Math.round(r.basicShares + (opts.count || 0) + (war.count || 0)), method: "all-in" };
+}
+
 function extractDilutedShares(facts) {
   if (!facts || !facts.facts) return null;
   const ug = facts.facts["us-gaap"] || {};
@@ -550,8 +576,8 @@ async function pullEdgarFinancials(companyName, force) {
     quarterlyBurnUSD: runway ? runway.quarterlyBurnUSD : null,
     runwayMonths: runway ? runway.runwayMonths : null,
     runwayNote: runway ? runway.note : null,
-    options: options ? { count: options.count, avgStrike: options.avgStrike, priceFound: options.priceFound } : null,
-    warrants: warrants ? { count: warrants.count, avgStrike: warrants.avgStrike, priceFound: warrants.priceFound } : null,
+    options: options ? { count: options.count, avgStrike: options.avgStrike, priceFound: options.priceFound, asOf: options.asOf || null } : null,
+    warrants: warrants ? { count: warrants.count, avgStrike: warrants.avgStrike, priceFound: warrants.priceFound, asOf: warrants.asOf || null } : null,
     convertibleFace: converts ? converts.faceValue : null,
     recentFilings, sourceFilingUrl,
     sourceFilingLabel: mostRecentFinancialFiling ? mostRecentFinancialFiling.form + " filed " + mostRecentFinancialFiling.date : null,

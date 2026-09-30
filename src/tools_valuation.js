@@ -255,7 +255,8 @@ function FdmcTool({ cases, updateCase, activeCase }) {
       setPullResult(r);
       setF({
         basicShares: r.basicShares != null ? String(r.basicShares) : fields.basicShares,
-        dilutedSharesSimple: r.dilutedShares != null ? String(r.dilutedShares) : fields.dilutedSharesSimple,
+        // A fully diluted count, not EDGAR's EPS weighted average (see edgarFullyDilutedShares).
+        dilutedSharesSimple: (() => { const fd = edgarFullyDilutedShares(r, fields.currentPrice); return fd ? String(fd.shares) : fields.dilutedSharesSimple; })(),
         opts: r.options && r.options.count != null ? String(r.options.count) : fields.opts,
         optK: r.options && r.options.avgStrike != null ? String(r.options.avgStrike) : fields.optK,
         war: r.warrants && r.warrants.count != null ? String(r.warrants.count) : fields.war,

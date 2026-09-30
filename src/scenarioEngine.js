@@ -1083,6 +1083,15 @@ function computeRedFlags(theCase) {
   programs.forEach(program => {
     const progName = program.drugName || program.name || "Program";
 
+    // 0. A territory-limited royalty in Napkin mode is applied to all revenue.
+    if (quickModeTerritoryMismatch(program)) {
+      const terr = (program.partnership.territory || "exUS") === "us" ? "US-only" : "ex-US";
+      flags.push({
+        programId: program.id, programName: progName, severity: "high",
+        message: `This ${terr} partnership is applied to all of ${progName}'s revenue: Napkin mode has one revenue figure and no US/ex-US split, so the ${program.partnership.royaltyPct}% royalty replaces the company's own sales everywhere. Switch to the Full model, or turn the partnership off and enter as peak revenue only what the company itself books (its own sales plus the royalty).`
+      });
+    }
+
     // 1. PoS override far from the phase/area benchmark
     if (program.posOverridePct !== "" && program.posOverridePct != null) {
       const overridePos = Number(program.posOverridePct) / 100;

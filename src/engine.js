@@ -322,6 +322,17 @@ function computeQuickProgramRevenue(quick, exclusivity, projectionYears) {
 // sales there. Quick mode has no US/ex-US split (exUSRevenue is always 0
 // there), so only "global" is meaningful for it — "us"/"exUS" territory
 // choices are only actionable in Full mode.
+// True when a Quick (Napkin) program carries a royalty deal limited to one
+// territory. Quick mode has one revenue figure, so the royalty is applied to
+// all of it — the deal is treated as worldwide, whatever territory it covers.
+// On the Stoke sample (ex-US royalty) that took Base from $28.84 to about $5.
+// Flagged, not "fixed": Quick has no split to honour the territory with.
+function quickModeTerritoryMismatch(program) {
+  const p = (program && program.partnership) || {};
+  const royalty = Number(p.royaltyPct);
+  return (program && (program.revenueMode || "quick") === "quick") && !!p.enabled && royalty > 0 && (p.territory || "exUS") !== "global";
+}
+
 function applyPartnershipToRevenue(revenueResult, partnership, revenueMode) {
   if (!partnership || !partnership.enabled || partnership.royaltyPct === "" || partnership.royaltyPct == null) return revenueResult;
   const royalty = Number(partnership.royaltyPct) / 100;

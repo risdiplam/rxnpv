@@ -664,6 +664,13 @@ function ProgramEditor({ program, onChange, onDelete, discountRatePct, terminalV
               role: "button", tabIndex: 0,
               onKeyDown: (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onNavigateToTools("licensing"); } },
               style: { color: "var(--teal)", cursor: "pointer", textDecoration: "underline" } }, "Tools → Licensing Comps"), "."),
+          // Quick mode hides the territory choice (it has no split to apply it
+          // to), which hid the consequence too: an ex-US deal was silently
+          // treated as worldwide.
+          quickModeTerritoryMismatch(program) && h("div", { role: "note", className: "pe-warn",
+            style: { marginTop: 8, padding: "8px 12px", borderRadius: 6, border: "1px solid var(--amber)", background: "var(--amber-bg, transparent)", color: "var(--ink-1)", fontFamily: "var(--sans)", fontSize: 12, lineHeight: 1.55 } },
+            h("strong", null, "Napkin mode treats this deal as worldwide. "),
+            "It has one revenue figure and no US/ex-US split, so the royalty replaces the company's own sales everywhere — this " + ((partnership.territory || "exUS") === "us" ? "US-only" : "ex-US") + " deal cuts all of it. Switch to the Full model to keep the territory, or turn the partnership off and enter as peak revenue only what the company itself books (its own sales plus the royalty)."),
           program.revenueMode === "full" && h("div", { style: { marginTop: 4, marginBottom: 4 } },
             h("div", { style: { ...UI.caption, marginBottom: 4 } }, "Territory partnered"),
             h("div", { style: { display: "flex", gap: 6 } },

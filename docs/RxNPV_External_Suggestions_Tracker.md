@@ -915,3 +915,13 @@ Verified: 14 suites, lint clean, UI audit zero findings in both themes and at 90
 
 Verified: 15 suites (new: `worked_examples_test.js`), 1,232 math checks, lint clean, UI audit zero findings, export sweep with only the known ink-score flags.
 
+## Phase 45 — Small fixes from filling in the sample
+
+✅ From the user: "do all of the small fixes first."
+
+- **Napkin mode with a territory deal is now called out.** Quick (Napkin) mode has one revenue figure, so a royalty limited to ex-US (or US) was applied to all of it — the Stoke sample fell from $28.84 to about $5 when switched to Napkin, with nothing on screen to say why. The partnership panel now warns in Quick mode, and the same message is a high-severity red flag (Evidence tab, and the "worth a second look" banner). `quickModeTerritoryMismatch()` in engine.js; a global deal, a Full-mode deal or a deal with no royalty is not flagged.
+- **Company Lookup and Diluted Market Cap no longer write the EPS share count into a case.** EDGAR's "diluted" figure is the weighted-average count for earnings per share; a loss-making company excludes every option and warrant from it. "Export financials to case" (simple mode) and the Diluted Market Cap EDGAR pull put it into "fully diluted shares" — 64.5M for Stoke against ~82M real, overstating value per share by about a quarter. Both now build the count from period-end basic shares plus options and warrants, by the treasury method at the case's price or all-in without one (`edgarFullyDilutedShares`, hand-checked).
+- **Every EDGAR figure carries its date.** Basic shares, the EPS count (now labelled as such, "not a fully diluted count"), cash and marketable securities, options and warrants each say "as of …" — they come from different filings, and options are usually only tagged in the 10-K (Stoke's are December's).
+
+Verified: 15 suites, 1,242 math checks, lint clean; both fixes looked at in the installed app.
+

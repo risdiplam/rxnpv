@@ -66,7 +66,7 @@ const EXPORTS = [
   "SCENARIO_PRESETS", "getEffectiveScenarioPreset", "applyBasePosAdjustment",
   "computeProgramValuation", "computeCaseValuation", "baseCaseFairValue", "computeProjectionRows", "computeSensitivityDrivers", "computeProgramRiskWaterfall",
   "computeEffectivePoS", "computeRnDToLaunch", "resolveLaunchYearOffset",
-  "computeFullCaseMonteCarlo", "solveImpliedPoSMultiplier", "computeEquityBridgeSteps", "computeRedFlags",
+  "computeFullCaseMonteCarlo", "solveImpliedPoSMultiplier", "computeEquityBridgeSteps", "computeRedFlags", "quickModeTerritoryMismatch",
   "computePortfolioSummary", "shrinkBinaryResponseRate", "shrinkHazardRatio",
   "BINARY_SHRINKAGE_FACTOR", "HR_SHRINKAGE_FACTOR",
   "MODALITY_OPTIONS", "getCogsBenchmark", "getErosionDefaults", "resolveErosionParams",
@@ -101,7 +101,7 @@ const EXPORTS = [
   "resultsRedFlags", "trUnescape", "trNum", "trRate", "trMonthsBetweenDates",
   "applyPartnershipToRevenue", "getProgramRevenueResult", "computePartnershipContribution", "distributeRnDCostByYear",
   "computeSimpleMultipleValuation", "computeSOTPBreakdown",
-  "periodMonths", "sumTranchesAtLatestDate", "calcRunwayFromFacts", "extractDebt",
+  "periodMonths", "sumTranchesAtLatestDate", "calcRunwayFromFacts", "extractDebt", "edgarFullyDilutedShares", "edgarAsOf",
   "extractSharesOutstanding", "extractDilutedShares", "extractOptions", "extractWarrants",
   "summarizeOpenMarketActivity", "FORM4_CODE_LABELS",
   "extractConvertibleNotes", "pickLatestUnit", "isFilingForm", "formatHalfLife"
@@ -2550,6 +2550,17 @@ section("EDGAR — cash runway picks the standalone quarter, not year-to-date");
   const stale = JSON.parse(JSON.stringify(stok));
   stale.facts["us-gaap"].AvailableForSaleSecuritiesDebtSecuritiesNoncurrent.units.USD[0].end = "2025-12-31";
   near("a securities balance dated differently from the cash is left out: $292.818M", api.calcRunwayFromFacts(stale).cashUSD, 292818000, 1e-6);
+
+  // Fully diluted from an EDGAR pull, not the EPS weighted average. Stoke-like:
+  // 64,526,242 basic, 10,151,430 options at $13.84, no warrants, price $24.80.
+  // Treasury method: proceeds 10,151,430 × 13.84 = 140,495,791; buyback at
+  // 24.80 = 5,665,153; net new 4,486,277 → 69,012,519. No price → all-in 74,677,672.
+  const pull = { basicShares: 64526242, dilutedShares: 64548862, options: { count: 10151430, avgStrike: 13.84 }, warrants: null };
+  near("fully diluted by treasury method at $24.80: 69,012,519", api.edgarFullyDilutedShares(pull, "24.80").shares, 69012519, 1);
+  near("no price: every option counted, 74,677,672", api.edgarFullyDilutedShares(pull, "").shares, 74677672, 0);
+  ok("never the EPS weighted average", api.edgarFullyDilutedShares(pull, "24.80").shares !== pull.dilutedShares);
+  ok("no basic shares → null, the case keeps its own", api.edgarFullyDilutedShares({ dilutedShares: 5 }, 10) === null);
+  ok("as-of label for a period end", api.edgarAsOf("2025-12-31") === " (as of Dec 31, 2025)" && api.edgarAsOf(null) === "");
 }
 report();
 
@@ -4007,6 +4018,19 @@ section("FIN-012: a Workspace peak-share override above 100% is capped and flagg
   ok("and not a second, contradictory 'above benchmark' flag for the same field",
     f150.filter(f => /Peak share override/.test(f.message)).length === 1);
   ok("an override within 100% does not raise the cap flag", !api.computeRedFlags(mkCase("60")).some(f => /above 100%/.test(f.message)));
+
+  // A territory-limited royalty in Quick mode is applied to all revenue, so it
+  // is flagged; a global deal, a Full-mode deal and a deal with no royalty are not.
+  const qCase = (mode, territory, royaltyPct) => ({ name: "Q", capitalStructure: { mode: "simple", dilutedSharesSimple: "1" },
+    programs: [{ id: "q1", name: "Asset", currentPhase: "phase2", therapeuticArea: "Oncology", modality: "smallMolecule", revenueMode: mode,
+      quickRevenue: { peakRevenue: "1000000000", yearsToPeak: "6", profile: "median" }, revenueBuild: rb("60"),
+      partnership: { enabled: true, territory, royaltyPct, upfrontM: "", costSharingPct: "", milestones: [] } }] });
+  const napkinFlag = c => api.computeRedFlags(c).some(f => /Napkin mode has one revenue figure/.test(f.message));
+  ok("Quick + ex-US royalty is flagged", napkinFlag(qCase("quick", "exUS", "15")));
+  ok("Quick + US-only royalty is flagged", napkinFlag(qCase("quick", "us", "15")));
+  ok("Quick + global royalty is not (it means what it says)", !napkinFlag(qCase("quick", "global", "15")));
+  ok("Full + ex-US royalty is not (the split is honoured)", !napkinFlag(qCase("full", "exUS", "15")));
+  ok("Quick + a deal with no royalty is not", !napkinFlag(qCase("quick", "exUS", "")));
 }
 report();
 
