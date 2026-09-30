@@ -133,7 +133,10 @@ function fieldGrid(fields) {
 // these aren't just inline paragraphs.
 function note(summaryText, bodyText) {
   return el('details', { class: 'note' }, [
-    el('summary', {}, sci(summaryText)),
+    // One span: the summary is an inline-flex with a gap, so text split
+    // around subscripts (E0, Emax, EC50) became separate flex items, each
+    // pushed 7px apart.
+    el('summary', {}, [el('span', {}, sci(summaryText))]),
     el('div', { class: 'note-body' }, sci(bodyText))
   ]);
 }

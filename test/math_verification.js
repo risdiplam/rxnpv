@@ -1089,6 +1089,10 @@ section("Chart axis ticks (niceTicks / formatTick)");
   ok("formatTick renders a whole number without trailing decimals", api.formatTick(20, 20) === "20");
   ok("formatTick renders exact zero as \"0\"", api.formatTick(0, 20) === "0");
   ok("formatTick falls back to compact notation above 1000", api.formatTick(2.5e9, 1e9).endsWith("B"));
+  // Only the decimals the step needs: a $100M step reads 400M, not 400.00M.
+  ok("formatTick: 400,000,000 on a 100M step is '400M'", api.formatTick(4e8, 1e8) === "400M");
+  ok("formatTick: 1,250,000 on a 250K step is '1.25M'", api.formatTick(1.25e6, 2.5e5) === "1.25M");
+  ok("formatTick: 1,000 on a 200 step is '1K'; 2.5B on a 0.5B step is '2.5B'", api.formatTick(1000, 200) === "1K" && api.formatTick(2.5e9, 5e8) === "2.5B");
 }
 report();
 

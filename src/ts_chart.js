@@ -31,14 +31,22 @@ function niceTicks(min, max, targetCount = 5) {
 // formatNumber's flat 2 decimals turns a p-value axis of 0.001/0.01/0.05 into
 // "0.00, 0.01, 0.05", silently collapsing two distinct ticks to the same label.
 function formatTick(v, step) {
-  if (Math.abs(v) >= 1000) return formatNumber(v);
-  if (!isFinite(step) || step <= 0) return String(v);
-  const decimals = Math.max(0, Math.min(6, Math.ceil(-Math.log10(step)) + 1));
-  const s = v.toFixed(decimals);
   // Strip trailing zeros ONLY after a decimal point. A naive /\.?0+$/ (the
   // first version of this line) also ate the zero in whole numbers, turning
   // an axis tick of 20 into "2" and 100 into "1" — caught by the tick tests.
-  return s.indexOf('.') >= 0 ? (s.replace(/0+$/, '').replace(/\.$/, '') || '0') : s;
+  const strip = s => s.indexOf('.') >= 0 ? (s.replace(/0+$/, '').replace(/\.$/, '') || '0') : s;
+  const places = st => Math.max(0, Math.min(6, Math.ceil(-Math.log10(st)) + 1));
+  if (Math.abs(v) >= 1000) {
+    // Large ticks in K / M / B with only the decimals the step needs: a
+    // $100M step labelled "400.00M" (formatNumber's fixed two places) on the
+    // Peak Sales histogram; now "400M", and a 0.25M step still "1.25M".
+    const a = Math.abs(v);
+    const div = a >= 1e9 ? 1e9 : a >= 1e6 ? 1e6 : 1e3, suf = a >= 1e9 ? 'B' : a >= 1e6 ? 'M' : 'K';
+    if (!isFinite(step) || step <= 0) return formatNumber(v);
+    return strip((v / div).toFixed(places(step / div))) + suf;
+  }
+  if (!isFinite(step) || step <= 0) return String(v);
+  return strip(v.toFixed(places(step)));
 }
 
 function renderHistogram(values, opts = {}) {
