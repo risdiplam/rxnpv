@@ -248,8 +248,11 @@ function ProjectionChart({ rows, startYear, height, label }) {
       h("path", { d: line, fill: "none", stroke: "var(--surface)", strokeWidth: 6, strokeLinejoin: "round" }),
       h("path", { d: line, fill: "none", stroke: "var(--amber)", strokeWidth: 2.5, strokeLinejoin: "round" }),
       h("circle", { cx: cx(rows.length - 1), cy: y(last.runningPV), r: 4, fill: "var(--amber)" }),
-      h("text", { x: cx(rows.length - 1) + 12, y: y(last.runningPV) - 1, fontSize: 12, fontWeight: 700, fontFamily: "var(--mono)", fill: "var(--amber)" }, fmtMoney(last.runningPV)),
-      h("text", { x: cx(rows.length - 1) + 12, y: y(last.runningPV) + 13, fontSize: 10, fontFamily: "var(--mono)", fill: "var(--ink-3)" }, "by " + (startYear + last.index))
+      // From the last bar's right edge, not its centre: at ~34px per year the
+      // bar's half-width reached the old centre + 12 offset and the label
+      // touched the 2050 bar (seen exporting the PepGen case).
+      h("text", { x: Math.max(cx(rows.length - 1) + 12, barX(rows.length - 1) + barW + 8), y: y(last.runningPV) - 1, fontSize: 12, fontWeight: 700, fontFamily: "var(--mono)", fill: "var(--amber)" }, fmtMoney(last.runningPV)),
+      h("text", { x: Math.max(cx(rows.length - 1) + 12, barX(rows.length - 1) + barW + 8), y: y(last.runningPV) + 13, fontSize: 10, fontFamily: "var(--mono)", fill: "var(--ink-3)" }, "by " + (startYear + last.index))
     ),
     hr && h("div", { className: "proj-tip", style: {
         top: padT + 4, left: tipRight ? "auto" : (cx(hoverIdx) / W * 100) + "%", right: tipRight ? ((W - cx(hoverIdx)) / W * 100) + "%" : "auto",
