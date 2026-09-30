@@ -55,7 +55,9 @@ function useValuationSections({ theCase, onChange, goToTab }) {
       if (!r.ok) { setEdgarError(r.error); setEdgarResult(null); }
       else {
         setEdgarResult(r);
-        const patch = { cash: r.cash != null ? String(r.cash) : cap.cash, debt: r.debt != null ? String(r.debt) : cap.debt };
+        const patch = { cash: r.cash != null ? String(r.cash) : cap.cash, debt: r.debt != null ? String(r.debt) : cap.debt,
+          // The balance-sheet date and burn, so cash is carried forward to the valuation date.
+          cashAsOf: r.cash != null && r.asOf ? r.asOf : cap.cashAsOf, monthlyBurn: r.quarterlyBurnUSD > 0 ? String(Math.round(r.quarterlyBurnUSD / 3)) : cap.monthlyBurn };
         if (cap.mode === "simple") {
           patch.dilutedSharesSimple = r.dilutedShares != null ? String(r.dilutedShares) : (r.basicShares != null ? String(r.basicShares) : cap.dilutedSharesSimple);
         } else {
@@ -465,7 +467,9 @@ function useValuationSections({ theCase, onChange, goToTab }) {
         ? h("div", { style: { display: "flex", gap: 16, flexWrap: "wrap" } },
             h(BenchField, { label: "Fully diluted shares outstanding", value: cap.dilutedSharesSimple, onChange: v => setCap({ dilutedSharesSimple: v }), placeholder: "e.g. 50000000" }),
             h(MillionsField, { label: "Cash & equivalents", value: cap.cash, onChange: v => setCap({ cash: v }) }),
-            h(MillionsField, { label: "Debt", value: cap.debt, onChange: v => setCap({ debt: v }) })
+            h(MillionsField, { label: "Debt", value: cap.debt, onChange: v => setCap({ debt: v }) }),
+            h(CashAsOfFields, { cap, setCap, theCase }),
+            h(CashAsOfFields, { cap, setCap, theCase })
           )
         : h("div", { style: { display: "flex", gap: 16, flexWrap: "wrap" } },
             h(BenchField, { label: "Basic shares outstanding", value: cap.basicShares, onChange: v => setCap({ basicShares: v }) }),
@@ -947,4 +951,21 @@ function ProjectionTable({ rows, startYear, npv, footer, compact }) {
         h("tr", null,
           h("td", { className: "l", colSpan: span }, footer || null),
           h("td", { colSpan: 2 }, "Enterprise value " + fmtMoney(npv.npv))))));
+}
+
+// Cash as of the balance-sheet date, carried forward to the valuation date
+// (effectiveCapitalStructure). Both fields optional; blank = no adjustment.
+function CashAsOfFields({ cap, setCap, theCase }) {
+  const h = React.createElement;
+  const eff = effectiveCapitalStructure(theCase);
+  const inputStyle = { padding: "7px 10px", minHeight: 28, borderRadius: 6, border: "1.5px solid var(--rule)", background: "var(--surface)", color: "var(--ink-1)", fontFamily: "var(--mono)", fontSize: 13 };
+  return h("div", { style: { flex: "1 1 100%", display: "flex", gap: 16, flexWrap: "wrap", alignItems: "flex-end" } },
+    h("label", { style: { display: "flex", flexDirection: "column", gap: 4, fontSize: 12, fontFamily: "var(--sans)", color: "var(--ink-2)" } },
+      "Cash as of (balance-sheet date)",
+      h("input", { type: "date", value: cap.cashAsOf || "", onChange: e => setCap({ cashAsOf: e.target.value }), style: inputStyle })),
+    h(MillionsField, { label: "Monthly burn since then", value: cap.monthlyBurn || "", onChange: v => setCap({ monthlyBurn: v }) }),
+    h("div", { style: { ...UI.caption, flex: "1 1 260px", lineHeight: 1.6 } },
+      eff._spentSinceFiling
+        ? "Carried forward " + eff._monthsSinceFiling.toFixed(1) + " months to " + (theCase.valuationDate || "today") + ": " + fmtMoney(eff._cashFiled) + " − " + fmtMoney(eff._spentSinceFiling) + " spent ≈ " + fmtMoney(Number(eff.cash)) + ". The valuation charges costs from today, so without this the months since the filing would be paid for twice."
+        : "Optional. With both filled, cash is carried forward to the valuation date — the filing's cash less the burn since — so the months since the filing are not paid for twice. The EDGAR pull fills both."));
 }

@@ -280,7 +280,7 @@ function computeCaseValuation(theCase, scenario, scenarioKey, discountRateBasePc
 
   const npvResult = computeNPV(calendar.map(c => c.riskAdjFCF), discountRate, effectiveTVParams, calendar.map(c => c.revenue));
 
-  const capStruct = theCase.capitalStructure || { mode: "simple", dilutedSharesSimple: "" };
+  const capStruct = effectiveCapitalStructure(theCase);
   let capResult = computeCapitalStructure({ ...capStruct, currentPrice: theCase.currentPrice });
   capResult = applyFutureRaise(capResult, theCase.futureRaise, theCase.currentPrice);
   let equity = computeEquityValue(npvResult.npv, capResult);
@@ -338,13 +338,14 @@ function computePrvContribution(theCase, programVals, r) {
 // cash. The per-share number was right; the chips did not add up to it.
 // sign: +1 adds to equity, -1 subtracts, 0 is the starting value.
 function computeEquityBridgeSteps(theCase, result) {
-  const cap = theCase.capitalStructure || { mode: "simple" };
+  const cap = effectiveCapitalStructure(theCase);
   const capR = result.capResult || {};
   const steps = [
     { key: "ev", label: "Enterprise Value", value: result.npvResult.npv, sign: 0 },
-    { key: "cash", label: "Cash", value: numOr(cap.cash, 0), sign: 1 },
-    { key: "debt", label: "Debt", value: numOr(cap.debt, 0), sign: -1 }
+    { key: "cash", label: cap._spentSinceFiling ? "Cash at the filing" : "Cash", value: cap._spentSinceFiling ? cap._cashFiled : numOr(cap.cash, 0), sign: 1 }
   ];
+  if (cap._spentSinceFiling) steps.push({ key: "burnSince", label: "Spent since the filing", value: cap._spentSinceFiling, sign: -1 });
+  steps.push({ key: "debt", label: "Debt", value: numOr(cap.debt, 0), sign: -1 });
   const convFace = cap.mode === "simple" ? 0 : numOr(cap.convFace, 0);
   if (convFace > 0 && !capR.convertsInTheMoney) steps.push({ key: "convertible", label: "Convertible notes (not converting)", value: convFace, sign: -1 });
   if (capR._futureRaiseAmount) steps.push({ key: "raise", label: "Modeled future raise", value: capR._futureRaiseAmount, sign: 1 });
@@ -489,7 +490,7 @@ function computeFailureFloor(theCase, throughStage) {
   const items = (pv.riskAdjItems || []).slice(0, (throughStage || 0) + 1);
   const stage = items[items.length - 1];
   if (!stage || items.length !== (throughStage || 0) + 1) return null;
-  const cap = theCase.capitalStructure || { mode: "simple" };
+  const cap = effectiveCapitalStructure(theCase);
   const ga = theCase.corporateGA || {};
   const gaYear = (ga.preCommercialAnnualM !== "" && ga.preCommercialAnnualM != null ? Number(ga.preCommercialAnnualM) : SGA_BENCHMARKS.preCommercialGA.medianM) * 1e6;
   const windDownYears = ga.windDownYears !== "" && ga.windDownYears != null && isFinite(Number(ga.windDownYears)) ? Math.max(0, Number(ga.windDownYears)) : FAILURE_WIND_DOWN_YEARS_DEFAULT;
@@ -798,7 +799,7 @@ function computeSimpleMultipleValuation(theCase, scenario, scenarioKey, multiple
   });
 
   const npv = programVals.reduce((s, pv) => s + pv.pv, 0);
-  const capStruct = theCase.capitalStructure || { mode: "simple", dilutedSharesSimple: "" };
+  const capStruct = effectiveCapitalStructure(theCase);
   let capResult = computeCapitalStructure({ ...capStruct, currentPrice: theCase.currentPrice });
   capResult = applyFutureRaise(capResult, theCase.futureRaise, theCase.currentPrice);
   let equity = computeEquityValue(npv, capResult);
@@ -860,7 +861,7 @@ function applyDilutionPath(theCase, scenario, discountRateBasePct, equity, capRe
 // than costs are, so equity value increases with it across realistic ranges.
 function solveImpliedPoSMultiplier(theCase, discountRateBasePct, terminalValueParams) {
   if (!theCase.currentPrice || Number(theCase.currentPrice) <= 0) return { ok: false, error: "Set a current price first." };
-  const capStruct = theCase.capitalStructure || { mode: "simple", dilutedSharesSimple: "" };
+  const capStruct = effectiveCapitalStructure(theCase);
   const capResult = computeCapitalStructure({ ...capStruct, currentPrice: theCase.currentPrice });
   if (!capResult.dilutedShares || capResult.dilutedShares <= 0) return { ok: false, error: "Set diluted shares first." };
 
@@ -935,7 +936,7 @@ function solveImpliedVariable(theCase, discountRateBasePct, terminalValueParams,
   if (!theCase.programs || theCase.programs.length !== 1) return { ok: false, error: "Only meaningful for a single-program case — with more than one program there's no single unambiguous value to solve for." };
   const program = theCase.programs[0];
 
-  const capStruct = theCase.capitalStructure || { mode: "simple", dilutedSharesSimple: "" };
+  const capStruct = effectiveCapitalStructure(theCase);
   const capResult = computeCapitalStructure({ ...capStruct, currentPrice: theCase.currentPrice });
   if (!capResult.dilutedShares || capResult.dilutedShares <= 0) return { ok: false, error: "Set diluted shares first." };
   // Per share against the price, raise included — see solveImpliedPoSMultiplier.
@@ -1039,7 +1040,7 @@ function computeForwardRunway(theCase) {
   // just as much as in a valuation.
   const calendar = applyTaxToCalendar(computeCompanyRiskAdjustedCF(programVals, corpGA, 25), theCase.taxation);
 
-  const capStruct = theCase.capitalStructure || { mode: "simple", dilutedSharesSimple: "" };
+  const capStruct = effectiveCapitalStructure(theCase);
   const startingCash = numOr(capStruct.cash, 0);
 
   let balance = startingCash;
@@ -1075,7 +1076,7 @@ function computeForwardRunway(theCase) {
 // "risk-adjusted dilution" machinery needed on top.
 function computeDilutionPath(theCase, scenario, discountRateBasePct, opts) {
   opts = opts || {};
-  const capStruct = theCase.capitalStructure || { mode: "simple", dilutedSharesSimple: "" };
+  const capStruct = effectiveCapitalStructure(theCase);
   // Start from the post-manual-raise cap table, not the raw one. Callers
   // OVERWRITE dilutedShares with this function's result, so building from the
   // raw structure silently discarded a configured future raise: a case with a

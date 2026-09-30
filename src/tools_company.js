@@ -76,7 +76,8 @@ function CompanyLookupTool({ cases, updateCase, activeCase, onWatchTrial }) {
     const c = cases.find(x => x.id === exportCaseId);
     if (!c || !edgarResult) return;
     const cap = c.capitalStructure || { mode: "simple" };
-    const patch = { cash: edgarResult.cash != null ? String(edgarResult.cash) : cap.cash, debt: edgarResult.debt != null ? String(edgarResult.debt) : cap.debt };
+    const patch = { cash: edgarResult.cash != null ? String(edgarResult.cash) : cap.cash, debt: edgarResult.debt != null ? String(edgarResult.debt) : cap.debt,
+      cashAsOf: edgarResult.cash != null && edgarResult.asOf ? edgarResult.asOf : cap.cashAsOf, monthlyBurn: edgarResult.quarterlyBurnUSD > 0 ? String(Math.round(edgarResult.quarterlyBurnUSD / 3)) : cap.monthlyBurn };
     if (cap.mode === "simple") {
       const fd = edgarFullyDilutedShares(edgarResult, c.currentPrice);
       patch.dilutedSharesSimple = fd ? String(fd.shares) : cap.dilutedSharesSimple;
@@ -503,7 +504,8 @@ function RunwayTool({ cases, updateCase, activeCase }) {
     if (cash == null) return;
     const cap = c.capitalStructure || {};
     updateCase({
-      ...c, capitalStructure: { ...cap, cash: String(cash), debt: debt != null ? String(debt) : cap.debt },
+      ...c, capitalStructure: { ...cap, cash: String(cash), debt: debt != null ? String(debt) : cap.debt,
+        cashAsOf: pullResult && pullResult.asOf ? pullResult.asOf : cap.cashAsOf, monthlyBurn: pullResult && pullResult.quarterlyBurnUSD > 0 ? String(Math.round(pullResult.quarterlyBurnUSD / 3)) : cap.monthlyBurn },
       programs: appendEdgarEvidenceToPrograms(c.programs, pullResult, "Cash Runway's EDGAR pull"),
       updatedAt: Date.now()
     });

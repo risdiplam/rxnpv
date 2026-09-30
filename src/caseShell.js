@@ -22,7 +22,8 @@ function newCase() {
     capitalStructure: {
       mode: "simple", dilutedSharesSimple: "",
       basicShares: "", cash: "", debt: "",
-      opts: "", optK: "", war: "", warK: "", convFace: "", convPrice: ""
+      opts: "", optK: "", war: "", warK: "", convFace: "", convPrice: "",
+      cashAsOf: "", monthlyBurn: ""
     },
     scenarioOverrides: {
       bear: { shareMultiplierPct: "", posMultiplierPct: "", discountRateAddPct: "", exitMultiple: "" },

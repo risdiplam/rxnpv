@@ -75,6 +75,36 @@ function computeEquityValue(enterpriseValue, capStructResult) {
 // happen. No underwriting fee assumed (raised amount = cash added, in full).
 // Applied identically across Bear/Base/Bull so dilution risk shows up
 // consistently in every scenario, not just Base.
+// ── Cash as of the valuation date, not the filing date ──
+// A case's cash comes from the last 10-Q, but the valuation charges costs
+// from today. Without an adjustment the months between the two were paid for
+// twice: once out of the filed cash figure (which is still counted in full)
+// and again in the year-one costs. With capitalStructure.cashAsOf (the
+// balance-sheet date) and monthlyBurn (dollars a month, as MillionsField
+// stores it), cash becomes: filed cash − burn × months to the valuation date
+// (theCase.valuationDate, blank = today), never below zero. Either field
+// blank leaves the case exactly as it was. Every engine read of the capital
+// structure goes through here, so the adjustment cannot apply in one place
+// and not another.
+function parseIsoDay(s) {
+  const m = /^(\d{4})-(\d{2})(?:-(\d{2}))?$/.exec(String(s || "").trim());
+  if (!m) return null;
+  return Date.UTC(Number(m[1]), Number(m[2]) - 1, m[3] ? Number(m[3]) : 1);
+}
+function effectiveCapitalStructure(theCase) {
+  const cap = (theCase && theCase.capitalStructure) || { mode: "simple", dilutedSharesSimple: "" };
+  const burn = numOr(cap.monthlyBurn, 0);
+  const asOf = parseIsoDay(cap.cashAsOf);
+  if (!(burn > 0) || asOf == null || cap.cash === "" || cap.cash == null) return cap;
+  const now = new Date();
+  const at = parseIsoDay(theCase.valuationDate) != null ? parseIsoDay(theCase.valuationDate) : Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
+  const months = Math.max(0, (at - asOf) / (86400000 * 365.25 / 12));
+  const filed = numOr(cap.cash, 0);
+  const spent = Math.min(Math.max(0, filed), burn * months);
+  if (!(spent > 0)) return cap;
+  return { ...cap, cash: String(filed - spent), _cashFiled: filed, _spentSinceFiling: spent, _monthsSinceFiling: months };
+}
+
 function applyFutureRaise(capResult, futureRaise, fallbackPrice) {
   if (!futureRaise || !futureRaise.enabled) return capResult;
   const amountRaised = numOr(futureRaise.amountM, 0); // MillionsField already stores the raw dollar value, not millions

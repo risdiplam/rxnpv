@@ -66,7 +66,7 @@ const EXPORTS = [
   "SCENARIO_PRESETS", "getEffectiveScenarioPreset", "applyBasePosAdjustment",
   "computeProgramValuation", "computeCaseValuation", "baseCaseFairValue", "computeProjectionRows", "computeSensitivityDrivers", "computeProgramRiskWaterfall",
   "computeEffectivePoS", "computeRnDToLaunch", "launchCurveForYears", "resolveLaunchYearOffset",
-  "computeFullCaseMonteCarlo", "solveImpliedPoSMultiplier", "solveImpliedVariable", "computeCompanyActiveByYear", "computeEquityBridgeSteps", "computeRedFlags", "quickModeTerritoryMismatch",
+  "computeFullCaseMonteCarlo", "solveImpliedPoSMultiplier", "solveImpliedVariable", "computeCompanyActiveByYear", "effectiveCapitalStructure", "computeEquityBridgeSteps", "computeRedFlags", "quickModeTerritoryMismatch",
   "computePortfolioSummary", "shrinkBinaryResponseRate", "shrinkHazardRatio",
   "BINARY_SHRINKAGE_FACTOR", "HR_SHRINKAGE_FACTOR",
   "MODALITY_OPTIONS", "getCogsBenchmark", "getErosionDefaults", "resolveErosionParams",
@@ -4567,6 +4567,32 @@ section("Dilution path: raises bring their cash, counted with the odds they happ
   const stOn = JSON.parse(JSON.stringify(st)); stOn.dilutionPath.enabled = true;
   const sb = api.getEffectiveScenarioPreset(stOn, "base");
   near("Stoke (no raise needed): unchanged with the path on", api.computeCaseValuation(stOn, sb, "base", 12, st.terminalValue).equity.perShare, api.computeCaseValuation(st, sb, "base", 12, st.terminalValue).equity.perShare, 1e-9);
+}
+report();
+
+section("Cash is carried forward from the filing to the valuation date");
+{
+  // PepGen: $117,238,000 at June 30, 2026, burning $5.7M a month, valued at
+  // Sept 30, 2026. 92 days = 92 / (365.25 / 12) = 3.0226 months, so
+  // 5,700,000 x 3.0226 = $17,228,747 spent and $100,009,253 left. Before
+  // this, the filed cash was counted in full while the valuation also charged
+  // those months' costs from today — paid twice.
+  const pg = JSON.parse(fs.readFileSync(path.join(__dirname, "fixtures", "pepgen_case.json"), "utf8"));
+  const c = JSON.parse(JSON.stringify(pg));
+  c.capitalStructure.cashAsOf = "2026-06-30"; c.capitalStructure.monthlyBurn = "5700000"; c.valuationDate = "2026-09-30";
+  const eff = api.effectiveCapitalStructure(c);
+  near("months since the filing: 92 days = 3.0226 months", eff._monthsSinceFiling, 92 / (365.25 / 12), 1e-9);
+  near("spent since the filing: $5.7M x 3.0226 = $17,228,747", eff._spentSinceFiling, 5700000 * 92 / (365.25 / 12), 1);
+  near("cash carried forward: $117,238,000 - $17,228,747", Number(eff.cash), 117238000 - 5700000 * 92 / (365.25 / 12), 1);
+  const base = api.getEffectiveScenarioPreset(pg, "base");
+  const before = api.computeCaseValuation(pg, base, "base", 14, pg.terminalValue);
+  const after = api.computeCaseValuation(c, base, "base", 14, c.terminalValue);
+  near("value per share falls by exactly the spend over the shares", before.equity.perShare - after.equity.perShare, 5700000 * 92 / (365.25 / 12) / before.equity.dilutedShares, 1e-9);
+  const steps = api.computeEquityBridgeSteps(c, after);
+  ok("the bridge shows the filing's cash and the spend since as their own steps", steps.some(st => st.key === "cash" && st.value === 117238000) && steps.some(st => st.key === "burnSince" && st.sign === -1));
+  ok("either field blank: no adjustment", api.effectiveCapitalStructure(pg) === pg.capitalStructure);
+  const early = JSON.parse(JSON.stringify(c)); early.valuationDate = "2026-06-01";
+  ok("a valuation date before the filing spends nothing", Number(api.effectiveCapitalStructure(early).cash) === 117238000);
 }
 report();
 
