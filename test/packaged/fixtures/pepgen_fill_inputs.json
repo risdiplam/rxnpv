@@ -1023,9 +1023,9 @@
     "label": "PoS to launch: 15% (benchmark 38%)",
     "classification": "inference",
     "confidence": "moderate",
-    "source": "Judgment; app benchmark (Neurology Phase 2, rare + selection biomarker, Thomas 2016 overlap rule); price-implied ~22.5%",
+    "source": "Judgment; app benchmark (Neurology Phase 2, rare + selection biomarker, Thomas 2016 overlap rule); price-implied ~24%",
     "date": "2026-09-30",
-    "thesis": "The benchmark for a rare, genetically selected Phase 2 neurology program is 37.8%. Cut to 15% for three program-specific reasons: the only multi-dose data so far show splicing no better than placebo; HARBOR has just failed on vHOT; and FREEDOM2 carries a partial US clinical hold. The price implies about 22.5%, so the market is less pessimistic than this case. The November 10 mg/kg data are the next test of it."
+    "thesis": "The benchmark for a rare, genetically selected Phase 2 neurology program is 37.8%. Cut to 15% for three program-specific reasons: the only multi-dose data so far show splicing no better than placebo; HARBOR has just failed on vHOT; and FREEDOM2 carries a partial US clinical hold. The price implies about 24%, so the market is less pessimistic than this case. The November 10 mg/kg data are the next test of it."
    }
   },
   {
@@ -1125,7 +1125,7 @@
     "confidence": "moderate",
     "source": "This case, 2026-09-30",
     "date": "2026-09-30",
-    "thesis": "At $2.34: Base fair value ~$1.38 (about 41% below the price), Bear ~$0.25, Bull ~$3.58, after the modelled $100M raise; peak revenue ~$1.26B in Base ($648M US). The price implies ~22.5% odds of launch against this case's 15%. If PGN-EDODM1 is approved it is worth ~$10.19 a share on Base inputs. The failure floor reads $0 because the model charges the whole benchmark-proportioned Phase 2 cost (~$75M) as still to come, although FREEDOM2 is mostly paid for — a real ~$60M would likely remain after a Phase 2 failure (~$0.85 a share)."
+    "thesis": "At $2.34: Base fair value ~$1.38 (about 41% below the price), Bear ~$0.25, Bull ~$3.58, after the modelled $100M raise; peak revenue ~$1.26B in Base ($648M US). The price implies ~24% odds of launch against this case's 15%. If PGN-EDODM1 is approved it is worth ~$9.83 a share on Base inputs. The failure floor reads $0 because the model charges the whole benchmark-proportioned Phase 2 cost (~$75M) as still to come, although FREEDOM2 is mostly paid for — a real ~$60M would likely remain after a Phase 2 failure (~$0.85 a share). Corporate G&A is charged at the full rate in every year, including after a failure, which a company that failed would not pay; weighting it by survival would add roughly $0.70 a share."
    }
   },
   {
@@ -1139,7 +1139,7 @@
     "catalystLabel": "FREEDOM2 10 mg/kg data, through to approval (PoS to launch)",
     "catalystDate": "2026-11",
     "yourPoS": 15,
-    "marketImpliedPoS": 23,
+    "marketImpliedPoS": 24,
     "outcome": "pending",
     "notes": "Both figures are the probability of reaching launch. Market-implied is this case's own reverse-solve at $2.34 on 2026-09-30. The November data are the first multi-dose look at 10 mg/kg; a positive read should move both figures up."
    }
