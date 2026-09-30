@@ -1,7 +1,7 @@
 // ════════════════════════════════════════════════════════════════════════════
 // RxNPV — R&D-TO-LAUNCH ENGINE
 // Derives remaining time and cost to launch from a program's current phase,
-// using the area-specific duration tables and the "typical asset" cost
+// using the area-specific duration tables and the per-phase cost
 // benchmarks already loaded. Explicit assumption: "current phase" means the
 // program is at the START of that phase — its full remaining cost/time is
 // still ahead, plus every phase after it.
@@ -17,9 +17,9 @@ function computeRnDToLaunch(program) {
     items.push({
       key: "phase1", label: "Phase 1",
       years: TRIAL_DURATION_BY_AREA.phase1BaseYears,
-      costM: TRIAL_COST_BY_AREA.typicalAssetTotalM.phase1,
+      costM: PHASE_COST_BENCHMARKS.phase1,
       yearsSource: TRIAL_DURATION_BY_AREA.source + " — universal base estimate (Phase 1 not modeled by area)",
-      costSource: TRIAL_COST_BY_AREA.source + " — weighted-average typical asset (1 Phase 1 trial)"
+      costSource: PHASE_COST_BENCHMARKS.source
     });
   }
   if (idx <= 1) {
@@ -27,9 +27,9 @@ function computeRnDToLaunch(program) {
     items.push({
       key: "phase2", label: "Phase 2",
       years: TRIAL_DURATION_BY_AREA.nonclinicalAddYears.phase2 + d.value,
-      costM: TRIAL_COST_BY_AREA.typicalAssetTotalM.phase2,
+      costM: PHASE_COST_BENCHMARKS.phase2,
       yearsSource: d.source + " (clinical) + " + TRIAL_DURATION_BY_AREA.nonclinicalAddYears.phase2 + "yr nonclinical",
-      costSource: TRIAL_COST_BY_AREA.source + " — weighted-average typical asset (1 Phase 2 trial)"
+      costSource: PHASE_COST_BENCHMARKS.source
     });
   }
   if (idx <= 2) {
@@ -37,9 +37,9 @@ function computeRnDToLaunch(program) {
     items.push({
       key: "phase3", label: "Phase 3",
       years: TRIAL_DURATION_BY_AREA.nonclinicalAddYears.phase3 + d.value,
-      costM: TRIAL_COST_BY_AREA.typicalAssetTotalM.phase3,
+      costM: PHASE_COST_BENCHMARKS.phase3,
       yearsSource: d.source + " (clinical) + " + TRIAL_DURATION_BY_AREA.nonclinicalAddYears.phase3 + "yr nonclinical",
-      costSource: TRIAL_COST_BY_AREA.source + " — weighted-average typical asset (2 Phase 3 trials)"
+      costSource: PHASE_COST_BENCHMARKS.source
     });
   }
   if (idx <= 3) {

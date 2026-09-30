@@ -254,7 +254,7 @@ function ProgramEditor({ program, onChange, onDelete, discountRatePct, terminalV
               style: { marginTop: 6, padding: "7px 16px", borderRadius: 7, border: "1px solid var(--teal)", background: "var(--teal-bg)", color: "var(--teal)", fontFamily: "var(--mono)", fontSize: 12, fontWeight: 700, cursor: "pointer" }
             }, "Apply → set launch year to " + Math.round(rndYearsUsed)),
             h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginTop: 8, lineHeight: 1.6 } },
-              "Assumes \"current phase\" means the program is at the start of that phase — full remaining cost/time for it and everything after. Phase 2/3 durations are area-specific; costs use the weighted-average \"typical asset\" benchmark (area-specific patient counts aren't available to scale per-patient cost).")
+              "Assumes \"current phase\" means the program is at the start of that phase — full remaining cost/time for it and everything after. Phase 2/3 durations are area-specific; costs are DiMasi et al.'s (2016) median cost of taking a compound through each phase, in 2023 dollars — weighted to large-pharma programmes, so a rare-disease trial may cost less. The company's own reported R&D spend is the better figure where you have it: enter it as the override.")
           )
     )),
 

@@ -4502,7 +4502,7 @@ section("Stoke, the whole case recomputed from its inputs (Bear, Base, Bull)");
   const p = c.programs[0];
   const rnd = api.computeRnDToLaunch(p);
   const ramp = api.LAUNCH_CURVE_EXACT[5].median.map(x => x / 100);
-  const expectPS = { bear: 14.4365, base: 29.0686, bull: 45.9757 };
+  const expectPS = { bear: 14.4113, base: 29.0502, bull: 45.9621 };
   for (const [key, share, posMult, addPct] of [["bear", 70, 75, 3], ["base", 100, 100, 0], ["bull", 130, 120, -1]]) {
     const r = (12 + addPct) / 100, N = 25, L = 1;
     const eff = api.computeEffectivePoS(p, { posMultiplierPct: posMult });
@@ -4598,7 +4598,7 @@ section("Portfolio runway: unknown, runs out, or never runs out");
   const noCash = JSON.parse(JSON.stringify(pepgen)); noCash.capitalStructure.cash = "";
   const [st, pg, nc] = api.computePortfolioSummary([stoke, pepgen, noCash]);
   ok("Stoke: cash never runs out in the projection", st.runwayOutlasts === true && st.runwayYears == null);
-  ok("PepGen: runs out after ~1.5 years (1.72-year Phase 2 at $43.5M a year plus $26M G&A, then Phase 3)", pg.runwayOutlasts === false && Math.abs(pg.runwayYears - 1.534) < 0.01);
+  ok("PepGen: runs out after ~1.5 years (1.72-year Phase 2 at $43.5M a year plus $26M G&A, then Phase 3)", pg.runwayOutlasts === false && Math.abs(pg.runwayYears - 1.664) < 0.01);
   ok("no cash entered: unknown, not zero", nc.runwayYears == null && nc.runwayOutlasts === false);
 }
 report();
@@ -4666,7 +4666,7 @@ section("PepGen, the whole case recomputed from its inputs (Bear, Base, Bull)");
   const rnd = api.computeRnDToLaunch(p);
   const ramp = [11, 31, 58, 76, 89, 100].map(x => x / 100);
   near("the six-year median launch curve is the one typed here", 0, ramp.reduce((s, v, i) => s + Math.abs(v - api.launchCurveForYears(6, "median")[i] / 100), 0), 1e-12);
-  const expectPS = { bear: 0.2475, base: 1.3767, bull: 3.5842 };
+  const expectPS = { bear: 0.3210, base: 1.4429, bull: 3.6444 };
   for (const [key, share, posMult, addPct] of [["bear", 60, 60, 3], ["base", 100, 100, 0], ["bull", 140, 150, -1]]) {
     const r = (14 + addPct) / 100, N = 25, L = 5;
     const eff = api.computeEffectivePoS(p, { posMultiplierPct: posMult });

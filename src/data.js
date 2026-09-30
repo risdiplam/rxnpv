@@ -235,8 +235,28 @@ const TRIAL_COST_BY_AREA = {
     "Pain/Anesthesiology": { phase1: 43.8, phase2: 170.0, phase3: 206.6 },
     "Respiratory":       { phase1: 144.4, phase2: 164.9, phase3: 53.8 }
   },
-  typicalAssetTotalM: { phase1: 4, phase2: 13, phase3: 40 }, // 1 Ph1 trial, 1 Ph2 trial, 2 Ph3 trials
+  // Trial-only direct costs (1 Ph1, 1 Ph2, 2 Ph3 trials). Kept for reference;
+  // NOT used as the R&D default any more — see PHASE_COST_BENCHMARKS.
+  typicalAssetTotalM: { phase1: 4, phase2: 13, phase3: 40 },
   phase3OrphanVsNonOrphanMedianK: { nonOrphan: 54, orphan: 157 }
+};
+
+// ── R&D cost to take a compound through each phase — the model's default ──
+// DiMasi, Grabowski & Hansen (2016), "Innovation in the pharmaceutical
+// industry: New estimates of R&D costs", J. Health Economics 47:20–33: median
+// out-of-pocket clinical cost per compound entering each phase, $17.3M /
+// $44.8M / $200.0M in 2013 dollars, adjusted ×1.2 to 2023 dollars as in the
+// Analysis Group practitioner guide (Chandra & Mazumdar, J. Investment
+// Management 2024, Table 3). The previous default was the trial-only
+// "typical asset" figure above, 4–6× lower: it leaves out manufacturing
+// scale-up, staff, extension studies and nonclinical work that a company's
+// R&D line carries, so a case left on the default was valued as if the drug
+// cost a fraction of what it does (PepGen: $1.38 → $2.16). DiMasi's sample is
+// weighted to large-pharma programmes; rare-disease trials are often smaller,
+// which is why a company's own reported R&D is the better input where known.
+const PHASE_COST_BENCHMARKS = {
+  source: "DiMasi et al. (2016), J Health Econ 47:20–33 — median out-of-pocket cost per compound entering each phase, 2013 $ ×1.2 to 2023 $ (Chandra & Mazumdar 2024)",
+  phase1: 20.8, phase2: 53.8, phase3: 240.0
 };
 
 // ── Regulatory ──
