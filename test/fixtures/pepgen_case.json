@@ -65,7 +65,8 @@
      "includeExUS": true,
      "exUSPriceFactorPct": "50",
      "exUSAnnualGrowthPct": "0",
-     "exUSPatientMultiplierPct": "180"
+     "exUSPatientMultiplierPct": "180",
+     "exUSLaunchLagYears": "1.5"
     },
     "exclusivity": {
      "yearsToLOE": "10",
@@ -292,19 +293,21 @@
   "war": "1101110",
   "warK": "0",
   "convFace": "0",
-  "convPrice": "0"
+  "convPrice": "0",
+  "cashAsOf": "2026-06-30",
+  "monthlyBurn": "5700000"
  },
  "scenarioOverrides": {
   "bear": {
    "shareMultiplierPct": "60",
    "posMultiplierPct": "60",
-   "discountRateAddPct": "3",
+   "discountRateAddPct": "0",
    "exitMultiple": "3"
   },
   "bull": {
    "shareMultiplierPct": "140",
    "posMultiplierPct": "150",
-   "discountRateAddPct": "-1",
+   "discountRateAddPct": "0",
    "exitMultiple": "5"
   }
  },
@@ -331,5 +334,6 @@
  },
  "outcomeTree": {
   "resubmitFixPct": "47"
- }
+ },
+ "valuationDate": "2026-09-30"
 }

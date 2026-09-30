@@ -186,6 +186,32 @@
    "value": "0"
   },
   {
+   "set": "Cash as of (balance-sheet date)",
+   "paste": true,
+   "value": "2026-06-30"
+  },
+  {
+   "expect": "capitalStructure.cashAsOf",
+   "value": "2026-06-30"
+  },
+  {
+   "set": "Monthly burn since then ($M)",
+   "value": "5.7"
+  },
+  {
+   "expect": "capitalStructure.monthlyBurn",
+   "value": "5700000"
+  },
+  {
+   "set": "Value as of (blank = today)",
+   "paste": true,
+   "value": "2026-09-30"
+  },
+  {
+   "expect": "valuationDate",
+   "value": "2026-09-30"
+  },
+  {
    "set": "Options outstanding",
    "value": "8139082"
   },
@@ -584,6 +610,14 @@
    "value": "180"
   },
   {
+   "set": "Ex-US launch after the US (yrs)",
+   "value": "1.5"
+  },
+  {
+   "expect": "programs.0.revenueBuild.pricing.exUSLaunchLagYears",
+   "value": "1.5"
+  },
+  {
    "set": "Years from launch to LOE (yrs)",
    "value": "10"
   },
@@ -830,12 +864,12 @@
   },
   {
    "set": "Discount rate adjustment (pp)",
-   "value": "3",
+   "value": "0",
    "nth": 0
   },
   {
    "expect": "scenarioOverrides.bear.discountRateAddPct",
-   "value": "3"
+   "value": "0"
   },
   {
    "set": "Exit multiple override (x)",
@@ -866,12 +900,12 @@
   },
   {
    "set": "Discount rate adjustment (pp)",
-   "value": "-1",
+   "value": "0",
    "nth": 1
   },
   {
    "expect": "scenarioOverrides.bull.discountRateAddPct",
-   "value": "-1"
+   "value": "0"
   },
   {
    "set": "Exit multiple override (x)",
@@ -1023,9 +1057,9 @@
     "label": "PoS to launch: 15% (benchmark 38%)",
     "classification": "inference",
     "confidence": "moderate",
-    "source": "Judgment; app benchmark (Neurology Phase 2, rare + selection biomarker, Thomas 2016 overlap rule); price-implied ~24%",
+    "source": "Judgment; app benchmark (Neurology Phase 2, rare + selection biomarker, Thomas 2016 overlap rule); price-implied ~25%",
     "date": "2026-09-30",
-    "thesis": "The benchmark for a rare, genetically selected Phase 2 neurology program is 37.8%. Cut to 15% for three program-specific reasons: the only multi-dose data so far show splicing no better than placebo; HARBOR has just failed on vHOT; and FREEDOM2 carries a partial US clinical hold. The price implies about 24%, so the market is less pessimistic than this case. The November 10 mg/kg data are the next test of it."
+    "thesis": "The benchmark for a rare, genetically selected Phase 2 neurology program is 37.8%. Cut to 15% for three program-specific reasons: the only multi-dose data so far show splicing no better than placebo; HARBOR has just failed on vHOT; and FREEDOM2 carries a partial US clinical hold. The price implies about 25%, so the market is less pessimistic than this case. The November 10 mg/kg data are the next test of it."
    }
   },
   {
@@ -1055,7 +1089,7 @@
     "confidence": "low",
     "source": "PepGen 10-K FY2025; the app's Table 4-2 list-price factor",
     "date": "2026-09-30",
-    "thesis": "Europe and Japan together have about 90,000 patients to the US's 40,000 (225%), cut to 180% for slower reimbursement and access. Priced at 50% of the US list price — the app's convention compares list prices and does not model ex-US gross-to-net."
+    "thesis": "Europe and Japan together have about 90,000 patients to the US's 40,000 (225%), cut to 180% for slower reimbursement and access. Priced at 50% of the US list price — the app's convention compares list prices and does not model ex-US gross-to-net. Ex-US sales start 1.5 years after the US launch, the app's benchmark: EMA approval follows FDA's by about six months and EU access takes a further year or more."
    }
   },
   {
@@ -1085,7 +1119,7 @@
     "confidence": "high",
     "source": "Q2 2026 10-Q (filed 2026-08-06)",
     "date": "2026-09-30",
-    "thesis": "$117.2M of cash, equivalents and marketable securities at June 30, 2026; no debt. 69,259,517 shares outstanding at August 2, 2026. Options 8,139,082 at a $4.89 weighted strike — all out of the money at $2.34, so they add nothing by the treasury method. 1,101,110 unvested RSUs, entered as zero-strike warrants. Federal NOLs $177.3M. The company guides cash into Q4 2027."
+    "thesis": "$117.2M of cash, equivalents and marketable securities at June 30, 2026; no debt. 69,259,517 shares outstanding at August 2, 2026. Options 8,139,082 at a $4.89 weighted strike — all out of the money at $2.34, so they add nothing by the treasury method. 1,101,110 unvested RSUs, entered as zero-strike warrants. Federal NOLs $177.3M. The company guides cash into Q4 2027. The cash is dated June 30 and carried forward to the valuation date at the $5.7M monthly burn (~$17M by September 30, leaving ~$100M), so the months since the filing are not charged twice."
    }
   },
   {
@@ -1105,7 +1139,7 @@
     "confidence": "moderate",
     "source": "Judgment; runway guidance into Q4 2027",
     "date": "2026-09-30",
-    "thesis": "Cash runs out before a registrational trial could even start, so a raise is certain: $100M at $1.99 (15% below $2.34) is modelled as the next financing (50M shares). The dilution-path inputs are filled but switched off: that tool prices every projected raise at today's price, so for a company whose launch is five years away it issued about 225M shares and took Base to $0.25 — raises made after positive data would be priced far higher."
+    "thesis": "Cash runs out before a registrational trial could even start, so a raise is certain: $100M at $1.99 (15% below $2.34) is modelled as the next financing (50.3M shares). Without it Base is ~$1.22, lower than with it — the raise is priced above this case's own fair value, so new investors pay more per share than the case thinks a share is worth. The dilution-path inputs are filled but switched off. Switched on, it projects ~$379M of raises over the years to launch, each counted with the odds the company is still going when it would happen (~$312M expected) and bringing its cash with its shares; at today's price less 15% they end with ~278M shares and Base ~$1.80, and priced at the case's own value they leave Base unchanged. Raises after positive data would be priced far higher than today's."
    }
   },
   {
@@ -1125,7 +1159,7 @@
     "confidence": "moderate",
     "source": "This case, 2026-09-30",
     "date": "2026-09-30",
-    "thesis": "At $2.34: Base fair value ~$1.38 (about 41% below the price), Bear ~$0.25, Bull ~$3.58, after the modelled $100M raise; peak revenue ~$1.26B in Base ($648M US). The price implies ~24% odds of launch against this case's 15%. If PGN-EDODM1 is approved it is worth ~$9.83 a share on Base inputs. The failure floor reads $0 because the model charges the whole benchmark-proportioned Phase 2 cost (~$75M) as still to come, although FREEDOM2 is mostly paid for — a real ~$60M would likely remain after a Phase 2 failure (~$0.85 a share). Corporate G&A is charged at the full rate in every year, including after a failure, which a company that failed would not pay; weighting it by survival would add roughly $0.70 a share."
+    "thesis": "At $2.34: Base fair value ~$1.54 (about 34% below the price), Bear ~$0.75, Bull ~$2.98, after the modelled $100M raise; peak revenue ~$1.26B in Base ($648M US). The price implies ~25% odds of launch against this case's 15%. If PGN-EDODM1 is approved it is worth ~$8.22 a share on Base inputs. The failure floor reads $0: from the ~$100M left today the model charges the whole benchmark-proportioned Phase 2 cost (~$58M) as still to come, plus G&A to the readout and a year of wind-down, although FREEDOM2 is mostly paid for — roughly $20M (~$0.30 a share) would more likely remain after a Phase 2 failure. Loss of exclusivity: a small-molecule cliff gives ~$1.37, a biologic-style decline ~$1.79."
    }
   },
   {
@@ -1139,7 +1173,7 @@
     "catalystLabel": "FREEDOM2 10 mg/kg data, through to approval (PoS to launch)",
     "catalystDate": "2026-11",
     "yourPoS": 15,
-    "marketImpliedPoS": 24,
+    "marketImpliedPoS": 25,
     "outcome": "pending",
     "notes": "Both figures are the probability of reaching launch. Market-implied is this case's own reverse-solve at $2.34 on 2026-09-30. The November data are the first multi-dose look at 10 mg/kg; a positive read should move both figures up."
    }

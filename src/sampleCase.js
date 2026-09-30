@@ -71,7 +71,7 @@ function sampleCaseStoke() {
       adherencePct: "85",
       marketShare: { numDrugs: 2, orderOfEntry: 1, peakShareOverridePct: "60" },
       launchCurve: { yearsToPeak: 5, profile: "median" },
-      pricing: { usAnnualPrice: "375000", priceBasis: "WAC", netPriceRealizationPct: "80", usAnnualGrowthPct: "3", includeExUS: true, exUSPriceFactorPct: "50", exUSAnnualGrowthPct: "0", exUSPatientMultiplierPct: "140" },
+      pricing: { usAnnualPrice: "375000", priceBasis: "WAC", netPriceRealizationPct: "80", usAnnualGrowthPct: "3", includeExUS: true, exUSPriceFactorPct: "50", exUSAnnualGrowthPct: "0", exUSPatientMultiplierPct: "140", exUSLaunchLagYears: "1.5" },
       exclusivity: { yearsToLOE: "12", modality: "smallMolecule", volumeRetainedPct: "45", priceDeclinePct: "35" }
     },
     costStructure: { cogsPct: "10", reps: { primaryCare: "0", specialty: "50", hospital: "0" }, marketingPctOfPeak: "3" },
@@ -105,13 +105,13 @@ function sampleCaseStoke() {
       ev("EMPEROR Phase 3 design and timing", "fact", "high", "Q2 2026 10-Q; enrollment press release 2026-06-30; ClinicalTrials.gov NCT06872125",
         "Randomised 1:1, quadruple-blind, sham-controlled; 162 patients enrolled in the US, UK and Japan in 10 months — the population for the US NDA, so ~81 per arm. About 30 more were enrolling in Europe (sham by needle prick, due to complete Aug 2026) and screening is under way in China; neither group is planned for the US filing. ClinicalTrials.gov's 170 is an estimate. 70 mg x2 loading then 45 mg maintenance over 52 weeks. Primary endpoint: % change in major motor seizure frequency at week 28; secondaries at week 52 (seizures, Vineland-3 composite and subdomains). As of Jul 31, 2026 ~60 patients were past week 28 and none had discontinued. Pre-NDA meeting 2H 2026, rolling NDA from Q1 2027, readout Q3 2027, NDA complete 2H 2027, US launch targeted early 2028."),
       ev("PoS to launch: 65%", "inference", "moderate", "Judgment; Goldman Sachs uses 75%",
-        "The app's benchmark with both program attributes applied stacks to ~97%, and the app itself warns that multiplying the two overstates the odds — so an explicit override is the honest input here. Above the plain Neurology Phase 3 benchmark because the effect in open-label data is large, the endpoint (seizure frequency vs sham) is one approved Dravet drugs have met, and patients are genetically selected. Held below Goldman's 75% because open-label seizure data overstate controlled effects (placebo arms in Dravet trials responded 5–27%), soticlestat shows a Dravet Phase 3 can miss, and intrathecal CSF-protein findings need a clean safety read."),
+        "The app's benchmark with both program attributes applied is ~76% (rare disease and a selection biomarker overlap, so the stronger lift at each phase is used rather than both), about Goldman's 75%. An explicit override is used because this case's judgment is more specific than the attribute lift. Above the plain Neurology Phase 3 benchmark because the effect in open-label data is large, the endpoint (seizure frequency vs sham) is one approved Dravet drugs have met, and patients are genetically selected. Held below Goldman's 75% because open-label seizure data overstate controlled effects (placebo arms in Dravet trials responded 5–27%), soticlestat shows a Dravet Phase 3 can miss, and intrathecal CSF-protein findings need a clean safety read."),
       ev("Remaining R&D: $200M over 1.4 yrs, Biogen pays 30%", "inference", "moderate", "Q2 2026 10-Q (R&D $49.5M in Q2, $89.2M in H1); Biogen agreement",
         "R&D ran $89.2M in H1 2026 across all programs and rose to $49.5M in Q2; most is zorevunersen. ~$140M a year of it for the ~1.4 years to launch ≈ $200M. Biogen funds 30% of external clinical costs; applying it to the whole figure slightly overstates the sharing."),
       ev("Corporate G&A: $95M a year, 1 year of it if the program fails", "inference", "moderate", "Q2 2026 10-Q (SG&A $25.3M in Q2, $45.2M in H1)",
         "SG&A rose to $25.3M in Q2 as launch preparation began, ~$100M a year at that rate; $95M is used before launch. Wind-down is set to one year explicitly: after a failed readout a company with a second program (STK-002) cuts back rather than closes, and one year of G&A before any restructuring is the conservative reading."),
       ev("Biogen deal: ex-North America", "fact", "high", "Biogen / Stoke press release (Feb 2025); Q2 2026 10-Q",
-        "$165M upfront (received, already in cash — so not entered again here), up to $385M in development and commercial milestones, tiered royalties from low double digits to high teens. Stoke keeps the US, Canada and Mexico. As of Jun 30, 2026 no milestone had been achieved. Modelled at a 15% royalty on ex-US sales and $100M of milestones paid on approval (the model's launch gate, so they carry the approval odds and timing); the split of the $385M is not disclosed, so that entry is an assumption."),
+        "$165M upfront (received, already in cash — so not entered again here), up to $385M in development and commercial milestones, tiered royalties from low double digits to high teens. Stoke keeps the US, Canada and Mexico. As of Jun 30, 2026 no milestone had been achieved. Modelled at a 15% royalty on ex-US sales, which start 1.5 years after the US launch (the app's benchmark lag: EMA approval follows FDA's, then country-by-country access), and $100M of milestones paid on approval (the model's launch gate, so they carry the approval odds and timing); the split of the $385M is not disclosed, so that entry is an assumption."),
       ev("Exclusivity: ~12 years from launch", "inference", "moderate", "10-K FY2025, Intellectual property",
         "Licensed mechanism patents run to 2035–36; Stoke's own zorevunersen patents run 2038–2046 before extensions, and orphan exclusivity adds 7 years from approval. LOE around 2040 is a middle reading. Erosion is set halfway between the app's two benchmarks — 45% of volume kept and a 35% price decline, so ~29% of revenue survives — because no oligonucleotide has yet faced generic competition, so neither the small-molecule cliff (90% of volume gone in a year) nor the biologic curve (80% kept) has a precedent. Spinraza still has no generic about a decade after approval, though its sales have fallen from a $2.1B peak in 2019 as one-time and oral competitors arrived (the Exclusivity example on the Saved tab looks up its patents)."),
       ev("Terminal value off (multiples filled for reference)", "inference", "high", "Judgment; this case's own cash-flow window",
@@ -121,7 +121,7 @@ function sampleCaseStoke() {
       ev("Launch timing: year 1", "inference", "moderate", "Company guidance (Q2 2026 10-Q): US launch early 2028",
         "Early 2028 is ~1.4 years from this snapshot. The model counts whole years from today and discounts each year's cash at its end, so year 1 places the first year of sales at ~Sep 2028 — close to the real first sales year of roughly Feb 2028 to Feb 2029. Typing 1.5 would be rounded to 2: every revenue year moves back a full year, and fair value falls about $3.50 for a timing error, not a judgment."),
       ev("Bear and Bull: what each one assumes", "inference", "moderate", "Judgment; Goldman Sachs PoS 75% (Sep 2026)",
-        "Bull: EMPEROR reads out cleanly and Encoded's ETX101 arrives late or is used after zorevunersen, so peak share is 130% of Base (78% of treated patients), the odds of launch are 120% of Base (78%, just above Goldman's 75%), and the discount rate is a point lower. Bear: share 70% of Base, odds 75% of Base (49%), discount rate 3 points higher. Both are still probability-weighted — Bull keeps a 22% chance of failure in it."),
+        "Bull: EMPEROR reads out cleanly and Encoded's ETX101 arrives late or is used after zorevunersen, so peak share is 130% of Base (78% of treated patients) and the odds of launch are 120% of Base (78%, just above Goldman's 75%). Bear: share 70% of Base, odds 75% of Base (49%). The discount rate stays at 12% in both: it is the cost of capital, and the odds already carry the risk of failure — raising the rate in Bear as well would count that risk twice. Both are still probability-weighted — Bull keeps a 22% chance of failure in it."),
       ev("Before the readout: 60% of wins clear, 40% modest", "inference", "moderate", "ClinicalTrials.gov results for the five Dravet Phase 3s that met their primary endpoint",
         "Three of the five were clear wins (fenfluramine, 54–65% placebo-adjusted reductions) and two modest (cannabidiol, 23–26 points), so 60% of wins are counted as clear. A clear win is set at 115% of Base share and 94% odds of approval; a modest one at 75% of share and 91% — the odds this case already has once the readout is positive (65% ÷ 72%, the approval rate after a positive Phase 3 that the benchmark implies)."),
       ev("FDA rejection fixed a year later: 47%", "fact", "moderate", "Sacks et al., JAMA 2014;311(4):378–384 (new molecular entities 2000–2012)",
@@ -129,7 +129,7 @@ function sampleCaseStoke() {
       ev("Priority review voucher: $190M", "fact", "moderate", "10-K FY2025; 2026 voucher sales (Jazz $200M, Cyprium/Fortress $205M, Rocket $180M)",
         "Rare Pediatric Disease designation (Oct 2022) makes an approval before the program's Sept 30, 2029 sunset eligible for a voucher. Recent sales cluster at $180–205M."),
       ev("Balance sheet", "fact", "high", "Q2 2026 10-Q (filed 2026-08-03)",
-        "$354.3M cash and securities at June 30, 2026, plus $65.7M from ~2.1M ATM shares sold after quarter end = $420.0M, and no debt or convertible notes (entered as 0). Company guides cash to fund operations to the early-2028 launch. Shares: 64,526,242 outstanding (July 30) plus 3,703,730 pre-funded warrants at $0.0001, counted as shares, as Stoke does. Options: 11,532,638 outstanding at June 30, 2026 (the 10-Q's anti-dilutive table), at a $13.84 weighted strike — the latest disclosed, for the 10,151,430 outstanding at Dec 2025 (10-K); the 1.87M granted in 2026 were priced higher, so the true strike is somewhat above it. RSUs + PSUs: 2,157,698, entered as zero-strike warrants. The simple-mode share count (81.9M) is all of these added together, for anyone switching modes."),
+        "$354.3M cash and securities at June 30, 2026, plus $65.7M from ~2.1M ATM shares sold after quarter end = $420.0M, and no debt or convertible notes (entered as 0). The cash is dated June 30 and carried forward to the valuation date at the $19.5M monthly burn (~$58M by September 28), so the months since the filing are not charged twice. Company guides cash to fund operations to the early-2028 launch. Shares: 64,526,242 outstanding (July 30) plus 3,703,730 pre-funded warrants at $0.0001, counted as shares, as Stoke does. Options: 11,532,638 outstanding at June 30, 2026 (the 10-Q's anti-dilutive table), at a $13.84 weighted strike — the latest disclosed, for the 10,151,430 outstanding at Dec 2025 (10-K); the 1.87M granted in 2026 were priced higher, so the true strike is somewhat above it. RSUs + PSUs: 2,157,698, entered as zero-strike warrants. The simple-mode share count (81.9M) is all of these added together, for anyone switching modes."),
       ev("Cash burn: $19.5M a month", "fact", "high", "Q2 2026 10-Q, statement of cash flows",
         "Cash used in operations was $117.2M in H1 2026, $19.5M a month, and rising: Q2's net loss was $61.6M against $50.0M in Q1. $420M at that rate lasts about 21½ months — to around April–May 2028, consistent with the company's 'to launch in early 2028'. The Cash Runway example uses these figures."),
       ev("The new $200M ATM, modelled as a future raise", "inference", "moderate", "424B5 and 8-K, 2026-08-03 (up to $200M through Cantor, up to 3% commission)",
@@ -137,9 +137,9 @@ function sampleCaseStoke() {
       ev("Dilution path: on, with no share creep", "inference", "moderate", "Q1 and Q2 2026 10-Qs (stock-based compensation $19.6M in H1; 1.87M options and 0.80M RSUs granted)",
         "Switched on to check whether any scenario needs another raise after the ATM: with $100M kept as a minimum, 18 months raised at a time and a 10% discount, none does — the model turns cash-positive in the second sales year. Share creep is set to 0% deliberately: stock compensation (~$40M a year) is already inside the reported R&D and SG&A that the cost inputs are built from, so adding yearly share creep on top would count it twice."),
       ev("Napkin mode check", "inference", "high", "This case, Full vs Napkin",
-        "Napkin (Quick) mode has no US/ex-US split, so it treats a partnership as covering all revenue — with Biogen's 15% royalty left on, the Napkin figure is badly understated. With Partnership Economics switched off, Napkin on this case's own peaks ($1.31B Base: US sales plus the ex-US royalty) gives about $30.5 against the Full model's $29.07 — close, and the gap is the Full build's cost detail. Compare the two modes that way."),
+        "Napkin (Quick) mode has no US/ex-US split, so it treats a partnership as covering all revenue — with Biogen's 15% royalty left on, the Napkin figure is badly understated. With Partnership Economics switched off, Napkin on this case's own peaks ($1.31B Base: US sales plus the ex-US royalty) gives about $30.0 against the Full model's $28.07 — close, and the gap is the Full build's cost detail and its ex-US royalty starting 1.5 years after the US launch, which one Quick curve cannot show. Compare the two modes that way."),
       ev("What the model says (snapshot)", "inference", "moderate", "This case, 2026-09-28",
-        "At $24.80: Base fair value ~$29.07 (about 17% above the price), Bear ~$14.44, Bull ~$45.98; peak revenue ~$1.31B in Base (US sales plus the ex-US royalty). The price implies ~54% odds of reaching launch against this case's 65%, so this case is somewhat more confident than the market. If approved, with no failure weighting, a share is worth ~$42.92 on Base inputs; if EMPEROR fails, ~$1.40 is left (cash less the costs already committed, before any raise). The judgment that moves it most after peak share and PoS is what happens at loss of exclusivity: a small-molecule generic cliff gives ~$25.97, a biologic-style decline ~$32.81, and this case sits between them. The full $200M ATM costs ~$0.53 a share (Base $29.60 without it); switching terminal value on would add ~$6.85, which is why it stays off."),
+        "At $24.80: Base fair value ~$28.07 (about 13% above the price), Bear ~$16.57, Bull ~$41.18; peak revenue ~$1.31B in Base (US sales plus the ex-US royalty). The price implies ~56% odds of reaching launch against this case's 65%, so this case is somewhat more confident than the market. If approved, with no failure weighting, a share is worth ~$41.32 on Base inputs; if EMPEROR fails, ~$0.48 is left (cash carried to today, less the Phase 3 still to pay, G&A to the readout and a year of wind-down, before any raise). The judgment that moves it most after peak share and PoS is what happens at loss of exclusivity: a small-molecule generic cliff gives ~$25.18, a biologic-style decline ~$31.46, and this case sits between them. The full $200M ATM costs ~$0.43 a share (Base $28.50 without it); switching terminal value on would add ~$6.50, which is why it stays off."),
       ev("Share price $24.80", "fact", "high", "Close on 2026-09-25 (stockanalysis.com)",
         "Down from $29.20 on Sep 22; the week included a board change (former CEO Edward Kaye resigned as a director, Bo Cumbo appointed; 8-K 2026-09-25). No clinical news. Update the price before relying on the upside figure."),
       ev("Worked examples: what is and is not included", "inference", "high", "This case's Saved tab",
@@ -147,7 +147,7 @@ function sampleCaseStoke() {
     ],
     calibrationLog: [
       { id: newId("cal"), catalystLabel: "EMPEROR Phase 3 topline, through to approval (PoS to launch)", catalystDate: "2027-Q3",
-        yourPoS: 65, marketImpliedPoS: 54, outcome: "pending",
+        yourPoS: 65, marketImpliedPoS: 56, outcome: "pending",
         notes: "Both figures are the probability of reaching launch. Market-implied is this case's own reverse-solve at $24.80 on 2026-09-28 (Overview → What the price implies). Score it as success on approval, failure on a failed readout or a rejection." }
     ]
   });
@@ -248,6 +248,7 @@ function sampleCaseStoke() {
   return Object.assign(base, {
     name: "Stoke Therapeutics — sample case",
     ticker: "STOK",
+    valuationDate: SAMPLE_CASE_AS_OF,
     currentPrice: "24.80",
     discountRatePct: "12",
     valuationMethod: "dcf",
@@ -258,6 +259,11 @@ function sampleCaseStoke() {
       mode: "detailed", dilutedSharesSimple: String(64526242 + 3703730 + 11532638 + 2157698),
       basicShares: String(64526242 + 3703730),
       cash: String(420.0e6), debt: "0",
+      // Cash dated at the quarter end and carried forward to valuationDate at
+      // the H1 burn, so the months since the filing are not paid for twice.
+      // The $420.0M includes July's $65.7M of ATM sales, cash that arrived
+      // after the quarter end; only the burn is carried forward.
+      cashAsOf: "2026-06-30", monthlyBurn: String(19.5e6),
       opts: "11532638", optK: "13.84",
       war: "2157698", warK: "0",
       convFace: "0", convPrice: "0"
@@ -269,8 +275,8 @@ function sampleCaseStoke() {
     basePosAdjustmentPct: "100",
     multipleAssumptions: { bear: "3", base: "4", bull: "5" },
     scenarioOverrides: {
-      bear: { shareMultiplierPct: "70", posMultiplierPct: "75", discountRateAddPct: "3", exitMultiple: "3" },
-      bull: { shareMultiplierPct: "130", posMultiplierPct: "120", discountRateAddPct: "-1", exitMultiple: "5" }
+      bear: { shareMultiplierPct: "70", posMultiplierPct: "75", discountRateAddPct: "0", exitMultiple: "3" },
+      bull: { shareMultiplierPct: "130", posMultiplierPct: "120", discountRateAddPct: "0", exitMultiple: "5" }
     },
     readoutScenarios: { clearOfWinsPct: "60", clearPosPct: "94", clearSharePct: "115", modestPosPct: "91", modestSharePct: "75" },
     outcomeTree: { resubmitFixPct: "47" },
@@ -330,7 +336,7 @@ function sampleCasePepGen() {
       adherencePct: "85",
       marketShare: { numDrugs: 4, orderOfEntry: 3, peakShareOverridePct: "23" },
       launchCurve: { yearsToPeak: "6", profile: "median" },
-      pricing: { usAnnualPrice: "350000", priceBasis: "WAC", netPriceRealizationPct: "80", usAnnualGrowthPct: "2", includeExUS: true, exUSPriceFactorPct: "50", exUSAnnualGrowthPct: "0", exUSPatientMultiplierPct: "180" },
+      pricing: { usAnnualPrice: "350000", priceBasis: "WAC", netPriceRealizationPct: "80", usAnnualGrowthPct: "2", includeExUS: true, exUSPriceFactorPct: "50", exUSAnnualGrowthPct: "0", exUSPatientMultiplierPct: "180", exUSLaunchLagYears: "1.5" },
       exclusivity: { yearsToLOE: "10", modality: "smallMolecule", volumeRetainedPct: "45", priceDeclinePct: "35" }
     },
     costStructure: { cogsPct: "12", reps: { primaryCare: "0", specialty: "60", hospital: "0" }, marketingPctOfPeak: "3" },
@@ -351,30 +357,30 @@ function sampleCasePepGen() {
         "Novartis's del-desiran (acquired with Avidity) missed its primary endpoint, video hand-opening time, in a ~150-patient Phase 3 in DM1, with activity claimed on secondary and exploratory measures. It is the first registrational read-out in DM1, and on the very functional measure PepGen cites from FREEDOM2 — a read-through on endpoint choice and on how much splicing correction translates into function."),
       ev("Competition: third of about four disease-modifying drugs", "inference", "moderate", "Dyne Q2 2026 results (BLA for accelerated approval Q3 2027, launch 1H 2028); ClinicalTrials.gov NCT05481879, NCT06185764, NCT06138743",
         "Dyne's z-basivarsen (DYNE-101) has Breakthrough designation, a 71-patient registrational expansion cohort reading out Q1 2027 and a confirmatory Phase 3 dosing since July 2026 — about three years ahead of PepGen. Del-desiran's path is uncertain after HARBOR. Vertex's VX-670 and Sarepta's SRP-1003 (ARO-DM1) are in Phase 1/2. PepGen launching around 2031 would be third of about four: the model's order-of-entry benchmark gives 23%, typed explicitly."),
-      ev("PoS to launch: 15% (benchmark 38%)", "inference", "moderate", "Judgment; app benchmark (Neurology Phase 2, rare + selection biomarker, Thomas 2016 overlap rule); price-implied ~24%",
-        "The benchmark for a rare, genetically selected Phase 2 neurology program is 37.8%. Cut to 15% for three program-specific reasons: the only multi-dose data so far show splicing no better than placebo; HARBOR has just failed on vHOT; and FREEDOM2 carries a partial US clinical hold. The price implies about 24%, so the market is less pessimistic than this case. The November 10 mg/kg data are the next test of it."),
+      ev("PoS to launch: 15% (benchmark 38%)", "inference", "moderate", "Judgment; app benchmark (Neurology Phase 2, rare + selection biomarker, Thomas 2016 overlap rule); price-implied ~25%",
+        "The benchmark for a rare, genetically selected Phase 2 neurology program is 37.8%. Cut to 15% for three program-specific reasons: the only multi-dose data so far show splicing no better than placebo; HARBOR has just failed on vHOT; and FREEDOM2 carries a partial US clinical hold. The price implies about 25%, so the market is less pessimistic than this case. The November 10 mg/kg data are the next test of it."),
       ev("US prevalence 40,000; 9,900 treatable adults", "inference", "moderate", "PepGen 10-K FY2025 (1 in 8,000; ~40,000 US, 75,000 Europe, 15,000 Japan); Johnson et al., Neurology 2021 (1 in 2,100 genetic carriers)",
         "The company's 40,000 is a clinical-prevalence figure; genetic screening suggests many more carriers, about half symptomatic. Diagnosed 60% (DM1 is under-diagnosed; symptoms can start after 50), treated 55% (a monthly IV infusion), eligible 75% (adult, non-congenital — FREEDOM2 enrols adults): 40,000 × 60% × 55% × 75% ≈ 9,900. The least certain part of the build after peak share."),
       ev("Price: $350K a year WAC, 80% realised", "inference", "low", "Judgment; no approved DM1 disease-modifier; Spinraza maintenance WAC ~$375–400K; Sarepta's exon-skipping PMOs weight-based, ~$300K+ for adults",
         "Weight-based IV dosing every four weeks, like the PMO class it belongs to. No DM1 drug has a disclosed price, so this rests on analogs, and Dyne's launch in 2028 will set the real anchor before PepGen's. Entered as WAC with 80% realised (Medicaid and commercial rebates for an adult specialty drug)."),
       ev("Ex-US: 180% of US patients at 50% of list", "inference", "low", "PepGen 10-K FY2025; the app's Table 4-2 list-price factor",
-        "Europe and Japan together have about 90,000 patients to the US's 40,000 (225%), cut to 180% for slower reimbursement and access. Priced at 50% of the US list price — the app's convention compares list prices and does not model ex-US gross-to-net."),
+        "Europe and Japan together have about 90,000 patients to the US's 40,000 (225%), cut to 180% for slower reimbursement and access. Priced at 50% of the US list price — the app's convention compares list prices and does not model ex-US gross-to-net. Ex-US sales start 1.5 years after the US launch, the app's benchmark: EMA approval follows FDA's by about six months and EU access takes a further year or more."),
       ev("Launch in year 5 (2031); $320M of R&D over 4.5 years", "inference", "moderate", "Q2 2026 10-Q (R&D $12.5M in Q2, cash guidance into Q4 2027); timeline judgment",
         "FREEDOM2 completes in 1H 2027, then an end-of-Phase-2 meeting, a registrational trial around 2028–2030, filing about 2030 and approval about 2031 — year 5. R&D runs ~$50M a year today and would rise to ~$80M a year for a registrational trial plus commercial manufacturing: about $320M in all, entered as an override because the Phase 2 is already mostly paid for."),
       ev("Loss of exclusivity: 10 years from launch", "inference", "moderate", "PepGen 10-K FY2025, Intellectual property and the OUI/MRC licence",
         "The licensed composition-of-matter patent (US 12,465,646) and related applications expire 2039–2042 before extensions; orphan exclusivity gives 7 years from a 2031 approval. About 2041 is a middle reading. Erosion is set halfway between the app's small-molecule and biologic benchmarks (45% of volume kept, 35% price decline), as no oligonucleotide has yet faced generic competition. The licence also carries a low-single-digit royalty above £20–30M of sales, which is folded into the 12% COGS."),
       ev("Balance sheet", "fact", "high", "Q2 2026 10-Q (filed 2026-08-06)",
-        "$117.2M of cash, equivalents and marketable securities at June 30, 2026; no debt. 69,259,517 shares outstanding at August 2, 2026. Options 8,139,082 at a $4.89 weighted strike — all out of the money at $2.34, so they add nothing by the treasury method. 1,101,110 unvested RSUs, entered as zero-strike warrants. Federal NOLs $177.3M. The company guides cash into Q4 2027."),
+        "$117.2M of cash, equivalents and marketable securities at June 30, 2026; no debt. 69,259,517 shares outstanding at August 2, 2026. Options 8,139,082 at a $4.89 weighted strike — all out of the money at $2.34, so they add nothing by the treasury method. 1,101,110 unvested RSUs, entered as zero-strike warrants. Federal NOLs $177.3M. The company guides cash into Q4 2027. The cash is dated June 30 and carried forward to the valuation date at the $5.7M monthly burn (~$17M by September 30, leaving ~$100M), so the months since the filing are not charged twice."),
       ev("Cash burn: $5.7M a month", "fact", "high", "Q2 2026 10-Q, statement of cash flows",
         "Cash used in operations was $34.2M in H1 2026, $5.7M a month; Q2 R&D $12.5M and G&A $6.4M (so G&A runs ~$26M a year). $117.2M at that rate lasts about 20 months, but spending rises with the 12.5 mg/kg cohort and registrational preparation, which is why the company says Q4 2027."),
       ev("A $100M raise at $1.99; the dilution path left off", "inference", "moderate", "Judgment; runway guidance into Q4 2027",
-        "Cash runs out before a registrational trial could even start, so a raise is certain: $100M at $1.99 (15% below $2.34) is modelled as the next financing (50.3M shares). Without it Base is ~$0.94, lower than with it — the raise is priced above this case's own fair value, so new investors pay more per share than the case thinks a share is worth. The dilution-path inputs are filled but switched off: that tool prices every projected raise at a discount to today's price, so for a company five years from launch it raises ~$338M more, ends with ~290M shares and takes Base to ~$0.57 — raises made after positive data would be priced far higher."),
+        "Cash runs out before a registrational trial could even start, so a raise is certain: $100M at $1.99 (15% below $2.34) is modelled as the next financing (50.3M shares). Without it Base is ~$1.22, lower than with it — the raise is priced above this case's own fair value, so new investors pay more per share than the case thinks a share is worth. The dilution-path inputs are filled but switched off. Switched on, it projects ~$379M of raises over the years to launch, each counted with the odds the company is still going when it would happen (~$312M expected) and bringing its cash with its shares; at today's price less 15% they end with ~278M shares and Base ~$1.80, and priced at the case's own value they leave Base unchanged. Raises after positive data would be priced far higher than today's."),
       ev("Share price $2.34", "fact", "high", "Close on 2026-09-29 (stockanalysis.com)",
         "Down 9.7% that day and about 60% year to date, after the March 5 mg/kg data and HARBOR's failure on September 8. At $2.34 the market capitalisation is ~$162M against $117M of cash — an enterprise value of about $45M for the program. Update the price before relying on the upside figure."),
       ev("Incidence alternative: 450 a year for 55 years", "inference", "low", "Johnson et al., Neurology 2021 (genetic prevalence); PepGen 10-K FY2025 (clinical prevalence 1 in 8,000)",
         "Unused while the build is in prevalence mode. ~450 people a year develop symptomatic adult DM1 in the US (onset mostly in the 20s–40s) and live ~55 years with it: 24,750 addressable against the prevalence build's 40,000. Switching the population to incidence mode shows what the case is worth if the company's 40,000 is too high — Base falls to about $0.63."),
       ev("Bear and Bull: what each one assumes", "inference", "moderate", "Judgment",
-        "Bull: the 10 and 12.5 mg/kg cohorts show clear dose-dependent splicing correction and a functional signal, del-desiran's path stays blocked, so peak share is 140% of Base (32%), the odds of launch 150% of Base (22.5% — roughly what the price implies), and the discount rate a point lower. Bear: share 60% of Base, odds 60% (9%), discount rate 3 points higher. Both are still probability-weighted."),
+        "Bull: the 10 and 12.5 mg/kg cohorts show clear dose-dependent splicing correction and a functional signal, del-desiran's path stays blocked, so peak share is 140% of Base (32%) and the odds of launch 150% of Base (22.5% — close to the ~25% the price implies). Bear: share 60% of Base, odds 60% (9%). The discount rate stays at 14% in both: it is the cost of capital, and the odds already carry the risk of failure, so raising it in Bear would count that risk twice. Both are still probability-weighted."),
       ev("Before the 10 mg/kg data: 30% of wins clear, 70% modest", "inference", "low", "Judgment; FREEDOM single-dose and FREEDOM2 5 mg/kg results",
         "A 'win' here is a splicing result clearly above placebo; a clear win also shows a functional trend. With 6 treated and 2 placebo patients per cohort, most positive readouts will be modest, so 30% of wins are counted as clear. Clear win: 64% odds of launch after it and 110% of Base share; modest win: 41% (the odds this case already has after a positive Phase 2) and 70% of share."),
       ev("FDA rejection fixed a year later: 47%", "fact", "moderate", "Sacks et al., JAMA 2014;311(4):378–384 (new molecular entities 2000–2012)",
@@ -384,15 +390,15 @@ function sampleCasePepGen() {
       ev("Terminal value off (multiples filled for reference)", "inference", "high", "Judgment; this case's own cash-flow window",
         "The explicit cash flows run through loss of exclusivity and the decline after it, so a terminal value on top would count value already written down. The exit multiples (3x / 4x / 5x) are filled so switching it on gives a sourced answer: Base would rise to ~$2.16."),
       ev("Napkin mode check", "inference", "high", "This case, Full vs Napkin",
-        "The Napkin peaks are the Full build's own peak revenues ($1.26B Base, $0.75B Bear, $1.76B Bull). Napkin on those gives ~$1.44 against the Full model's $1.38 — close, and the gap is the Full build's cost detail."),
+        "The Napkin peaks are the Full build's own peak revenues ($1.26B Base, $0.75B Bear, $1.76B Bull). Napkin on those gives ~$1.82 against the Full model's $1.54. The gap is the Full build's cost detail and its ex-US sales starting 1.5 years after the US; one Quick curve starts everything on launch day, so it reads higher."),
       ev("Worked examples: what is and is not included", "inference", "high", "This case's Saved tab",
         "Each tool and simulation with real DM1 data behind it has a worked example on the Saved tab. Left out, because there is nothing honest to put in: Launch & Actuals (no DM1 drug is approved, and Sarepta's PMOs, the closest modality, do not appear in Medicare's Part B or Part D spending files — checked 2026-09-30); the Phase 2→3 Translator, Meta-Analysis, Fragility Index, P-value↔CI, Single-Arm CI, 2×2 and Multiplicity (DM1 trials report splicing indices and timed functional tests, not responder counts, and none has posted controlled results); Non-Inferiority (no DM1 trial uses one). The PK/PD example is plasma pharmacokinetics from the approved PMO class, which clears within hours — muscle exposure is what PepGen measures, and the tool does not model tissue."),
       ev("What the model says (snapshot)", "inference", "moderate", "This case, 2026-09-30",
-        "At $2.34: Base fair value ~$1.38 (about 41% below the price), Bear ~$0.25, Bull ~$3.58, after the modelled $100M raise; peak revenue ~$1.26B in Base ($648M US). The price implies ~24% odds of launch against this case's 15%. If PGN-EDODM1 is approved it is worth ~$9.83 a share on Base inputs. The failure floor reads $0: the model charges the whole benchmark-proportioned Phase 2 cost (~$75M) as still to come, although FREEDOM2 is mostly paid for — a real ~$60M would likely remain after a Phase 2 failure (~$0.85 a share). Corporate G&A is charged at the full rate in every year, including after a failure, which a company that failed would not pay; weighting it by survival would add roughly $0.70 a share. Loss of exclusivity: a small-molecule cliff gives ~$1.19, a biologic-style decline ~$1.65.")
+        "At $2.34: Base fair value ~$1.54 (about 34% below the price), Bear ~$0.75, Bull ~$2.98, after the modelled $100M raise; peak revenue ~$1.26B in Base ($648M US). The price implies ~25% odds of launch against this case's 15%. If PGN-EDODM1 is approved it is worth ~$8.22 a share on Base inputs. The failure floor reads $0: from the ~$100M left today the model charges the whole benchmark-proportioned Phase 2 cost (~$58M) as still to come, plus G&A to the readout and a year of wind-down, although FREEDOM2 is mostly paid for — roughly $20M (~$0.30 a share) would more likely remain after a Phase 2 failure. Loss of exclusivity: a small-molecule cliff gives ~$1.37, a biologic-style decline ~$1.79.")
     ],
     calibrationLog: [
       { id: newId("cal"), catalystLabel: "FREEDOM2 10 mg/kg data, through to approval (PoS to launch)", catalystDate: "2026-11",
-        yourPoS: 15, marketImpliedPoS: 24, outcome: "pending",
+        yourPoS: 15, marketImpliedPoS: 25, outcome: "pending",
         notes: "Both figures are the probability of reaching launch. Market-implied is this case's own reverse-solve at $2.34 on 2026-09-30. The November data are the first multi-dose look at 10 mg/kg; a positive read should move both figures up." }
     ]
   });
@@ -428,15 +434,15 @@ function sampleCasePepGen() {
     tool("Catalysts from this case", "calendar", "Company", "Catalyst Calendar", [], "Pull events",
       "Dated events for PepGen's registered trials. The registry's completion dates are estimates; the 10 mg/kg data (November 2026) and the 12.5 mg/kg data (1H 2027) come from company guidance and sit in the Calibration Log."),
     tool("PepGen's cash runway", "runway", "Company", "Cash Runway", [["Cash & investments ($M)", "117.2"], ["Monthly burn ($M)", "5.7"]], null,
-      "$117.2M against $5.7M a month (cash used in operations, H1 2026 ÷ 6): about 20 months, into mid-2028 at today's rate. The company guides into Q4 2027 because spending rises with the 12.5 mg/kg cohort — either way, well short of a registrational trial."),
+      "$117.2M against $5.7M a month (cash used in operations, H1 2026 ÷ 6): about 20 months from June 30, to around March 2028 at that rate. The company guides into Q4 2027 because spending rises with the 12.5 mg/kg cohort — either way, well short of a registrational trial."),
     tool("Does the cash reach the 12.5 mg/kg readout?", "runwayCatalyst", "Company", "Runway vs. Catalyst", [["Cushion required at readout (months)", "6"]], null,
       "Uses this case's own cash, burn and the pending catalyst in its Calibration Log. The November readout is covered with room to spare; the question the case turns on is what the company raises on after it."),
     tool("Exondys 51 — does a PMO face a generic?", "exclusivity", "Commercial", "Exclusivity / LOE", [["Brand name", "Exondys 51"]], "Look up",
       "The first approved PMO (2016): five Orange Book patents, the last to 2034, and still no generic a decade on. Why this case sets erosion between the small-molecule cliff and the biologic curve."),
     tool("What moves this case most", "sensitivity", "Valuation", "Sensitivity", [], null,
-      "Peak share, launch timing and PoS each swing Base by about a dollar a share — against a $1.38 Base, the case is a bet on all three. The grid shows which combinations the $2.34 price assumes."),
+      "Peak share, launch timing, the discount rate and PoS each swing Base by $0.70–0.85 a share — against a $1.54 Base, the case is a bet on all four. The grid shows which combinations the $2.34 price assumes."),
     tool("The 10 mg/kg readout as a binary bet", "binaryEvent", "Valuation", "Binary Event", [], null,
-      "Filled from the case: today's price, the value if PGN-EDODM1 is approved (100% odds on Base inputs), the failure floor, and the case's 15%. With a failure floor of $0 the question is simply whether 15% odds of ~$9.83 justify $2.34."),
+      "Filled from the case: today's price, the value if PGN-EDODM1 is approved (100% odds on Base inputs), the failure floor, and the case's 15%. With a failure floor of $0 the question is simply whether 15% odds of ~$8.22 justify $2.34."),
     tool("Fully diluted market cap", "fdmc", "Valuation", "Diluted Market Cap", [], null,
       "From this case's share count: 69.26M common, the 8.14M options (all out of the money at $4.89, so they add nothing at $2.34) and 1.1M RSUs. Fully diluted it is ~$165M — about $47M more than the cash."),
     tool("A takeout at the DM1 precedent's premium", "ma", "Benchmarks", "M&A Premium", [["Assumed takeout premium (%)", "46"]], null,
@@ -464,6 +470,7 @@ function sampleCasePepGen() {
   return Object.assign(base, {
     name: "PepGen — sample case",
     ticker: "PEPG",
+    valuationDate: "2026-09-30",
     currentPrice: "2.34",
     discountRatePct: "14",
     valuationMethod: "dcf",
@@ -476,6 +483,8 @@ function sampleCasePepGen() {
       mode: "detailed", dilutedSharesSimple: String(69259517 + 1101110),
       basicShares: "69259517",
       cash: String(117.238e6), debt: "0",
+      // Dated at the quarter end, carried forward to valuationDate at the H1 burn.
+      cashAsOf: "2026-06-30", monthlyBurn: String(5.7e6),
       opts: "8139082", optK: "4.89",
       war: "1101110", warK: "0",
       convFace: "0", convPrice: "0"
@@ -485,8 +494,8 @@ function sampleCasePepGen() {
     basePosAdjustmentPct: "100",
     multipleAssumptions: { bear: "3", base: "4", bull: "5" },
     scenarioOverrides: {
-      bear: { shareMultiplierPct: "60", posMultiplierPct: "60", discountRateAddPct: "3", exitMultiple: "3" },
-      bull: { shareMultiplierPct: "140", posMultiplierPct: "150", discountRateAddPct: "-1", exitMultiple: "5" }
+      bear: { shareMultiplierPct: "60", posMultiplierPct: "60", discountRateAddPct: "0", exitMultiple: "3" },
+      bull: { shareMultiplierPct: "140", posMultiplierPct: "150", discountRateAddPct: "0", exitMultiple: "5" }
     },
     readoutScenarios: { clearOfWinsPct: "30", clearPosPct: "64", clearSharePct: "110", modestPosPct: "41", modestSharePct: "70" },
     outcomeTree: { resubmitFixPct: "47" },

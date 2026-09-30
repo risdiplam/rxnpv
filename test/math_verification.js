@@ -4493,8 +4493,9 @@ section("Stoke, the whole case recomputed from its inputs (Bear, Base, Bull)");
   //   G&A $95M before revenue, on revenue-if-launched after, each weighted by
   //       the odds the company is in that state (developing / launched);
   //       tax 21% of the success case's profit after a $301.7M NOL, x P(launch);
-  //       discount 12% (+3 / -1)
-  //   Equity      NPV + $420M cash + PRV $190M x P(launch) / 1.12 + milestone
+  //       discount 12% in every scenario (Bear and Bull vary share and odds)
+  //   Equity      NPV + cash ($420M at Jun 30 less $19.5M a month for the 90
+  //               days to the Sept 28 valuation date) + PRV $190M x P(launch) / 1.12 + milestone
   //               $100M x P(launch) / 1.12 + $194M raise
   //   Shares      68,229,972 + 11,532,638 x (1 - 13.84 / 24.80) + 2,157,698
   //               + 194M / 24.06 = 83,547,527
@@ -4505,8 +4506,8 @@ section("Stoke, the whole case recomputed from its inputs (Bear, Base, Bull)");
   const p = c.programs[0];
   const rnd = api.computeRnDToLaunch(p);
   const ramp = api.LAUNCH_CURVE_EXACT[5].median.map(x => x / 100);
-  const expectPS = { bear: 14.9406, base: 28.7629, bull: 44.8640 };
-  for (const [key, share, posMult, addPct] of [["bear", 70, 75, 3], ["base", 100, 100, 0], ["bull", 130, 120, -1]]) {
+  const expectPS = { bear: 16.5706, base: 28.0728, bull: 41.1835 };
+  for (const [key, share, posMult, addPct] of [["bear", 70, 75, 0], ["base", 100, 100, 0], ["bull", 130, 120, 0]]) {
     const r = (12 + addPct) / 100, N = 25, L = 1;
     const eff = api.computeEffectivePoS(p, { posMultiplierPct: posMult });
     const reach = {}; eff.posStages.forEach(st => { reach[st.key] = st.posToReachStage; });
@@ -4552,7 +4553,8 @@ section("Stoke, the whole case recomputed from its inputs (Bear, Base, Bull)");
       npv += (pre - pos * taxIfWorks) / Math.pow(1 + r, t + 1);
     }
     const shares = 64526242 + 3703730 + 11532638 * (1 - 13.84 / 24.80) + 2157698 + 194e6 / 24.06;
-    const perShare = (npv + 420e6 + (190e6 + 100e6) * pos / Math.pow(1 + r, L) + 194e6) / shares;
+    const cash = 420e6 - 19.5e6 * 90 / (365.25 / 12);
+    const perShare = (npv + cash + (190e6 + 100e6) * pos / Math.pow(1 + r, L) + 194e6) / shares;
     const app = api.computeCaseValuation(c, api.getEffectiveScenarioPreset(c, key), key, 12, c.terminalValue);
     near("Stoke " + key + ": NPV equals the independent rebuild", app.npvResult.npv, npv, 25);
     near("Stoke " + key + ": 83,547,527 diluted shares", app.equity.dilutedShares, shares, 0.5);
@@ -4582,7 +4584,7 @@ section("Dilution path: raises bring their cash, counted with the odds they happ
   const r = api.computeCaseValuation(on, base, "base", 14, pg.terminalValue);
   const p = 2.34 * 0.85;
   near("market price: per share = (E + cash) / (S + cash / p)", r.equity.perShare, (off.equity.equityValue + cash) / (off.equity.dilutedShares + cash / p), 1e-6);
-  ok("market price: the raises add value when investors pay more than the model's value ($1.99 > $1.38)", r.equity.perShare > off.equity.perShare);
+  ok("market price: the raises add value when investors pay more than the model's value ($1.99 > $1.54)", r.equity.perShare > off.equity.perShare);
   const fair = JSON.parse(JSON.stringify(on)); fair.dilutionPath.priceBasis = "fair";
   near("fair-value price: value per share is unchanged (value-neutral)", api.computeCaseValuation(fair, base, "base", 14, pg.terminalValue).equity.perShare, off.equity.perShare, 1e-9);
   // Stoke needs no raise: switching the path on changes nothing.
@@ -4600,9 +4602,10 @@ section("Cash is carried forward from the filing to the valuation date");
   // 5,700,000 x 3.0226 = $17,228,747 spent and $100,009,253 left. Before
   // this, the filed cash was counted in full while the valuation also charged
   // those months' costs from today — paid twice.
-  const pg = JSON.parse(fs.readFileSync(path.join(__dirname, "fixtures", "pepgen_case.json"), "utf8"));
-  const c = JSON.parse(JSON.stringify(pg));
-  c.capitalStructure.cashAsOf = "2026-06-30"; c.capitalStructure.monthlyBurn = "5700000"; c.valuationDate = "2026-09-30";
+  // The fixture carries these dates; "pg" is the same case with them blank.
+  const c = JSON.parse(fs.readFileSync(path.join(__dirname, "fixtures", "pepgen_case.json"), "utf8"));
+  const pg = JSON.parse(JSON.stringify(c)); pg.capitalStructure.cashAsOf = ""; pg.capitalStructure.monthlyBurn = ""; delete pg.valuationDate;
+  ok("the fixture is dated: cash June 30, $5.7M a month, valued Sept 30", c.capitalStructure.cashAsOf === "2026-06-30" && c.capitalStructure.monthlyBurn === "5700000" && c.valuationDate === "2026-09-30");
   const eff = api.effectiveCapitalStructure(c);
   near("months since the filing: 92 days = 3.0226 months", eff._monthsSinceFiling, 92 / (365.25 / 12), 1e-9);
   near("spent since the filing: $5.7M x 3.0226 = $17,228,747", eff._spentSinceFiling, 5700000 * 92 / (365.25 / 12), 1);
@@ -4729,7 +4732,7 @@ section("Portfolio runway: unknown, runs out, or never runs out");
   const noCash = JSON.parse(JSON.stringify(pepgen)); noCash.capitalStructure.cash = "";
   const [st, pg, nc] = api.computePortfolioSummary([stoke, pepgen, noCash]);
   ok("Stoke: cash never runs out in the projection", st.runwayOutlasts === true && st.runwayYears == null);
-  ok("PepGen: runs out after ~1.5 years (1.72-year Phase 2 at $43.5M a year plus $26M G&A, then Phase 3)", pg.runwayOutlasts === false && Math.abs(pg.runwayYears - 1.664) < 0.01);
+  ok("PepGen: runs out after ~1.5 years (1.72-year Phase 2 at $43.5M a year plus $26M G&A, then Phase 3)", pg.runwayOutlasts === false && Math.abs(pg.runwayYears - 1.465) < 0.01);
   ok("no cash entered: unknown, not zero", nc.runwayYears == null && nc.runwayOutlasts === false);
 }
 report();
@@ -4794,7 +4797,8 @@ section("PepGen, the whole case recomputed from its inputs (Bear, Base, Bull)");
   //   Tax          21% of the success case's profit after a $177.3M NOL that also
   //                collects every loss year of the success case, x P(launch)
   //   Discount     end of year: year t (2026 = 0) at 1/(1+r)^(t+1)
-  //   Equity       NPV + $117.238M cash + $100M raise, over 69,259,517 +
+  //   Equity       NPV + cash ($117.238M at Jun 30 less $5.7M a month for the 92
+  //                days to the Sept 30 valuation date) + $100M raise, over 69,259,517 +
   //                1,101,110 RSUs + 50,251,256 raise shares (options at $4.89 are
   //                out of the money at $2.34) = 120,611,883
   const c = JSON.parse(fs.readFileSync(path.join(__dirname, "fixtures", "pepgen_case.json"), "utf8"));
@@ -4802,8 +4806,8 @@ section("PepGen, the whole case recomputed from its inputs (Bear, Base, Bull)");
   const rnd = api.computeRnDToLaunch(p);
   const ramp = [11, 31, 58, 76, 89, 100].map(x => x / 100);
   near("the six-year median launch curve is the one typed here", 0, ramp.reduce((s, v, i) => s + Math.abs(v - api.launchCurveForYears(6, "median")[i] / 100), 0), 1e-12);
-  const expectPS = { bear: 0.8408, base: 1.6861, bull: 3.4232 };
-  for (const [key, share, posMult, addPct] of [["bear", 60, 60, 3], ["base", 100, 100, 0], ["bull", 140, 150, -1]]) {
+  const expectPS = { bear: 0.7515, base: 1.5432, bull: 2.9755 };
+  for (const [key, share, posMult, addPct] of [["bear", 60, 60, 0], ["base", 100, 100, 0], ["bull", 140, 150, 0]]) {
     const r = (14 + addPct) / 100, N = 25, L = 5;
     const eff = api.computeEffectivePoS(p, { posMultiplierPct: posMult });
     const reach = {}; eff.posStages.forEach(st => { reach[st.key] = st.posToReachStage; });
@@ -4854,7 +4858,8 @@ section("PepGen, the whole case recomputed from its inputs (Bear, Base, Bull)");
       cf.push(flow); npv += flow / Math.pow(1 + r, t + 1);
     }
     const shares = 69259517 + 1101110 + 100e6 / 1.99;
-    const perShare = (npv + 117.238e6 + 100e6) / shares;
+    const cash = 117.238e6 - 5.7e6 * 92 / (365.25 / 12);
+    const perShare = (npv + cash + 100e6) / shares;
     const app = api.computeCaseValuation(c, api.getEffectiveScenarioPreset(c, key), key, 14, c.terminalValue);
     near(key + ": NPV equals the independent rebuild", app.npvResult.npv, npv, 25);
     near(key + ": diluted shares are 120,611,883", app.equity.dilutedShares, shares, 0.5);

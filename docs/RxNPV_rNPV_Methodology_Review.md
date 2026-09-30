@@ -1,6 +1,32 @@
 # RxNPV — rNPV methodology review (2026-09-30)
 
-Written at the user's request after the PepGen pass: *"we need to step back and really look deeply into how an rNPV for a biotech is done by genuine specialists and the conventions they use."* Nothing here has been changed in the code yet. Every figure is from the two sample cases (PepGen, Base $1.38 at a $2.34 price; Stoke, Base $29.07 at $24.80), computed on the engine as it stands.
+Written at the user's request after the PepGen pass: *"we need to step back and really look deeply into how an rNPV for a biotech is done by genuine specialists and the conventions they use."* Every figure in §0–§5 is from the two sample cases (PepGen, Base $1.38 at a $2.34 price; Stoke, Base $29.07 at $24.80), computed on the engine as it stood before the fixes.
+
+## Status — all proposed fixes made (2026-09-30)
+
+The user's instruction: *"alright, work through whatever needs fixing."* Each fix below was made as its own change, hand-checked against the independent year-by-year rebuilds of both samples in `test/math_verification.js` (which re-derive every figure with their own formulas, not the engine's), and pushed.
+
+| # | Fix | What the engine does now | Measured on Base (as each landed) |
+|---|---|---|---|
+| D | Dilution path | Projected raises bring their cash with their shares, each weighted by the odds the company is still going that year; priced at today's price less the discount, or at the case's own value (value-neutral) | PepGen with the path on read $0.57; now $1.80 against $1.54 with it off (the raises are priced above the case's value); Stoke unchanged (no raise needed) |
+| F | Bear/Bull discount rate | Presets add 0 points; Bear and Bull vary share and odds only | Bear/Bull only |
+| G | Benchmark R&D | DiMasi 2016 phase costs ($20.8M / $53.8M / $240.0M) instead of trial-only costs; an override still wins | Only cases without an override |
+| C | Cash date | Cash as of the filing, carried forward to "Value as of" at the monthly burn (new fields beside Cash; the EDGAR pull fills both) | PepGen −$0.14, Stoke −$0.69 |
+| H | Ex-US lag | "Ex-US launch after the US", default 1.5 years; the ex-US ramp is the US curve shifted and read between years; LOE on the US calendar | PepGen −$0.26, Stoke −$0.63 |
+| A | Overhead | G&A before launch × the odds of still developing or winding down; after launch, G&A on revenue-if-launched × P(launch) | PepGen +$0.64, Stoke +$0.65 |
+| B | Tax | One program: P(launch) × the success case's tax after its own losses. Several programs: the odds-weighted flow is taxed (stated approximation) | PepGen −$0.14, Stoke −$0.31 |
+| 9–10 | Presentation | "If it works" beside Bear/Base/Bull with a line saying Base is the odds-weighted average; an If-it-works / × odds toggle on the year-by-year card; a "What each outcome is worth" heading over the per-outcome panels | — |
+
+**The two samples, before → after** (both re-derived: flat Bear/Bull rates, cash dated June 30 and carried to the research date, the 1.5-year ex-US lag, every quoted figure in their evidence recomputed):
+
+| | Bear | Base | Bull | Price implies | If it works | If the next readout fails |
+|---|---|---|---|---|---|---|
+| PepGen ($2.34) | $0.25 → **$0.75** | $1.38 → **$1.54** | $3.58 → **$2.98** | 24% → **25%** (case: 15%) | $9.83 → **$8.22** | $0 → **$0** |
+| Stoke ($24.80) | $14.44 → **$16.57** | $29.07 → **$28.07** | $45.98 → **$41.18** | 54% → **56%** (case: 65%) | $42.92 → **$41.32** | $1.40 → **$0.48** |
+
+The fixes pull in both directions, as §3 predicted, and mostly offset on Base. What changed most is the spread: Bear is no longer charged the same risk three times, and Bull no longer gets a lower discount rate on top of better odds. **PepGen still reads below its price for the reason in §4 — the case's own 15% odds of launch, against the ~25% the price implies — not because of the engine.**
+
+**Left alone, as proposed:** mid-year discounting (I), no terminal value by default, 12–15% discount-rate guidance (E).
 
 ---
 

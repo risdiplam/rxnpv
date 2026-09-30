@@ -65,7 +65,8 @@
      "includeExUS": true,
      "exUSPriceFactorPct": "50",
      "exUSAnnualGrowthPct": "0",
-     "exUSPatientMultiplierPct": "140"
+     "exUSPatientMultiplierPct": "140",
+     "exUSLaunchLagYears": "1.5"
     },
     "exclusivity": {
      "yearsToLOE": "12",
@@ -87,8 +88,6 @@
     "totalYears": "1.4",
     "totalCostM": "200"
    },
-   "evidenceLog": [],
-   "calibrationLog": [],
    "partnership": {
     "enabled": true,
     "territory": "exUS",
@@ -97,7 +96,7 @@
     "costSharingPct": "30",
     "milestones": [
      {
-      "id": "ms_munvwhjh_4",
+      "id": "ms_muoj96q6_55",
       "label": "Ex-US regulatory milestones — assumed part of the undisclosed $385M",
       "gate": "launch",
       "valueM": 100
@@ -130,6 +129,8 @@
   "basicShares": "68229972",
   "cash": "420000000",
   "debt": "0",
+  "cashAsOf": "2026-06-30",
+  "monthlyBurn": "19500000",
   "opts": "11532638",
   "optK": "13.84",
   "war": "2157698",
@@ -141,16 +142,17 @@
   "bear": {
    "shareMultiplierPct": "70",
    "posMultiplierPct": "75",
-   "discountRateAddPct": "3",
+   "discountRateAddPct": "0",
    "exitMultiple": "3"
   },
   "bull": {
    "shareMultiplierPct": "130",
    "posMultiplierPct": "120",
-   "discountRateAddPct": "-1",
+   "discountRateAddPct": "0",
    "exitMultiple": "5"
   }
  },
+ "valuationDate": "2026-09-28",
  "valuationMethod": "dcf",
  "futureRaise": {
   "enabled": true,
