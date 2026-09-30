@@ -81,7 +81,7 @@ const EXPORTS = [
   "applyTaxToCalendar", "computeMoleculeTypePoSRatios", "POS_BY_MOLECULE",
   "computeProgramValuation",
   "revenueChartYScale", "niceAxisTicks", "histogramBins", "spreadLabels", "localDateStamp", "selectPeakSalesCompWindow",
-  "readPriceVsScenarios", "readMonteCarlo", "readCashFlow", "readSotp", "readRiskWaterfall", "readTornado", "readPriceGrid", "readInterval", "readPValue", "readSingleArm", "readAssurance", "readPeakSalesRange", "readBinaryImplied", "readPremium", "readForwardRunway", "readBreakEven", "readPriceGap", "readOutcomeRange", "possessive", "compareTrials", "compareTrialsWeeks", "readTrialComparison",
+  "readPriceVsScenarios", "readMonteCarlo", "readCashFlow", "readSotp", "readRiskWaterfall", "readTornado", "readPriceGrid", "readInterval", "readPValue", "readSingleArm", "readAssurance", "readPeakSalesRange", "readBinaryImplied", "readPremium", "readForwardRunway", "readBreakEven", "readPriceGap", "readOutcomeRange", "possessive", "aNum", "compareTrials", "compareTrialsWeeks", "readTrialComparison",
   "measureStorage", "STORAGE_ASSUMED_QUOTA_BYTES", "STORAGE_WARN_FRACTION", "STORAGE_CRITICAL_FRACTION",
   "computeTreatedPopulation", "launchCurveForYears", "erosionMultiplier", "computeProgramRevenue",
   "resolveNetPrice", "aspPctOfBasis", "PRICE_BASIS_OPTIONS", "getRevenueBuild", "PRICING_CONVERSION_MATRIX", "priceBasisArticle",
@@ -4377,6 +4377,11 @@ section("Break-even and price-gap readings");
   r = api.readPriceGap(29.05, 24.80, 54.7, 65);
   ok("price gap: $4.25 a share below this case", r.verdict === "About $4.25 a share separates the price from this case.");
   ok("price gap: 10-point disagreement, more confident", r.text.includes("the 55% the price implies and this case's 65%") && r.text.includes("A 10-point gap") && r.text.includes("more confident"));
+  // "an 8-point gap", not "a 8-point gap" (PepGen: 23% implied vs 15%).
+  ok("price gap: an 8-point gap reads 'An 8-point'", api.readPriceGap(1.38, 2.34, 23, 15).text.includes("An 8-point gap"));
+  ok("price gap: a 10-point gap reads 'A 10-point'", api.readPriceGap(1.38, 2.34, 25, 15).text.includes("A 10-point gap"));
+  ok("aNum: 8, 11, 18, 80-89, 800, 11,000 take 'an'", [8, 11, 18, 80, 85, 89, 800, 8000, 11000, 18000].every(n => api.aNum(n) === "an"));
+  ok("aNum: 1, 10, 12, 81 is an, 100, 110, 1100, 180 take 'a'", [1, 10, 12, 100, 110, 1100, 180, 7, 90].every(n => api.aNum(n) === "a") && api.aNum(81) === "an");
   ok("price gap: within 5 points is judgment", api.readPriceGap(25, 24.8, 62, 65).text.includes("matter of judgment"));
   ok("price gap: price above the case", api.readPriceGap(20, 24.8, null, null).verdict === "About $4.80 a share of the price is not in this case.");
 }

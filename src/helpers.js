@@ -2004,6 +2004,13 @@ function readTornado(drivers, base, price) {
     : "Only " + andList(reach) + (reach.length === 1 ? " reaches" : " each reach") + " today's " + fmtShare(price) + (reach.length === 1 ? " on its own." : " on their own.");
   return { verdict, text: lead };
 }
+// "a" or "an" before a number as it is read aloud: an 8-point gap, an 11%
+// premium, an 80% premium, but a 1 in 10 chance and a 100-point range.
+function aNum(n, capital) {
+  const digits = String(Math.floor(Math.abs(Number(n)) || 0));
+  const an = digits[0] === "8" || ((digits.length === 2 || digits.length === 5) && (digits.slice(0, 2) === "11" || digits.slice(0, 2) === "18"));
+  return (capital ? (an ? "An" : "A") : (an ? "an" : "a"));
+}
 // "A", "A and B", "A, B and C" — a list that reads as a sentence.
 function andList(items) {
   return items.length < 2 ? items.join("") : items.slice(0, -1).join(", ") + " and " + items[items.length - 1];
@@ -2052,7 +2059,7 @@ function readSingleArm(n, lower, upper) {
   if (![n, lower, upper].every(isFinite) || n <= 0) return null;
   const width = (upper - lower) * 100;
   const verdict = width >= 30 ? "Too few patients to pin the rate down." : width >= 15 ? "A rough estimate." : "A fairly precise estimate.";
-  return { verdict, text: "With " + n + " patient" + (n === 1 ? "" : "s") + ", the true rate could be anywhere from " + (lower * 100).toFixed(0) + "% to " + (upper * 100).toFixed(0) + "%, a " + width.toFixed(0) + "-point range. A comparator's rate inside that range cannot be ruled out." };
+  return { verdict, text: "With " + n + " patient" + (n === 1 ? "" : "s") + ", the true rate could be anywhere from " + (lower * 100).toFixed(0) + "% to " + (upper * 100).toFixed(0) + "%, " + aNum(Math.round(width)) + " " + width.toFixed(0) + "-point range. A comparator's rate inside that range cannot be ruled out." };
 }
 // Assurance: the share of simulated trials that read out significant.
 function readAssurance(pct, sided) {
@@ -2076,7 +2083,7 @@ function readPeakSalesRange(p10, p50, p90, topDriverLabel) {
 function readBinaryImplied(impliedPct) {
   if (!isFinite(impliedPct) || impliedPct < 0 || impliedPct > 100) return null;
   const inTen = Math.round(impliedPct / 10);
-  const odds = inTen === 0 ? "less than a 1 in 10 chance" : inTen === 10 ? "near-certain success" : "roughly a " + inTen + " in 10 chance";
+  const odds = inTen === 0 ? "less than a 1 in 10 chance" : inTen === 10 ? "near-certain success" : "roughly " + aNum(inTen) + " " + inTen + " in 10 chance";
   return { verdict: "The price assumes " + odds + " that it works.", text: "If your own odds are higher than " + impliedPct.toFixed(0) + "%, the bet pays on average at these values; if lower, it doesn't. Add your PoS above to see the expected value." };
 }
 // A takeout premium against the premiums actually paid in tracked deals.
@@ -2086,7 +2093,7 @@ function readPremium(pct, premiumsKnown) {
   const below = premiumsKnown.filter(p => p < pct).length;
   const median = percentile(premiumsKnown.slice().sort((a, b) => a - b), 0.5);
   const verdict = below / n >= 0.75 ? "Richer than most real deals." : below / n <= 0.25 ? "Leaner than most real deals." : "In line with real deals.";
-  return { verdict, text: "A " + pctWord(pct) + " premium is above " + below + " of the " + n + " tracked deals with a disclosed premium; the median is " + pctWord(median) + "." };
+  return { verdict, text: aNum(Math.round(pct), true) + " " + pctWord(pct) + " premium is above " + below + " of the " + n + " tracked deals with a disclosed premium; the median is " + pctWord(median) + "." };
 }
 // Break-even peak revenue: how much the price needs against what the case
 // carries, and whether that sits inside the case's own Bear–Bull range.
@@ -2115,7 +2122,7 @@ function readPriceGap(fairPerShare, price, impliedPct, basePct) {
   if (impliedPct == null || basePct == null) return { verdict, text: gap > 0 ? "The market values the company below this case's Base assumptions." : "The market values the company above this case's Base assumptions." };
   const d = basePct - impliedPct;
   return { verdict, text: "In odds, that is the difference between the " + Math.round(impliedPct) + "% the price implies and this case's " + Math.round(basePct) + "%. " +
-    (Math.abs(d) <= 5 ? "Close enough to be a matter of judgment." : "A " + Math.round(Math.abs(d)) + "-point gap is a real disagreement — worth being able to say why you are " + (d > 0 ? "more" : "less") + " confident than the market.") };
+    (Math.abs(d) <= 5 ? "Close enough to be a matter of judgment." : aNum(Math.round(Math.abs(d)), true) + " " + Math.round(Math.abs(d)) + "-point gap is a real disagreement — worth being able to say why you are " + (d > 0 ? "more" : "less") + " confident than the market.") };
 }
 
 // The whole range as a binary bet: what is left if the readout fails, what it
