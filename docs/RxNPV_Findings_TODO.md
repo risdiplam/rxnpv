@@ -10,7 +10,14 @@ The bulk of this list came out of an exhaustive audit pass (September 2026) cove
 
 ## Still open
 
-The September 2026 external audit (`RxNPV_MUSE_AUDIT.md`) reopened this list. Its fourteen findings, the packaged-app worklist B-001–B-013, and seven further items found while working through them are all dispositioned in that file's §13 and recorded under Fixed below. What remains is one small thing that needs the user rather than code:
+The September 2026 external audit (`RxNPV_MUSE_AUDIT.md`) reopened this list. Its fourteen findings, the packaged-app worklist B-001–B-013, and seven further items found while working through them are all dispositioned in that file's §13 and recorded under Fixed below. What remains needs the user rather than code:
+
+### 🟡 Four model choices waiting on the user (found on the PepGen pass, 2026-09-30)
+Not bugs — each is a stated simplification — but each moves real value, so none was changed without a decision. Details and numbers in the build log, Phase 47.
+1. **Corporate G&A is charged at full rate in every year, including after a failure.** Survival-weighting it (G&A only while the company exists, plus the wind-down the failure floor already uses) would add ~$0.71 a share to PepGen (half its Base) and ~$0.68 to Stoke. Reprices every case.
+2. **The failure floor charges the current stage's full benchmark-proportioned cost as still to come.** PepGen's floor is $0 because it charges all of Phase 2's ~$75M though FREEDOM2 is mostly paid for; an input for "share of this stage already spent" would fix it.
+3. **The dilution path prices every projected raise at a discount to today's price** — for a company five years from launch that issues ~170M shares (PepGen Base $0.57 with it on).
+4. **Medicaid drug-utilization data** was declined because Medicare Part B/D covers the question. It does not for paediatric rare-disease drugs: Sarepta's PMOs and nusinersen are absent from Medicare's files entirely. Worth reconsidering only if a paediatric launch needs tracking.
 
 ### 🔵 One manual click
 The packaged-app harness replaces only the native save sheet. Clicking **Export as PDF** once in the real app and choosing a location is the single step it cannot perform.
