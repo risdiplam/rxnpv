@@ -21,6 +21,8 @@
 //   { "header": "name" | "ticker" | "price", "value": "…" }
 //   { "openAll": true }                           expand every collapsed card
 //   { "wait": 500 }
+//   { "expectNow": "programs.0.x", "value": … }  check a stored value mid-plan
+//   { "clickLabel": "Delete this milestone" }   (a button by its aria-label)
 //   { "evidence": { label, classification, confidence, source, date, thesis } }
 //   { "calibration": { catalystLabel, catalystDate, yourPoS, marketImpliedPoS, outcome, notes } }
 //   { "expect": "programs.0.revenueBuild.population.prevalence", "value": "40000" }
@@ -97,6 +99,7 @@ app.whenReady().then(async () => {
       try {
       if (st.tab) { r = await js(`(() => { const t = document.getElementById("casetab-${st.tab}"); if (t) t.click(); return !!t; })()`); await sleep(700); }
       else if (st.click) { r = await js(`(() => { const b = __f.button(${JSON.stringify(st.click)}, ${!!st.prefix}); if (b) b.click(); return !!b; })()`); await sleep(st.after || 600); }
+      else if (st.clickLabel) { r = await js(`(() => { const b = [...document.querySelectorAll("button")].filter(x => x.offsetParent !== null).find(x => x.getAttribute("aria-label") === ${JSON.stringify(st.clickLabel)}); if (b) b.click(); return !!b; })()`); await sleep(st.after || 400); }
       else if (st.openAll) { for (let i = 0; i < 3; i++) { await js(`__f.openAll()`); await sleep(400); } }
       else if (st.wait) await sleep(st.wait);
       else if (st.header) {
@@ -154,6 +157,13 @@ app.whenReady().then(async () => {
           const save = [...document.querySelectorAll("button")].filter(b => b.offsetParent !== null).reverse().find(b => /^(Save|Add|Save entry|Add entry|Save prediction)$/.test(b.textContent.trim()));
           if (!save) return "no save button"; save.click(); await wait(300); return true;
         })()`);
+      }
+      else if (st.expectNow) {
+        // Checked at this point in the plan, for a value a later step changes.
+        await sleep(400);
+        const cs = JSON.parse(await js(`localStorage.getItem("rxnpv_cases_v1")`) || "[]");
+        const got = st.expectNow.split(".").reduce((o, k) => (o == null ? undefined : o[k]), cs[cs.length - 1]);
+        r = JSON.stringify(got) === JSON.stringify(st.value) || "stored " + JSON.stringify(got) + ", expected " + JSON.stringify(st.value);
       }
       else if (st.expect) continue;
       } catch (e) { r = "threw: " + String(e.message).slice(0, 120); }
