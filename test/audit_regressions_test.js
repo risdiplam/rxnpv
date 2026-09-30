@@ -529,6 +529,29 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
     ok(!!d.querySelector(".secnav") && w.localStorage.getItem("rxnpv_secnav_hidden") === "0", "Section list: Show section list brings it back");
   }
 
+  // $M fields typed one key at a time. The field used to show the stored value
+  // rounded to whole millions from $100M up, rewritten on every keystroke, so
+  // typing 117.238 lost the decimals and stored $11.7B. Each key is APPENDED
+  // to whatever the field shows at that moment, the way a keyboard types
+  // (".2" goes in as one step: jsdom rejects "117." as a number mid-edit).
+  {
+    click(btn("+ New case")); await wait(400);
+    click(d.getElementById("casetab-assumptions")); await wait(300);
+    const cashIn = () => [...d.querySelectorAll("input")].find(i => i.getAttribute("aria-label") === "Cash & equivalents ($M)");
+    const el = cashIn();
+    el.focus(); el.dispatchEvent(new w.FocusEvent("focusin", { bubbles: true }));
+    for (const k of ["1", "1", "7", ".2", "3", "8"]) {
+      const cur = cashIn();
+      Object.getOwnPropertyDescriptor(w.HTMLInputElement.prototype, "value").set.call(cur, cur.value + k);
+      cur.dispatchEvent(new w.Event("input", { bubbles: true })); await wait(40);
+    }
+    const shown = cashIn().value;
+    const cs = JSON.parse(w.localStorage.getItem("rxnpv_cases_v1")); const typed = cs[cs.length - 1].capitalStructure.cash;
+    ok(shown === "117.238" && typed === "117238000", "$M field typed key by key keeps its decimals: shows " + shown + ", stores " + typed);
+    cashIn().blur(); cashIn().dispatchEvent(new w.FocusEvent("focusout", { bubbles: true })); await wait(60);
+    ok(cashIn().value === "117.238", "$M field shows three decimals after editing (" + cashIn().value + "), not 117");
+  }
+
   if (errors.length) { console.log(errors.slice(0, 40).join("\n")); console.log("\n" + errors.length + " FAILURE(S) across " + checks + " checks"); process.exit(1); }
   console.log("ALL AUDIT REGRESSION CHECKS PASSED — " + checks + " checks");
   process.exit(0);

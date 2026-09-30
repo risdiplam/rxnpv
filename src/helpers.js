@@ -109,7 +109,7 @@ function getTrialDurationForArea(area, phaseKey) {
 
 // ── BenchField: the signature input component ──
 // props: label, value, onChange (v)=>{}, bench: {value, source} | null, suffix, placeholder, step, type, help
-function BenchField({ label, value, onChange, bench, suffix, placeholder, step, type, help, wide }) {
+function BenchField({ label, value, onChange, bench, suffix, placeholder, step, type, help, wide, onFocus, onBlur }) {
   const h = React.createElement;
   const hasValue = value !== "" && value != null;
   const isBenchmark = bench && hasValue && Math.abs(Number(value) - Number(bench.value)) < 0.001;
@@ -128,6 +128,7 @@ function BenchField({ label, value, onChange, bench, suffix, placeholder, step, 
       h("input", {
         type: type || "number", step: step || "any", value: value == null ? "" : value, placeholder: placeholder,
         onChange: e => onChange(e.target.value),
+        onFocus, onBlur,
         // The visible label sits two levels up in the DOM, so it isn't
         // programmatically associated with this input — a screen reader
         // announced these as bare, unnamed fields. aria-label carries the same
@@ -889,12 +890,15 @@ function ExternalLink({ href, children, style }) {
 
 function MillionsField({ label, value, onChange, bench, help, wide, placeholder }) {
   const h = React.createElement;
+  // Up to three decimals ($117.238M is a real balance). It used to round
+  // anything from $100M up to whole millions — and because the field showed
+  // that rounded number back on every keystroke, typing "117.2" snapped to
+  // "117", the next "3" made it 1173, and $117.238M was stored as $11.7B.
   const toMillions = (raw) => {
     if (raw === "" || raw == null) return "";
     const n = Number(raw);
     if (isNaN(n)) return "";
-    const m = n / 1e6;
-    return Math.abs(m) >= 100 ? String(Math.round(m)) : String(Math.round(m * 100) / 100);
+    return String(Math.round((n / 1e6) * 1000) / 1000);
   };
   const fromMillions = (m) => {
     if (m === "" || m == null) return "";
@@ -903,11 +907,17 @@ function MillionsField({ label, value, onChange, bench, help, wide, placeholder 
     return String(Math.round(n * 1e6));
   };
   const displayValue = toMillions(value);
+  // While the field has focus it shows exactly what was typed; the stored
+  // dollars are converted on every keystroke, but the text is not rebuilt
+  // from them until the field is left.
+  const [editing, setEditing] = React.useState(null);
   const displayBench = bench ? { ...bench, value: typeof bench.value === "number" ? Math.round((bench.value / 1e6) * 100) / 100 : bench.value } : null;
   return h(BenchField, {
     label, wide, help, placeholder,
-    value: displayValue,
-    onChange: (v) => onChange(fromMillions(v)),
+    value: editing != null ? editing : displayValue,
+    onChange: (v) => { setEditing(v); onChange(fromMillions(v)); },
+    onFocus: () => setEditing(displayValue),
+    onBlur: () => setEditing(null),
     bench: displayBench,
     suffix: "$M"
   });

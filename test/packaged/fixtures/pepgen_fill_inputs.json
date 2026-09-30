@@ -1,0 +1,869 @@
+{
+ "steps": [
+  {
+   "header": "name",
+   "value": "PepGen (PEPG)"
+  },
+  {
+   "expect": "name",
+   "value": "PepGen (PEPG)"
+  },
+  {
+   "header": "ticker",
+   "value": "PEPG"
+  },
+  {
+   "expect": "ticker",
+   "value": "PEPG"
+  },
+  {
+   "header": "price",
+   "value": "2.34"
+  },
+  {
+   "expect": "currentPrice",
+   "value": "2.34"
+  },
+  {
+   "tab": "overview"
+  },
+  {
+   "click": "NapkinType",
+   "prefix": true
+  },
+  {
+   "tab": "assumptions"
+  },
+  {
+   "openAll": true
+  },
+  {
+   "set": "Peak worldwide revenue estimate ($M)",
+   "value": "1257"
+  },
+  {
+   "expect": "programs.0.quickRevenue.peakRevenue",
+   "value": "1257000000"
+  },
+  {
+   "set": "Years to peak (yrs)",
+   "value": "6"
+  },
+  {
+   "expect": "programs.0.quickRevenue.yearsToPeak",
+   "value": "6"
+  },
+  {
+   "select": "Ramp shape",
+   "value": "median"
+  },
+  {
+   "tab": "scenarios"
+  },
+  {
+   "openAll": true
+  },
+  {
+   "set": "New Program — peak revenue override ($M)",
+   "value": "754",
+   "nth": 0
+  },
+  {
+   "expect": "programs.0.quickRevenue.scenarioOverrides.bear.peakRevenue",
+   "value": "754000000"
+  },
+  {
+   "set": "New Program — peak revenue override ($M)",
+   "value": "1760",
+   "nth": 1
+  },
+  {
+   "expect": "programs.0.quickRevenue.scenarioOverrides.bull.peakRevenue",
+   "value": "1760000000"
+  },
+  {
+   "tab": "overview"
+  },
+  {
+   "click": "Full modelBuild",
+   "prefix": true
+  },
+  {
+   "expect": "programs.0.revenueMode",
+   "value": "full"
+  },
+  {
+   "expect": "valuationMethod",
+   "value": "dcf"
+  },
+  {
+   "tab": "assumptions"
+  },
+  {
+   "openAll": true
+  },
+  {
+   "check": "Apply cash tax (with NOL carryforward)",
+   "value": true
+  },
+  {
+   "expect": "taxation.enabled",
+   "value": true
+  },
+  {
+   "set": "Effective tax rate (%)",
+   "value": "21"
+  },
+  {
+   "expect": "taxation.effectiveRatePct",
+   "value": "21"
+  },
+  {
+   "set": "Existing NOL carryforward ($M)",
+   "value": "177.3"
+  },
+  {
+   "expect": "taxation.startingNOLM",
+   "value": "177300000"
+  },
+  {
+   "set": "Discount rate (%)",
+   "value": "14"
+  },
+  {
+   "expect": "discountRatePct",
+   "value": "14"
+  },
+  {
+   "check": "Include terminal value beyond the projection window",
+   "value": true
+  },
+  {
+   "set": "EV / peak revenue multiple (x)",
+   "value": "4"
+  },
+  {
+   "expect": "terminalValue.exitMultiple",
+   "value": "4"
+  },
+  {
+   "check": "Include terminal value beyond the projection window",
+   "value": false
+  },
+  {
+   "expect": "terminalValue.enabled",
+   "value": false
+  },
+  {
+   "click": "Detailed"
+  },
+  {
+   "expect": "capitalStructure.mode",
+   "value": "detailed"
+  },
+  {
+   "set": "Basic shares outstanding",
+   "value": "69259517"
+  },
+  {
+   "expect": "capitalStructure.basicShares",
+   "value": "69259517"
+  },
+  {
+   "set": "Cash & equivalents ($M)",
+   "value": "117.238"
+  },
+  {
+   "expect": "capitalStructure.cash",
+   "value": "117238000"
+  },
+  {
+   "set": "Debt ($M)",
+   "value": "0"
+  },
+  {
+   "expect": "capitalStructure.debt",
+   "value": "0"
+  },
+  {
+   "set": "Options outstanding",
+   "value": "8139082"
+  },
+  {
+   "expect": "capitalStructure.opts",
+   "value": "8139082"
+  },
+  {
+   "set": "Options avg strike ($)",
+   "value": "4.89"
+  },
+  {
+   "expect": "capitalStructure.optK",
+   "value": "4.89"
+  },
+  {
+   "set": "Warrants outstanding",
+   "value": "1101110"
+  },
+  {
+   "expect": "capitalStructure.war",
+   "value": "1101110"
+  },
+  {
+   "set": "Warrants strike ($)",
+   "value": "0"
+  },
+  {
+   "expect": "capitalStructure.warK",
+   "value": "0"
+  },
+  {
+   "set": "Convertible face value ($M)",
+   "value": "0"
+  },
+  {
+   "expect": "capitalStructure.convFace",
+   "value": "0"
+  },
+  {
+   "set": "Conversion price ($)",
+   "value": "0"
+  },
+  {
+   "expect": "capitalStructure.convPrice",
+   "value": "0"
+  },
+  {
+   "check": "Model a future capital raise",
+   "value": true
+  },
+  {
+   "expect": "futureRaise.enabled",
+   "value": true
+  },
+  {
+   "set": "Amount to raise ($M)",
+   "value": "100"
+  },
+  {
+   "expect": "futureRaise.amountM",
+   "value": "100000000"
+  },
+  {
+   "set": "Assumed raise price ($)",
+   "value": "1.99"
+  },
+  {
+   "expect": "futureRaise.priceOverride",
+   "value": "1.99"
+  },
+  {
+   "check": "Model dilution path to launch",
+   "value": true
+  },
+  {
+   "set": "Minimum cash buffer ($M)",
+   "value": "40"
+  },
+  {
+   "expect": "dilutionPath.minCashBufferM",
+   "value": "40000000"
+  },
+  {
+   "set": "Each raise covers (mo)",
+   "value": "18"
+  },
+  {
+   "expect": "dilutionPath.targetRunwayMonths",
+   "value": "18"
+  },
+  {
+   "set": "Discount to market (%)",
+   "value": "15"
+  },
+  {
+   "expect": "dilutionPath.discountToMarketPct",
+   "value": "15"
+  },
+  {
+   "set": "Annual SBC share creep (%)",
+   "value": "0"
+  },
+  {
+   "expect": "dilutionPath.sbcAnnualGrowthPct",
+   "value": "0"
+  },
+  {
+   "check": "Model dilution path to launch",
+   "value": false
+  },
+  {
+   "expect": "dilutionPath.enabled",
+   "value": false
+  },
+  {
+   "set": "Pre-commercial corporate G&A ($M per year)",
+   "value": "26"
+  },
+  {
+   "expect": "corporateGA.preCommercialAnnualM",
+   "value": "26"
+  },
+  {
+   "set": "G&A share of mature SG&A (%)",
+   "value": "50"
+  },
+  {
+   "expect": "corporateGA.gaShareOfMatureSgaPct",
+   "value": "50"
+  },
+  {
+   "set": "Wind-down after a failed readout (years of G&A)",
+   "value": "1"
+  },
+  {
+   "expect": "corporateGA.windDownYears",
+   "value": "1"
+  },
+  {
+   "set": "Program name",
+   "value": "PGN-EDODM1"
+  },
+  {
+   "expect": "programs.0.name",
+   "value": "PGN-EDODM1"
+  },
+  {
+   "set": "Drug name",
+   "value": "PGN-EDODM1"
+  },
+  {
+   "expect": "programs.0.drugName",
+   "value": "PGN-EDODM1"
+  },
+  {
+   "set": "Indication",
+   "value": "Myotonic dystrophy type 1 — adults"
+  },
+  {
+   "expect": "programs.0.indication",
+   "value": "Myotonic dystrophy type 1 — adults"
+  },
+  {
+   "select": "Therapeutic area",
+   "value": "Neurology"
+  },
+  {
+   "expect": "programs.0.therapeuticArea",
+   "value": "Neurology"
+  },
+  {
+   "select": "Modality",
+   "value": "smallMolecule"
+  },
+  {
+   "expect": "programs.0.modality",
+   "value": "smallMolecule"
+  },
+  {
+   "select": "Current phase",
+   "value": "phase2"
+  },
+  {
+   "expect": "programs.0.currentPhase",
+   "value": "phase2"
+  },
+  {
+   "set": "Launch in year (from today)",
+   "value": "5"
+  },
+  {
+   "expect": "programs.0.launchYearOffset",
+   "value": "5"
+  },
+  {
+   "set": "Key trials (NCT numbers)",
+   "value": "NCT06667453, NCT06204809, NCT07220603"
+  },
+  {
+   "expect": "programs.0.trialIds",
+   "value": "NCT06667453, NCT06204809, NCT07220603"
+  },
+  {
+   "set": "Target gene",
+   "value": "DMPK"
+  },
+  {
+   "expect": "programs.0.target",
+   "value": "DMPK"
+  },
+  {
+   "set": "Override total years (optional) (yr)",
+   "value": "4.5"
+  },
+  {
+   "expect": "programs.0.rndOverride.totalYears",
+   "value": "4.5"
+  },
+  {
+   "set": "Override total cost (optional) ($M)",
+   "value": "320"
+  },
+  {
+   "expect": "programs.0.rndOverride.totalCostM",
+   "value": "320"
+  },
+  {
+   "click": "I know incidence"
+  },
+  {
+   "set": "Annual incidence (new cases/yr) (pts/yr)",
+   "value": "450"
+  },
+  {
+   "set": "Disease duration (yrs pt lives w/ disease) (yrs)",
+   "value": "55"
+  },
+  {
+   "click": "I know prevalence"
+  },
+  {
+   "expect": "programs.0.revenueBuild.population.incidence",
+   "value": "450"
+  },
+  {
+   "expect": "programs.0.revenueBuild.population.diseaseDurationYears",
+   "value": "55"
+  },
+  {
+   "expect": "programs.0.revenueBuild.population.mode",
+   "value": "prevalence"
+  },
+  {
+   "set": "Prevalence (existing cases, target region) (pts)",
+   "value": "40000"
+  },
+  {
+   "expect": "programs.0.revenueBuild.population.prevalence",
+   "value": "40000"
+  },
+  {
+   "set": "Diagnosis rate (%)",
+   "value": "60"
+  },
+  {
+   "expect": "programs.0.revenueBuild.population.diagnosisRatePct",
+   "value": "60"
+  },
+  {
+   "set": "Treatment rate (%)",
+   "value": "55"
+  },
+  {
+   "expect": "programs.0.revenueBuild.population.treatmentRatePct",
+   "value": "55"
+  },
+  {
+   "set": "Eligible subgroup (%)",
+   "value": "75"
+  },
+  {
+   "expect": "programs.0.revenueBuild.population.eligiblePct",
+   "value": "75"
+  },
+  {
+   "set": "Adherence / persistence rate (%)",
+   "value": "85"
+  },
+  {
+   "expect": "programs.0.revenueBuild.adherencePct",
+   "value": "85"
+  },
+  {
+   "select": "Total drugs in market at peak (incl. this one)",
+   "value": "4"
+  },
+  {
+   "expect": "programs.0.revenueBuild.marketShare.numDrugs",
+   "value": 4
+  },
+  {
+   "select": "This drug's order of entry",
+   "value": "3"
+  },
+  {
+   "expect": "programs.0.revenueBuild.marketShare.orderOfEntry",
+   "value": 3
+  },
+  {
+   "set": "Override peak share (optional) (%)",
+   "value": "23"
+  },
+  {
+   "expect": "programs.0.revenueBuild.marketShare.peakShareOverridePct",
+   "value": "23"
+  },
+  {
+   "set": "Years to peak (yrs)",
+   "value": "6"
+  },
+  {
+   "expect": "programs.0.revenueBuild.launchCurve.yearsToPeak",
+   "value": "6"
+  },
+  {
+   "select": "Ramp shape",
+   "value": "median"
+  },
+  {
+   "expect": "programs.0.revenueBuild.launchCurve.profile",
+   "value": "median"
+  },
+  {
+   "set": "US annual price per patient ($/yr)",
+   "value": "350000"
+  },
+  {
+   "expect": "programs.0.revenueBuild.pricing.usAnnualPrice",
+   "value": "350000"
+  },
+  {
+   "select": "Price basis",
+   "value": "WAC"
+  },
+  {
+   "expect": "programs.0.revenueBuild.pricing.priceBasis",
+   "value": "WAC"
+  },
+  {
+   "set": "Net price realization (%)",
+   "value": "80"
+  },
+  {
+   "expect": "programs.0.revenueBuild.pricing.netPriceRealizationPct",
+   "value": "80"
+  },
+  {
+   "set": "Annual US price growth (%)",
+   "value": "2"
+  },
+  {
+   "expect": "programs.0.revenueBuild.pricing.usAnnualGrowthPct",
+   "value": "2"
+  },
+  {
+   "check": "Include ex-US revenue",
+   "value": true
+  },
+  {
+   "expect": "programs.0.revenueBuild.pricing.includeExUS",
+   "value": true
+  },
+  {
+   "set": "Ex-US price as % of US price (%)",
+   "value": "50"
+  },
+  {
+   "expect": "programs.0.revenueBuild.pricing.exUSPriceFactorPct",
+   "value": "50"
+  },
+  {
+   "set": "Ex-US annual price growth (%)",
+   "value": "0"
+  },
+  {
+   "expect": "programs.0.revenueBuild.pricing.exUSAnnualGrowthPct",
+   "value": "0"
+  },
+  {
+   "set": "Ex-US patient pool vs US (%)",
+   "value": "180"
+  },
+  {
+   "expect": "programs.0.revenueBuild.pricing.exUSPatientMultiplierPct",
+   "value": "180"
+  },
+  {
+   "set": "Years from launch to LOE (yrs)",
+   "value": "10"
+  },
+  {
+   "expect": "programs.0.revenueBuild.exclusivity.yearsToLOE",
+   "value": "10"
+  },
+  {
+   "set": "Volume retained after LOE (%)",
+   "value": "45"
+  },
+  {
+   "expect": "programs.0.revenueBuild.exclusivity.volumeRetainedPct",
+   "value": "45"
+  },
+  {
+   "set": "Price decline after LOE (%)",
+   "value": "35"
+  },
+  {
+   "expect": "programs.0.revenueBuild.exclusivity.priceDeclinePct",
+   "value": "35"
+  },
+  {
+   "set": "COGS (% of revenue) (%)",
+   "value": "12"
+  },
+  {
+   "expect": "programs.0.costStructure.cogsPct",
+   "value": "12"
+  },
+  {
+   "set": "Primary care reps",
+   "value": "0"
+  },
+  {
+   "expect": "programs.0.costStructure.reps.primaryCare",
+   "value": "0"
+  },
+  {
+   "set": "Specialty reps",
+   "value": "60"
+  },
+  {
+   "expect": "programs.0.costStructure.reps.specialty",
+   "value": "60"
+  },
+  {
+   "set": "Hospital-based reps",
+   "value": "0"
+  },
+  {
+   "expect": "programs.0.costStructure.reps.hospital",
+   "value": "0"
+  },
+  {
+   "set": "Marketing (% of peak revenue) (%)",
+   "value": "3"
+  },
+  {
+   "expect": "programs.0.costStructure.marketingPctOfPeak",
+   "value": "3"
+  },
+  {
+   "select": "Patient selection",
+   "value": "selection"
+  },
+  {
+   "expect": "programs.0.posBiomarkerUse",
+   "value": "selection"
+  },
+  {
+   "select": "Disease population",
+   "value": "rare"
+  },
+  {
+   "expect": "programs.0.posDiseaseType",
+   "value": "rare"
+  },
+  {
+   "set": "Cumulative PoS to launch (Base case) (%)",
+   "value": "15"
+  },
+  {
+   "expect": "programs.0.posOverridePct",
+   "value": "15"
+  },
+  {
+   "check": "Priority Review Voucher-eligible (e.g. rare pediatric disease designation)",
+   "value": true
+  },
+  {
+   "set": "PRV value ($M)",
+   "value": "150"
+  },
+  {
+   "check": "Priority Review Voucher-eligible (e.g. rare pediatric disease designation)",
+   "value": false
+  },
+  {
+   "expect": "programs.0.prv.enabled",
+   "value": false
+  },
+  {
+   "check": "Partnered asset (licensed rights, royalty/milestone deal)",
+   "value": true
+  },
+  {
+   "check": "Partnered asset (licensed rights, royalty/milestone deal)",
+   "value": false
+  },
+  {
+   "expect": "programs.0.partnership.enabled",
+   "value": false
+  },
+  {
+   "tab": "scenarios"
+  },
+  {
+   "openAll": true
+  },
+  {
+   "tab": "assumptions"
+  },
+  {
+   "check": "Include terminal value beyond the projection window",
+   "value": true
+  },
+  {
+   "tab": "scenarios"
+  },
+  {
+   "set": "Base PoS adjustment (%)",
+   "value": "100"
+  },
+  {
+   "expect": "basePosAdjustmentPct",
+   "value": "100"
+  },
+  {
+   "set": "Peak share multiplier (%)",
+   "value": "60",
+   "nth": 0
+  },
+  {
+   "expect": "scenarioOverrides.bear.shareMultiplierPct",
+   "value": "60"
+  },
+  {
+   "set": "PoS multiplier (%)",
+   "value": "60",
+   "nth": 0
+  },
+  {
+   "expect": "scenarioOverrides.bear.posMultiplierPct",
+   "value": "60"
+  },
+  {
+   "set": "Discount rate adjustment (pp)",
+   "value": "3",
+   "nth": 0
+  },
+  {
+   "expect": "scenarioOverrides.bear.discountRateAddPct",
+   "value": "3"
+  },
+  {
+   "set": "Exit multiple override (x)",
+   "value": "3",
+   "nth": 0
+  },
+  {
+   "expect": "scenarioOverrides.bear.exitMultiple",
+   "value": "3"
+  },
+  {
+   "set": "Peak share multiplier (%)",
+   "value": "140",
+   "nth": 1
+  },
+  {
+   "expect": "scenarioOverrides.bull.shareMultiplierPct",
+   "value": "140"
+  },
+  {
+   "set": "PoS multiplier (%)",
+   "value": "150",
+   "nth": 1
+  },
+  {
+   "expect": "scenarioOverrides.bull.posMultiplierPct",
+   "value": "150"
+  },
+  {
+   "set": "Discount rate adjustment (pp)",
+   "value": "-1",
+   "nth": 1
+  },
+  {
+   "expect": "scenarioOverrides.bull.discountRateAddPct",
+   "value": "-1"
+  },
+  {
+   "set": "Exit multiple override (x)",
+   "value": "5",
+   "nth": 1
+  },
+  {
+   "tab": "assumptions"
+  },
+  {
+   "check": "Include terminal value beyond the projection window",
+   "value": false
+  },
+  {
+   "tab": "scenarios"
+  },
+  {
+   "expect": "scenarioOverrides.bull.exitMultiple",
+   "value": "5"
+  },
+  {
+   "wait": 800
+  },
+  {
+   "set": "Clear wins as a share of all wins (%)",
+   "value": "30"
+  },
+  {
+   "expect": "readoutScenarios.clearOfWinsPct",
+   "value": "30"
+  },
+  {
+   "set": "Clear win odds to launch (%)",
+   "value": "64"
+  },
+  {
+   "expect": "readoutScenarios.clearPosPct",
+   "value": "64"
+  },
+  {
+   "set": "Clear win peak share vs Base (%)",
+   "value": "110"
+  },
+  {
+   "expect": "readoutScenarios.clearSharePct",
+   "value": "110"
+  },
+  {
+   "set": "Modest win odds to launch (%)",
+   "value": "41"
+  },
+  {
+   "expect": "readoutScenarios.modestPosPct",
+   "value": "41"
+  },
+  {
+   "set": "Modest win peak share vs Base (%)",
+   "value": "70"
+  },
+  {
+   "expect": "readoutScenarios.modestSharePct",
+   "value": "70"
+  },
+  {
+   "tab": "overview"
+  },
+  {
+   "wait": 1200
+  },
+  {
+   "openAll": true
+  },
+  {
+   "set": "Share of FDA rejections fixed on resubmission (%)",
+   "value": "47"
+  },
+  {
+   "expect": "outcomeTree.resubmitFixPct",
+   "value": "47"
+  }
+ ]
+}

@@ -112,28 +112,34 @@ function CaseGlanceChart({ evidence, moreCount, pos, value, label }) {
   // ── Odds ──
   caption(od.x - 8, wide ? 18 : od.y - 26, "ODDS OF REACHING LAUNCH");
   rule(od.x - 8, od.x + od.w + 10, wide ? 28 : od.y - 16);
-  const lo = Math.max(0, Math.min(pos.bear, pos.implied != null ? pos.implied : pos.bear) - 12);
-  const hi = Math.min(100, Math.max(pos.bull, pos.implied != null ? pos.implied : pos.bull) + 12);
+  // The curve runs from the lowest of the three odds to the highest. Bull's
+  // odds are normally the highest, but not while a multiplier is being typed
+  // ("1" on the way to "150") or if a case really sets Bull below Bear — and
+  // a curve built from Bear to Bull then had no points, leaving an SVG path
+  // that began with "L" (a console error, and no shading at all).
+  const oLo = Math.min(pos.bear, pos.base, pos.bull), oHi = Math.max(pos.bear, pos.base, pos.bull);
+  const lo = Math.max(0, Math.min(oLo, pos.implied != null ? pos.implied : oLo) - 12);
+  const hi = Math.min(100, Math.max(oHi, pos.implied != null ? pos.implied : oHi) + 12);
   const oTicks = niceAxisTicks(lo, hi, 4).ticks.filter(t => t >= lo && t <= hi);
   const my = od.y + od.h - 60, mh = Math.min(150, od.h - 150);
   const px = p => od.x + (p - lo) / ((hi - lo) || 1) * od.w;
-  const tri = p => p <= pos.bear || p >= pos.bull ? 0 : p <= pos.base ? (p - pos.bear) / ((pos.base - pos.bear) || 1) : (pos.bull - p) / ((pos.bull - pos.base) || 1);
+  const tri = p => p <= oLo || p >= oHi ? 0 : p <= pos.base ? (p - oLo) / ((pos.base - oLo) || 1) : (oHi - p) / ((oHi - pos.base) || 1);
   let curve = "";
-  for (let p = pos.bear - 3; p <= pos.bull + 3; p += 0.25) { const t = tri(p); const s = t * t * (3 - 2 * t); curve += (curve ? "L" : "M") + px(Math.max(lo, Math.min(hi, p))).toFixed(1) + "," + (my - s * mh).toFixed(1); }
+  if (isFinite(oLo) && isFinite(oHi)) for (let p = oLo - 3; p <= oHi + 3; p += 0.25) { const t = tri(p); const s = t * t * (3 - 2 * t); curve += (curve ? "L" : "M") + px(Math.max(lo, Math.min(hi, p))).toFixed(1) + "," + (my - s * mh).toFixed(1); }
   els.push(h("g", { key: "odds" },
-    h("path", { d: curve + " L" + px(Math.min(hi, pos.bull + 3)) + "," + my + " L" + px(Math.max(lo, pos.bear - 3)) + "," + my + " Z", fill: "var(--teal)", opacity: 0.1 }),
-    h("path", { d: curve, fill: "none", stroke: "var(--teal)", strokeWidth: 2 }),
+    curve && h("path", { d: curve + " L" + px(Math.min(hi, oHi + 3)) + "," + my + " L" + px(Math.max(lo, oLo - 3)) + "," + my + " Z", fill: "var(--teal)", opacity: 0.1 }),
+    curve && h("path", { d: curve, fill: "none", stroke: "var(--teal)", strokeWidth: 2 }),
     h("line", { x1: px(pos.base), x2: px(pos.base), y1: my - mh, y2: my, stroke: "var(--teal)", strokeDasharray: "3,3" }),
     h("circle", { cx: px(pos.base), cy: my - mh, r: 5, fill: "var(--teal)" }),
     h("text", { x: px(pos.base), y: my - mh - 40, textAnchor: "middle", fontSize: 30, fontWeight: 600, fontFamily: "var(--sans)", fill: "var(--ink-1)" }, Math.round(pos.base) + "%"),
-    h("text", { x: px(pos.base), y: my - mh - 18, textAnchor: "middle", fontSize: 11.5, fontFamily: "var(--sans)", fill: "var(--ink-2)" }, "your PoS · range " + Math.round(pos.bear) + "–" + Math.round(pos.bull) + "%"),
+    h("text", { x: px(pos.base), y: my - mh - 18, textAnchor: "middle", fontSize: 11.5, fontFamily: "var(--sans)", fill: "var(--ink-2)" }, "your PoS · range " + Math.round(oLo) + "–" + Math.round(oHi) + "%"),
     h("line", { x1: od.x - 8, x2: od.x + od.w + 8, y1: my, y2: my, stroke: "var(--ink-3)" }),
     oTicks.map(t => h("g", { key: "ot" + t },
       h("line", { x1: px(t), x2: px(t), y1: my, y2: my + 4, stroke: "var(--ink-3)" }),
       h("text", { x: px(t), y: my + 18, textAnchor: "middle", fontSize: 10.5, fontFamily: "var(--mono)", fill: "var(--ink-3)" }, t + "%"))),
     pos.implied != null && h("path", { d: "M" + px(pos.implied) + "," + (my + 24) + " l-5,8 h10 z", fill: "var(--amber)" }),
     pos.implied != null && h("text", { x: px(pos.implied), y: my + 46, textAnchor: "middle", fontSize: 11, fontWeight: 600, fontFamily: "var(--sans)", fill: "var(--amber)" }, "price implies " + Math.round(pos.implied) + "%")));
-  if (wide) anchors.forEach((a, i) => els.push(h("path", { key: "flow" + i, d: "M" + (ev.x + cardW) + "," + a.y + " C" + (ev.x + cardW + 55) + "," + a.y + " " + (od.x - 45) + "," + my + " " + px(Math.max(lo, pos.bear - 3)) + "," + my,
+  if (wide) anchors.forEach((a, i) => els.push(h("path", { key: "flow" + i, d: "M" + (ev.x + cardW) + "," + a.y + " C" + (ev.x + cardW + 55) + "," + a.y + " " + (od.x - 45) + "," + my + " " + px(Math.max(lo, oLo - 3)) + "," + my,
     fill: "none", stroke: a.col, strokeOpacity: 0.45, strokeWidth: 1.4, strokeDasharray: a.dashed ? "4,3" : "none" })));
 
   // ── Value ──
