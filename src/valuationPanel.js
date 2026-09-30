@@ -663,7 +663,9 @@ function useValuationSections({ theCase, onChange, goToTab }) {
               (theCase.programs.length === 1 && s.result.programVals && s.result.programVals[0] && s.result.programVals[0].posToLaunch != null
                 ? "PoS " + (s.result.programVals[0].posToLaunch * 100).toFixed(1) + "%"
                 : s.preset.posMultiplierPct + "% of modeled PoS")
-              + " · " + (s.preset.discountRateAddPct >= 0 ? "+" : "") + s.preset.discountRateAddPct + "pp disc."
+              // The rate is normally the same in every scenario (the odds carry
+              // the risk), so it is only mentioned when a scenario changes it.
+              + (Number(s.preset.discountRateAddPct) ? " · " + (s.preset.discountRateAddPct > 0 ? "+" : "") + s.preset.discountRateAddPct + "pp disc." : "")
               + (valMethod === "multiple" ? " · " + numOr(multipleAssumptions[s.key], 3).toFixed(1) + "x" : "")),
             h("div", { style: UI.caption }, "Enterprise value (rNPV)"),
             h("div", { style: { fontSize: 15, fontFamily: "var(--mono)", fontWeight: 700, color: "var(--ink-1)", marginBottom: 6 } }, fmtMoney(s.result.npvResult.npv)),

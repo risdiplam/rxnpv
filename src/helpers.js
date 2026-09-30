@@ -1290,10 +1290,12 @@ function MonteCarloBox({ theCase, discountRatePct, tv, baseValue }) {
       h(Explain, Object.assign({ onTint: true }, readMonteCarlo(result.sortedValues, result.percentiles.p10, result.percentiles.p90, theCase.currentPrice !== "" && theCase.currentPrice != null ? Number(theCase.currentPrice) : null, result.drivers))),
       // Secondary detail, one click away rather than always on screen.
       h("div", { style: { marginTop: 10 } }, h(Note, { summary: "Why the median differs from Base, and what drives the spread" },
-        h("div", { style: { marginBottom: 8 } }, "Median can differ from the Base-case point estimate above — that's expected, not a discrepancy: discounting is non-linear (a higher rate hurts value more than an equal-sized lower rate helps it), so averaging across a range captures that in a way three fixed points can't."),
+        h("div", { style: { marginBottom: 8 } }, "Median can differ from the Base-case point estimate above — that's expected, not a discrepancy: the Bear-to-Bull ranges are rarely symmetric around Base, and value does not move in a straight line with each input (odds and share multiply, and a discount rate, where your scenarios vary it, hurts more going up than it helps going down), so averaging across a range captures what three fixed points can't."),
       h("div", { style: { marginTop: 4 } },
         h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-2)", marginBottom: 6 } }, "What's driving the spread (correlation with fair value)"),
-        result.drivers.map(d => h("div", { key: d.key, style: { display: "flex", justifyContent: "space-between", fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-2)", marginBottom: 3 } },
+        // An input the scenarios do not vary (usually the discount rate) has
+        // no spread to drive, so it is left out rather than listed at +0.00.
+        result.drivers.filter(d => Math.abs(d.correlation) >= 0.005).map(d => h("div", { key: d.key, style: { display: "flex", justifyContent: "space-between", fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-2)", marginBottom: 3 } },
           h("span", null, d.label), h("span", null, (d.correlation >= 0 ? "+" : "") + d.correlation.toFixed(2))))
       )))
     )

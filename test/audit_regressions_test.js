@@ -316,6 +316,17 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
     ok(!!table && table.querySelectorAll("tbody tr").length === 16, "Projections: the table shows the first 16 years");
     ok(!!table && /Enterprise value \$1\.62B/.test(table.querySelector("tfoot").textContent), "Projections: the table ends at the Base enterprise value");
     const lastRun = table && [...table.querySelectorAll("tbody tr")].pop().lastChild.textContent;
+    // "If it works" beside the odds-weighted scenarios, and the Projections
+    // card's world toggle: the if-it-works table drops the "× odds" column and
+    // ends at the enterprise value of the case at 100% odds.
+    ok(/If it works\s*\$41\.32/.test(panel.textContent) && /not the failure case/.test(panel.textContent), "Headline: If it works $41.32 beside Bear/Base/Bull, with Base explained");
+    const worldBtn = l => [...panel.querySelectorAll('[aria-label="Which world to show"] button')].find(b => b.textContent === l);
+    click(worldBtn("If it works")); await wait(300);
+    const wTable = panel.querySelector(".proj-table");
+    const heads = wTable ? [...wTable.querySelectorAll("thead th")].map(t => t.textContent) : [];
+    ok(worldBtn("If it works") && worldBtn("If it works").getAttribute("aria-pressed") === "true" && heads.includes("Revenue") && !heads.includes("Revenue × odds") && /Enterprise value \$2\.\d\dB/.test(wTable.querySelector("tfoot").textContent), "Projections: If it works shows the success world (" + (wTable && wTable.querySelector("tfoot").textContent) + ")");
+    click(worldBtn("× odds")); await wait(300);
+    ok(/Enterprise value \$1\.62B/.test(panel.querySelector(".proj-table tfoot").textContent), "Projections: × odds goes back to the odds-weighted table");
     ok(!!panel.querySelector('svg[aria-label^="Year-by-year"]'), "Projections: the chart renders");
     const showAll = [...panel.querySelectorAll("button")].find(b => /^Show all \d+ years/.test(b.textContent));
     ok(!!showAll, "Projections: offers the remaining years");
