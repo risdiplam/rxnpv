@@ -911,7 +911,7 @@ Verified: 14 suites, lint clean, UI audit zero findings in both themes and at 90
 - Asset Program missed trials registered under a code name.
 - Runway vs. Catalyst ran a late catalyst's label off the card.
 
-**Proposed, not added:** UCB–Zogenix, Spinraza, Epidiolex and Fintepla sales, and the Stoke–Biogen licence (`docs/comps_candidates/2026-09-28-dravet.md`).
+**Comps added on approval (2026-09-30):** UCB–Zogenix, Spinraza, Epidiolex and Fintepla sales, and the Stoke–Biogen licence — each re-read in its primary document first (`docs/comps_candidates/2026-09-28-dravet.md`). The sample's M&A Premium example now uses Zogenix's 72%, and its Peak Sales example filters for the Dravet drugs.
 
 Verified: 15 suites (new: `worked_examples_test.js`), 1,232 math checks, lint clean, UI audit zero findings, export sweep with only the known ink-score flags.
 

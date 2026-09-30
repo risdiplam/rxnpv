@@ -294,7 +294,7 @@ function PeakSalesCompsTool({ cases, updateCase, activeCase }) {
         const maxB = Math.max(...chartDrugs.map(d => d.peakSalesB), 1);
         return h("div", { style: { marginBottom: 16, padding: "10px 12px", borderRadius: 8, background: "var(--surface-2)" } },
           ownDrugs.length > 0 && h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--amber)", marginBottom: 8 } },
-            "Amber = " + (exportCase ? possessive(exportCase.name) : "your case's") + " own asset" + (ownDrugs.length > 1 ? "s" : "") + " (" + ownDrugs.map(d => d.drug + " $" + d.peakSalesB.toFixed(2) + "B").join(", ") + ") — shown in its correct position among real comps, not pinned to the bottom."),
+            "Highlighted: " + (exportCase ? possessive(exportCase.name) : "your case's") + " own asset" + (ownDrugs.length > 1 ? "s" : "") + " (" + ownDrugs.map(d => d.drug + " $" + d.peakSalesB.toFixed(2) + "B").join(", ") + ") — shown in its correct position among real comps, not pinned to the bottom."),
           h("div", { style: { display: "flex", flexDirection: "column", gap: 3, maxHeight: 320, overflowY: "auto" } },
             chartDrugs.map((d, i) => h("div", { key: i, style: { display: "flex", alignItems: "center", gap: 8 } },
               h("div", { title: d.drug, style: { width: 170, fontSize: 10, fontFamily: "var(--mono)", color: d._own ? "var(--amber)" : "var(--ink-3)", fontWeight: d._own ? 700 : 400, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flexShrink: 0 } }, d.drug),
