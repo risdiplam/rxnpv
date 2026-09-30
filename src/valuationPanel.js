@@ -33,6 +33,13 @@ function useValuationSections({ theCase, onChange, goToTab }) {
   const setCap = (patch) => update({ capitalStructure: { ...cap, ...patch } });
 
   const [edgarQuery, setEdgarQuery] = React.useState(theCase.ticker || theCase.name || "");
+  // Follows the case's ticker (else its name) until the user types here: it
+  // used to be read once, when the card first appeared, so a case created and
+  // then named in the header still searched EDGAR for "New Case".
+  const edgarTyped = React.useRef(false);
+  React.useEffect(() => {
+    if (!edgarTyped.current) setEdgarQuery(theCase.ticker || theCase.name || "");
+  }, [theCase.id, theCase.ticker, theCase.name]);
   const [edgarLoading, setEdgarLoading] = React.useState(false);
   const [edgarResult, setEdgarResult] = React.useState(null);
   const [edgarError, setEdgarError] = React.useState(null);
@@ -414,7 +421,7 @@ function useValuationSections({ theCase, onChange, goToTab }) {
       isDesktop && h("div", { style: { padding: "10px 12px", borderRadius: 8, background: "var(--surface-2)", marginBottom: 14 } },
         h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginBottom: 6, } }, "Pull financials from SEC EDGAR"),
         h("div", { style: { display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" } },
-          h("input", { type: "text", "aria-label": "Company name or ticker to pull from EDGAR", value: edgarQuery, placeholder: "Company name or ticker", onChange: e => setEdgarQuery(e.target.value),
+          h("input", { type: "text", "aria-label": "Company name or ticker to pull from EDGAR", value: edgarQuery, placeholder: "Company name or ticker", onChange: e => { edgarTyped.current = true; setEdgarQuery(e.target.value); },
             style: { flex: "1 1 200px", padding: "6px 10px", borderRadius: 6, border: "1.5px solid var(--rule)", background: "var(--surface)", color: "var(--ink-1)", fontFamily: "var(--mono)", fontSize: 12 } }),
           h("button", { onClick: () => pullFromEdgar(false), disabled: edgarLoading,
             style: { padding: "6px 14px", borderRadius: 6, border: "1px solid var(--teal)", background: "var(--teal-bg)", color: "var(--teal)", fontFamily: "var(--mono)", fontSize: 11, fontWeight: 700, cursor: edgarLoading ? "default" : "pointer" }

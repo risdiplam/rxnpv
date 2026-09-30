@@ -18,6 +18,9 @@ const dom = new JSDOM(html, { runScripts: "dangerously", pretendToBeVisual: true
     w.console.error = (...a) => errors.push("ERROR: " + a.join(" ").slice(0, 250));
     w.addEventListener("error", e => errors.push("UNCAUGHT: " + (e.error && e.error.stack || e.message).slice(0, 350)));
     w.fetch = async () => ({ ok: false, status: 404 });
+    // The desktop flag only, so desktop-only controls (the EDGAR box) render;
+    // no edgarFetch bridge, so nothing reaches the network.
+    w.electronAPI = { isDesktop: true };
   } });
 const wait = ms => new Promise(r => setTimeout(r, ms));
 
@@ -32,6 +35,20 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
   click(btn("+ New case")); await wait(400);
   setVal(inputsByLabel("Peak worldwide revenue")[0], "1000"); await wait(150);
   setVal(inputsByLabel("Fully diluted shares")[0], "100000000"); await wait(200);
+
+  // ── The EDGAR box follows the case's ticker until the user types in it ──
+  // It was read once when the card mounted, so a new case named afterwards
+  // still searched EDGAR for "New Case" (seen filling in the PepGen case).
+  {
+    const eq = () => d.querySelector('input[aria-label="Company name or ticker to pull from EDGAR"]');
+    ok(!!eq(), "EDGAR box: present on a new case");
+    setVal(d.querySelector('input[aria-label="Ticker symbol"]'), "PEPG"); await wait(250);
+    ok(eq() && eq().value === "PEPG", "EDGAR box: follows a ticker typed after the case was created (got " + (eq() && eq().value) + ")");
+    setVal(eq(), "PepGen Inc"); await wait(150);
+    setVal(d.querySelector('input[aria-label="Ticker symbol"]'), "PEPGX"); await wait(250);
+    ok(eq().value === "PepGen Inc", "EDGAR box: once typed in, a ticker change leaves it alone (got " + eq().value + ")");
+    setVal(d.querySelector('input[aria-label="Ticker symbol"]'), ""); await wait(200);
+  }
 
   // ── FIN-001 — Bear/Bull peak-revenue override: display = stored = used ──
   // The field is labelled $M. Typing 1000 means $1,000M = $1,000,000,000,
