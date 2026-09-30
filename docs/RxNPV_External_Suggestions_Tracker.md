@@ -935,3 +935,31 @@ Verified: 15 suites, 1,242 math checks, lint clean; both fixes looked at in the 
 
 **Found by typing every input by hand (the PepGen pass).** A new harness, `test/packaged/case_fill.js`, fills a case through the packaged app's own fields — typed one key at a time, as a person types — and then checks every stored value. Its first real catch: **every $M field corrupted decimals from $100M up.** The field redisplayed the stored value rounded to whole millions on every keystroke, so typing 117.238 into Cash stored $11,738,000,000. Every earlier test set whole values at once and could not see it. MillionsField now shows exactly what is typed while it has focus, reformats on leaving, and displays up to three decimals; an audit regression types it key by key and was confirmed to fail on the old code. Second catch: the case-at-a-glance odds curve ran from Bear to Bull odds, so with Bull's odds momentarily below Bear's (while typing "150") the path had no points and threw an SVG error — it now spans the lowest to the highest of the three.
 
+
+## Phase 47 — The PepGen pass: every input, every export, the math rebuilt from scratch
+
+✅ From the user: "do another full blown test using $PEPG… touch every input, every export, review every chart and graph, every simulation, and most importantly, check all of the math." Then, overnight: "continue to run an overall top down audit of everything."
+
+**The math, rebuilt independently.** PepGen's valuation was recomputed from its inputs with formulas written out in the test itself — funnel, pricing (WAC × 80% in the US, the entered price × 50% ex-US), launch curve, erosion, COGS, reps, marketing, the $320M R&D override split by stage odds, corporate G&A, NOL tax, end-of-year discounting and the dilution bridge — with only benchmark lookups taken from the app. All 25 years of Bear, Base and Bull match to under $1; $0.2475 / $1.3767 / $3.5842 a share. It is pinned in `math_verification.js` against `test/fixtures/pepgen_case.json` (the case exactly as typed into the packaged app).
+
+**Four engine defects that rebuild and the screen review found:**
+- **The price-implied odds and share ignored the modelled raise.** Typing the "implied" 22.5% back into PepGen showed $2.19, not the $2.34 price, and the implied peak share (33%) disagreed with the break-even chart beside it (35%). Both solvers now solve on the headline's own per-share value, raise included: 23.9% and 35.2%. A raise at today's price gives the same answer as before.
+- **Stage odds did not multiply back to the requested odds when a stage hit the 99% cap** — the excess was dropped, so revenue and stage costs were weighted at different odds. Every "if it works" figure (a 100% override) ran PepGen at 69% × 99% × 99%, charging its $230M Phase 3 at 69% in a world where the drug certainly launches; Stoke's Bull asked for 84.5% and charged costs at 81%. A capped stage now hands its excess to the others. PepGen's value if it works: $10.19 → $9.83 (confirmed by the independent rebuild at 100%); runway 1.6 → 1.5 years. Base/Bear/Bull unchanged; Stoke's figures do not move at two decimals.
+- **The runway red flag ignored a modelled raise** and told PepGen its financing was "not yet reflected in the capital structure". It now counts the raise and says so (1.5 years, 2.4 with the $100M).
+- **Wording:** "A 8-point gap" (now `aNum()`), and a 63% miss described as "one time in two" (now "about six times in ten").
+
+**Two data-extraction defects:**
+- **Condition searches were contaminated by ClinicalTrials.gov's synonym expansion.** "Myotonic dystrophy type 1" is expanded through "DM1" to T-DM1 (trastuzumab emtansine): 18 of 23 Phase 2 trials with posted results, and all 7 Phase 3 ones, were breast and gastric cancer trials. The analog effect-size board would have read their hazard ratios as the DM1 reference class; the competitor scan listed Genentech as a DM1 competitor. `filterStudiesByCondition()` keeps a hit only when its registered conditions, keywords, titles or MeSH terms contain the query's real words, and every panel counts what it left out.
+- **openFDA label Warnings & Precautions never showed**, on any drug: the app read `warnings_and_precautions`, which openFDA does not have (`warnings_and_cautions`, or `warnings` on older labels).
+
+**UI:** the capital-structure EDGAR box now follows the case's ticker (it searched for "New Case" on a case named after creation); the per-asset risk waterfall says it is before corporate G&A and tax (it read $177M beside a case NPV of −$51M); the year-by-year chart's end label no longer touches the last bar.
+
+**PepGen is a second built-in sample.** "Load sample case" offers Stoke (Dravet, Phase 3) or PepGen (DM1, Phase 2). Same inputs as the typed-in case, 25 sourced evidence entries, a calibration entry and 22 worked examples, each checked against the live source it reads; where no honest DM1 data exists the case says so instead of inventing an example.
+
+**Harness work:** `case_fill.js` gained Evidence Log / calibration forms, a full partnership-form pass (added, checked mid-run with `expectNow`, cleared) and `clickLabel`; `export_sweep.js` takes `--case=<file>` (PepGen: 914 checks; the 9 ink flags were each looked at — margins, expanded scroll boxes, small forms); API health adds a live DM1 check, PepGen's 10-Q figures as a second EDGAR extraction check, and label-warning checks.
+
+**Open for the user — model choices, not bugs, and not changed overnight:**
+- **Corporate G&A is charged at full rate in every year, including after a failure.** A company that fails winds down (the failure floor already uses a wind-down input). Weighting G&A by survival would add about $0.71 a share to PepGen (half its Base value) and $0.68 to Stoke. It reprices every case, so it waits for a decision.
+- **The failure floor charges a stage's full benchmark-proportioned cost as still to come** — PepGen's is $0 because it charges all of Phase 2's ~$75M, although FREEDOM2 is mostly paid for.
+- **The dilution path prices every projected raise at a discount to today's price**, which for a company five years from launch issues ~170M shares (PepGen Base $0.57 with it on).
+- **RSUs are not in EDGAR's fully diluted pull** — PepGen does not tag them in XBRL; they stay a manual input.
