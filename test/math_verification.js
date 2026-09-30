@@ -4472,6 +4472,73 @@ section("Trial comparison");
   const same = api.compareTrials([st("A", "PLACEBO_COMPARATOR", "Week 14", 1), st("B", "PLACEBO_COMPARATOR", "Week 15", 2)]);
   ok("compare: a week apart is not a difference", !same.designDiff && !same.timeDiff);
 }
+section("Stoke, the whole case recomputed from its inputs (Bear, Base, Bull)");
+{
+  // test/fixtures/stoke_sample_case.json is sampleCaseStoke()'s inputs
+  // (backup_test holds the two equal). It exercises what PepGen does not: an
+  // ex-US royalty replacing ex-US sales, COGS and marketing charged on US
+  // sales only, 30% of R&D paid by the partner, R&D squeezed into a one-year
+  // launch window, a PRV and a milestone paid in the launch year, in-the-money
+  // options by the treasury method, and a raise at a price override.
+  //   Treated     15,700 x 75% x 60% x 80% = 5,652; x 60% share x 85% = 2,882.5 at peak
+  //   US          $375,000 WAC x 80% = $300,000, +3% a year; 5-year median ramp
+  //   Ex-US       140% of US patients x $187,500 (50% of the entered price), flat,
+  //               replaced by a 15% royalty on it
+  //   LOE         year 12: 45% of volume x 65% of price
+  //   Costs       COGS 10% and marketing 3% of peak US sales — on US sales only;
+  //               50 specialty reps x $280,000 (+2%/yr), 30% in the year before launch
+  //   R&D         $200M split by benchmark, x 70% (Biogen pays 30%), x odds of
+  //               reaching each stage, all in year 0 (a 1.4-year timeline in a
+  //               1-year window)
+  //   G&A $95M before revenue; tax 21% after a $301.7M NOL; discount 12% (+3 / -1)
+  //   Equity      NPV + $420M cash + PRV $190M x P(launch) / 1.12 + milestone
+  //               $100M x P(launch) / 1.12 + $194M raise
+  //   Shares      68,229,972 + 11,532,638 x (1 - 13.84 / 24.80) + 2,157,698
+  //               + 194M / 24.06 = 83,547,527
+  // The scenario runs caught a real defect: Bear/Bull left the royalty part of
+  // revenue and the peak commercial revenue at Base size (marketing charged
+  // at Base level), so Bear read $14.25 against this rebuild's $14.44.
+  const c = JSON.parse(fs.readFileSync(path.join(__dirname, "fixtures", "stoke_sample_case.json"), "utf8"));
+  const p = c.programs[0];
+  const rnd = api.computeRnDToLaunch(p);
+  const ramp = api.LAUNCH_CURVE_EXACT[5].median.map(x => x / 100);
+  const expectPS = { bear: 14.4365, base: 29.0686, bull: 45.9757 };
+  for (const [key, share, posMult, addPct] of [["bear", 70, 75, 3], ["base", 100, 100, 0], ["bull", 130, 120, -1]]) {
+    const r = (12 + addPct) / 100, N = 25, L = 1;
+    const eff = api.computeEffectivePoS(p, { posMultiplierPct: posMult });
+    const reach = {}; eff.posStages.forEach(st => { reach[st.key] = st.posToReachStage; });
+    const pos = eff.posToLaunch;
+    const peakPts = 15700 * 0.75 * 0.60 * 0.80 * 0.60 * (share / 100) * 0.85;
+    const us = [], roy = [];
+    for (let y = 1; y <= N; y++) {
+      const pts = peakPts * (y <= 5 ? ramp[y - 1] : 1), em = y <= 12 ? 1 : 0.45 * 0.65;
+      us.push(pts * 300000 * Math.pow(1.03, y - 1) * em);
+      roy.push(pts * 1.40 * 187500 * em * 0.15);
+    }
+    const peakUS = Math.max(...us);
+    const contrib = us.map((u, i) => u + roy[i] - 0.10 * u - (i < 12 ? 50 * 280000 * Math.pow(1.02, i) + 0.03 * peakUS : 0));
+    const bCost = rnd.items.reduce((a, i) => a + i.costM, 0);
+    const rd0 = rnd.items.reduce((a, i) => a + i.costM * (200 / bCost) * 0.70 * 1e6 * reach[i.key], 0) + 50 * 280000 * 0.30 * pos;
+    const ga = v => v <= 0 ? 95e6 : v >= 400e6 ? v * 0.17 : 95e6 + (400e6 * 0.17 - 95e6) * v / 400e6;
+    let nol = 301.7e6, npv = 0;
+    for (let t = 0; t < N; t++) {
+      const i = t - L;
+      const pre = (i >= 0 ? contrib[i] * pos : 0) - (t === 0 ? rd0 : 0) - ga(i >= 0 ? (us[i] + roy[i]) * pos : 0);
+      let tax = 0;
+      if (pre < 0) nol -= pre; else { const use = Math.min(nol, pre); nol -= use; tax = 0.21 * (pre - use); }
+      npv += (pre - tax) / Math.pow(1 + r, t + 1);
+    }
+    const shares = 64526242 + 3703730 + 11532638 * (1 - 13.84 / 24.80) + 2157698 + 194e6 / 24.06;
+    const perShare = (npv + 420e6 + (190e6 + 100e6) * pos / Math.pow(1 + r, L) + 194e6) / shares;
+    const app = api.computeCaseValuation(c, api.getEffectiveScenarioPreset(c, key), key, 12, c.terminalValue);
+    near("Stoke " + key + ": NPV equals the independent rebuild", app.npvResult.npv, npv, 25);
+    near("Stoke " + key + ": 83,547,527 diluted shares", app.equity.dilutedShares, shares, 0.5);
+    near("Stoke " + key + ": fair value per share equals the rebuild", app.equity.perShare, perShare, 1e-6);
+    near("Stoke " + key + ": and is $" + expectPS[key], perShare, expectPS[key], 5e-5);
+  }
+}
+report();
+
 section("Condition searches drop hits CT.gov matched only through a synonym");
 {
   // Shapes as the v2 API returns them (fields trimmed). CT.gov expands

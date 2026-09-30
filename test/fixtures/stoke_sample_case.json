@@ -1,0 +1,184 @@
+{
+ "id": "case_munvwhjh_1",
+ "name": "Stoke Therapeutics — sample case",
+ "ticker": "STOK",
+ "createdAt": 1790759386061,
+ "updatedAt": 1790759386061,
+ "programs": [
+  {
+   "id": "prog_munvwhjh_3",
+   "name": "Zorevunersen (STK-001)",
+   "drugName": "Zorevunersen",
+   "indication": "Dravet syndrome — SCN1A, not gain-of-function (ages 2 to <18 in Phase 3)",
+   "therapeuticArea": "Neurology",
+   "modality": "smallMolecule",
+   "currentPhase": "phase3",
+   "posOverridePct": "65",
+   "posBiomarkerUse": "selection",
+   "posDiseaseType": "rare",
+   "trialIds": "NCT06872125, NCT04442295, NCT04740476",
+   "target": "SCN1A",
+   "prv": {
+    "enabled": true,
+    "valueM": "190"
+   },
+   "launchYearOffset": "1",
+   "revenueMode": "full",
+   "quickRevenue": {
+    "peakRevenue": "1311000000",
+    "yearsToPeak": "5",
+    "profile": "median",
+    "scenarioOverrides": {
+     "bear": {
+      "peakRevenue": "917000000"
+     },
+     "bull": {
+      "peakRevenue": "1704000000"
+     }
+    }
+   },
+   "revenueBuild": {
+    "population": {
+     "mode": "prevalence",
+     "prevalence": "15700",
+     "incidence": "232",
+     "diseaseDurationYears": "16",
+     "diagnosisRatePct": "75",
+     "treatmentRatePct": "60",
+     "eligiblePct": "80"
+    },
+    "adherencePct": "85",
+    "marketShare": {
+     "numDrugs": 2,
+     "orderOfEntry": 1,
+     "peakShareOverridePct": "60"
+    },
+    "launchCurve": {
+     "yearsToPeak": 5,
+     "profile": "median"
+    },
+    "pricing": {
+     "usAnnualPrice": "375000",
+     "priceBasis": "WAC",
+     "netPriceRealizationPct": "80",
+     "usAnnualGrowthPct": "3",
+     "includeExUS": true,
+     "exUSPriceFactorPct": "50",
+     "exUSAnnualGrowthPct": "0",
+     "exUSPatientMultiplierPct": "140"
+    },
+    "exclusivity": {
+     "yearsToLOE": "12",
+     "modality": "smallMolecule",
+     "volumeRetainedPct": "45",
+     "priceDeclinePct": "35"
+    }
+   },
+   "costStructure": {
+    "cogsPct": "10",
+    "reps": {
+     "primaryCare": "0",
+     "specialty": "50",
+     "hospital": "0"
+    },
+    "marketingPctOfPeak": "3"
+   },
+   "rndOverride": {
+    "totalYears": "1.4",
+    "totalCostM": "200"
+   },
+   "evidenceLog": [],
+   "calibrationLog": [],
+   "partnership": {
+    "enabled": true,
+    "territory": "exUS",
+    "royaltyPct": "15",
+    "upfrontM": "0",
+    "costSharingPct": "30",
+    "milestones": [
+     {
+      "id": "ms_munvwhjh_4",
+      "label": "Ex-US regulatory milestones — assumed part of the undisclosed $385M",
+      "gate": "launch",
+      "valueM": 100
+     }
+    ]
+   }
+  }
+ ],
+ "currentPrice": "24.80",
+ "corporateGA": {
+  "preCommercialAnnualM": "95",
+  "gaShareOfMatureSgaPct": "50",
+  "windDownYears": "1"
+ },
+ "discountRatePct": "12",
+ "terminalValue": {
+  "enabled": false,
+  "method": "exitMultiple",
+  "growthPct": "0",
+  "exitMultiple": "4"
+ },
+ "taxation": {
+  "enabled": true,
+  "effectiveRatePct": "21",
+  "startingNOLM": "301700000"
+ },
+ "capitalStructure": {
+  "mode": "detailed",
+  "dilutedSharesSimple": "81920308",
+  "basicShares": "68229972",
+  "cash": "420000000",
+  "debt": "0",
+  "opts": "11532638",
+  "optK": "13.84",
+  "war": "2157698",
+  "warK": "0",
+  "convFace": "0",
+  "convPrice": "0"
+ },
+ "scenarioOverrides": {
+  "bear": {
+   "shareMultiplierPct": "70",
+   "posMultiplierPct": "75",
+   "discountRateAddPct": "3",
+   "exitMultiple": "3"
+  },
+  "bull": {
+   "shareMultiplierPct": "130",
+   "posMultiplierPct": "120",
+   "discountRateAddPct": "-1",
+   "exitMultiple": "5"
+  }
+ },
+ "valuationMethod": "dcf",
+ "futureRaise": {
+  "enabled": true,
+  "amountM": "194000000",
+  "priceOverride": "24.06"
+ },
+ "dilutionPath": {
+  "enabled": true,
+  "minCashBufferM": "100000000",
+  "targetRunwayMonths": "18",
+  "discountToMarketPct": "10",
+  "sbcAnnualGrowthPct": "0"
+ },
+ "basePosAdjustmentPct": "100",
+ "multipleAssumptions": {
+  "bear": "3",
+  "base": "4",
+  "bull": "5"
+ },
+ "readoutScenarios": {
+  "clearOfWinsPct": "60",
+  "clearPosPct": "94",
+  "clearSharePct": "115",
+  "modestPosPct": "91",
+  "modestSharePct": "75"
+ },
+ "outcomeTree": {
+  "resubmitFixPct": "47"
+ },
+ "modelYearZero": "2026"
+}

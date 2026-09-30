@@ -64,19 +64,26 @@ function cappedShareMultiplier(revenueResult, multiplier) {
 
 // Exact rescale — patient counts (and thus revenue, since price is unchanged) scale
 // linearly with market share by construction, so this is not an approximation.
+// The royalty part of each year and the peak commercial revenue scale with
+// everything else. They used to be left at Base size, so on a partnered case
+// Bear/Bull charged marketing (a share of peak COMMERCIAL revenue) at the
+// Base level and computed COGS on "total − unscaled royalty" — Stoke's Bear
+// came out $0.19 low and its Bull $0.35 high against an independent rebuild.
 function scaleRevenueResult(revenueResult, multiplier) {
   const years = revenueResult.years.map(y => ({
     ...y,
     onDrugPatientsUS: Math.round(y.onDrugPatientsUS * multiplier),
     usRevenue: Math.round(y.usRevenue * multiplier),
     exUSRevenue: Math.round(y.exUSRevenue * multiplier),
-    totalRevenue: Math.round(y.totalRevenue * multiplier)
+    totalRevenue: Math.round(y.totalRevenue * multiplier),
+    ...(y.royaltyRevenue != null ? { royaltyRevenue: Math.round(y.royaltyRevenue * multiplier) } : {})
   }));
   return {
     ...revenueResult, years,
     peakPatients: Math.round(revenueResult.peakPatients * multiplier),
     peakUSRevenue: Math.round(revenueResult.peakUSRevenue * multiplier),
-    peakTotalRevenue: Math.round(revenueResult.peakTotalRevenue * multiplier)
+    peakTotalRevenue: Math.round(revenueResult.peakTotalRevenue * multiplier),
+    ...(revenueResult.peakCommercialRevenue != null ? { peakCommercialRevenue: Math.round(revenueResult.peakCommercialRevenue * multiplier) } : {})
   };
 }
 

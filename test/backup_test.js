@@ -91,6 +91,11 @@ function stub(obj) {
 
   // ── The sample case ──
   const sc = w.sampleCaseStoke();
+  // math_verification rebuilds Stoke year by year from this fixture; it must
+  // hold the sample's own inputs.
+  const sfx = JSON.parse(require("fs").readFileSync(__dirname + "/fixtures/stoke_sample_case.json", "utf8"));
+  const strip = o => JSON.stringify(o, (k, v) => ["id", "createdAt", "updatedAt", "evidenceLog", "calibrationLog", "pinnedResults"].includes(k) ? undefined : v);
+  ok(strip(sfx) === strip(sc), "Stoke sample: inputs match the fixture math_verification rebuilds");
   ok(sc.ticker === "STOK" && sc.programs.length === 1 && sc.programs[0].drugName === "Zorevunersen", "sample: Stoke, one program, zorevunersen");
   ok(w.caseMissingInputs(sc).length === 0, "sample: nothing required is missing (" + w.caseMissingInputs(sc).join(", ") + ")");
   ok(sc.programs[0].evidenceLog.length >= 15 && sc.programs[0].evidenceLog.every(e => e.source && e.date && e.thesis && ["fact", "inference", "speculation"].includes(e.classification) && ["high", "moderate", "low"].includes(e.confidence)), "sample: every evidence entry has a source, date, reasoning and valid labels");
