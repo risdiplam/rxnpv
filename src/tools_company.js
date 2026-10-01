@@ -409,7 +409,7 @@ function CatalystCalendarTool({ cases, updateCase, activeCase }) {
       h("div", { style: { display: "flex", flexDirection: "column", gap: 4, marginBottom: 12, maxHeight: 150, overflowY: "auto" } },
         cases.map(c => h("label", { key: c.id, style: { display: "flex", alignItems: "center", gap: 8, fontSize: 12, fontFamily: "var(--mono)", color: "var(--ink-2)", cursor: "pointer" } },
           h("input", { type: "checkbox", checked: selectedIds.has(c.id), onChange: () => toggleCase(c.id) }),
-          c.name + (c.ticker ? " (" + c.ticker + ")" : "") + " — " + c.programs.length + " program" + (c.programs.length !== 1 ? "s" : "")
+          caseDisplayName(c) + " — " + c.programs.length + " program" + (c.programs.length !== 1 ? "s" : "")
         )),
         cases.length === 0 && h("div", { style: UI.captionMd }, "No cases yet — create one in Workspace first.")
       ),
@@ -594,14 +594,14 @@ function RunwayTool({ cases, updateCase, activeCase }) {
       ]);
     })(),
 
-    (pullResult || manualCashNum > 0) && toolCard(h, [
-      h("div", { style: { display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" } },
+    // An action, not a result: a row under the cards rather than a card of
+    // its own (which also gave it an Export button with nothing to export).
+    (pullResult || manualCashNum > 0) && h("div", { style: { display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", margin: "0 0 16px" } },
         h(CasePicker, { cases, selectedId: exportCaseId, onChange: setExportCaseId }),
         h("button", { onClick: exportToCase, disabled: !exportCaseId,
           style: { padding: "6px 14px", borderRadius: 6, border: "1px solid var(--amber)", background: "var(--amber-bg)", color: "var(--amber)", fontFamily: "var(--mono)", fontSize: 11, fontWeight: 700, cursor: exportCaseId ? "pointer" : "default", opacity: exportCaseId ? 1 : 0.5 } }, "Export cash/debt to case →"),
         exportMsg && h("span", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--teal)" } }, exportMsg)
-      )
-    ])
+    )
   );
 }
 

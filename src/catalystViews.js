@@ -124,8 +124,8 @@ function OutcomeTreeSection({ theCase, discountRatePct, tv, baseValue, onChange 
   return h(ExportSection, { title: "How the catalysts play out", style: { marginBottom: 16 } },
     h("div", { style: { fontSize: 13, fontFamily: "var(--display)", fontWeight: 600, color: "var(--ink-1)", marginBottom: 4 } }, title),
     h("div", { className: "prose", style: { ...UI.caption, marginBottom: 8 } },
-      "Each branch uses this case's own odds (" + tree.gates.map(g => pct(g.pass) + " at the " + g.label).join(", ") + ", together the Base " + pct(tree.posToLaunch) +
-      "). Each ending is valued by the model: launch at Base inputs, or the cash left after a failure and the wind-down set under Corporate G&A."),
+      // The odds of each gate are on its branches; the caption does not list them again.
+      "Each branch carries this case's own odds, which multiply back to its " + pct(tree.posToLaunch) + ". Each ending is valued by the model: launch on Base inputs, or the cash left after a failure and the wind-down."),
     h(ExportableBlock, { title: (theCase.name || "Case") + " — outcome tree" },
       h(OutcomeTreeChart, { tree, price, label: "Outcome tree: each remaining catalyst, its odds, and what each ending is worth per share" })),
     h("div", { className: "mc-stats", style: { marginTop: 10 } },

@@ -17,7 +17,7 @@ function CasePicker({ cases, selectedId }) {
   const h = React.createElement;
   const c = (cases || []).find(x => x.id === selectedId);
   return h("span", { className: "case-chip", title: "Switch cases in the Working in bar at the top" },
-    c ? ["Case: ", h("b", { key: "n" }, c.name + (c.ticker ? " (" + c.ticker + ")" : ""))] : "No case open — open or create one in Workspace");
+    c ? ["Case: ", h("b", { key: "n" }, caseDisplayName(c))] : "No case open — open or create one in Workspace");
 }
 // The case a tool works in: always the open case. Returned in useState's shape
 // ([id, setter]) so tools that used to hold their own copy read the same.
@@ -155,6 +155,11 @@ function toolCard(h, children) {
 }
 function toolLabel(h, t) {
   return h("div", { "data-section-title": "", style: { fontSize: 14, fontWeight: 600, fontFamily: "var(--sans)", color: "var(--ink-1)", letterSpacing: "-0.005em", marginBottom: 12 } }, t);
+}
+
+// A subhead inside a decoder card (the card's own title is toolLabel).
+function decoderSubhead(first) {
+  return { fontSize: 12, fontWeight: 600, fontFamily: "var(--sans)", color: "var(--ink-1)", margin: (first ? 2 : 16) + "px 0 7px" };
 }
 
 // ── Text truncation shared by the Trial, Science and FDA tools ──

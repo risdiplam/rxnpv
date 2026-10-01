@@ -227,6 +227,14 @@ function caseBinaryDefaults(theCase) {
 }
 
 // One line under a tool's inputs saying which of them came from the case.
+// A case's label with its ticker — unless the name already carries it
+// ("PepGen (PEPG)" read "PepGen (PEPG) (PEPG)").
+function caseDisplayName(c) {
+  if (!c) return "";
+  const name = c.name || "Untitled";
+  return c.ticker && name.indexOf(c.ticker) === -1 ? name + " (" + c.ticker + ")" : name;
+}
+
 function CaseFilledNote({ activeCase, filled }) {
   const h = React.createElement;
   const list = (filled || []).filter(Boolean);
@@ -261,7 +269,7 @@ function CaseContextBar({ cases, activeCase, onSelectCase, onOpenWorkspace }) {
   return h("div", { className: "case-bar", role: "region", "aria-label": "Working in" },
     h("span", { className: "case-bar-label" }, "Working in"),
     h("select", { value: activeCase ? activeCase.id : "", "aria-label": "Case these tools work in", onChange: e => onSelectCase && onSelectCase(e.target.value) },
-      cases.map(c => h("option", { key: c.id, value: c.id }, c.name + (c.ticker ? " (" + c.ticker + ")" : "")))),
+      cases.map(c => h("option", { key: c.id, value: c.id }, caseDisplayName(c)))),
     facts.length > 0 && h("span", { className: "case-bar-facts" }, facts.join(" · ")),
     onOpenWorkspace && h("button", { type: "button", className: "link-btn case-bar-open", onClick: onOpenWorkspace }, "Open in Workspace →"));
 }
@@ -1284,8 +1292,8 @@ function MonteCarloBox({ theCase, discountRatePct, tv, baseValue }) {
 
   return h(ExportSection, { title: "Full-case Monte Carlo", style: { marginTop: 16, borderTop: "1px dashed var(--rule)", paddingTop: 14 } },
     h("div", { style: { fontSize: 13, fontFamily: "var(--display)", fontWeight: 700, color: "var(--ink-1)", marginBottom: 4 } }, "Full-case Monte Carlo"),
-    h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-2)", marginBottom: 10, lineHeight: 1.6 } },
-      "3,000 trials, sampling PoS and peak share (and the discount rate, if your scenarios vary it) continuously between your Bear and Bull bounds (Base as the most likely value) instead of only the three fixed points — a full fair-value distribution, not just three scenarios."),
+    h("div", { className: "prose", style: { ...UI.caption, marginBottom: 10 } },
+      "3,000 trials, each drawing PoS and peak share (and the discount rate, if your scenarios vary it) between your Bear and Bull values, Base the most likely — the whole spread of fair values, not three points."),
     h("button", { onClick: run, disabled: running,
       style: { padding: "6px 16px", borderRadius: 6, border: "none", background: running ? "var(--rule)" : "var(--teal-fill)", color: "var(--on-teal)", fontFamily: "var(--mono)", fontSize: 11, fontWeight: 700, cursor: running ? "default" : "pointer" }
     }, running ? "Running…" : result ? "Re-run" : "Run 3,000 trials"),

@@ -378,18 +378,19 @@ function CaseView({ theCase, onChange, onDelete, onNavigateToTools, onReopenSave
     // catalyst as overdue when its date is unambiguously parseable — see
     // parseCatalystDate; a "H1 2027"-style entry stays simply open.
     (() => {
-      const { overdue, open } = pendingCalibrationEntries(theCase);
-      if (overdue.length === 0 && open.length === 0) return null;
+      // Only once a catalyst date has passed, when there is something to do:
+      // a prediction that is simply still open is already counted on the
+      // Calibration tab's badge, and a banner for it sat under every case
+      // header for months at a time.
+      const { overdue } = pendingCalibrationEntries(theCase);
+      if (overdue.length === 0) return null;
       const detail = overdue.slice(0, 3).map(e => e.programName + " — " + (e.catalystLabel || "prediction") + (e.catalystDate ? " (" + e.catalystDate + ")" : "")).join(" · ");
-      return h("div", { style: { padding: "7px 14px", marginBottom: 16, background: "var(--surface)", borderLeft: "2px solid " + (overdue.length ? "var(--teal)" : "var(--rule)"), borderRadius: 4, fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-2)", lineHeight: 1.6 } },
-        overdue.length > 0
-          ? h("div", null,
+      return h("div", { style: { padding: "7px 14px", marginBottom: 16, background: "var(--surface)", borderLeft: "2px solid var(--teal)", borderRadius: 4, fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-2)", lineHeight: 1.6 } },
+        h("div", null,
               h("span", { style: { color: "var(--teal)", fontWeight: 700 } }, overdue.length + " calibration prediction" + (overdue.length > 1 ? "s" : "") + " past its catalyst date"),
               " — score " + (overdue.length > 1 ? "them" : "it") + " against what actually happened, in the program's Calibration Log. ",
               tab !== "calibration" && h("button", { type: "button", className: "link-btn", onClick: () => setTab("calibration") }, "Open Calibration →"),
               h("div", { style: { fontSize: 10, color: "var(--ink-3)", marginTop: 3 } }, detail + (overdue.length > 3 ? " · +" + (overdue.length - 3) + " more" : "")))
-          : h("div", { style: { color: "var(--ink-3)" } },
-              open.length + " calibration prediction" + (open.length > 1 ? "s" : "") + " still open — score " + (open.length > 1 ? "them" : "it") + " once the catalyst reads out.")
       );
     })(),
 

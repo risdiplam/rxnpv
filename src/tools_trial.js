@@ -395,11 +395,12 @@ function TrialResultsPanels({ results, study }) {
       h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--teal)", } }, "What it actually reported"),
       h("div", { style: { height: 1, background: "var(--rule)", flex: 1 } })),
 
-    toolCard(h, [
+    // Under the divider, not a card of its own: one fold and one sentence.
+    h("div", { style: { marginBottom: 14 } },
       h(Note, { summary: "How to read the results below" },
         h("div", { style: { lineHeight: 1.6 } }, "Everything above this line is the design as the sponsor registered it before the trial ran. Everything below is what got posted afterwards. The numbers are read straight out of ClinicalTrials.gov's structured results fields — nothing is inferred, and nothing here knows which arm is the investigational drug, so arms are named exactly as the sponsor named them and any difference is shown signed rather than described as good or bad. A measure reported across several strata is not collapsed into one headline number. Deaths are separated from every other reason for leaving, because in a serious indication most of an arm can be “did not complete — death”, and folding that into a dropout rate produces a large, confident, meaningless figure.")),
       caveat("Posted results are the sponsor's own submission. They are not peer reviewed, not audited, and often thinner than the eventual publication.")
-    ]),
+    ),
 
     toolCard(h, [
       toolLabel(h, "Primary endpoint" + (results.primaryOutcomes.length > 1 ? "s (" + results.primaryOutcomes.length + ")" : "")),
@@ -631,22 +632,20 @@ function TrialDecoderTool({ activeCase, initialNctId, onConsumedInitialNctId }) 
           h(ExternalLink, { href: "https://clinicaltrials.gov/study/" + decoded.nctId, style: { fontSize: 10 } }, "→ Full record on ClinicalTrials.gov"))
       ]),
 
+      // One card, three parts: what the design can establish, what it cannot,
+      // and its red flags. They were three cards, each with its own Export
+      // button, and the flags card usually said only that there were none.
       toolCard(h, [
-        toolLabel(h, "What this trial can establish"),
+        toolLabel(h, "What the design can and cannot establish"),
+        h("div", { style: decoderSubhead(true) }, "What this trial can establish"),
         decoded.canProve.length
           ? h("ul", { style: { margin: 0, paddingLeft: 18, display: "flex", flexDirection: "column", gap: 7 } },
               decoded.canProve.map((t, i) => h("li", { key: i, className: "prose", style: { fontSize: 12, fontFamily: "var(--sans)", color: "var(--ink-2)", lineHeight: 1.6 } }, t)))
-          : h("div", { style: UI.captionMd }, "Not enough registered design detail to say.")
-      ]),
-
-      toolCard(h, [
-        toolLabel(h, "What it cannot"),
+          : h("div", { style: UI.captionMd }, "Not enough registered design detail to say."),
+        h("div", { style: decoderSubhead() }, "What it cannot"),
         h("ul", { style: { margin: 0, paddingLeft: 18, display: "flex", flexDirection: "column", gap: 7 } },
-          decoded.cannotProve.map((t, i) => h("li", { key: i, className: "prose", style: { fontSize: 12, fontFamily: "var(--sans)", color: "var(--ink-2)", lineHeight: 1.6 } }, t)))
-      ]),
-
-      toolCard(h, [
-        toolLabel(h, "Design flags (" + decoded.redFlags.length + ")"),
+          decoded.cannotProve.map((t, i) => h("li", { key: i, className: "prose", style: { fontSize: 12, fontFamily: "var(--sans)", color: "var(--ink-2)", lineHeight: 1.6 } }, t))),
+        h("div", { style: decoderSubhead() }, "Design flags (" + decoded.redFlags.length + ")"),
         decoded.redFlags.length === 0
           ? h("div", { className: "prose", style: { fontSize: 11.5, fontFamily: "var(--sans)", color: "var(--ink-2)", lineHeight: 1.6 } },
               "Nothing in the registered design tripped a flag. That is a statement about the architecture only — it says nothing about whether the drug works, whether the effect size assumed is realistic, or whether the trial will read out positive.")
