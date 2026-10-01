@@ -111,6 +111,24 @@ window.__t = {
       if (el.tabIndex >= 0) return;
       out.push({ type: "clickable but not keyboard-reachable", text: label(el), detail: el.tagName.toLowerCase(), where: where(el) });
     });
+    // The section Export button sits in the section's top-right corner; it
+    // must never cover the section's own text, controls or charts.
+    document.querySelectorAll(".section-export-bar").forEach(bar => {
+      if (!vis(bar)) return;
+      const sec = bar.closest(".export-section");
+      if (!sec) return;
+      const boxes = [...bar.children].filter(c => vis(c) && !c.classList.contains("xm-menu")).map(c => c.getBoundingClientRect()).filter(r => r.width > 0);
+      const hit = (r) => boxes.some(b => Math.min(b.right, r.right) - Math.max(b.left, r.left) > 2 && Math.min(b.bottom, r.bottom) - Math.max(b.top, r.top) > 2);
+      for (const el of sec.querySelectorAll("*")) {
+        if (bar.contains(el) || !vis(el)) continue;
+        const leaf = /^(INPUT|SELECT|TEXTAREA|BUTTON|IMG|svg)$/.test(el.tagName) || [...el.childNodes].some(n => n.nodeType === 3 && n.textContent.trim());
+        if (!leaf || el.closest("svg") && el.tagName !== "svg") continue;
+        // Text: measure the text itself, not a block that stretches across.
+        let r = el.getBoundingClientRect();
+        if (!/^(INPUT|SELECT|TEXTAREA|BUTTON|IMG|svg)$/.test(el.tagName)) { const rg = document.createRange(); rg.selectNodeContents(el); r = rg.getBoundingClientRect(); }
+        if (r.width > 0 && hit(r)) { out.push({ type: "export button overlaps content", text: (el.textContent || el.tagName).trim().slice(0, 50), detail: el.tagName.toLowerCase(), where: where(el) }); break; }
+      }
+    });
     const over = document.documentElement.scrollWidth - innerWidth;
     if (over > 1) out.push({ type: "sideways scroll", text: "", detail: over + "px" });
     return out;

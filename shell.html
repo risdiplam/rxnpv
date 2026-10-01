@@ -155,6 +155,23 @@
   .app-rail-badge { position: absolute; top: -6px; right: -10px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px;
     background: var(--teal-fill); color: var(--on-teal); font: 700 10px/16px var(--sans); }
   @media print { .app-rail { display: none !important; } }
+  /* ── Section Export button: top-right of its section ───────────────
+     It used to be a row of its own at the foot of every section — the one
+     button between every pair of sections. Now it sits level with the
+     section's title; the bar reports its width (--xbar-pad, set by
+     ExportBar) and the section's first row keeps that much room clear.
+     Status messages drop below the button instead of pushing into the title. */
+  .export-section { position: relative; }
+  .section-export-bar { position: absolute; top: calc(var(--xbar-top, 0px) - 4px); right: var(--xbar-right, 0px); z-index: 5; display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
+  /* min-height: a short title's caption would otherwise start beside the
+     button and, at narrow widths, run underneath it. */
+  .export-section > :first-child:not(.section-export-bar) { padding-right: var(--xbar-pad, 104px); min-height: 24px; }
+  .section-card > :first-child { min-height: 0; }
+  .section-card .section-export-bar { top: 10px; right: 14px; }
+  .panel.export-section > h2:first-child, .panel.export-section > h3:first-child, .panel.export-section > h4:first-child { padding-right: var(--xbar-pad, 104px); min-height: 24px; }
+  .sim-export-host { height: 0; }
+  .section-export-bar > [role="status"] { position: absolute; top: calc(100% + 4px); right: 0; white-space: nowrap; padding: 5px 9px; border-radius: 7px;
+    background: var(--surface); border: 1px solid var(--rule); box-shadow: 0 4px 12px rgba(15,18,24,0.12); }
   /* ── Export menu (one per section / chart) ────────────────────────── */
   .xm-trigger { display: inline-flex; align-items: center; gap: 6px; min-height: 28px; padding: 4px 11px 4px 9px; border-radius: 8px;
     border: 1px solid var(--rule); background: var(--surface); color: var(--ink-2); font: 500 12px/1 var(--sans); cursor: pointer; }
@@ -303,10 +320,13 @@
      printed "Enterprise value" under a partial running total (PepGen's
      report: 2046, −$54M, then the −$51.2M total). Printed once, at the end. */
   @media print { .proj-table tfoot, .rs-table tfoot { display: table-row-group; } }
-  .explain { display: flex; gap: 9px; align-items: flex-start; margin-top: 12px; padding: 9px 12px; border-radius: 8px; background: var(--surface-2);
+  /* A plain-English reading: text with a thin accent rule, not a filled box
+     with an icon — nearly every section has one, and a box in every section
+     was a large part of the screen's weight. */
+  .explain { display: flex; gap: 9px; align-items: flex-start; margin-top: 12px; padding: 1px 0 1px 12px;
+    border-left: 2px solid color-mix(in srgb, var(--teal) 60%, transparent);
     font: 400 12.5px/1.55 var(--sans); color: var(--ink-2); max-width: var(--prose-width); }
-  .explain.on-tint { background: var(--surface); }
-  .explain svg { flex: none; margin-top: 2px; color: var(--teal); }
+  .explain svg { display: none; }
   .explain b { color: var(--ink-1); font-weight: 600; }
   /* ── Assumptions: section list ────────────────────────────────────── */
   .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
@@ -451,9 +471,6 @@
      tokens (confirmed by direct comparison during the merge); including
      them would have silently recolored the rest of the app, not just this
      view, depending on CSS cascade order. */
-  .header { display: flex; align-items: center; justify-content: space-between; padding: 14px 20px; border-bottom: 1px solid var(--rule); }
-  .brand { font-size: 18px; font-weight: 700; letter-spacing: 0.02em; display: flex; align-items: center; gap: 8px; }
-  .brand .logodot { width: 10px; height: 10px; border-radius: 3px; background: linear-gradient(135deg, var(--teal), var(--amber)); display: inline-block; }
   .runbtn { background: var(--surface-2); color: var(--ink-1); border: 1px solid var(--rule); border-radius: 6px; padding: 8px 14px; font-size: 13px; cursor: pointer; transition: opacity 0.15s, transform 0.1s; }
   .runbtn:hover:not(:disabled) { opacity: 0.85; }
   .runbtn:active:not(:disabled) { transform: scale(0.98); }
@@ -489,6 +506,9 @@
   .fieldgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px 16px; align-items: end; margin-bottom: 4px; }
   .fieldgrid .field { margin-bottom: 0; }
   .field-wide { grid-column: 1 / -1; }
+  /* A choice that has a whole row to itself ("Solve for", "Endpoint type")
+     does not need to be 1,500px wide to show a few words. */
+  .field > select { max-width: 560px; }
   .field { display: block; margin-bottom: 10px; font-size: 12.5px; color: var(--ink-2); }
   .field span { display: block; margin-bottom: 3px; }
   .field input, .field select { width: 100%; background: var(--surface-2); border: 1px solid var(--rule); border-radius: 6px; padding: 7px 9px; color: var(--ink-1); font-size: 13px; transition: border-color 0.15s; }

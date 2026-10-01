@@ -475,9 +475,11 @@ function RunwayTool({ cases, updateCase, activeCase }) {
   const [pullResult, setPullResult] = React.useState(null);
   const [manualCash, setManualCash] = React.useState("");
   const [manualMonthlyBurn, setManualMonthlyBurn] = React.useState("");
-  // The open case's own cash (dollars, as MillionsField stores it); the burn
-  // is left for the user, since a case does not carry one.
-  const cashFromCase = useCasePrefill(activeCase, String((activeCase && activeCase.capitalStructure && activeCase.capitalStructure.cash) || ""), manualCash, setManualCash);
+  // The open case's own cash and monthly burn (dollars, as MillionsField
+  // stores them) — both as of the case's balance-sheet date.
+  const capS = (activeCase && activeCase.capitalStructure) || {};
+  const cashFromCase = useCasePrefill(activeCase, String(capS.cash || ""), manualCash, setManualCash);
+  const burnFromCase = useCasePrefill(activeCase, String(capS.monthlyBurn || ""), manualMonthlyBurn, setManualMonthlyBurn);
   const [exportCaseId, setExportCaseId] = useActiveCaseId(activeCase);
   const [exportMsg, setExportMsg] = React.useState(null);
   const [forwardCaseId, setForwardCaseId] = useActiveCaseId(activeCase);
@@ -550,7 +552,7 @@ function RunwayTool({ cases, updateCase, activeCase }) {
         h(MillionsField, { label: "Cash & investments", value: manualCash, onChange: setManualCash }),
         h(MillionsField, { label: "Monthly burn", value: manualMonthlyBurn, onChange: setManualMonthlyBurn })
       ),
-      h(CaseFilledNote, { activeCase, filled: [cashFromCase && "cash"] }),
+      h(CaseFilledNote, { activeCase, filled: [cashFromCase && "cash", burnFromCase && "monthly burn"] }),
       h("div", null, h("div", { style: UI.caption }, "Runway"),
         h("div", { style: { fontSize: 22, fontFamily: "var(--mono)", fontWeight: 800, color: manualRunway != null && manualRunway < 12 ? "var(--red)" : "var(--green)" } },
           manualRunway != null ? manualRunway.toFixed(0) + " months" : "—"))

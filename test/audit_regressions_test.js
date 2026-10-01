@@ -441,7 +441,7 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
     const valOf = sel => (d.querySelector(sel) || {}).value;
     click(btnT("Trial")); await wait(150); click(btnT("Trial Decoder")); await wait(300);
     ok(valOf('input[aria-label="ClinicalTrials.gov ID"]') === "NCT06872125", "Case tools: the Decoder starts on the case's lead trial");
-    ok(/^Started from Stoke Therapeutics — sample case: the lead trial\./.test((d.querySelector(".case-filled") || {}).textContent || ""), "Case tools: says the value came from the case");
+    ok(/^From the case: the lead trial\./.test((d.querySelector(".case-filled") || {}).textContent || "") && /^Started from Stoke Therapeutics — sample case: the lead trial\./.test((d.querySelector(".case-filled") || {}).title || ""), "Case tools: says the value came from the case (the case named on hover)");
     click(btnT("Compare Trials")); await wait(300);
     ok(valOf('input[aria-label="ClinicalTrials.gov IDs to compare"]') === "NCT06872125, NCT04442295, NCT04740476", "Case tools: Compare Trials starts with the case's trials");
     click(btnT("Asset Program")); await wait(300);

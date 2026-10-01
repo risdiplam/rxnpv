@@ -292,13 +292,10 @@ function renderApp() {
     el('button', { class: 'tabbtn' + (t.id === activeTab ? ' active' : ''), onclick: () => { activeTab = t.id; renderApp(); } }, t.label)
   ));
 
-  const header = el('div', { class: 'header' }, [
-    el('div', { class: 'brand' }, [el('span', { class: 'logodot' }), 'Simulation'])
-  ]);
-
+  // No "Simulation" title row: the rail already says where you are, and the
+  // Tools view has none either.
   const content = el('div', { class: 'content', id: 'tabContent' });
 
-  root.appendChild(header);
   root.appendChild(nav);
   root.appendChild(content);
 

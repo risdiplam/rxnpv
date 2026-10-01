@@ -231,7 +231,11 @@ function CaseFilledNote({ activeCase, filled }) {
   const h = React.createElement;
   const list = (filled || []).filter(Boolean);
   if (!activeCase || !list.length) return null;
-  return h("div", { className: "case-filled", "data-no-export": "" }, "Started from " + activeCase.name + ": " + list.join(", ") + ". Type over any of it to use your own.");
+  // Short: the case's name is already in the "Working in" bar above, and
+  // this note appears under several inputs on some tools. The full sentence
+  // is the hover text.
+  return h("div", { className: "case-filled", "data-no-export": "", title: "Started from " + activeCase.name + ": " + list.join(", ") + ". Type over any of it to use your own." },
+    "From the case: " + list.join(", ") + ".");
 }
 
 // ── Working in: the case every tool and simulation is tuned to ─────────────
@@ -438,6 +442,19 @@ function ExportBar({ scope, title, heading, reportSection, source }) {
     if (t !== label) setLabel(t);
     const svg = isChart && b && Array.prototype.some.call(b.querySelectorAll("svg"), n => (n.getBoundingClientRect().width || 0) >= 120);
     if (!!svg !== hasSvg) setHasSvg(!!svg);
+    // A section's bar sits in the section's top-right corner (shell.html);
+    // the section's first row keeps exactly this much room clear for it, so
+    // a title or a header control never runs underneath. Unmeasured (a hidden
+    // tab), the CSS falls back to a fixed reservation.
+    if (!isChart && b && ref.current) {
+      const w = Math.ceil(ref.current.getBoundingClientRect().width);
+      if (w > 0) b.style.setProperty("--xbar-pad", (w + 14) + "px");
+      // Inset by the section's own padding, so on a padded card the button
+      // lines up with the title rather than hugging the border.
+      const cs = getComputedStyle(b);
+      b.style.setProperty("--xbar-top", (parseFloat(cs.paddingTop) || 0) + "px");
+      b.style.setProperty("--xbar-right", (parseFloat(cs.paddingRight) || 0) + "px");
+    }
   });
 
   const flash = (m, ms) => { setMsg(m); if (ms) setTimeout(() => setMsg(cur => cur === m ? null : cur), ms); };
@@ -605,7 +622,9 @@ function ExportBar({ scope, title, heading, reportSection, source }) {
     h("path", { d: "M12 4v11M7 10l5 5 5-5" }), h("path", { d: "M5 20h14" }));
   return h("div", {
     ref, "data-no-export": "", className: (isChart ? "chart-export-bar" : "section-export-bar") + (isChart && inSection ? " in-section" : "") + (msg || busy || open ? " is-active" : ""),
-    style: { position: "relative", display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 8, flexWrap: "wrap", marginTop: isChart ? 4 : 10 }
+    // A section's bar is placed by shell.html (top-right of its section); a
+    // chart's stays a row under its chart.
+    style: isChart ? { position: "relative", display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 8, flexWrap: "wrap", marginTop: 4 } : null
   },
     msg && h("span", { role: "status", style: { fontSize: 11, fontFamily: "var(--sans)", color: msg.tone === "ok" ? "var(--green)" : "var(--red)" } },
       msg.text,
@@ -857,9 +876,10 @@ function ConfirmDialog({ title, message, confirmLabel, onConfirm, onCancel }) {
 // paragraphs they push the actual numbers off screen and make a panel look
 // heavier than it is. One muted line, expandable, styling shared with the
 // vanilla-DOM version so both halves of the app read identically.
-function Note({ summary, children }) {
+// open: start unfolded (set once; the reader can still fold it).
+function Note({ summary, children, open }) {
   const h = React.createElement;
-  return h("details", { className: "note" },
+  return h("details", { className: "note", open: open || undefined },
     h("summary", null, summary || "Why this matters"),
     h("div", { className: "note-body" }, children)
   );
@@ -941,12 +961,14 @@ function SectionCard({ title, subtitle, children, defaultOpen, nav }) {
   // An exportable section like any other card — the inputs as set ARE the
   // relevant information for an assumptions card. The bar only shows while the
   // card is open, since a collapsed card has nothing in it to export.
-  return h("div", { "data-nav": nav || undefined, className: open ? "export-section" : undefined, "data-export-section": open ? (typeof title === "string" ? title : "") : undefined, style: { background: "var(--surface)", border: "1px solid var(--rule)", borderRadius: 10, marginBottom: 14, overflow: "hidden", boxShadow: "0 1px 2px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.03)" } },
+  return h("div", { "data-nav": nav || undefined, className: open ? "export-section section-card" : "section-card", "data-export-section": open ? (typeof title === "string" ? title : "") : undefined, style: { background: "var(--surface)", border: "1px solid var(--rule)", borderRadius: 10, marginBottom: 14, overflow: "hidden", boxShadow: "0 1px 2px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.03)" } },
     // Was a bare onClick div: no Tab stop, so a keyboard user could not open
     // a single input card in the Workspace.
     h("div", buttonLikeProps(() => setOpen(!open), {
       "aria-expanded": open,
-      style: { padding: "13px 18px", display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer", background: "var(--surface-2)" }
+      // While open, the right of the header keeps room for the Export button
+      // (placed over it by shell.html), with the chevron just to its left.
+      style: { padding: open ? "13px calc(var(--xbar-pad, 104px) + 6px) 13px 18px" : "13px 18px", display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer", background: "var(--surface-2)" }
     }),
       h("div", null,
         h("div", { style: { fontFamily: "var(--display)", fontSize: 15, fontWeight: 600, color: "var(--ink-1)" } }, title),

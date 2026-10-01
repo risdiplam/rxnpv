@@ -409,40 +409,30 @@ function CaseView({ theCase, onChange, onDelete, onNavigateToTools, onReopenSave
       theCase.programs.length === 0 && h("div", { className: "empty-note" }, "This case has no programs yet. ",
         h("button", { type: "button", className: "link-btn", onClick: () => setTab("assumptions") }, "Add one on Assumptions →")),
       vs.overview,
-    // Company-level aggregate
-    theCase.programs.length > 0 && h(ExportSection, { id: "ws-revenue", title: "Company revenue rollup — all programs", reportSection: "revenueChart", style: { background: "var(--surface)", border: "1px solid var(--rule)", borderRadius: 10, padding: "16px 18px", marginBottom: 22, marginTop: 16 } },
-      h("div", { style: { display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 10, flexWrap: "wrap", gap: 8 } },
-        h("div", { style: { fontFamily: "var(--display)", fontSize: 16, fontWeight: 600, color: "var(--ink-1)" } }, "Company revenue rollup — all programs"),
-        peakCalendarYear && h("div", { style: { fontSize: 12, fontFamily: "var(--mono)", color: "var(--ink-2)" } },
-          "Peak: ", h("b", { style: { color: "var(--ink-1)" } }, fmtMoney(peakCalendarYear.totalRevenue)), " in ", new Date().getFullYear() + peakCalendarYear.calendarYear)
-      ),
-      excludedPrograms.length > 0 && h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--warn)", background: "var(--warn-bg)", border: "1px solid var(--warn)", borderRadius: 6, padding: "8px 10px", marginBottom: 10, lineHeight: 1.6 } },
+    // Company revenue and P&L, if every program works — one card. They were
+    // two: the rollup chart, then a P&L card whose "Revenue" setting showed
+    // nothing at all (the revenue chart was the card above), so by default
+    // it was a heading, a line about G&A and two buttons.
+    theCase.programs.length > 0 && h(ExportSection, { id: "ws-revenue", title: "Company revenue and P&L", reportSection: "revenueChart", style: { background: "var(--surface)", border: "1px solid var(--rule)", borderRadius: 10, padding: "16px 18px", marginBottom: 22, marginTop: 16 } },
+      h("div", { style: { display: "flex", alignItems: "baseline", gap: 14, flexWrap: "wrap", marginBottom: 4 } },
+        h("div", { style: { fontFamily: "var(--display)", fontSize: 16, fontWeight: 600, color: "var(--ink-1)" } }, "Company revenue and P&L"),
+        rollupView === "ebit" && companyPnL.length > 0 && peakEbitYear
+          ? h("div", { style: { fontSize: 12, fontFamily: "var(--mono)", color: "var(--ink-2)" } }, "Peak EBIT: ", h("b", { style: { color: "var(--ink-1)" } }, fmtMoney(peakEbitYear.ebit)), " in ", new Date().getFullYear() + peakEbitYear.calendarYear)
+          : peakCalendarYear && h("div", { style: { fontSize: 12, fontFamily: "var(--mono)", color: "var(--ink-2)" } }, "Peak: ", h("b", { style: { color: "var(--ink-1)" } }, fmtMoney(peakCalendarYear.totalRevenue)), " in ", new Date().getFullYear() + peakCalendarYear.calendarYear)),
+      h("div", { className: "prose", style: { ...UI.caption, marginBottom: 10 } },
+        "If " + (theCase.programs.length > 1 ? "every program works" : "it works") + " — no odds applied. Corporate G&A $" + (corpGA.preCommercialAnnualM || SGA_BENCHMARKS.preCommercialGA.medianM) + "M a year before revenue, " + (corpGA.gaShareOfMatureSgaPct || 50) + "% of mature SG&A after. ",
+        h("button", { type: "button", className: "link-btn", onClick: () => setTab("assumptions") }, "Edit on Assumptions →")),
+      companyPnL.length > 0 && h("div", { role: "group", "aria-label": "Company chart", className: "proj-toggle", "data-no-export": "", style: { marginBottom: 12, display: "inline-flex" } },
+        [["revenue", "Revenue"], ["ebit", "P&L waterfall"]].map(([id, lbl]) => h("button", { key: id, type: "button", "aria-pressed": rollupView === id, className: rollupView === id ? "on" : "", onClick: () => setRollupView(id) }, lbl))),
+      excludedPrograms.length > 0 && h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--warn)", background: "var(--warn-bg)", border: "1px solid var(--warn)", borderRadius: 6, padding: "6px 10px", marginBottom: 10 } },
         (excludedPrograms.length === 1 ? "“" + excludedPrograms[0] + "” is" : excludedPrograms.length + " programs are")
         + " not included in this rollup or in any valuation below — their revenue build couldn't be computed, usually because a required field is still blank. "
         + "Every total on this page excludes " + (excludedPrograms.length === 1 ? "it" : "them") + "."),
-      h(ExportableBlock, { title: (theCase.name || "Case") + " — company revenue rollup" },
-        h(RevenueChart, { series: totalSeries.concat(aggChartSeries.length > 1 ? aggChartSeries : []), showLegend: theCase.programs.length > 1, height: 200, xPrefix: "", xAxisPrefix: "" }))
-    ),
-
-    // Company-level P&L / EBIT panel
-    companyPnL.length > 0 && h(ExportSection, { id: "ws-pnl", title: "Company P&L — costs applied", style: { background: "var(--surface)", border: "1px solid var(--rule)", borderRadius: 10, padding: "16px 18px", marginBottom: 22 } },
-      h("div", { style: { display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 12, flexWrap: "wrap", gap: 8 } },
-        h("div", { style: { fontFamily: "var(--display)", fontSize: 16, fontWeight: 600, color: "var(--ink-1)" } }, "Company P&L — costs applied"),
-        peakEbitYear && h("div", { style: { fontSize: 12, fontFamily: "var(--mono)", color: "var(--ink-2)" } },
-          "Peak EBIT: ", h("b", { style: { color: "var(--ink-1)" } }, fmtMoney(peakEbitYear.ebit)), " in ", new Date().getFullYear() + peakEbitYear.calendarYear)
-      ),
-      h("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap", fontSize: 12, color: "var(--ink-2)", marginBottom: 12 } },
-        h("span", null, "Corporate G&A: ", h("b", { style: { color: "var(--ink-1)" } }, "$" + (corpGA.preCommercialAnnualM || SGA_BENCHMARKS.preCommercialGA.medianM) + "M/yr"), " before launch · ",
-          h("b", { style: { color: "var(--ink-1)" } }, (corpGA.gaShareOfMatureSgaPct || 50) + "%"), " of mature SG&A after"),
-        h("button", { type: "button", className: "link-btn", onClick: () => setTab("assumptions") }, "Edit on Assumptions →")),
-      h("div", { style: { display: "flex", gap: 6, marginBottom: 12 } },
-        [["revenue","Revenue"],["ebit","P&L waterfall"]].map(([id,lbl]) => h("button", { key: id, onClick: () => setRollupView(id),
-          style: { padding: "5px 12px", borderRadius: 7, border: "1px solid var(--rule)", cursor: "pointer", fontFamily: "var(--mono)", fontSize: 11,
-            background: rollupView === id ? "var(--teal-bg)" : "transparent", color: rollupView === id ? "var(--teal)" : "var(--ink-2)", fontWeight: rollupView === id ? 700 : 400 } }, lbl))
-      ),
-      rollupView === "ebit" && h(ExportableBlock, { title: (theCase.name || "Case") + " — P&L by year" },
+      (rollupView !== "ebit" || !companyPnL.length) && h(ExportableBlock, { title: (theCase.name || "Case") + " — company revenue rollup" },
+        h(RevenueChart, { series: totalSeries.concat(aggChartSeries.length > 1 ? aggChartSeries : []), showLegend: theCase.programs.length > 1, height: 200, xPrefix: "", xAxisPrefix: "" })),
+      rollupView === "ebit" && companyPnL.length > 0 && h(ExportableBlock, { title: (theCase.name || "Case") + " — P&L by year" },
         h(RevenueChart, { series: ebitSeries, showLegend: true, height: 200, xPrefix: "", xAxisPrefix: "" })),
-      rollupView === "ebit" && (() => {
+      rollupView === "ebit" && companyPnL.length > 0 && (() => {
         const troughYear = companyPnL.reduce((worst, c) => c.ebit < worst.ebit ? c : worst, companyPnL[0]);
         return h("div", { style: { display: "flex", gap: 24, marginTop: 12, flexWrap: "wrap" } },
           h("div", null,
@@ -461,40 +451,10 @@ function CaseView({ theCase, onChange, onDelete, onNavigateToTools, onReopenSave
     panel("assumptions", h("div", { className: "assume-grid" + (theCase.programs.length > 0 && !navHidden ? " has-nav" : "") },
       theCase.programs.length > 0 && !navHidden && h(SectionNav, { groups: assumptionNavSections(theCase, activeProg), rootId: "casepanel-assumptions", active: tab === "assumptions", onHide: () => setNavHiddenSaved(true) }),
       h("div", { className: "assume-main" },
-    // Case-level master mode — one click sets every program's revenue mode AND
-    // the capital structure mode at once. Per-section toggles still work
-    // afterward if you want to mix modes within the case. Highlighted state is
-    // DERIVED from actual program/capital-structure modes (not a separate stored
-    // flag) so it can never drift out of sync with what's really set — if you
-    // manually change one program afterward, neither button stays highlighted,
-    // which is the honest answer ("this case is now mixed").
-    (() => {
-      const capModeNow = (theCase.capitalStructure || {}).mode || "simple";
-      const allQuick = theCase.programs.every(p => (p.revenueMode || "quick") === "quick") && capModeNow === "simple";
-      const allDetailed = theCase.programs.every(p => p.revenueMode === "full") && capModeNow === "detailed";
-      const setAll = (mode) => update({
-        programs: theCase.programs.map(p => ({ ...p, revenueMode: mode === "quick" ? "quick" : "full" })),
-        capitalStructure: { ...(theCase.capitalStructure || {}), mode: mode === "quick" ? "simple" : "detailed" }
-      });
-      return h("div", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 16, flexWrap: "wrap" } },
-        h("span", { style: UI.captionMd }, "Set entire case:"),
-        h("button", {
-          onClick: () => setAll("quick"),
-          style: { padding: "5px 14px", borderRadius: 7, border: "1px solid " + (allQuick ? "var(--teal)" : "var(--rule)"),
-            background: allQuick ? "var(--teal-bg)" : "transparent", color: allQuick ? "var(--teal)" : "var(--ink-2)",
-            fontFamily: "var(--mono)", fontSize: 11, fontWeight: allQuick ? 700 : 400, cursor: "pointer" }
-        }, "All Quick"),
-        h("button", {
-          onClick: () => setAll("detailed"),
-          style: { padding: "5px 14px", borderRadius: 7, border: "1px solid " + (allDetailed ? "var(--amber)" : "var(--rule)"),
-            background: allDetailed ? "var(--amber-bg)" : "transparent", color: allDetailed ? "var(--amber)" : "var(--ink-2)",
-            fontFamily: "var(--mono)", fontSize: 11, fontWeight: allDetailed ? 700 : 400, cursor: "pointer" }
-        }, "All Detailed"),
-        h("span", { style: UI.caption },
-          allQuick ? "— case is fully in Quick mode" : allDetailed ? "— case is fully in Detailed mode" : "— mixed: click to set every program + capital structure at once"),
-        navHidden && theCase.programs.length > 0 && h("button", { type: "button", className: "link-btn", style: { marginLeft: "auto" }, onClick: () => setNavHiddenSaved(false) }, "Show section list")
-      );
-    })(),
+    // "Set entire case: All Quick / All Detailed" now lives in the Company
+    // card's "Mix and match" fold, next to the presets it overlapped.
+    navHidden && theCase.programs.length > 0 && h("div", { style: { display: "flex", justifyContent: "flex-end", marginBottom: 8 } },
+      h("button", { type: "button", className: "link-btn", onClick: () => setNavHiddenSaved(false) }, "Show section list")),
 
       vs.inputs,
       theCase.programs.length > 0 && h(ExportSection, { nav: "ga", title: "Corporate G&A", style: { background: "var(--surface)", border: "1px solid var(--rule)", borderRadius: 10, padding: "16px 18px", marginBottom: 22 } },

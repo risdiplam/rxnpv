@@ -254,6 +254,9 @@ function serializeSection(root, opts) {
   opts = opts || {};
   if (!root || !root.cloneNode) return { ok: false, error: "Nothing to export." };
   const clone = root.cloneNode(true);
+  // On screen a section's first row keeps room for its Export button; the
+  // button is not exported, so neither is the room.
+  [clone].concat(Array.prototype.slice.call(clone.querySelectorAll(".export-section"))).forEach(n => { if (n.style) n.style.setProperty("--xbar-pad", "0px"); });
   // cloneNode preserves structure exactly, so the two lists line up one to one
   // and each clone node can be corrected from its live counterpart.
   const live = [root].concat(Array.prototype.slice.call(root.querySelectorAll("*")));

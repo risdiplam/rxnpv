@@ -32,6 +32,7 @@ function PortfolioView({ cases }) {
 
     // ── Summary table ──
     h(ExportSection, { title: "Portfolio summary", style: { background: "var(--surface)", border: "1px solid var(--rule)", borderRadius: 10, padding: "16px 18px", marginBottom: 18, overflowX: "auto" } },
+      h("div", { style: { fontFamily: "var(--display)", fontSize: 16, fontWeight: 600, color: "var(--ink-1)", marginBottom: 6 } }, "Portfolio summary"),
       h("table", { style: { width: "100%", borderCollapse: "collapse", fontSize: 12, fontFamily: "var(--mono)" } },
         h("thead", null, h("tr", { style: { borderBottom: "1px solid var(--rule)" } },
           ["Case", "Program", "Price", "Fair value", "Upside", "Runway", "Modeled PoS", "Implied PoS"].map(col =>

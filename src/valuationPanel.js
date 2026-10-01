@@ -319,15 +319,33 @@ function useValuationSections({ theCase, onChange, goToTab }) {
               valMethod === "multiple" && allFull ? "Epidemiology build valued off a multiple — rigorous peak, comp-based value."
                 : valMethod === "dcf" && allQuick ? "Typed peak run through the full cost and timing model."
                 : "Programs are mixed between Quick and Full revenue builds."))
-        ));
+        ),
+        // The finer controls the two presets set for you, one fold down: the
+        // revenue build of every program (with the capital table's detail),
+        // and the valuation method on its own. They used to be two more rows
+        // of buttons on this tab, one above the card and one below it.
+        (() => {
+          const capModeNow = cap.mode || "simple";
+          const caseQuick = allQuick && capModeNow === "simple";
+          const caseDetailed = allFull && capModeNow === "detailed";
+          const setAll = (mode) => update({
+            programs: theCase.programs.map(p => ({ ...p, revenueMode: mode === "quick" ? "quick" : "full" })),
+            capitalStructure: { ...(theCase.capitalStructure || {}), mode: mode === "quick" ? "simple" : "detailed" }
+          });
+          const pill = (on, label, onClick, tone) => h("button", { type: "button", key: label, onClick, "aria-pressed": on,
+            style: { padding: "5px 14px", minHeight: 28, borderRadius: 7, border: "1px solid " + (on ? "var(--" + tone + ")" : "var(--rule)"), cursor: "pointer", fontFamily: "var(--mono)", fontSize: 12,
+              background: on ? "var(--" + tone + "-bg)" : "transparent", color: on ? "var(--" + tone + ")" : "var(--ink-2)", fontWeight: on ? 700 : 400 } }, label);
+          const row = (label, kids, note) => h("div", { style: { display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", margin: "4px 0 8px" } },
+            h("span", { style: { ...UI.captionMd, minWidth: 190 } }, label), kids, note && h("span", { style: UI.caption }, note));
+          return h(Note, { summary: "Mix and match", open: active === "custom" },
+            row("Every program and the cap table", [pill(caseQuick, "All Quick", () => setAll("quick"), "teal"), pill(caseDetailed, "All Detailed", () => setAll("detailed"), "amber")],
+              caseQuick ? "— fully Quick" : caseDetailed ? "— fully Detailed" : "— mixed"),
+            row("Valuation method", [["dcf", "DCF (bottoms-up)"], ["multiple", "Simple Multiple"]].map(([id, lbl]) => pill(valMethod === id, lbl, () => update({ valuationMethod: id }), "teal"))),
+            h("div", null, "Quick types a peak revenue and a simple share count; Detailed builds peak from epidemiology and the cap table line by line. The two presets above pair the revenue build with the method that suits it; these let you combine them any other way."));
+        })());
     })()),
 
     show("inputs") && (h("div", { style: { marginBottom: 16 } },
-      h("div", { style: { display: "flex", gap: 6, marginBottom: 8 } },
-        [["dcf","DCF (bottoms-up)"],["multiple","Simple Multiple"]].map(([id,lbl]) => h("button", { key: id, onClick: () => update({ valuationMethod: id }),
-          style: { padding: "6px 14px", borderRadius: 7, border: "1px solid " + (valMethod === id ? "var(--teal)" : "var(--rule)"), cursor: "pointer", fontFamily: "var(--mono)", fontSize: 12,
-            background: valMethod === id ? "var(--teal-bg)" : "transparent", color: valMethod === id ? "var(--teal)" : "var(--ink-2)", fontWeight: valMethod === id ? 700 : 400 } }, lbl))
-      ),
       valMethod === "multiple" && h("div", { style: { padding: "10px 12px", borderRadius: 8, background: "var(--surface-2)" } },
         h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginBottom: 10, lineHeight: 1.6 } },
           "Peak revenue × multiple, still PoS-risked and discounted back to today — same convention as the DCF's exit multiple. Skips cost structure and year-by-year cash flows, so it's fast but cruder. A quick cross-check, not a replacement for the DCF."),
@@ -595,7 +613,10 @@ function useValuationSections({ theCase, onChange, goToTab }) {
     // Scenario comparison
     show("overview|scenarios") && (error ? h("div", { style: { padding: 14, borderRadius: 8, background: "var(--red-bg)", border: "1px solid var(--red)", color: "var(--red)", fontFamily: "var(--mono)", fontSize: 12 } }, "Calculation error: " + error)
     : h("div", null,
-        h(ExportSection, { title: "Scenario comparison", reportSection: "summary" },
+        // Scenarios tab only: the Overview's "Price vs. model" already leads
+        // with the same three per-share values, and the editors that change
+        // them live here.
+        show("scenarios") && h(ExportSection, { title: "Scenario comparison", reportSection: "summary" },
         h("div", { id: part === "scenarios" ? "ws-scenarios" : undefined, style: { fontSize: 13, fontFamily: "var(--display)", fontWeight: 600, color: "var(--ink-1)", marginBottom: 10, borderTop: part === "scenarios" ? "none" : "1px dashed var(--rule)", paddingTop: part === "scenarios" ? 0 : 14 } }, "Scenario comparison"),
 
         show("scenarios") && (h(SectionCard, { title: "Case-level Base-PoS adjustment", subtitle: "An overarching view on this whole case's odds, distinct from any single program's PoS override or the Bear/Bull scenario multipliers below", defaultOpen: false },
