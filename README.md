@@ -31,10 +31,10 @@ cd rxnpv
 node build.js              # assembles src/ into electron/rxnpv.html
 cd test
 npm install                # jsdom + React, for the test harness only
-npm test                   # regenerates the harness, runs all 13 suites
+npm test                   # regenerates the harness, runs all 16 suites
 ```
 
-Expected output ends with `All 13 suites passed`, and the exit code is 0. Any failure exits 1 and prints the failing suite's last 25 lines. `npm run test:dev` runs the same suite against React's development build. That run is stricter: warnings the production build hides, such as missing list keys, fail it.
+Expected output ends with `All 16 suites passed`, and the exit code is 0. Any failure exits 1 and prints the failing suite's last 25 lines. `npm run test:dev` runs the same suite against React's development build. That run is stricter: warnings the production build hides, such as missing list keys, fail it.
 
 ### Running the app itself
 
@@ -88,16 +88,22 @@ Suggested real-world inputs, most of them the cases used against the live servic
 | **Revenue modes** | *Quick*: you enter a peak revenue yourself. *Full*: epidemiology → diagnosed → treated → share → price, with a launch curve and loss of exclusivity. The price basis can be ASP, WAC, AWP or Retail, converted to ASP. | Switch the program to Full. Fill in steps 1–5 and watch the revenue output card update. |
 | **Napkin / Full model presets** | One click pairs revenue mode with valuation method: Napkin = Quick + Simple Multiple, Full = Full + DCF. Inputs the chosen method never reads are hidden or marked. | Click Napkin, then Full model. DCF-only inputs should disappear, then come back. |
 | **Two valuation methods** | Full DCF (risk-adjusted cash flows, discount rate, optional terminal value and cash tax) or Simple Multiple. | Toggle *DCF / Simple Multiple* and compare per-share values. |
-| **Bear / Base / Bull scenarios** | Multipliers on share, PoS and discount rate, overridable per case. | Open *Edit Bear / Bull assumptions* and change the Bear PoS multiplier. The Bear card should move. |
-| **Capital structure and dilution** | Cash, debt and diluted shares. Optional future raise and a dilution path to launch; the two combine correctly. | Enable *Model dilution path to launch*. The per-share value should fall and the preview line should show the shares growing. |
+| **Bear / Base / Bull scenarios** | Multipliers on share and PoS, overridable per case. The discount rate stays the same in every scenario by default (the odds carry the risk of failure; see the methodology review). | Open *Edit Bear / Bull assumptions* and change the Bear PoS multiplier. The Bear card should move. |
+| **Capital structure and dilution** | Cash (as the last filing reported it, with its date and the monthly burn; *Roll the cash forward* is an opt-in estimate), debt and diluted shares. Optional future raise, priced as a % below today's price or at a fixed price, and a dilution path to launch whose raises bring their cash with their shares. | Enable *Model dilution path to launch*. The preview line shows the raises, the expected cash and the shares; value per share moves up or down depending on whether the raise price is above or below the case's own value. |
 | **PRV, partnership economics** | Priority review voucher; royalty, milestone, upfront and cost-sharing overlay. Links to Licensing Comps. | Enable partnership. The EV→per-share bridge gains a line. |
 | **Full-case Monte Carlo** | 3,000 trials sampling PoS, share and discount rate between the Bear and Bull bounds. | Click **Run 3,000 trials**. A fair-value distribution appears. |
 | **Implied PoS and reverse-solve** | Given the current price, what PoS (or peak revenue, share or timing) the market is pricing in. | Set a current price. *What [case]'s price implies* appears. |
 | **Red flags** | Checks your own inputs against benchmarks, including a warning when post-approval M&A multiples are applied to a pre-approval asset. | Set a very high peak share. A flag appears. |
 | **Evidence Log, Calibration Log** | Sources behind judgement calls; your PoS call against the market's, Brier-scored after the outcome. | Add an entry to each, then delete one. Deletion needs two clicks. |
+| **Headline: price vs. model** | Today's price beside Bear/Base/Bull, the value *if it works* (Base at 100% odds), your odds of launch and the odds the price implies, one plain-English reading, and the case at a glance (evidence → odds → value) underneath. | Load the Stoke sample. The Overview opens on one card with all of these. |
+| **What each outcome is worth** | The range strip (if it fails · today · if it works, with Bear/Base/Bull), the outcome tree (each remaining catalyst with the case's own odds, endings valued by the model, optional resubmission branch) and, on Scenarios, what each readout result would do to the value. *If it fails* is the filing's cash less the current stage still to pay, G&A to the readout and a wind-down — it assumes the whole current stage is unpaid; a rough estimate from the monthly burn is an opt-in alternative. | Open the floor's note and tick *Rough estimate from the monthly burn*. The strip's floor moves; Bear/Base/Bull do not. |
+| **Year by year** | The odds-weighted cash flows and running present value, with an *If it works* view of the same years. | Toggle *× odds* / *If it works*. The table drops the × odds column and ends at the success-case enterprise value. |
+| **Red flags you have considered** | *Mark considered* collapses a flag to a dated line and takes it off the badge; it reopens by itself if the input behind it changes. | Mark a flag considered, then change the input it names. It comes back. |
+| **Snapshot from the model** | Writes the Evidence Log's "What the model says" entry from the live numbers, dated, replacing the previous one. | Change the price, press *Snapshot from the model*, read the entry. |
+| **Saved tab and worked examples** | Results saved from Tools and Simulation with their inputs; the sample cases carry one worked example per tool, each reopening its tool with sourced inputs. | Open the Stoke sample's Saved tab and open any example. |
 | **Sum-of-the-parts, risk waterfalls** | Per-program value contribution (needs 2+ programs); unrisked → risked NPV. | Add a second program. The SOTP and pipeline waterfall appear. |
 
-**Automated:** `final_regression_pass.js` covers the core valuation paths. `math_verification.js` (1,137 checks) covers every formula against hand-derived values.
+**Automated:** `final_regression_pass.js` covers the core valuation paths. `math_verification.js` (1,378 checks at the last update; it prints the current count) covers every formula against hand-derived values.
 
 ### Tools: six workbenches, 19 tools, grouped by the question being asked
 
@@ -155,7 +161,7 @@ A cross-case summary: fair value against price, runway, modelled against implied
 3. In **Sections ▼**, untick the added section. It should leave the report.
 4. Add a second section, reorder the two, then **Export as PDF**.
 
-**Automated:** `export_test.js` (serialiser and sanitiser) and `export_coverage_test.js` (403 checks):
+**Automated:** `export_test.js` (serialiser and sanitiser) and `export_coverage_test.js` (701 checks at the last update; it prints the current count):
 - every section in every view has its own export bar
 - + Report works both ways
 - the report renders the snapshot's real content with nothing executable in it
@@ -180,7 +186,10 @@ A cross-case summary: fair value against price, runway, modelled against implied
 
 | Suite | Covers |
 |---|---|
-| `math_verification.js` | 1,137 checks of engine math against values derived by hand, from closed forms or from published constants. Never against the app's own output. Needs no DOM. |
+| `math_verification.js` | 1,378 checks (at the last update; the suite prints the current count) of engine math against values derived by hand, from closed forms or from published constants. Never against the app's own output. Needs no DOM. |
+| `net_test.js` | `resilientFetch`, the one fetch every integration uses: what is retried (dropped connections, timeouts, 408/425/429/5xx), what is not (400/403/404), and the waits. |
+| `backup_test.js` | Backup and restore (ADD vs REPLACE, unknown keys dropped, caches excluded) and both sample cases, pinned to the independent rebuilds. |
+| `worked_examples_test.js` | Every worked example in the sample cases opens its tool, fills it and runs; none reach the report. |
 | `export_test.js` | Section serialiser: form state carried over, export controls removed, truncated text restored, sanitiser strips scripts, handlers, remote resources and `javascript:` URLs. |
 | `audit_regressions_test.js` | The UI-level fixes from the September 2026 Muse audit ([`docs/RxNPV_MUSE_AUDIT.md`](docs/RxNPV_MUSE_AUDIT.md)): override display round-trip, percent inputs, AE denominators, stale Form 4 / Exclusivity responses, the bridge convertible line, PK/PD notation, and the documented Trial Watch field count held to the code. Each check was confirmed to fail on the audited tree. |
 | `export_coverage_test.js` | Every section in every view has its own export bar; + Report (snapshot and live toggle); report rendering, include/exclude, reorder. |

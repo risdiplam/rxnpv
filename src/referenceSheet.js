@@ -1,7 +1,8 @@
 // ════════════════════════════════════════════════════════════════════════════
-// Reference Sheet — every benchmark used in the engine, with sources, plus
-// forward-looking tables (PoS, discount rate) not yet wired into calculations
-// but needed for judgment calls today and for the next build phases.
+// Reference Sheet — every benchmark the engine uses, with its source: revenue
+// build, costs, R&D and timelines, PoS (read by posEngine.js), discount-rate
+// guidance (the case's discount-rate field), dilution, M&A comps, and a trial
+// glossary. Display only; the numbers live in data.js.
 // ════════════════════════════════════════════════════════════════════════════
 function ReferenceSheet({ activeCase }) {
   const h = React.createElement;

@@ -45,6 +45,10 @@ Percentages are always typed as whole numbers 0–100 (e.g., `65` for 65%), not 
 - **Field:** years from today until launch, as a whole number, or left blank to use RxNPV's own phase-duration benchmark.
 - Only override this with a specific reason (a disclosed company timeline, a known regulatory filing date, an unusual trial completion date) — cite the source of the date directly.
 
+### 1.4b Tool-only fields
+
+- **Key trials (NCT numbers)** and **target gene**: comma-separated NCT IDs (lead trial first) and a gene symbol. Never read by the valuation; with the case open, the trial and science tools start on them.
+
 ### 1.5 Revenue — Quick Mode
 Used when a single peak revenue estimate is enough (fast, less granular).
 - **Peak revenue:** millions-denominated (e.g., `2000` for $2B peak).
@@ -57,7 +61,7 @@ Used for a genuine bottoms-up build. Report each of these separately if research
 - **Adherence %** — whole-number percentage.
 - **Market share:** number of competing drugs expected at peak, this drug's order of entry (1st, 2nd, etc.), and an optional peak-share override % if a benchmark based on order-of-entry alone would be misleading for a specific competitive situation.
 - **Launch curve:** years from launch to peak share.
-- **Pricing:** US annual price per patient (raw dollars, e.g., `180000`), **which price basis that number is on** (ASP / WAC / AWP / Retail — the model converts to ASP using Table 4-1 before multiplying by patients), an optional net price realisation % that overrides that conversion with your own gross-to-net, annual price growth %, whether to include ex-US revenue, ex-US price as a % of US price, ex-US patient-count multiplier relative to US. The basis defaults to ASP with no adjustment, so a price supplied without a basis is treated as already net.
+- **Pricing:** US annual price per patient (raw dollars, e.g., `180000`), **which price basis that number is on** (ASP / WAC / AWP / Retail — the model converts to ASP using Table 4-1 before multiplying by patients), an optional net price realisation % that overrides that conversion with your own gross-to-net, annual price growth %, whether to include ex-US revenue, ex-US price as a % of US price, ex-US patient-count multiplier relative to US, and the ex-US launch lag in years after the US launch (blank = the 1.5-year benchmark; the ex-US ramp runs on the same curve that much later). The basis defaults to ASP with no adjustment, so a price supplied without a basis is treated as already net.
 - **Exclusivity:** years from launch to loss of exclusivity, and — if known — expected volume-retained % and price-decline % after generic/biosimilar entry.
 - This section draws heavily on `BiotechAgent.md` Section 2 (population funnel and natural history) and Section 8 (competition, market access, pricing precedent, payer evidence threshold).
 
@@ -79,6 +83,11 @@ Used for a genuine bottoms-up build. Report each of these separately if research
 - **Discount rate:** whole-number percentage. This is compatible with PoS-weighting already applied elsewhere in the model — per `BiotechAgent.md`'s own double-counting warning, do not derive this from a market-based WACC that already implicitly prices in failure risk.
 - **Terminal value:** whether enabled, and if so the exit multiple (a peak-revenue multiple, e.g., `3` for 3x) or a perpetuity growth rate — only relevant if researching a specific comp-based multiple for the asset's therapeutic class.
 - **Capital structure:** cash and debt (millions-denominated), diluted shares outstanding (raw whole number, e.g., `100000000`). If reporting a fully diluted figure that accounts for options/warrants/converts, state that explicitly and cite the source filing and its date — dilutive instruments change quickly.
+- **Cash as of / monthly burn / value as of** (October 2026): the balance-sheet date of the cash figure (`YYYY-MM-DD`), the monthly burn (millions-denominated, stored as raw dollars like cash), and the valuation date (blank = today). The valuation uses the cash **as the filing reported it** unless **Roll the cash forward** is ticked, which subtracts the burn from the cash date to the valuation date — an estimate, off by default. Report the filing date and the burn basis (cash used in operations, not operating loss).
+- **Future raise:** the amount (field named `amountM` for history, but stored as **raw dollars** — the input converts from millions), and its price: **% below today's price** (`priceMode: "discount"`, `discountPct` 0–100, follows the stock — new cases start here) or a **fixed price** in dollars per share (cases saved before October 2026 keep this). An at-the-market facility sells near the market less the agent's ~3%; follow-ons usually price 10–20% below.
+- **Failure floor method and wind-down:** "If it fails" is computed from the stage cost by default; **Rough estimate from the monthly burn** (`failureFloor.method: "burn"`) uses the burn to the Calibration Log's next dated catalyst instead. Wind-down after a failed readout is in years of corporate G&A (blank = 1). Neither changes Bear/Base/Bull.
+- **Outcome tree resubmission %** (0–100, blank = off): the share of FDA rejections approved a year later (Sacks et al. 2014 found 47%). **Readout scenarios** (Scenarios tab): clear wins as a % of wins, and each result's odds to launch and peak share vs Base, all 0–100 percents; blank means the case's own default.
+- **Napkin peak vs the full build:** in Full mode the Napkin peak is not used; if the two differ by more than 1.5x the case shows a red flag, because switching modes would move the value by roughly that much.
 - **Bear/Bull scenario overrides:** optional case-specific multipliers on revenue %, PoS %, and discount rate add, relative to Base — only relevant if a specific reason exists to widen or narrow RxNPV's default Bear/Bull spread for this company.
 - **Valuation method:** RxNPV supports two modes — a full bottoms-up DCF (the default, everything above), or a faster Simple Multiple mode (peak revenue × a comp multiple, still PoS-risked and discounted, but skipping cost structure entirely). If a case uses Simple Multiple mode, the relevant research target is a defensible peak-revenue multiple for the asset's therapeutic class and stage — typically drawn from recent M&A or trading comps — reported per scenario (Bear/Base/Bull) if there's a specific reason it should differ by scenario; RxNPV's own default holds the multiple constant across all three unless overridden.
 
@@ -89,6 +98,7 @@ Useful context if asked to sanity-check or build on an already-computed case, no
 - **Bear / Base / Bull fair value per share**, each with its own enterprise value.
 - **Enterprise Value → Equity Value → Per-Share bridge**: EV, plus PRV (if any, PoS-weighted), plus cash, minus debt, divided by diluted shares.
 - **Sum-of-the-Parts** (multi-program cases only, DCF mode only): each program's standalone value plus a shared corporate G&A drag, reconciling to the same total as the combined valuation.
+- **If it works** (DCF only): Base at 100% odds — the value if every remaining readout and the FDA go the program's way. **If it fails**: the failure floor above. **Outcome tree** and **readout scenarios**: each ending or result valued on its own, with the case's odds.
 - **Implied PoS** (DCF mode only): solved backward from the current price — what probability of success the market's price requires, given the modeled revenue and cost assumptions. Useful as a sanity check against your own PoS override: if the market's implied PoS is far outside what the clinical evidence supports, that gap is itself a research finding worth stating.
 
 Simple Multiple mode produces Bear/Base/Bull fair value and the EV bridge, but not Sum-of-the-Parts or Implied PoS — if reviewing a case in that mode, their absence is expected, not a missing piece.

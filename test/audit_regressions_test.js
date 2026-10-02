@@ -418,6 +418,7 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
     ok(!!rng && ["If it fails", "≈$1.30", "If it works", "Today", "Bear", "Base", "Bull"].every(t => rt.includes(t)), "Range strip: floor, scenarios, today and success all marked (" + rt.join(" | ") + ")");
     ok(!!rng && /paying 58% of the way from failure to success/.test(rng.textContent), "Range strip: the reading places the price between failure and success");
     ok(!!rng && /1 year of wind-down G&A \$95\.0M/.test(rng.textContent), "Range strip: the floor's arithmetic is written out");
+    ok(!!rng && /assumes the whole current stage is still to pay/.test(rng.textContent), "Range strip: the floor says its default assumes the current stage is unpaid (GAP-003)");
 
     // The rough burn estimate for "if it fails": off by default, a checkbox
     // in the floor's note. On, the strip's floor moves to $0.46 ($19.5M a

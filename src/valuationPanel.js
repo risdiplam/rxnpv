@@ -281,7 +281,8 @@ function useValuationSections({ theCase, onChange, goToTab }) {
               : "Net cash " + fmtMoney(floor.netCash) + " − " + floor.stageLabel + " cost to the readout " + fmtMoney(floor.trialCost) + " (the company's share) − G&A to the readout " + fmtMoney(floor.gaToReadout),
             " − " + floor.windDownYears + " year" + (floor.windDownYears === 1 ? "" : "s") + " of wind-down G&A " + fmtMoney(floor.windDown) + " = " + fmtMoney(floor.equity) + ", ÷ " + fmtNum(Math.round(floor.shares)) + " shares at that price" +
             (floor.cashShort ? " — cash runs out first, so without new money the equity is worth about nothing" : "") +
-            ". Before any new raise and not discounted; anything the platform or other assets might fetch is left out. The wind-down is set under Assumptions → Corporate G&A."),
+            ". Before any new raise and not discounted; anything the platform or other assets might fetch is left out. The wind-down is set under Assumptions → Corporate G&A." +
+            (floor.method === "burn" ? "" : " This default assumes the whole current stage is still to pay, so for a trial already mostly paid for it reads low.")),
           // Opt-in: a rough alternative from the reported burn. It only moves
           // the failure figures (this strip, the outcome tree's failure
           // endings, the readout table's miss) — never Bear, Base or Bull.

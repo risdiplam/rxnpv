@@ -1,3 +1,5 @@
+> **Historical record — September 2026.** This was the packet for the September 2026 audit, written against tree `f49689f`. Every finding in it was fixed and is dispositioned in §13 and in [`RxNPV_Findings_TODO.md`](RxNPV_Findings_TODO.md); the "NOT MET / not yet" verdicts below describe that tree, not the current app. For packaged-app checks today, run `test/packaged/packaged_check.js` (`cd test && npm run packaged -- --mode=offline|reopen|live`).
+
 # CLAUDE IMPLEMENTATION PACKET — RxNPV
 
 **To:** Claude Code (head developer)

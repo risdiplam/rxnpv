@@ -479,11 +479,14 @@ function computeBreakEvenCurve(theCase, discountRateBasePct, terminalValueParams
 }
 
 // ── Failure floor: roughly what a share is worth if the next readout fails ──
-// Built as cash, not as a valuation with PoS set to zero: that run keeps
-// charging pre-commercial G&A for the whole projection, as if a company with
-// a failed lead asset kept its full overhead for twenty-five years, and came
-// out below zero (the Stoke sample showed -$3.81). What actually happens is a
-// wind-down, so the floor is:
+// Built as plain cash arithmetic rather than as a valuation with the odds set
+// to zero. Since corporate G&A is weighted by the odds the company is still
+// going, a zero-odds run charges only the current stage and a wind-down too,
+// and lands near the burn estimate (PepGen: $0.93 against $0.89) — but it
+// discounts, counts the modelled raise and any partner payments, and spreads
+// costs over the stage calendar. The floor is the simpler, explicit picture a
+// reader can check by hand: undiscounted, before any raise, floored at zero
+// (cashShort says when the cash runs out first). It is:
 //   net cash (cash − debt − a convertible that would not convert)
 //   − the company's share of the current stage's cost, to the readout
 //   − corporate G&A until the readout
@@ -1298,7 +1301,7 @@ function buildModelSnapshot(theCase, today) {
       const fl = single ? computeFailureFloor(theCase) : null;
       if (works != null && Math.abs(works - ps(base)) >= 0.005)
         parts.push("If approved, with no failure weighting, a share is worth ~" + sh(works) + " on Base inputs" +
-          (fl ? "; if the next readout fails, " + (fl.perShare < 0.005 ? "about nothing" : "~" + sh(fl.perShare)) + " is left (" + (fl.method === "burn"
+          (fl ? "; if the next readout fails, " + (fl.perShare < 0.005 ? "about nothing" + (fl.cashShort ? " — the cash runs out first —" : "") : "~" + sh(fl.perShare)) + " is left (" + (fl.method === "burn"
             ? "the rough burn estimate: the filing's cash less " + fmtMoney(fl.monthlyBurn) + " a month for " + fl.monthsToReadout.toFixed(0) + " months to the readout and a wind-down"
             : "the filing's cash less the " + fl.stageLabel + " still to pay, G&A to the readout and a wind-down") + ", before any raise)." : "."));
     } catch (e) { /* skip */ }
