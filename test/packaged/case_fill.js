@@ -39,7 +39,11 @@ const { app, BrowserWindow } = require("electron");
 const path = require("path"), fs = require("fs"), os = require("os");
 const args = Object.fromEntries(process.argv.slice(2).map(a => a.replace(/^--/, "").split("=")).map(([k, v]) => [k, v == null ? true : v]));
 const appPath = args.app || "/Applications/RxNPV.app";
-const plan = JSON.parse(fs.readFileSync(args.plan, "utf8"));
+// A missing or broken plan exits with a message: thrown here, Electron would
+// open a native error dialog that nobody sees, and the run would sit there.
+let plan;
+try { plan = JSON.parse(fs.readFileSync(args.plan, "utf8")); }
+catch (e) { console.error("cannot read plan " + args.plan + ": " + e.message); process.exit(2); }
 const OUT = args.out || fs.mkdtempSync(path.join(os.tmpdir(), "rx-fill-"));
 fs.mkdirSync(OUT, { recursive: true });
 app.setPath("userData", args.userdata ? path.resolve(String(args.userdata)) : fs.mkdtempSync(path.join(os.tmpdir(), "rx-fill-profile-")));

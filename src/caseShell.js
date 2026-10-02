@@ -333,7 +333,9 @@ function CaseView({ theCase, onChange, onDelete, onNavigateToTools, onReopenSave
     h("div", { style: { display: "flex", alignItems: "center", gap: 12, marginBottom: 6, flexWrap: "wrap" } },
       h("input", { value: theCase.name, onChange: e => update({ name: e.target.value }), "aria-label": "Case name",
         style: { fontFamily: "var(--display)", fontSize: 26, fontWeight: 700, color: "var(--ink-1)", background: "transparent", border: "none", borderBottom: "2px solid var(--rule)", padding: "4px 0", flex: "1 1 260px", minWidth: 200 } }),
-      h("input", { value: theCase.ticker, onChange: e => update({ ticker: e.target.value }), placeholder: "TICKER", "aria-label": "Ticker symbol",
+      // A leading "$" (cashtag habit) is dropped: tools search EDGAR and
+      // ClinicalTrials.gov with this, and "$STOK" finds nothing.
+      h("input", { value: theCase.ticker, onChange: e => update({ ticker: e.target.value.replace(/^\s*\$+/, "").toUpperCase() }), placeholder: "TICKER", "aria-label": "Ticker symbol",
         style: { width: 100, fontFamily: "var(--mono)", fontSize: 14, color: "var(--ink-2)", background: "var(--surface)", border: "1px solid var(--rule)", borderRadius: 6, padding: "6px 10px" } }),
       h("div", { style: { display: "flex", alignItems: "center", gap: 6 } },
         h("span", { style: UI.captionMd }, "Current price"),
