@@ -14,11 +14,16 @@ The September 2026 external audit (`RxNPV_MUSE_AUDIT.md`) reopened this list. It
 
 ### 🟡 Model choices — two settled, two still open (PepGen pass, 2026-09-30)
 Two of the four were settled by the methodology review (`RxNPV_rNPV_Methodology_Review.md`) and fixed on the user's go-ahead (build log, Phase 48): **corporate G&A is now weighted by the odds the company is still going**, and **the dilution path adds each raise's cash with its shares**, weighted by the odds it happens. Still open, each a stated simplification:
-1. **The failure floor charges the current stage's full benchmark-proportioned cost as still to come.** PepGen's floor is $0 partly because it charges all of Phase 2's ~$58M though FREEDOM2 is mostly paid for. The user judged tracking "how far through a trial" a guess too far; the review's alternative — cash minus the burn to the readout's date — is not built.
+1. **The failure floor's default charges the current stage's full benchmark-proportioned cost as still to come.** PepGen's floor is $0 partly because it charges all of Phase 2's ~$58M though FREEDOM2 is mostly paid for. The user judged tracking "how far through a trial" a guess too far. The review's alternative — cash minus the burn to the readout's date — **was built on 2026-10-01 as an opt-in** ("Rough estimate from the monthly burn" in the floor's note; Phase 50), and since 2026-10-02 the note says the default assumes the whole current stage is unpaid (GAP-003). The default stays as it is: the user's decision.
 2. **Medicaid drug-utilization data** was declined because Medicare Part B/D covers the question. It does not for paediatric rare-disease drugs: Sarepta's PMOs and nusinersen are absent from Medicare's files entirely. Worth reconsidering only if a paediatric launch needs tracking.
 
 ### 🔵 One manual click
-The packaged-app harness replaces only the native save sheet. Clicking **Export as PDF** once in the real app and choosing a location is the single step it cannot perform.
+The packaged-app harness replaces only the native save sheet. Clicking **Export as PDF** once in the real app and choosing a location is the single step it cannot perform. **Last done 2026-10-02** (October audit, Phase 6): the installed app on a throwaway profile, Stoke sample → Generate Report → Export as PDF → the native sheet → Save; a 4-page vector report, every page rendered and looked at.
+
+### 🟡 Decisions the October 2026 audit surfaced (the user's call)
+- **GAP-001 — Pipeline view / 10-K vs CT.gov mismatch** is marked "DECIDED — build" in the Feature Map and nothing implements it. Recommendation: move it to OPEN. The CT.gov half exists (Company Lookup, Asset Program); the 10-K half means reading free-text pipeline tables out of annual reports — fragile parsing of the kind this project has been burned by. Left as is until the user says.
+- **GAP-002 — Payer coverage / formulary access** stays OPEN: no reliable free source. Not faked.
+- **P3 — pasting "$1,200.50" into a millions field leaves it blank.** Number inputs reject the text, so nothing wrong is stored, but the paste is silently dropped. Polish, not money.
 
 The two standing limitations are in CLAUDE.md under "Known limitations", and `RxNPV_Feature_Map.md` holds what is deliberately not built.
 
@@ -27,6 +32,36 @@ One small thing that is not a finding but is worth not forgetting: `npm install`
 ---
 
 ## Fixed
+
+### 🟢 October 2026 audit (Muse/Grok/Spark prompt, executed 2026-10-02 against `07f101f`)
+The pre-loaded findings were confirmed and fixed; every phase was then re-checked on the code and in the packaged app. Separating fact from fix:
+
+| ID | Sev | Evidence | Fix | Commit |
+|---|---|---|---|---|
+| DOC-001 | P1 (auditor contract) | README and test/README said `npm test` runs 13 suites; `run_all.js` lists 16 | Both say 16; README's table names net, backup and worked-examples | `9b7d589` |
+| DOC-002 | P1 (auditor contract) | README said 1,137 math checks; the suite prints 1,378 | Counts given "at the last update; the suite prints the current count" | `9b7d589` |
+| DOC-003 | P1 if planned from | Feature Overview described the removed Chemistry/RDKit tab as current | Retired, pointing to the README and Feature Map | `9b7d589` |
+| DOC-004 | P2 | README and Field Reference missed the October workspace and fields | README rows; Field Reference gains cash date/burn/roll-forward, raise price mode (`amountM` stores dollars), floor method, resubmission, readout overrides, the Napkin-vs-build flag, the ex-US lag, trial/target | `9b7d589` |
+| DOC-005 | P2 | Muse audit still read "NOT MET: 6 P1 open"; the retired checklist pointed at B-001–B-013 | Muse audit bannered as the September record; checklist points to `packaged_check.js` | `9b7d589` |
+| DOC-006 | P3 | Export-coverage count disagreed (403 / 654); the suite prints 701 | 701, with "the suite prints its count" | `9b7d589` |
+| DOC-007 | P3 | Reference Sheet header said its PoS and discount tables were unwired | Rewritten to what they are | `9b7d589` |
+| DOC-008 | P3 | CLAUDE.md cited "16 phases" | Says read to the end of the tracker | `9b7d589` |
+| SPK-001 | P2 (comment; money correct) | The floor rationale claimed a PoS-0 run charges 25 years of G&A (−$3.81) — the pre-weighting engine. Re-measured: PepGen zero-odds run $0.93 with $71.2M of G&A, burn estimate $0.89 | Comment and CLAUDE.md rewritten: the floor stays plain, hand-checkable cash arithmetic (undiscounted, before any raise, floored at zero) | `9b7d589` |
+| GAP-003 | P2 (disclosed) | The floor's note did not say its default assumes the current stage unpaid | One sentence on the note (test written first, failed, then passed); the model snapshot says "the cash runs out first" when that is why the floor is zero | `9b7d589` |
+| — | P2 (tests) | Napkin-vs-build flag at exactly 1.5x and the raise-discount clamps had no edge tests | Exactly 1.5x does not fire (both directions), 1.51x does; discount −5% → today's price, 150% → no raise | `922c73f` |
+
+**Model notes, confirmed (not bugs):** the dilution path's continuation balance is never charted as valuation cash (both "Projected cash balance" charts read `computeForwardRunway`); the floor's `cashShort` is used on the Overview note and now in the snapshot; the Napkin flag compares raw dollars to raw dollars; `futureRaise.amountM` stores dollars (commented at `applyFutureRaise`, now also in the Field Reference).
+
+**Release note (2026-10-02).**
+- *What could still give a wrong price target:* your own inputs, above all. The engine follows the conventions in the methodology review, and the two samples are pinned to independent year-by-year rebuilds. The judgment calls that move a case most — odds of launch, peak share, launch timing, the discount rate — are where a wrong target comes from, and the red flags and Live impact point at them. Two stated simplifications remain: multi-program tax is taken on the odds-weighted flow, and the failure floor's default treats the current stage as unpaid (the burn estimate is the opt-in alternative). Neither touches a single-program Base.
+- *Fixed:* `77da093` considered flags and the merged Overview headline; `9b7d589` DOC-001–008, SPK-001, GAP-003; `922c73f` edge tests.
+- *Left as the user's call:* GAP-001 (recommend moving to OPEN), GAP-002, the floor's default, Medicaid data.
+- *Tests:* `npm test` 16/16, `npm run test:dev` 16/16, `npm run lint` clean, after the last commit.
+- *Packaged checks actually run, on the installed build:* `packaged_check` offline 26/26, reopen 4/4, live 21/21 (DAPA-HF HR 0.74 [0.65–0.85] with denominators; KEYNOTE-189; NCT04368728 with no sideways scroll; VRTX Form 4 with P/S apart from awards; Uptravi's Medicare history via the asterisk fallback; PCSK9 and TTR dossiers; an openFDA outage not shown as "no data"). `npm run apihealth` 0 content / 0 transport failures over 3 rounds; `npm run canary` clean. `ui_audit` zero findings on both samples (both themes, 1470 and 900). `export_sweep` on both samples: only the known ink flags, the new Portfolio ones looked at by eye and faithful; contact sheets viewed. `button_sweep` 756 / 791 presses, 0 problems. The manual PDF save done by hand through the real dialog — a 4-page vector report, every page looked at.
+- *Code tightness:* no dead code added (the Glance's own reading kept for the report only, `!embedded`); no duplicated logic (the considered-flag key is one function, used by both the split and the mark); lint clean; the stale floor comment rewritten in the same commit as its caveat; every behaviour change has a test that failed first (considered flags, the floor caveat, the edge clamps).
+
+**Where the prompt was wrong or stale (documented, no action):** it says the burn-to-readout floor "is not built and is not yours to add unless Caleb asks" — Caleb asked on 2026-10-01 and it is built, opt-in (its own convention #6 says so). It asks for "a failing test first" for every fix; for the doc-only items there is nothing to fail, so those were verified by reading the result. Hard-coded check counts drift with every commit, so the docs now give the count at the last update and point at the banner rather than a figure the next test makes wrong.
+
 
 ### 🟢 September 2026 external audit — six P1s, six P2s, two P3s, four doc-drift rows
 Dispositions and commits are in §13 of `RxNPV_MUSE_AUDIT.md`; this is the short version. **P1:** Bear/Bull peak-revenue override displayed stored dollars as $M and compounded on edit (`97a6934`) · partnership milestones ignored scenario PoS and the per-program override (`d88ab6a`) · Peak Sales rates were unlabelled fractions that clamped a typed 60 to 100% (`2a0eafb`) · per-event adverse-event rates had no denominators (`97997c3`) · Company Lookup's Form 4 panel survived a new search (`8f67b70`) · Exclusivity lookup had no stale-response guard (`dec29ef`). **P2:** implied PoS used the benchmark instead of the override (`5734324`) · PRV longhand check added (`d0f0bc8`) · case Monte Carlo drew outside its own bounds, worst with a Base-PoS adjustment (`5738c1c`) · the EV→equity bridge omitted a non-converting convertible and a modelled raise (`be1acf0`) · a peak-share override above 100% flowed into revenue (`f8a390f`). **P3:** dead no-timeout fetcher deleted, PK/PD message notation (`7bc764d`; the label half was a false positive). **Docs:** 13 Trial Watch fields not 14, Electron item done, stale checklist retired (`528b2cb`). Every P1 test was confirmed to fail on the audited tree `f49689f`. **Found while working through it:** Simple Multiple dropped the PRV (`33375ab`) · a Bull share multiplier could exceed 100% of patients (`2e12d21`) · PDFs carried shadow bitmaps, the report printed the nav bar, and a money figure was unformatted (`7e719a0`). **Packaged app:** B-001–B-013 run in the installed build by `test/packaged/packaged_check.js` — offline 26/26, reopen 4/4, live 21/21; live canary built (`npm run canary`).
