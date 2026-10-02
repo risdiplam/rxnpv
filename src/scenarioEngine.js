@@ -499,30 +499,78 @@ const FAILURE_WIND_DOWN_YEARS_DEFAULT = 1;
 // throughStage (default 0): the stage whose readout fails — later stages add
 // their cost and time first (the outcome tree values a rejection at the FDA
 // this way, after the Phase 3 has been paid for).
+//
+// An optional, rougher alternative the user switches on
+// (theCase.failureFloor.method === "burn"; off by default): instead of the
+// stage's benchmark cost and G&A, the cash the company actually burns until
+// the readout — the filing's cash less the monthly burn from the filing date
+// to the readout date, less the wind-down. The readout date is the earliest
+// dated pending entry in the Calibration Log when there is one, else the
+// model's own timeline. It uses the burn the company reports rather than a
+// benchmark split, so a trial already mostly paid for is not charged again;
+// but it assumes today's burn holds to the readout, which is a guess — hence
+// opt-in, and it never touches Bear, Base or Bull.
 function computeFailureFloor(theCase, throughStage) {
   if (!theCase || !theCase.programs || theCase.programs.length !== 1) return null;
   const pv = computeProgramValuation(theCase.programs[0], SCENARIO_PRESETS.base, "base");
   const items = (pv.riskAdjItems || []).slice(0, (throughStage || 0) + 1);
   const stage = items[items.length - 1];
   if (!stage || items.length !== (throughStage || 0) + 1) return null;
-  const cap = effectiveCapitalStructure(theCase);
   const ga = theCase.corporateGA || {};
   const gaYear = (ga.preCommercialAnnualM !== "" && ga.preCommercialAnnualM != null ? Number(ga.preCommercialAnnualM) : SGA_BENCHMARKS.preCommercialGA.medianM) * 1e6;
   const windDownYears = ga.windDownYears !== "" && ga.windDownYears != null && isFinite(Number(ga.windDownYears)) ? Math.max(0, Number(ga.windDownYears)) : FAILURE_WIND_DOWN_YEARS_DEFAULT;
   const years = items.reduce((a, it) => a + it.years, 0);
-  const trialCost = items.reduce((a, it) => a + it.costM, 0) * 1e6, gaToReadout = gaYear * years, windDown = gaYear * windDownYears;
+  const windDown = gaYear * windDownYears;
+  const burnPlan = failureFloorBurnPlan(theCase, years, items.slice(1).reduce((a, it) => a + it.years, 0));
+  // Burn method: from the filing's own cash and date, so the months since the
+  // filing are counted once (never with the rolled-forward cash).
+  const cap = burnPlan ? ((theCase && theCase.capitalStructure) || {}) : effectiveCapitalStructure(theCase);
+  const trialCost = burnPlan ? 0 : items.reduce((a, it) => a + it.costM, 0) * 1e6;
+  const gaToReadout = burnPlan ? 0 : gaYear * years;
+  const spend = burnPlan ? burnPlan.burnToReadout : trialCost + gaToReadout;
   const netCashAt = p => computeCapitalStructure({ ...cap, currentPrice: p }).netCash;
   // Shares depend on the price, and the price on the shares: two passes from
   // the basic count settle it (options either are or are not in the money).
-  let equity = netCashAt(0) - trialCost - gaToReadout - windDown;
+  let equity = netCashAt(0) - spend - windDown;
   let shares = computeCapitalStructure({ ...cap, currentPrice: 0 }).dilutedShares;
   for (let k = 0; k < 2; k++) {
     const p = shares > 0 ? Math.max(0, equity / shares) : 0;
-    equity = netCashAt(p) - trialCost - gaToReadout - windDown;
+    equity = netCashAt(p) - spend - windDown;
     shares = computeCapitalStructure({ ...cap, currentPrice: p }).dilutedShares;
   }
   if (!(shares > 0)) return null;
-  return { perShare: Math.max(0, equity / shares), equity, shares, netCash: netCashAt(Math.max(0, equity / shares)), trialCost, gaToReadout, windDown, windDownYears, readoutYears: years, stageLabel: stage.label, cashShort: equity < 0 };
+  return Object.assign({ perShare: Math.max(0, equity / shares), equity, shares, netCash: netCashAt(Math.max(0, equity / shares)), trialCost, gaToReadout, windDown, windDownYears, readoutYears: years, stageLabel: stage.label, cashShort: equity < 0,
+    method: burnPlan ? "burn" : "stage", burnMissing: failureFloorWantsBurn(theCase) && !burnPlan }, burnPlan || {});
+}
+function failureFloorWantsBurn(theCase) {
+  return !!(theCase && theCase.failureFloor && theCase.failureFloor.method === "burn");
+}
+// The burn method's inputs, or null when it is off or cannot run (no burn).
+// laterYears: the model's years from the first readout to this one, for the
+// outcome tree's later gates.
+function failureFloorBurnPlan(theCase, modelYears, laterYears) {
+  if (!failureFloorWantsBurn(theCase)) return null;
+  const cap = theCase.capitalStructure || {};
+  const burn = numOr(cap.monthlyBurn, 0);
+  if (!(burn > 0)) return null;
+  const DAY = 86400000, MONTH = DAY * 365.25 / 12;
+  const now = new Date();
+  const today = parseIsoDay(theCase.valuationDate) != null ? parseIsoDay(theCase.valuationDate) : Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
+  const cashDate = parseIsoDay(cap.cashAsOf) != null ? parseIsoDay(cap.cashAsOf) : today;
+  // The next readout: the earliest pending, dated, still-future Calibration
+  // Log entry (parseCatalystDate reads "2026-11" as the end of November).
+  let logged = null;
+  (theCase.programs[0].calibrationLog || []).forEach(e => {
+    if (e.outcome && e.outcome !== "pending") return;
+    const d = parseCatalystDate(e.catalystDate);
+    if (!d) return;
+    const t = Date.UTC(d.getFullYear(), d.getMonth(), d.getDate());
+    if (t >= today && (!logged || t < logged.t)) logged = { t, label: e.catalystLabel || "the logged catalyst", date: e.catalystDate };
+  });
+  const readout = logged ? logged.t + laterYears * 12 * MONTH : today + modelYears * 12 * MONTH;
+  const months = Math.max(0, (readout - cashDate) / MONTH);
+  return { burnToReadout: burn * months, monthsToReadout: months, monthlyBurn: burn,
+    readoutSource: logged ? (laterYears > 0 ? "the Calibration Log's " + logged.date + " plus the model's later stages" : "the Calibration Log (" + logged.date + ")") : "the model's timeline" };
 }
 
 // ── Outcome tree: how the remaining catalysts play out ─────────────────────

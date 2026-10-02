@@ -295,7 +295,8 @@
   "convFace": "0",
   "convPrice": "0",
   "cashAsOf": "2026-06-30",
-  "monthlyBurn": "5700000"
+  "monthlyBurn": "5700000",
+  "carryCashForward": false
  },
  "scenarioOverrides": {
   "bear": {

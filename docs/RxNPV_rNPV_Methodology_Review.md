@@ -11,18 +11,20 @@ The user's instruction: *"alright, work through whatever needs fixing."* Each fi
 | D | Dilution path | Projected raises bring their cash with their shares, each weighted by the odds the company is still going that year; priced at today's price less the discount, or at the case's own value (value-neutral) | PepGen with the path on read $0.57; now $1.80 against $1.54 with it off (the raises are priced above the case's value); Stoke unchanged (no raise needed) |
 | F | Bear/Bull discount rate | Presets add 0 points; Bear and Bull vary share and odds only | Bear/Bull only |
 | G | Benchmark R&D | DiMasi 2016 phase costs ($20.8M / $53.8M / $240.0M) instead of trial-only costs; an override still wins | Only cases without an override |
-| C | Cash date | Cash as of the filing, carried forward to "Value as of" at the monthly burn (new fields beside Cash; the EDGAR pull fills both) | PepGen −$0.14, Stoke −$0.69 |
+| C | Cash date | Cash as of the filing, rolled forward to "Value as of" at the monthly burn — **made opt-in on 2026-10-01 at the user's request** ("the basic base, bull, and bear cases should just assume the most recent verified numbers"); the date and burn are still kept | PepGen −$0.14, Stoke −$0.69 when ticked; off by default |
 | H | Ex-US lag | "Ex-US launch after the US", default 1.5 years; the ex-US ramp is the US curve shifted and read between years; LOE on the US calendar | PepGen −$0.26, Stoke −$0.63 |
 | A | Overhead | G&A before launch × the odds of still developing or winding down; after launch, G&A on revenue-if-launched × P(launch) | PepGen +$0.64, Stoke +$0.65 |
 | B | Tax | One program: P(launch) × the success case's tax after its own losses. Several programs: the odds-weighted flow is taxed (stated approximation) | PepGen −$0.14, Stoke −$0.31 |
 | 9–10 | Presentation | "If it works" beside Bear/Base/Bull with a line saying Base is the odds-weighted average; an If-it-works / × odds toggle on the year-by-year card; a "What each outcome is worth" heading over the per-outcome panels | — |
 
-**The two samples, before → after** (both re-derived: flat Bear/Bull rates, cash dated June 30 and carried to the research date, the 1.5-year ex-US lag, every quoted figure in their evidence recomputed):
+**The two samples, before → after** (both re-derived: flat Bear/Bull rates, cash dated June 30 with the burn kept, the 1.5-year ex-US lag, every quoted figure in their evidence recomputed):
 
 | | Bear | Base | Bull | Price implies | If it works | If the next readout fails |
 |---|---|---|---|---|---|---|
-| PepGen ($2.34) | $0.25 → **$0.75** | $1.38 → **$1.54** | $3.58 → **$2.98** | 24% → **25%** (case: 15%) | $9.83 → **$8.22** | $0 → **$0** |
-| Stoke ($24.80) | $14.44 → **$16.57** | $29.07 → **$28.07** | $45.98 → **$41.18** | 54% → **56%** (case: 65%) | $42.92 → **$41.32** | $1.40 → **$0.48** |
+| PepGen ($2.34) | $0.25 → **$0.89** | $1.38 → **$1.69** | $3.58 → **$3.12** | 24% → **23%** (case: 15%) | $9.83 → **$8.36** | $0 → **$0** ($0.89 on the opt-in burn estimate) |
+| Stoke ($24.80) | $14.44 → **$17.26** | $29.07 → **$28.76** | $45.98 → **$41.87** | 54% → **55%** (case: 65%) | $42.92 → **$42.01** | $1.40 → **$1.30** ($0.46 on the opt-in burn estimate) |
+
+(Figures with cash as the filing reported it — the default since 2026-10-01. With "Roll the cash forward" ticked, Base is $1.54 and $28.07.)
 
 The fixes pull in both directions, as §3 predicted, and mostly offset on Base. What changed most is the spread: Bear is no longer charged the same risk three times, and Bull no longer gets a lower discount rate on top of better odds. **PepGen still reads below its price for the reason in §4 — the case's own 15% odds of launch, against the ~25% the price implies — not because of the engine.**
 

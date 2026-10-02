@@ -56,7 +56,8 @@ function useValuationSections({ theCase, onChange, goToTab }) {
       else {
         setEdgarResult(r);
         const patch = { cash: r.cash != null ? String(r.cash) : cap.cash, debt: r.debt != null ? String(r.debt) : cap.debt,
-          // The balance-sheet date and burn, so cash is carried forward to the valuation date.
+          // The balance-sheet date and burn: remembered for Cash Runway, the rough
+          // "if it fails" estimate, and rolling cash forward if the user opts in.
           cashAsOf: r.cash != null && r.asOf ? r.asOf : cap.cashAsOf, monthlyBurn: r.quarterlyBurnUSD > 0 ? String(Math.round(r.quarterlyBurnUSD / 3)) : cap.monthlyBurn };
         if (cap.mode === "simple") {
           patch.dilutedSharesSimple = r.dilutedShares != null ? String(r.dilutedShares) : (r.basicShares != null ? String(r.basicShares) : cap.dilutedSharesSimple);
@@ -259,11 +260,24 @@ function useValuationSections({ theCase, onChange, goToTab }) {
         h(ExportableBlock, { title: (theCase.name || "Case") + " — range of outcomes per share" },
           h(OutcomeRangeStrip, { marks, band: [Math.min(by("bear"), by("bull")), Math.max(by("bear"), by("bull"))], label: "Range of outcomes per share: failure, scenarios, today's price and success" })),
         floor && h(Explain, readOutcomeRange(floor.perShare, success, price, one ? impliedSolved.impliedAbsolutePct : null)),
-        floor && h("div", { style: { marginTop: 8 } }, h(Note, { summary: "How “if it fails” is worked out" },
-          "Net cash " + fmtMoney(floor.netCash) + " − " + floor.stageLabel + " cost to the readout " + fmtMoney(floor.trialCost) + " (the company's share) − G&A to the readout " + fmtMoney(floor.gaToReadout) +
-          " − " + floor.windDownYears + " year" + (floor.windDownYears === 1 ? "" : "s") + " of wind-down G&A " + fmtMoney(floor.windDown) + " = " + fmtMoney(floor.equity) + ", ÷ " + fmtNum(Math.round(floor.shares)) + " shares at that price" +
-          (floor.cashShort ? " — cash runs out first, so without new money the equity is worth about nothing" : "") +
-          ". Before any new raise and not discounted; anything the platform or other assets might fetch is left out. The wind-down is set under Assumptions → Corporate G&A.")),
+        floor && h("div", { style: { marginTop: 8 } }, h(Note, { summary: "How “if it fails” is worked out" + (floor.method === "burn" ? " (rough estimate on)" : ""), open: floor.method === "burn" || floor.burnMissing },
+          h("div", null,
+            floor.method === "burn"
+              ? "Net cash at the filing " + fmtMoney(floor.netCash) + " − " + fmtMoney(floor.monthlyBurn) + " a month for " + floor.monthsToReadout.toFixed(1) + " months to the readout (" + fmtMoney(floor.burnToReadout) + "; the date from " + floor.readoutSource + ")"
+              : "Net cash " + fmtMoney(floor.netCash) + " − " + floor.stageLabel + " cost to the readout " + fmtMoney(floor.trialCost) + " (the company's share) − G&A to the readout " + fmtMoney(floor.gaToReadout),
+            " − " + floor.windDownYears + " year" + (floor.windDownYears === 1 ? "" : "s") + " of wind-down G&A " + fmtMoney(floor.windDown) + " = " + fmtMoney(floor.equity) + ", ÷ " + fmtNum(Math.round(floor.shares)) + " shares at that price" +
+            (floor.cashShort ? " — cash runs out first, so without new money the equity is worth about nothing" : "") +
+            ". Before any new raise and not discounted; anything the platform or other assets might fetch is left out. The wind-down is set under Assumptions → Corporate G&A."),
+          // Opt-in: a rough alternative from the reported burn. It only moves
+          // the failure figures (this strip, the outcome tree's failure
+          // endings, the readout table's miss) — never Bear, Base or Bull.
+          h("label", { style: { display: "flex", alignItems: "center", gap: 8, marginTop: 10, cursor: "pointer", color: "var(--ink-1)" } },
+            h("input", { type: "checkbox", checked: floor.method === "burn" || !!floor.burnMissing, onChange: e => update({ failureFloor: { ...(theCase.failureFloor || {}), method: e.target.checked ? "burn" : "stage" } }) }),
+            "Rough estimate from the monthly burn instead"),
+          h("div", { style: { marginTop: 4 } },
+            floor.burnMissing
+              ? "On, but it needs a monthly burn (Assumptions → Capital structure) — showing the stage method until then."
+              : "Uses the burn the company reports to the readout date (your Calibration Log's next catalyst, else the model's timeline) instead of the stage's benchmark cost, so a trial that is already mostly paid for is not charged again. It assumes today's burn holds, so it is a rough figure; it never changes Bear, Base or Bull."))),
         !floor && theCase.programs.length > 1 && h("div", { style: { ...UI.caption, marginTop: 8 } }, "No failure floor with more than one program — one failure leaves the others' value standing, which needs more than this arithmetic.")
       );
     })()),
@@ -1015,7 +1029,8 @@ function ProjectionTable({ rows, startYear, npv, footer, compact, works }) {
           h("td", { colSpan: 2 }, "Enterprise value " + fmtMoney(npv.npv))))));
 }
 
-// Cash as of the balance-sheet date, carried forward to the valuation date
+// Cash as of the balance-sheet date, rolled forward to the valuation date only
+// when the user ticks "Roll the cash forward" (off by default)
 // (effectiveCapitalStructure). Both fields optional; blank = no adjustment.
 function CashAsOfFields({ cap, setCap, theCase, update }) {
   const h = React.createElement;
@@ -1025,14 +1040,20 @@ function CashAsOfFields({ cap, setCap, theCase, update }) {
     h("label", { style: { display: "flex", flexDirection: "column", gap: 4, fontSize: 12, fontFamily: "var(--sans)", color: "var(--ink-2)" } },
       "Cash as of (balance-sheet date)",
       h("input", { type: "date", value: cap.cashAsOf || "", onChange: e => setCap({ cashAsOf: e.target.value }), style: inputStyle })),
-    h(MillionsField, { label: "Monthly burn since then", value: cap.monthlyBurn || "", onChange: v => setCap({ monthlyBurn: v }) }),
-    // theCase.valuationDate: the day cash is carried forward to. Blank = today;
+    h(MillionsField, { label: "Monthly burn", value: cap.monthlyBurn || "", onChange: v => setCap({ monthlyBurn: v }) }),
+    // theCase.valuationDate: the day cash is rolled forward to (if ticked). Blank = today;
     // a sample case sets it so its numbers do not drift day by day.
     h("label", { style: { display: "flex", flexDirection: "column", gap: 4, fontSize: 12, fontFamily: "var(--sans)", color: "var(--ink-2)" } },
       "Value as of (blank = today)",
       h("input", { type: "date", value: theCase.valuationDate || "", onChange: e => update({ valuationDate: e.target.value }), style: inputStyle })),
-    h("div", { style: { ...UI.caption, flex: "1 1 260px", lineHeight: 1.6 } },
+    // Off by default: the valuation uses the cash the filing reported.
+    h("label", { style: { flex: "1 1 100%", display: "flex", alignItems: "center", gap: 8, fontSize: 12, fontFamily: "var(--sans)", color: "var(--ink-2)", cursor: "pointer" } },
+      h("input", { type: "checkbox", checked: !!cap.carryCashForward, onChange: e => setCap({ carryCashForward: e.target.checked }) }),
+      "Roll the cash forward to the “Value as of” date at this burn (an estimate)"),
+    h("div", { style: { ...UI.caption, flex: "1 1 100%", lineHeight: 1.6, marginTop: -8 } },
       eff._spentSinceFiling
-        ? "Carried forward " + eff._monthsSinceFiling.toFixed(1) + " months to " + (theCase.valuationDate || "today") + ": " + fmtMoney(eff._cashFiled) + " − " + fmtMoney(eff._spentSinceFiling) + " spent ≈ " + fmtMoney(Number(eff.cash)) + ". The valuation charges costs from today, so without this the months since the filing would be paid for twice."
-        : "Optional. With both filled, cash is carried forward to the valuation date — the filing's cash less the burn since — so the months since the filing are not paid for twice. The EDGAR pull fills both."));
+        ? "On: " + fmtMoney(eff._cashFiled) + " at the filing − " + fmtMoney(eff._spentSinceFiling) + " burned over " + eff._monthsSinceFiling.toFixed(1) + " months to " + (theCase.valuationDate || "today") + " ≈ " + fmtMoney(Number(eff.cash)) + " used in the valuation."
+        : cap.carryCashForward
+          ? "On, but it needs the cash date and the monthly burn."
+          : "Off: the valuation uses the cash the filing reported. The date and burn are remembered for Cash Runway and the rough “if it fails” estimate; the EDGAR pull fills both."));
 }

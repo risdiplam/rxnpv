@@ -79,13 +79,13 @@ function stub(obj) {
 
   // ── The PepGen sample: the same inputs as the case typed into the app
   // (test/fixtures/pepgen_case.json), which math_verification rebuilds year
-  // by year to $0.7515 / $1.5432 / $2.9755. ──
+  // by year to $0.8944 / $1.6861 / $3.1183. ──
   const pg = w.sampleCasePepGen();
   ok(pg.ticker === "PEPG" && pg.programs.length === 1 && pg.programs[0].drugName === "PGN-EDODM1", "PepGen sample: one program, PGN-EDODM1");
   ok(w.caseMissingInputs(pg).length === 0, "PepGen sample: nothing required is missing (" + w.caseMissingInputs(pg).join(", ") + ")");
   ok(pg.programs[0].evidenceLog.length >= 25 && pg.programs[0].evidenceLog.every(e => e.source && e.date && e.thesis && ["fact", "inference", "speculation"].includes(e.classification) && ["high", "moderate", "low"].includes(e.confidence)), "PepGen sample: every evidence entry has a source, date, reasoning and valid labels");
   const pgv = k => w.computeCaseValuation(pg, w.getEffectiveScenarioPreset(pg, k), k, 14, pg.terminalValue).equity.perShare;
-  ok([["bear", 0.7515], ["base", 1.5432], ["bull", 2.9755]].every(([k, v]) => Math.abs(pgv(k) - v) < 5e-5), "PepGen sample: Bear/Base/Bull are the independently rebuilt $0.7515 / $1.5432 / $2.9755 (" + ["bear", "base", "bull"].map(k => pgv(k).toFixed(4)).join(" / ") + ")");
+  ok([["bear", 0.8944], ["base", 1.6861], ["bull", 3.1183]].every(([k, v]) => Math.abs(pgv(k) - v) < 5e-5), "PepGen sample: Bear/Base/Bull are the independently rebuilt $0.8944 / $1.6861 / $3.1183 (" + ["bear", "base", "bull"].map(k => pgv(k).toFixed(4)).join(" / ") + ")");
   const fx = JSON.parse(require("fs").readFileSync(__dirname + "/fixtures/pepgen_case.json", "utf8"));
   ok(JSON.stringify(fx.programs[0].revenueBuild) === JSON.stringify(pg.programs[0].revenueBuild) && JSON.stringify(fx.capitalStructure.basicShares) === JSON.stringify(pg.capitalStructure.basicShares), "PepGen sample: revenue build and shares match the typed-in fixture");
 
@@ -129,17 +129,16 @@ function stub(obj) {
   // Launch year 1 (sample), five-year ramp, LOE 12 years after launch -> index 13.
   ok("sample projection: phases follow launch year, ramp and LOE", pr[0].phase === "Before launch" && pr[1].isLaunch && pr[1].phase === "Launch ramp" && pr[6].phase === "Peak years" && pr[13].isLOE && pr[13].phase === "After LOE");
   // Failure floor: cash less what the readout and a wind-down cost, over the
-  // shares that exist at that price. Stoke: $420M cash at June 30, carried to
-  // the Sept 28 valuation date at $19.5M a month (90 days) = $362,340,862; no
-  // debt; G&A $95M/yr. Options strike $13.84 are out of the money at ~$0.48,
-  // so shares = basic
+  // shares that exist at that price. Stoke: $420M cash as filed (rolling it
+  // forward is off); no debt; G&A $95M/yr. Options strike $13.84 are out of
+  // the money at ~$1.30, so shares = basic
   // 68,229,972 + 2,157,698 zero-strike RSUs = 70,387,670.
   const fl = w.computeFailureFloor(sc);
-  const stCash = 420e6 - 19.5e6 * 90 / (365.25 / 12);
+  const stCash = 420e6;
   ok(fl && Math.abs(fl.equity - (stCash - fl.trialCost - fl.gaToReadout - fl.windDown)) < 1, "floor: equity = cash − trial cost − G&A to readout − wind-down");
   ok(fl && Math.abs(fl.gaToReadout - 95e6 * fl.readoutYears) < 1 && fl.windDown === 95e6 && fl.windDownYears === 1, "floor: G&A to readout at $95M/yr; one year of wind-down by default");
   ok(fl && fl.shares === 70387670, "floor: shares at the floor price exclude out-of-the-money options (" + (fl && fl.shares) + ")");
-  ok(fl && Math.abs(fl.perShare - fl.equity / 70387670) < 1e-9 && fl.perShare > 0.3 && fl.perShare < 0.7, "floor: about $0.48 a share (" + (fl && fl.perShare.toFixed(2)) + ")");
+  ok(fl && Math.abs(fl.perShare - fl.equity / 70387670) < 1e-9 && fl.perShare > 1 && fl.perShare < 1.6, "floor: about $1.30 a share (" + (fl && fl.perShare.toFixed(2)) + ")");
   const fl2 = w.computeFailureFloor(Object.assign({}, sc, { corporateGA: Object.assign({}, sc.corporateGA, { windDownYears: "2" }) }));
   ok(Math.abs((fl.equity - fl2.equity) - 95e6) < 1, "floor: a second wind-down year costs exactly one more year of G&A");
   ok(w.computeFailureFloor(Object.assign({}, sc, { programs: [sc.programs[0], sc.programs[0]] })) === null, "floor: none for more than one program");

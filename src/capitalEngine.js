@@ -93,6 +93,10 @@ function parseIsoDay(s) {
 }
 function effectiveCapitalStructure(theCase) {
   const cap = (theCase && theCase.capitalStructure) || { mode: "simple", dilutedSharesSimple: "" };
+  // Off unless the user ticks it: the valuation uses the cash as the last
+  // filing reported it. Rolling it forward is an estimate (the burn since is
+  // not reported yet), so it is the user's call, not the default.
+  if (!cap.carryCashForward) return cap;
   const burn = numOr(cap.monthlyBurn, 0);
   const asOf = parseIsoDay(cap.cashAsOf);
   if (!(burn > 0) || asOf == null || cap.cash === "" || cap.cash == null) return cap;

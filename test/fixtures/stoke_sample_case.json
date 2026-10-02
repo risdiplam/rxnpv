@@ -96,7 +96,7 @@
     "costSharingPct": "30",
     "milestones": [
      {
-      "id": "ms_muoj96q6_55",
+      "id": "ms_muqaoubz_4",
       "label": "Ex-US regulatory milestones — assumed part of the undisclosed $385M",
       "gate": "launch",
       "valueM": 100
@@ -131,6 +131,7 @@
   "debt": "0",
   "cashAsOf": "2026-06-30",
   "monthlyBurn": "19500000",
+  "carryCashForward": false,
   "opts": "11532638",
   "optK": "13.84",
   "war": "2157698",
@@ -181,6 +182,9 @@
  },
  "outcomeTree": {
   "resubmitFixPct": "47"
+ },
+ "failureFloor": {
+  "method": "stage"
  },
  "modelYearZero": "2026"
 }

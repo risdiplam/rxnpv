@@ -23,7 +23,7 @@ function newCase() {
       mode: "simple", dilutedSharesSimple: "",
       basicShares: "", cash: "", debt: "",
       opts: "", optK: "", war: "", warK: "", convFace: "", convPrice: "",
-      cashAsOf: "", monthlyBurn: ""
+      cashAsOf: "", monthlyBurn: "", carryCashForward: false
     },
     scenarioOverrides: {
       bear: { shareMultiplierPct: "", posMultiplierPct: "", discountRateAddPct: "", exitMultiple: "" },
