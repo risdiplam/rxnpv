@@ -25,6 +25,13 @@
 //   { "clickLabel": "Delete this milestone" }   (a button by its aria-label)
 //   { "evidence": { label, classification, confidence, source, date, thesis } }
 //   { "calibration": { catalystLabel, catalystDate, yourPoS, marketImpliedPoS, outcome, notes } }
+//   { "editEvidence": "<label of an existing entry>", "evidence": { …fields to set } }  (its Edit button)
+//   { "editCalibration": "<catalyst label of an existing entry>", "calibration": { … } }
+//
+// --userdata=<dir> runs on that profile (e.g. the user's real data, backed up
+// first) and leaves the theme alone; --case="<name>" opens that existing case
+// instead of starting a new one, and the read-back finds it by that name
+// (--readname="<name>" if the plan renames it). --minutes=N raises the time limit.
 //   { "expect": "programs.0.revenueBuild.population.prevalence", "value": "40000" }
 // A field is found by: its aria-label, else the text of the <label> around
 // it, else the text just above it — the same way a person reads the form.
@@ -35,9 +42,12 @@ const appPath = args.app || "/Applications/RxNPV.app";
 const plan = JSON.parse(fs.readFileSync(args.plan, "utf8"));
 const OUT = args.out || fs.mkdtempSync(path.join(os.tmpdir(), "rx-fill-"));
 fs.mkdirSync(OUT, { recursive: true });
-app.setPath("userData", fs.mkdtempSync(path.join(os.tmpdir(), "rx-fill-profile-")));
+app.setPath("userData", args.userdata ? path.resolve(String(args.userdata)) : fs.mkdtempSync(path.join(os.tmpdir(), "rx-fill-profile-")));
 const sleep = ms => new Promise(r => setTimeout(r, ms));
-setTimeout(() => { console.error("timed out"); app.exit(2); }, 600000);
+setTimeout(() => { console.error("timed out"); app.exit(2); }, (Number(args.minutes) || 10) * 60000);
+const READ_NAME = args.readname || args.case || null;
+// The case the plan works on: the named one, else the newest.
+const pickCase = `(cs => ${READ_NAME ? `cs.find(c => c.name === ${JSON.stringify(String(READ_NAME))})` : `cs[cs.length - 1]`})`;
 
 // Runs in the page: find a visible field by its label and act on it.
 const PAGE_HELPERS = `
@@ -86,9 +96,12 @@ app.whenReady().then(async () => {
     const dbg = w.webContents.debugger; dbg.attach("1.3");
     const errs = []; w.webContents.on("console-message", (e) => { if (e.level === "error") errs.push(String(e.message).slice(0, 200)); });
     w.setSize(1470, 1000); await sleep(500);
-    await js(`localStorage.setItem("rxnpv_theme", "light"); location.reload()`); await sleep(1800);
+    if (!args.userdata) { await js(`localStorage.setItem("rxnpv_theme", "light"); location.reload()`); await sleep(1800); }
+    else await sleep(1500);
     await js(PAGE_HELPERS);
-    const started = await js(`(() => { try { const b = __f.button("+ New case"); if (!b) return "no + New case button; buttons: " + [...document.querySelectorAll("button")].map(x => JSON.stringify(x.textContent.trim())).slice(0, 12).join(","); b.click(); return true; } catch (e) { return "error: " + e.message; } })()`);
+    const started = args.case
+      ? await js(`(() => { const b = [...document.querySelectorAll("button, [role=button]")].filter(x => x.offsetParent !== null).find(x => x.textContent.trim().indexOf(${JSON.stringify(String(args.case))}) === 0); if (!b) return "no case named " + ${JSON.stringify(String(args.case))}; b.click(); return true; })()`)
+      : await js(`(() => { try { const b = __f.button("+ New case"); if (!b) return "no + New case button; buttons: " + [...document.querySelectorAll("button")].map(x => JSON.stringify(x.textContent.trim())).slice(0, 12).join(","); b.click(); return true; } catch (e) { return "error: " + e.message; } })()`);
     if (started !== true) throw new Error("could not start a case: " + started);
     await sleep(1200);
     let n = 0;
@@ -135,24 +148,35 @@ app.whenReady().then(async () => {
       else if (st.evidence || st.calibration) {
         const e = st.evidence || st.calibration;
         const isEv = !!st.evidence;
+        const editing = st.editEvidence || st.editCalibration || null;
         r = await js(`(async () => {
           const wait = ms => new Promise(r => setTimeout(r, ms));
-          const btn = __f.button(${JSON.stringify(isEv ? "+ Add evidence" : "+ Add prediction")}); if (!btn) return "no add button"; btn.click(); await wait(300);
+          ${editing ? `
+          // An existing entry: its Edit button, found by the entry's own title.
+          const titleEl = [...document.querySelectorAll("div")].filter(x => x.offsetParent !== null && x.children.length === 0).find(x => x.textContent.trim() === ${JSON.stringify(String(editing))});
+          if (!titleEl) return "no entry titled " + ${JSON.stringify(String(editing))};
+          let box = titleEl; while (box && !box.querySelector("button")) box = box.parentElement;
+          const edit = box && [...box.querySelectorAll("button")].find(b => b.textContent.trim() === "Edit");
+          if (!edit) return "no Edit button by " + ${JSON.stringify(String(editing))};
+          edit.click(); await wait(300);` : `
+          const btn = __f.button(${JSON.stringify(isEv ? "+ Add evidence" : "+ Add prediction")}); if (!btn) return "no add button"; btn.click(); await wait(300);`}
           const byPh = ph => [...document.querySelectorAll("input, textarea")].filter(x => __f.visible(x)).find(x => x.placeholder === ph);
           const e = ${JSON.stringify(e)};
           ${isEv ? `
-          __f.setValue(byPh("e.g. PoS override, peak share"), e.label);
-          __f.setValue(document.querySelector('select[aria-label="Classification"]'), e.classification);
-          __f.setValue(document.querySelector('select[aria-label="Confidence"]'), e.confidence);
-          __f.setValue(byPh("URL, filing, DOI, etc."), e.source);
-          __f.setValue(byPh("e.g. 2026-08-17"), e.date);
-          __f.setValue(byPh("The actual reasoning — what the source supports, and the main uncertainty if this isn't a plain Fact."), e.thesis);` : `
-          __f.setValue(byPh("e.g. Phase 2 readout"), e.catalystLabel);
-          __f.setValue(byPh("e.g. 2026-Q4"), e.catalystDate);
-          __f.setValue(document.querySelector('select[aria-label="Outcome"]'), e.outcome || "pending");
-          __f.setValue(byPh("e.g. 40"), String(e.yourPoS));
-          __f.setValue(byPh("from Implied PoS above"), String(e.marketImpliedPoS));
-          __f.setValue(byPh("Anything worth remembering about this call."), e.notes || "");`}
+          const put = (el, v) => { if (v != null && el) __f.setValue(el, String(v)); };
+          put(byPh("e.g. PoS override, peak share"), e.label);
+          put(document.querySelector('select[aria-label="Classification"]'), e.classification);
+          put(document.querySelector('select[aria-label="Confidence"]'), e.confidence);
+          put(byPh("URL, filing, DOI, etc."), e.source);
+          put(byPh("e.g. 2026-08-17"), e.date);
+          put(byPh("The actual reasoning — what the source supports, and the main uncertainty if this isn't a plain Fact."), e.thesis);` : `
+          const put = (el, v) => { if (v != null && el) __f.setValue(el, String(v)); };
+          put(byPh("e.g. Phase 2 readout"), e.catalystLabel);
+          put(byPh("e.g. 2026-Q4"), e.catalystDate);
+          put(document.querySelector('select[aria-label="Outcome"]'), e.outcome || (${!!editing} ? null : "pending"));
+          put(byPh("e.g. 40"), e.yourPoS);
+          put(byPh("from Implied PoS above"), e.marketImpliedPoS);
+          put(byPh("Anything worth remembering about this call."), e.notes);`}
           await wait(200);
           const save = [...document.querySelectorAll("button")].filter(b => b.offsetParent !== null).reverse().find(b => /^(Save|Add|Save entry|Add entry|Save prediction)$/.test(b.textContent.trim()));
           if (!save) return "no save button"; save.click(); await wait(300); return true;
@@ -162,7 +186,7 @@ app.whenReady().then(async () => {
         // Checked at this point in the plan, for a value a later step changes.
         await sleep(400);
         const cs = JSON.parse(await js(`localStorage.getItem("rxnpv_cases_v1")`) || "[]");
-        const got = st.expectNow.split(".").reduce((o, k) => (o == null ? undefined : o[k]), cs[cs.length - 1]);
+        const got = st.expectNow.split(".").reduce((o, k) => (o == null ? undefined : o[k]), eval(pickCase)(cs));
         r = JSON.stringify(got) === JSON.stringify(st.value) || "stored " + JSON.stringify(got) + ", expected " + JSON.stringify(st.value);
       }
       else if (st.expect) continue;
@@ -171,7 +195,7 @@ app.whenReady().then(async () => {
     }
     await sleep(1200);
     const cases = JSON.parse(await js(`localStorage.getItem("rxnpv_cases_v1")`) || "[]");
-    const theCase = cases[cases.length - 1];
+    const theCase = eval(pickCase)(cases);
     fs.writeFileSync(path.join(OUT, "case.json"), JSON.stringify(theCase, null, 1));
     const get = (obj, p) => p.split(".").reduce((o, k) => (o == null ? undefined : o[k]), obj);
     let checked = 0;
