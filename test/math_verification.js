@@ -4729,6 +4729,18 @@ section("Raise priced as a discount to today, the Napkin-vs-build flag, the mode
   ok("a $2.5B Napkin peak against the build's: flagged, 1.9x", !!mm && Math.abs(mm.ratio - 2.5e9 / mm.full) < 1e-12 && mm.ratio > 1.8 && mm.ratio < 2.0 && mm.mode === "full");
   const close = JSON.parse(JSON.stringify(big)); close.quickRevenue.peakRevenue = String(Math.round(mm.full * 1.4));
   ok("1.4x apart: not flagged (the line is 1.5x)", api.napkinBuildPeakMismatch(close) === null);
+  // Exactly 1.5x does not fire ("more than half"); a hair over does; and the
+  // other direction (the build 1.5x the typed peak) mirrors it.
+  const at = r => { const x = JSON.parse(JSON.stringify(big)); x.quickRevenue.peakRevenue = String(mm.full * r); return api.napkinBuildPeakMismatch(x); };
+  ok("exactly 1.5x: not flagged", at(1.5) === null);
+  ok("1.51x: flagged", !!at(1.51));
+  ok("the build 1.5x the typed peak: not flagged; 1.51x: flagged", at(1 / 1.5) === null && !!at(1 / 1.51));
+  // Raise discount edges: negative clamps to 0 (today's price); over 100
+  // clamps to 100, a price of 0, which applyFutureRaise skips (no raise).
+  ok("discount -5%: today's price", api.futureRaisePrice({ priceMode: "discount", discountPct: "-5" }, "10") === 10);
+  ok("discount 150%: a price of 0", api.futureRaisePrice({ priceMode: "discount", discountPct: "150" }, "10") === 0);
+  const cap0 = { dilutedShares: 1e6, netCash: 0 };
+  ok("a price of 0 adds no raise at all", api.applyFutureRaise(cap0, { enabled: true, amountM: "1000000", priceMode: "discount", discountPct: "150" }, "10") === cap0);
   ok("the flag appears in the red flags", api.computeRedFlags({ ...st, programs: [big] }).some(f => /Napkin peak \(\$2\.50B\) is 1\.9x the full build's/.test(f.message)));
   // The snapshot quotes the engine's own numbers.
   const snap = api.buildModelSnapshot(st, "2026-09-28");
