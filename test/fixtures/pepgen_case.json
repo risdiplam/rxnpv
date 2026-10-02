@@ -316,7 +316,9 @@
  "futureRaise": {
   "enabled": true,
   "amountM": "100000000",
-  "priceOverride": "1.99"
+  "priceOverride": "",
+  "priceMode": "discount",
+  "discountPct": "15"
  },
  "dilutionPath": {
   "enabled": false,

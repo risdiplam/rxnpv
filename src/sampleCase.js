@@ -133,7 +133,7 @@ function sampleCaseStoke() {
       ev("Cash burn: $19.5M a month", "fact", "high", "Q2 2026 10-Q, statement of cash flows",
         "Cash used in operations was $117.2M in H1 2026, $19.5M a month, and rising: Q2's net loss was $61.6M against $50.0M in Q1. $420M at that rate lasts about 21½ months — to around April–May 2028, consistent with the company's 'to launch in early 2028'. The Cash Runway example uses these figures."),
       ev("The new $200M ATM, modelled as a future raise", "inference", "moderate", "424B5 and 8-K, 2026-08-03 (up to $200M through Cantor, up to 3% commission)",
-        "The August prospectus supplement replaced the earlier one and is a fresh $200M: the ~4.7M shares ($146.4M) sold in H1 and July were under the March supplement. Stoke used the facility heavily in 2026, so the case assumes all of it is sold at today's price: $194M net at $24.06 a share after the 3% commission (8.1M shares). Turn the future raise off to see the value with no further dilution."),
+        "The August prospectus supplement replaced the earlier one and is a fresh $200M: the ~4.7M shares ($146.4M) sold in H1 and July were under the March supplement. Stoke used the facility heavily in 2026, so the case assumes all of it is sold at today's price: $194M net at $24.06 a share after the 3% commission (8.1M shares). It is entered as 3% below today's price, so it follows the stock when the price is updated. Turn the future raise off to see the value with no further dilution."),
       ev("Dilution path: on, with no share creep", "inference", "moderate", "Q1 and Q2 2026 10-Qs (stock-based compensation $19.6M in H1; 1.87M options and 0.80M RSUs granted)",
         "Switched on to check whether any scenario needs another raise after the ATM: with $100M kept as a minimum, 18 months raised at a time and a 10% discount, none does — the model turns cash-positive in the second sales year. Share creep is set to 0% deliberately: stock compensation (~$40M a year) is already inside the reported R&D and SG&A that the cost inputs are built from, so adding yearly share creep on top would count it twice."),
       ev("Napkin mode check", "inference", "high", "This case, Full vs Napkin",
@@ -269,7 +269,9 @@ function sampleCaseStoke() {
     },
     // The fresh $200M ATM (424B5, 2026-08-03), net of Cantor's 3%: $194M at
     // $24.06 a share, i.e. $200M gross at today's $24.80. Dollars (MillionsField).
-    futureRaise: { enabled: true, amountM: String(194e6), priceOverride: "24.06" },
+    // Priced as today's price less Cantor's 3%, so it follows the stock;
+    // the fixed $24.06 is what that came to on the day (kept for "fixed").
+    futureRaise: { enabled: true, amountM: String(194e6), priceMode: "discount", discountPct: "3", priceOverride: "24.06" },
     dilutionPath: { enabled: true, minCashBufferM: String(100e6), targetRunwayMonths: "18", discountToMarketPct: "10", sbcAnnualGrowthPct: "0" },
     basePosAdjustmentPct: "100",
     multipleAssumptions: { bear: "3", base: "4", bull: "5" },
@@ -490,7 +492,8 @@ function sampleCasePepGen() {
       war: "1101110", warK: "0",
       convFace: "0", convPrice: "0"
     },
-    futureRaise: { enabled: true, amountM: String(100e6), priceOverride: "1.99" },
+    // 15% below today's price, so it follows the stock ($1.99 on the day).
+    futureRaise: { enabled: true, amountM: String(100e6), priceMode: "discount", discountPct: "15", priceOverride: "1.99" },
     dilutionPath: { enabled: false, minCashBufferM: String(40e6), targetRunwayMonths: "18", discountToMarketPct: "15", sbcAnnualGrowthPct: "0" },
     basePosAdjustmentPct: "100",
     multipleAssumptions: { bear: "3", base: "4", bull: "5" },

@@ -109,11 +109,23 @@ function effectiveCapitalStructure(theCase) {
   return { ...cap, cash: String(filed - spent), _cashFiled: filed, _spentSinceFiling: spent, _monthsSinceFiling: months };
 }
 
+// The price a modelled raise is done at. priceMode "discount" (new cases):
+// today's price less discountPct, so it follows the stock — a dollar figure
+// typed once went stale the moment the price moved (the samples' $24.06 and
+// $1.99 were "today's price less X" on the day they were typed). "fixed"
+// (and any case saved before the choice existed): the typed priceOverride,
+// else today's price.
+function futureRaisePrice(futureRaise, currentPrice) {
+  const fr = futureRaise || {};
+  const now = numOr(currentPrice, 0);
+  if (fr.priceMode === "discount") return now * (1 - Math.min(100, Math.max(0, numOr(fr.discountPct, 0))) / 100);
+  return fr.priceOverride !== "" && fr.priceOverride != null ? numOr(fr.priceOverride, 0) : now;
+}
+
 function applyFutureRaise(capResult, futureRaise, fallbackPrice) {
   if (!futureRaise || !futureRaise.enabled) return capResult;
   const amountRaised = numOr(futureRaise.amountM, 0); // MillionsField already stores the raw dollar value, not millions
-  const raisePrice = futureRaise.priceOverride !== "" && futureRaise.priceOverride != null
-    ? numOr(futureRaise.priceOverride, 0) : numOr(fallbackPrice, 0);
+  const raisePrice = futureRaisePrice(futureRaise, fallbackPrice);
   if (amountRaised <= 0 || raisePrice <= 0) return capResult;
   const newShares = amountRaised / raisePrice;
   return {

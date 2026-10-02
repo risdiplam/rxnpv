@@ -1247,6 +1247,84 @@ function computeDilutionPath(theCase, scenario, discountRateBasePct, opts) {
 // and only when the user has actually set an override — a program left at
 // pure benchmark defaults can never trigger these by construction, since
 // the benchmark is being compared against itself.
+// ── "What the model says" — the snapshot evidence entry, from the model ──
+// The snapshot entry used to be written by hand, and every figure in it went
+// stale the moment the price or an input moved (filling two cases meant
+// recomputing ~15 numbers each). This builds it from the live model: price,
+// Bear/Base/Bull, peak revenue, the odds the price implies against the
+// case's, the value if it works, what is left if the next readout fails (by
+// whichever floor method the case uses) and the three inputs that move it
+// most. Every number is the engine's own; nothing here is a new calculation.
+// The Evidence Log replaces its one snapshot entry in place, dated — a
+// current reading, not a history (versioned snapshots are deliberately not
+// built). today: "YYYY-MM-DD" (defaults to the case's valuationDate or today).
+const MODEL_SNAPSHOT_LABEL = "What the model says (snapshot)";
+function buildModelSnapshot(theCase, today) {
+  if (!theCase || !theCase.programs || !theCase.programs.length) return null;
+  const d = new Date();
+  const date = today || theCase.valuationDate || (d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"));
+  const multiple = theCase.valuationMethod === "multiple";
+  const dr = theCase.discountRatePct !== "" && theCase.discountRatePct != null ? Number(theCase.discountRatePct) : DISCOUNT_RATE_GUIDANCE.earlyBiotechSelfView[0];
+  const tv = theCase.terminalValue || { enabled: false };
+  const value = k => {
+    const preset = getEffectiveScenarioPreset(theCase, k);
+    const ma = theCase.multipleAssumptions || {};
+    return multiple ? computeSimpleMultipleValuation(theCase, preset, k, numOr(ma[k], 3), dr) : computeCaseValuation(theCase, preset, k, dr, tv);
+  };
+  let bear, base, bull;
+  try { bear = value("bear"); base = value("base"); bull = value("bull"); } catch (e) { return null; }
+  const ps = r => r && r.equity && isFinite(r.equity.perShare) ? r.equity.perShare : null;
+  if (ps(base) == null) return null;
+  const sh = v => "$" + v.toFixed(2);
+  const price = Number(theCase.currentPrice) > 0 ? Number(theCase.currentPrice) : null;
+  const single = theCase.programs.length === 1;
+  const parts = [];
+  const gap = price ? Math.round(Math.abs(ps(base) / price - 1) * 100) : null;
+  parts.push((price ? "At " + sh(price) + " on " + date + ": " : "On " + date + ": ") + "Base fair value ~" + sh(ps(base)) +
+    (price ? (gap === 0 ? " (at the price)" : " (about " + gap + "% " + (ps(base) > price ? "above" : "below") + " the price)") : "") +
+    ", Bear ~" + sh(ps(bear)) + ", Bull ~" + sh(ps(bull)) +
+    "; peak revenue ~" + fmtMoney((base.programVals || []).reduce((a, p) => a + (p.peakRevenue || 0), 0), 2) + " in Base" +
+    (multiple ? ", valued by Simple Multiple (peak revenue × the multiple, risked by the odds and discounted)." : "."));
+  if (!multiple && single && price) {
+    try {
+      const imp = solveImpliedPoSMultiplier(theCase, dr, tv);
+      if (imp && imp.ok && !imp.degenerate && imp.impliedAbsolutePct != null)
+        parts.push("The price implies ~" + Math.round(imp.impliedAbsolutePct) + "% odds of launch against this case's " + Math.round(imp.baseAbsolutePct) + "%.");
+    } catch (e) { /* no implied odds to quote */ }
+  }
+  if (!multiple) {
+    try {
+      const works = ps(computeCaseValuation({ ...theCase, programs: theCase.programs.map(p => ({ ...p, posOverridePct: "100" })) }, SCENARIO_PRESETS.base, "base", dr, tv));
+      const fl = single ? computeFailureFloor(theCase) : null;
+      if (works != null && Math.abs(works - ps(base)) >= 0.005)
+        parts.push("If approved, with no failure weighting, a share is worth ~" + sh(works) + " on Base inputs" +
+          (fl ? "; if the next readout fails, " + (fl.perShare < 0.005 ? "about nothing" : "~" + sh(fl.perShare)) + " is left (" + (fl.method === "burn"
+            ? "the rough burn estimate: the filing's cash less " + fmtMoney(fl.monthlyBurn) + " a month for " + fl.monthsToReadout.toFixed(0) + " months to the readout and a wind-down"
+            : "the filing's cash less the " + fl.stageLabel + " still to pay, G&A to the readout and a wind-down") + ", before any raise)." : "."));
+    } catch (e) { /* skip */ }
+    try {
+      const rows = (computeSensitivityDrivers(theCase, { skipGrid: true }).rows || []).slice(0, 3);
+      if (rows.length) parts.push("What moves it most: " + andList(rows.map(r => r.name.replace(/ \(.*\)$/, "").replace(/ \/ revenue$/, "").replace(/^[A-Z](?![A-Z])/, c => c.toLowerCase()) + " (" + sh(Math.min(r.lo, r.hi)) + " to " + sh(Math.max(r.lo, r.hi)) + ")")) + ".");
+    } catch (e) { /* skip */ }
+  }
+  return { label: MODEL_SNAPSHOT_LABEL, classification: "inference", confidence: "moderate", source: "Generated from this case's model on " + date, date, thesis: parts.join(" ") };
+}
+
+// The typed Napkin peak against the full build's own peak (US sales plus any
+// royalty, as the valuation would use it), when both exist and one is more
+// than 1.5x the other. Null otherwise.
+function napkinBuildPeakMismatch(program) {
+  try {
+    const quick = numOr(((program.quickRevenue || {}).peakRevenue), 0);
+    if (!(quick > 0)) return null;
+    const full = getProgramRevenueResult({ ...program, revenueMode: "full" }, 25).peakTotalRevenue;
+    if (!(full > 0)) return null;
+    const ratio = quick / full;
+    if (ratio <= 1.5 && ratio >= 1 / 1.5) return null;
+    return { quick, full, ratio, mode: program.revenueMode === "full" ? "full" : "quick" };
+  } catch (e) { return null; }
+}
+
 function computeRedFlags(theCase) {
   const flags = [];
   const programs = theCase.programs || [];
@@ -1261,6 +1339,21 @@ function computeRedFlags(theCase) {
         programId: program.id, programName: progName, severity: "high",
         message: `This ${terr} partnership is applied to all of ${progName}'s revenue: Napkin mode has one revenue figure and no US/ex-US split, so the ${program.partnership.royaltyPct}% royalty replaces the company's own sales everywhere. Switch to the Full model, or turn the partnership off and enter as peak revenue only what the company itself books (its own sales plus the royalty).`
       });
+    }
+
+    // 0b. The Napkin peak and the full build disagree by more than half. Only
+    // one of them is in the valuation, so the other is silently ignored — a
+    // case can carry a $2.5B typed peak while the build says $1.3B, and the
+    // two modes then give very different answers without saying why.
+    {
+      const mismatch = napkinBuildPeakMismatch(program);
+      if (mismatch) {
+        const inUse = mismatch.mode === "quick" ? "Napkin peak" : "full build";
+        flags.push({
+          programId: program.id, programName: progName, severity: "medium",
+          message: `${progName}'s Napkin peak (${fmtMoney(mismatch.quick)}) is ${mismatch.ratio >= 1 ? mismatch.ratio.toFixed(1) + "x" : (1 / mismatch.ratio).toFixed(1) + "x below"} the full build's (${fmtMoney(mismatch.full)}). Only the ${inUse} is in the valuation now, so switching modes would move the value by roughly that much. Worth deciding which one you believe — the price, the share of patients treated, or a wider label are the usual reasons they differ.`
+        });
+      }
     }
 
     // 1. PoS override far from the phase/area benchmark

@@ -66,7 +66,7 @@ const EXPORTS = [
   "SCENARIO_PRESETS", "getEffectiveScenarioPreset", "applyBasePosAdjustment",
   "computeProgramValuation", "computeCaseValuation", "baseCaseFairValue", "computeProjectionRows", "computeSensitivityDrivers", "computeProgramRiskWaterfall",
   "computeEffectivePoS", "computeRnDToLaunch", "launchCurveForYears", "resolveLaunchYearOffset",
-  "computeFullCaseMonteCarlo", "solveImpliedPoSMultiplier", "solveImpliedVariable", "computeCompanyActiveByYear", "computeCompanyRiskAdjustedCF", "computeFailureFloor", "EXUS_LAUNCH_LAG_BENCHMARK", "effectiveCapitalStructure", "computeEquityBridgeSteps", "computeRedFlags", "quickModeTerritoryMismatch",
+  "computeFullCaseMonteCarlo", "solveImpliedPoSMultiplier", "solveImpliedVariable", "computeCompanyActiveByYear", "computeCompanyRiskAdjustedCF", "computeFailureFloor", "futureRaisePrice", "napkinBuildPeakMismatch", "buildModelSnapshot", "EXUS_LAUNCH_LAG_BENCHMARK", "effectiveCapitalStructure", "computeEquityBridgeSteps", "computeRedFlags", "quickModeTerritoryMismatch",
   "computePortfolioSummary", "shrinkBinaryResponseRate", "shrinkHazardRatio",
   "BINARY_SHRINKAGE_FACTOR", "HR_SHRINKAGE_FACTOR",
   "MODALITY_OPTIONS", "getCogsBenchmark", "getErosionDefaults", "resolveErosionParams",
@@ -4497,7 +4497,7 @@ section("Stoke, the whole case recomputed from its inputs (Bear, Base, Bull)");
   //   Equity      NPV + $420M cash as filed (rolling forward is off) + PRV $190M x P(launch) / 1.12 + milestone
   //               $100M x P(launch) / 1.12 + $194M raise
   //   Shares      68,229,972 + 11,532,638 x (1 - 13.84 / 24.80) + 2,157,698
-  //               + 194M / 24.06 = 83,547,527
+  //               + 194M / ($24.80 x 0.97, the ATM priced 3% below today) = 83,548,148
   // The scenario runs caught a real defect: Bear/Bull left the royalty part of
   // revenue and the peak commercial revenue at Base size (marketing charged
   // at Base level), so Bear read $14.25 against this rebuild's $14.44.
@@ -4505,7 +4505,7 @@ section("Stoke, the whole case recomputed from its inputs (Bear, Base, Bull)");
   const p = c.programs[0];
   const rnd = api.computeRnDToLaunch(p);
   const ramp = api.LAUNCH_CURVE_EXACT[5].median.map(x => x / 100);
-  const expectPS = { bear: 17.2607, base: 28.7629, bull: 41.8736 };
+  const expectPS = { bear: 17.2604, base: 28.7624, bull: 41.8729 };
   for (const [key, share, posMult, addPct] of [["bear", 70, 75, 0], ["base", 100, 100, 0], ["bull", 130, 120, 0]]) {
     const r = (12 + addPct) / 100, N = 25, L = 1;
     const eff = api.computeEffectivePoS(p, { posMultiplierPct: posMult });
@@ -4551,12 +4551,12 @@ section("Stoke, the whole case recomputed from its inputs (Bear, Base, Bull)");
       if (ifWorks < 0) nol -= ifWorks; else { const use = Math.min(nol, ifWorks); nol -= use; taxIfWorks = 0.21 * (ifWorks - use); }
       npv += (pre - pos * taxIfWorks) / Math.pow(1 + r, t + 1);
     }
-    const shares = 64526242 + 3703730 + 11532638 * (1 - 13.84 / 24.80) + 2157698 + 194e6 / 24.06;
+    const shares = 64526242 + 3703730 + 11532638 * (1 - 13.84 / 24.80) + 2157698 + 194e6 / (24.80 * 0.97);
     const cash = 420e6; // as the filing reported it (rolling forward is off)
     const perShare = (npv + cash + (190e6 + 100e6) * pos / Math.pow(1 + r, L) + 194e6) / shares;
     const app = api.computeCaseValuation(c, api.getEffectiveScenarioPreset(c, key), key, 12, c.terminalValue);
     near("Stoke " + key + ": NPV equals the independent rebuild", app.npvResult.npv, npv, 25);
-    near("Stoke " + key + ": 83,547,527 diluted shares", app.equity.dilutedShares, shares, 0.5);
+    near("Stoke " + key + ": 83,548,868 diluted shares", app.equity.dilutedShares, shares, 0.5);
     near("Stoke " + key + ": fair value per share equals the rebuild", app.equity.perShare, perShare, 1e-6);
     near("Stoke " + key + ": and is $" + expectPS[key], perShare, expectPS[key], 5e-5);
   }
@@ -4583,7 +4583,7 @@ section("Dilution path: raises bring their cash, counted with the odds they happ
   const r = api.computeCaseValuation(on, base, "base", 14, pg.terminalValue);
   const p = 2.34 * 0.85;
   near("market price: per share = (E + cash) / (S + cash / p)", r.equity.perShare, (off.equity.equityValue + cash) / (off.equity.dilutedShares + cash / p), 1e-6);
-  ok("market price: the raises add value when investors pay more than the model's value ($1.99 > $1.54)", r.equity.perShare > off.equity.perShare);
+  ok("market price: the raises add value when investors pay more than the model's value ($1.99 > $1.69)", r.equity.perShare > off.equity.perShare);
   const fair = JSON.parse(JSON.stringify(on)); fair.dilutionPath.priceBasis = "fair";
   near("fair-value price: value per share is unchanged (value-neutral)", api.computeCaseValuation(fair, base, "base", 14, pg.terminalValue).equity.perShare, off.equity.perShare, 1e-9);
   // Stoke needs no raise: switching the path on changes nothing.
@@ -4708,6 +4708,35 @@ section("Rough failure floor from the monthly burn (opt-in)");
   // Never moves the valuation.
   const base = api.getEffectiveScenarioPreset(pg, "base");
   ok("Bear/Base/Bull are untouched by it", api.computeCaseValuation(on, base, "base", 14, on.terminalValue).equity.perShare === api.computeCaseValuation(pg, base, "base", 14, pg.terminalValue).equity.perShare);
+}
+report();
+
+section("Raise priced as a discount to today, the Napkin-vs-build flag, the model snapshot");
+{
+  // A raise priced 15% below today's price follows the price: at $2.34 it is
+  // $1.989, at $2.21 $1.8785. A fixed $1.99 stays $1.99; a case saved before
+  // the choice existed (no priceMode) reads its typed price as before.
+  near("discount mode: 15% below $2.34", api.futureRaisePrice({ priceMode: "discount", discountPct: "15" }, "2.34"), 1.989, 1e-12);
+  near("discount mode follows the price: 15% below $2.21", api.futureRaisePrice({ priceMode: "discount", discountPct: "15", priceOverride: "1.99" }, "2.21"), 1.8785, 1e-12);
+  ok("fixed mode keeps the typed price", api.futureRaisePrice({ priceMode: "fixed", priceOverride: "1.99" }, "2.21") === 1.99);
+  ok("a case saved before the choice reads its typed price", api.futureRaisePrice({ priceOverride: "24.06" }, "26.01") === 24.06);
+  ok("nothing typed: today's price", api.futureRaisePrice({}, "26.01") === 26.01);
+  // Napkin vs build: the build's own peak (US + royalty) against the typed one.
+  const st = JSON.parse(fs.readFileSync(path.join(__dirname, "fixtures", "stoke_sample_case.json"), "utf8"));
+  ok("the sample's Napkin peak is the build's own: no flag", api.napkinBuildPeakMismatch(st.programs[0]) === null);
+  const big = JSON.parse(JSON.stringify(st.programs[0])); big.quickRevenue.peakRevenue = "2500000000";
+  const mm = api.napkinBuildPeakMismatch(big);
+  ok("a $2.5B Napkin peak against the build's: flagged, 1.9x", !!mm && Math.abs(mm.ratio - 2.5e9 / mm.full) < 1e-12 && mm.ratio > 1.8 && mm.ratio < 2.0 && mm.mode === "full");
+  const close = JSON.parse(JSON.stringify(big)); close.quickRevenue.peakRevenue = String(Math.round(mm.full * 1.4));
+  ok("1.4x apart: not flagged (the line is 1.5x)", api.napkinBuildPeakMismatch(close) === null);
+  ok("the flag appears in the red flags", api.computeRedFlags({ ...st, programs: [big] }).some(f => /Napkin peak \(\$2\.50B\) is 1\.9x the full build's/.test(f.message)));
+  // The snapshot quotes the engine's own numbers.
+  const snap = api.buildModelSnapshot(st, "2026-09-28");
+  const v = k => api.computeCaseValuation(st, api.getEffectiveScenarioPreset(st, k), k, 12, st.terminalValue).equity.perShare.toFixed(2);
+  ok("snapshot: dated, labelled, and quotes Bear/Base/Bull as the engine computes them", snap.date === "2026-09-28" && snap.label === "What the model says (snapshot)" &&
+    snap.thesis.includes("Base fair value ~$" + v("base")) && snap.thesis.includes("Bear ~$" + v("bear")) && snap.thesis.includes("Bull ~$" + v("bull")));
+  ok("snapshot: the price-implied odds against the case's 65%", /The price implies ~55% odds of launch against this case's 65%/.test(snap.thesis));
+  ok("snapshot: the failure floor by the case's method", /if the next readout fails, ~\$1\.30 is left \(the filing's cash/.test(snap.thesis));
 }
 report();
 
@@ -4838,14 +4867,14 @@ section("PepGen, the whole case recomputed from its inputs (Bear, Base, Bull)");
   //   Discount     end of year: year t (2026 = 0) at 1/(1+r)^(t+1)
   //   Equity       NPV + $117.238M cash as filed (rolling forward is off) + $100M
   //                raise, over 69,259,517 +
-  //                1,101,110 RSUs + 50,251,256 raise shares (options at $4.89 are
-  //                out of the money at $2.34) = 120,611,883
+  //                1,101,110 RSUs + 50,276,521 raise shares (options at $4.89 are
+  //                out of the money at $2.34) = 120,637,148 (the raise 15% below $2.34)
   const c = JSON.parse(fs.readFileSync(path.join(__dirname, "fixtures", "pepgen_case.json"), "utf8"));
   const p = c.programs[0];
   const rnd = api.computeRnDToLaunch(p);
   const ramp = [11, 31, 58, 76, 89, 100].map(x => x / 100);
   near("the six-year median launch curve is the one typed here", 0, ramp.reduce((s, v, i) => s + Math.abs(v - api.launchCurveForYears(6, "median")[i] / 100), 0), 1e-12);
-  const expectPS = { bear: 0.8944, base: 1.6861, bull: 3.1183 };
+  const expectPS = { bear: 0.8942, base: 1.6857, bull: 3.1177 };
   for (const [key, share, posMult, addPct] of [["bear", 60, 60, 0], ["base", 100, 100, 0], ["bull", 140, 150, 0]]) {
     const r = (14 + addPct) / 100, N = 25, L = 5;
     const eff = api.computeEffectivePoS(p, { posMultiplierPct: posMult });
@@ -4896,12 +4925,12 @@ section("PepGen, the whole case recomputed from its inputs (Bear, Base, Bull)");
       const flow = pre - pos * taxIfWorks;
       cf.push(flow); npv += flow / Math.pow(1 + r, t + 1);
     }
-    const shares = 69259517 + 1101110 + 100e6 / 1.99;
+    const shares = 69259517 + 1101110 + 100e6 / (2.34 * 0.85);
     const cash = 117.238e6; // as the filing reported it (rolling forward is off)
     const perShare = (npv + cash + 100e6) / shares;
     const app = api.computeCaseValuation(c, api.getEffectiveScenarioPreset(c, key), key, 14, c.terminalValue);
     near(key + ": NPV equals the independent rebuild", app.npvResult.npv, npv, 25);
-    near(key + ": diluted shares are 120,611,883", app.equity.dilutedShares, shares, 0.5);
+    near(key + ": diluted shares are 120,637,148", app.equity.dilutedShares, shares, 0.5);
     near(key + ": fair value per share equals the rebuild", app.equity.perShare, perShare, 1e-6);
     near(key + ": and is the $" + expectPS[key] + " the case showed", perShare, expectPS[key], 5e-5);
     const rows = api.computeProjectionRows(app, c);

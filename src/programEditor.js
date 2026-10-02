@@ -70,7 +70,7 @@ function newProgram() {
   };
 }
 
-function ProgramEditor({ program, onChange, onDelete, discountRatePct, terminalValue, valuationMethod, basePosAdjustmentPct, onNavigateToTools, part }) {
+function ProgramEditor({ program, onChange, onDelete, discountRatePct, terminalValue, valuationMethod, basePosAdjustmentPct, onNavigateToTools, part, theCase }) {
   const h = React.createElement;
   // Which Workspace tab this instance draws: "inputs" (Assumptions),
   // "evidence" or "calibration" — or everything, when no part is given. Each
@@ -720,7 +720,17 @@ function ProgramEditor({ program, onChange, onDelete, discountRatePct, terminalV
     show("evidence") && ((() => {
       const [showForm, setShowForm] = React.useState(false);
       const [editingIdx, setEditingIdx] = React.useState(null);
+      const [snapMsg, setSnapMsg] = React.useState(null);
       const log = program.evidenceLog || [];
+      // The snapshot entry, written from the live model: replaces the one
+      // already in the log (same id, same place) or adds it at the end.
+      const writeSnapshot = () => {
+        const entry = theCase ? buildModelSnapshot({ ...theCase, programs: (theCase.programs || []).map(p => p.id === program.id ? program : p) }) : null;
+        if (!entry) { setSnapMsg("Nothing to snapshot yet — the case needs a value first."); return; }
+        const at = log.findIndex(e => e.label === MODEL_SNAPSHOT_LABEL);
+        set("evidenceLog", at >= 0 ? log.map((e, i) => i === at ? { ...e, ...entry } : e) : [...log, { id: newId("ev"), ...entry }]);
+        setSnapMsg((at >= 0 ? "Snapshot updated" : "Snapshot added") + " — " + entry.date + ".");
+      };
 
       const addEntry = (entry) => {
         set("evidenceLog", [...log, { id: newId("ev"), ...entry }]);
@@ -764,6 +774,10 @@ function ProgramEditor({ program, onChange, onDelete, discountRatePct, terminalV
                 )
               )
         ),
+        h("div", { style: { display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", margin: "4px 0 8px" } },
+          h("button", { type: "button", onClick: writeSnapshot, title: "Writes “" + MODEL_SNAPSHOT_LABEL + "” from the model as it stands — price, Bear/Base/Bull, the odds the price implies, the value if it works or fails, and what moves it most. Replaces the existing snapshot entry.",
+            style: { padding: "6px 14px", minHeight: 28, borderRadius: 6, border: "1px solid var(--teal)", background: "var(--teal-bg)", color: "var(--teal)", fontFamily: "var(--mono)", fontSize: 11, fontWeight: 700, cursor: "pointer" } }, "Snapshot from the model"),
+          snapMsg && h("span", { role: "status", style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-3)" } }, snapMsg)),
         showForm
           ? h(EvidenceEntryForm, { saveLabel: "Add", onSave: addEntry, onCancel: () => setShowForm(false) })
           : h("button", { onClick: () => setShowForm(true), style: { padding: "6px 14px", borderRadius: 6, border: "1px solid var(--rule)", background: "transparent", color: "var(--ink-2)", fontFamily: "var(--mono)", fontSize: 11, cursor: "pointer", marginTop: log.length > 0 ? 4 : 0 } }, "+ Add evidence")

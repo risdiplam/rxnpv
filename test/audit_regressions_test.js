@@ -385,6 +385,17 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
     const stored = JSON.parse(w.localStorage.getItem("rxnpv_cases_v1")).find(c => c.name === "Stoke Therapeutics — sample case");
     const rsNow = [...d.querySelectorAll("[data-export-section]")].find(e => e.getAttribute("data-export-section") === "Before the next readout");
     ok(stored && stored.readoutScenarios && stored.readoutScenarios.clearOfWinsPct === "50" && /36%[\s\S]*36%[\s\S]*28%/.test(rsNow.querySelector("tbody").textContent), "Readout: an edit is saved on the case and splits wins 36/36 (a 72% positive readout, halved)");
+    // "Snapshot from the model" rewrites the snapshot entry in place, dated,
+    // from the live model (the sample's hand-written one is replaced).
+    click(d.getElementById("casetab-evidence")); await wait(300);
+    const snapBtn = [...d.querySelectorAll("button")].find(b => b.textContent === "Snapshot from the model");
+    ok(!!snapBtn, "Snapshot: the Evidence Log has a 'Snapshot from the model' button");
+    const snapCase = () => JSON.parse(w.localStorage.getItem("rxnpv_cases_v1")).find(c => c.name === "Stoke Therapeutics — sample case");
+    const nBefore = snapCase().programs[0].evidenceLog.length;
+    if (snapBtn) { click(snapBtn); await wait(400); }
+    const snapEntries = snapCase().programs[0].evidenceLog.filter(e => e.label === "What the model says (snapshot)");
+    ok(snapEntries.length === 1 && snapCase().programs[0].evidenceLog.length === nBefore && /^Generated from this case's model on /.test(snapEntries[0].source) && /Base fair value ~\$28\.76/.test(snapEntries[0].thesis),
+      "Snapshot: replaces the one snapshot entry in place with the model's own figures (" + (snapEntries[0] && snapEntries[0].thesis.slice(0, 80)) + ")");
     click(d.getElementById("casetab-overview")); await wait(300);
 
     // The whole range on one line, with the failure floor.

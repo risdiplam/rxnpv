@@ -551,10 +551,12 @@ function useValuationSections({ theCase, onChange, goToTab }) {
     // too, so "the price implies X" is the X at which this fair value equals
     // the price (see solveImpliedPoSMultiplier).
     show("inputs") && ((() => {
-      const fr = theCase.futureRaise || { enabled: false, amountM: "", priceOverride: "" };
+      // A case that has never set a raise starts on "% below today's price".
+      const fr = theCase.futureRaise || { enabled: false, amountM: "", priceOverride: "", priceMode: "discount", discountPct: "" };
       const setFR = (patch) => update({ futureRaise: { ...fr, ...patch } });
       const fallbackPrice = theCase.currentPrice;
-      const impliedPrice = fr.priceOverride !== "" && fr.priceOverride != null ? Number(fr.priceOverride) : Number(fallbackPrice || 0);
+      const byDiscount = fr.priceMode === "discount";
+      const impliedPrice = futureRaisePrice(fr, fallbackPrice);
       const newShares = (fr.enabled && impliedPrice > 0 && fr.amountM) ? Number(fr.amountM) / impliedPrice : 0;
       return h("div", { "data-nav": "financing", style: { borderTop: "1px dashed var(--rule)", paddingTop: 14, marginBottom: 16 } },
         h("label", { style: { display: "flex", alignItems: "center", gap: 8, fontSize: 13, fontFamily: "var(--display)", fontWeight: 600, color: "var(--ink-1)", cursor: "pointer", marginBottom: fr.enabled ? 10 : 0 } },
@@ -565,8 +567,16 @@ function useValuationSections({ theCase, onChange, goToTab }) {
             "Applied to every scenario — new shares dilute the count, raised cash adds to net cash dollar for dollar. No underwriting fee, no explicit timing — answers \"what happens at $X raised at $Y,\" not when."),
           h("div", { style: { display: "flex", gap: 16, flexWrap: "wrap" } },
             h(MillionsField, { label: "Amount to raise", value: fr.amountM, onChange: v => setFR({ amountM: v }) }),
-            h(BenchField, { label: "Assumed raise price", value: fr.priceOverride, onChange: v => setFR({ priceOverride: v }), suffix: "$", placeholder: "today's price",
-              bench: { value: Number(fallbackPrice || 0), source: "Defaults to the case's current price — override for a raise at a discount (or premium)" } })
+            h("div", { style: { flex: "1 1 200px", minWidth: 180, maxWidth: 420, marginBottom: 14 } },
+              h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-2)", marginBottom: 5 } }, "Price the raise"),
+              h("select", { "aria-label": "Price the raise", value: byDiscount ? "discount" : "fixed", onChange: e => setFR({ priceMode: e.target.value }), style: UI.input },
+                h("option", { value: "discount" }, "% below today's price (follows the stock)"),
+                h("option", { value: "fixed" }, "At a fixed price"))),
+            byDiscount
+              ? h(BenchField, { label: "Discount to today's price", value: fr.discountPct == null ? "" : fr.discountPct, onChange: v => setFR({ discountPct: v }), suffix: "%", placeholder: "0",
+                  help: "An ATM sells near the market less the agent's commission (~3%); a follow-on offering usually prices 10–20% below." })
+              : h(BenchField, { label: "Assumed raise price", value: fr.priceOverride, onChange: v => setFR({ priceOverride: v }), suffix: "$", placeholder: "today's price",
+                  bench: { value: Number(fallbackPrice || 0), source: "Defaults to the case's current price — a fixed figure does not move when the price does" } })
           ),
           newShares > 0 && h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-3)", marginTop: 8 } },
             "≈ ", h("b", { style: { color: "var(--ink-2)" } }, Math.round(newShares).toLocaleString()), " new shares at $" + impliedPrice.toFixed(2) + "/share.")

@@ -96,7 +96,7 @@
     "costSharingPct": "30",
     "milestones": [
      {
-      "id": "ms_muqaoubz_4",
+      "id": "ms_muqep2xv_4",
       "label": "Ex-US regulatory milestones — assumed part of the undisclosed $385M",
       "gate": "launch",
       "valueM": 100
@@ -158,6 +158,8 @@
  "futureRaise": {
   "enabled": true,
   "amountM": "194000000",
+  "priceMode": "discount",
+  "discountPct": "3",
   "priceOverride": "24.06"
  },
  "dilutionPath": {

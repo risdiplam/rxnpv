@@ -181,7 +181,11 @@ function SavedPanel({ theCase, onChange, onReopen }) {
             title: "Open " + (p.source || "the tool") + " with these inputs and run it" }, "Open in " + whereTo(p.reopen) + " →"),
           p.note && h("button", { type: "button", className: "saved-btn", "aria-expanded": openId === p.id, onClick: () => setOpenId(openId === p.id ? null : p.id) }, openId === p.id ? "Hide" : "Why these inputs"),
           h(ConfirmXButton, { title: "Remove " + (p.title || "this example") + " from this case", label: "Remove", onConfirm: () => save(all.filter(x => x !== p)) })),
-        openId === p.id && p.note && h("div", { className: "saved-preview prose", style: { ...UI.caption, color: "var(--ink-2)", lineHeight: 1.6 } }, p.note)))))));
+        // Dated: a note quotes the case's numbers as they were when it was
+        // written; opening the example runs it on today's case.
+        openId === p.id && p.note && h("div", { className: "saved-preview prose", style: { ...UI.caption, color: "var(--ink-2)", lineHeight: 1.6 } },
+          p.capturedAt && h("span", { style: { color: "var(--ink-3)" } }, "Written " + new Date(p.capturedAt).toISOString().slice(0, 10) + " — figures as of then; opening it runs it on today's case. "),
+          p.note)))))));
 }
 // "Tools · Trial · Trial Decoder" → group "Tools · Trial", tool "Trial Decoder";
 // "Simulation · Trial Statistics · Fragility Index" → "Simulation", the rest.
@@ -325,7 +329,9 @@ function CaseView({ theCase, onChange, onDelete, onNavigateToTools, onReopenSave
       discountRatePct: theCase.discountRatePct, terminalValue: theCase.terminalValue,
       valuationMethod: theCase.valuationMethod || "dcf",
       basePosAdjustmentPct: theCase.basePosAdjustmentPct,
-      onNavigateToTools
+      onNavigateToTools,
+      // Read at click time by the Evidence Log's "snapshot from the model".
+      theCase
     });
 
   return h("div", { "data-export-context": "Workspace · " + (theCase.name || "Untitled case") },

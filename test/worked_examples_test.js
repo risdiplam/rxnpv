@@ -53,7 +53,7 @@ const SKIP = new Set(["fdmc"]);
   ok(items.length === examples.length, "one row per example (" + items.length + ")");
   ok(items.every(it => !it.querySelector('input[type="checkbox"]')), "examples have no 'In the PDF report' tick box");
   const why = items[0] && btn("Why these inputs", items[0]); click(why); await wait(150);
-  ok(!!why && items[0].querySelector(".saved-preview") && items[0].querySelector(".saved-preview").textContent === examples[0].note, "'Why these inputs' shows the example's note");
+  ok(!!why && items[0].querySelector(".saved-preview") && /^Written \d{4}-\d{2}-\d{2} — figures as of then; opening it runs it on today's case\. /.test(items[0].querySelector(".saved-preview").textContent) && items[0].querySelector(".saved-preview").textContent.endsWith(examples[0].note), "'Why these inputs' shows the example's note, dated");
 
   // Open each one and check it landed.
   const openAll = async (examples) => {

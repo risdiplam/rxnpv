@@ -276,12 +276,20 @@
    "value": "100000000"
   },
   {
-   "set": "Assumed raise price ($)",
-   "value": "1.99"
+   "select": "Price the raise",
+   "value": "discount"
   },
   {
-   "expect": "futureRaise.priceOverride",
-   "value": "1.99"
+   "expect": "futureRaise.priceMode",
+   "value": "discount"
+  },
+  {
+   "set": "Discount to today's price (%)",
+   "value": "15"
+  },
+  {
+   "expect": "futureRaise.discountPct",
+   "value": "15"
   },
   {
    "check": "Model dilution path to launch",
