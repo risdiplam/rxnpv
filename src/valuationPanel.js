@@ -135,7 +135,12 @@ function useValuationSections({ theCase, onChange, goToTab }) {
   // from the model, "+ Report" switches that section on rather than storing a
   // snapshot of it.
   const PART_TITLES = { overview: "Valuation", inputs: "Company-level assumptions", scenarios: "Scenarios", evidence: "Inputs worth a second look" };
-  const flags = computeRedFlags(theCase);
+  const allFlags = computeRedFlags(theCase);
+  // Flags marked "considered" collapse and stop counting toward the pointer
+  // and the Evidence tab's badge (splitConsideredFlags).
+  const { open: flags, considered: consideredFlags } = splitConsideredFlags(theCase, allFlags);
+  const today = new Date().toISOString().slice(0, 10);
+  const setConsidered = (key, on) => update({ consideredFlags: markFlagConsidered(theCase, allFlags, key, on, today) });
   const renderPart = (part) => {
     const show = (p) => p.split("|").includes(part);
     // The Scenarios tab holds exactly one section (the scenario comparison,
@@ -148,29 +153,35 @@ function useValuationSections({ theCase, onChange, goToTab }) {
     (show("overview") || show("inputs")) && flags.length > 0 && h("button", { type: "button", onClick: () => goToTab && goToTab("evidence"), className: "flag-pointer" },
       h("span", { "aria-hidden": "true" }, "●"),
       flags.length + " input" + (flags.length > 1 ? "s" : "") + " worth a second look", h("span", { className: "flag-pointer-go" }, "Review on Evidence →")),
-    show("evidence") && flags.length === 0 && h("div", { style: { fontSize: 13, color: "var(--ink-2)", lineHeight: 1.6 } },
+    show("evidence") && allFlags.length === 0 && h("div", { style: { fontSize: 13, color: "var(--ink-2)", lineHeight: 1.6 } },
       "Nothing stands out: every input this app checks sits within its benchmark range."),
+    show("evidence") && allFlags.length > 0 && flags.length === 0 && h("div", { style: { fontSize: 13, color: "var(--ink-2)", lineHeight: 1.6, marginBottom: 10 } },
+      "Nothing new to look at: every flag below has been marked considered. Change the input behind one and it opens again."),
 
     // Red flags — cross-checks this case's own inputs against the same
     // benchmarks and formulas used elsewhere in the app, before presenting
     // what those inputs produce. Purely descriptive, never a verdict — see
     // computeRedFlags in scenarioEngine.js for exactly what's checked and why.
-    show("evidence") && ((() => {
-      const flags = computeRedFlags(theCase);
-      if (flags.length === 0) return null;
+    show("evidence") && flags.length > 0 && ((() => {
       const highCount = flags.filter(f => f.severity === "high").length;
       return h("div", { style: { marginBottom: 16, padding: "12px 14px", borderRadius: 8, background: "var(--warn-bg)", border: "1px solid var(--warn)" } },
         h("div", { style: { fontSize: 12, fontFamily: "var(--display)", fontWeight: 600, color: "var(--warn)", marginBottom: 8 } },
           flags.length + " input" + (flags.length > 1 ? "s" : "") + " worth a second look" + (highCount > 0 ? " (" + highCount + " large deviation" + (highCount > 1 ? "s" : "") + ")" : "")),
-        flags.map((f, i) => h("div", { key: i, style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-2)", lineHeight: 1.5, marginBottom: i < flags.length - 1 ? 8 : 0, paddingLeft: 10, borderLeft: "2px solid " + (f.severity === "high" ? "var(--red)" : "var(--amber)") } },
+        flags.map((f, i) => h("div", { key: f.key, style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-2)", lineHeight: 1.5, marginBottom: i < flags.length - 1 ? 8 : 0, paddingLeft: 10, borderLeft: "2px solid " + (f.severity === "high" ? "var(--red)" : "var(--amber)") } },
           f.programName && h("span", { style: { fontWeight: 700, color: "var(--ink-1)" } }, f.programName + ": "),
-          f.message
+          f.message, " ",
+          h("button", { type: "button", className: "link-btn", "data-no-export": "", style: { fontSize: 11 }, onClick: () => setConsidered(f.key, true),
+            title: "You have looked at this and have a reason (an Evidence Log entry, say). It collapses and stops counting; it opens again if the input behind it changes." }, "Mark considered")
         ))
       );
     })()),
-
-    // The case at a glance — evidence, odds and value as one picture (caseGlance.js).
-    show("overview") && (!error && scenarioResults && valMethod === "dcf" && theCase.programs.length === 1 && h(CaseGlance, { theCase, scenarioResults, impliedSolved })),
+    // Considered flags: one line each, dated, with a way back.
+    show("evidence") && consideredFlags.length > 0 && h("div", { style: { marginBottom: 16 } },
+      h("div", { style: { ...UI.captionMd, marginBottom: 6 } }, consideredFlags.length + " considered"),
+      consideredFlags.map(f => h("div", { key: f.key, style: { ...UI.caption, display: "flex", gap: 8, alignItems: "baseline", flexWrap: "wrap", marginBottom: 4 } },
+        h("span", { title: f.message, style: { flex: "1 1 300px", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } },
+          "Considered" + (f.consideredAt ? " " + f.consideredAt : "") + " — " + (f.programName ? f.programName + ": " : "") + f.message),
+        h("button", { type: "button", className: "link-btn", "data-no-export": "", style: { fontSize: 11 }, onClick: () => setConsidered(f.key, false) }, "Reopen")))),
 
     // Price vs. model — a prominent, glanceable summary placed ahead of every
     // input section rather than buried after them, so "what does this case
@@ -218,6 +229,9 @@ function useValuationSections({ theCase, onChange, goToTab }) {
         showSuccess && h("div", { className: "prose", style: { ...UI.caption, marginTop: 8 } },
           "Bear, Base and Bull are each weighted by the odds of launch" + (theCase.programs.length === 1 && baseResult.programVals && baseResult.programVals[0] ? " (Base: " + Math.round(baseResult.programVals[0].posToLaunch * 100) + "%)" : "") +
           " — the average across the ways it can go, not the failure case. \u201cIf it works\u201d is Base with the drug approved: the value if every remaining readout and the FDA go its way."),
+        // The case at a glance — evidence, odds and value as one picture
+        // (caseGlance.js) — inside this card, under the numbers it pictures.
+        valMethod === "dcf" && theCase.programs.length === 1 && h(CaseGlance, { theCase, scenarioResults, impliedSolved, embedded: true }),
         valMethod === "multiple" && h("div", { style: { ...UI.caption, marginTop: 8 } }, "Implied PoS is DCF-only — switch off Simple Multiple to see what the price requires."),
         price == null && h("div", { style: { ...UI.caption, marginTop: 8 } }, "Set a current price above to see upside/downside and implied PoS."),
         valMethod === "dcf" && price != null && theCase.programs.length > 1 && h("div", { style: { ...UI.caption, marginTop: 8 } }, "Implied PoS as a single absolute number needs one program — see \"as a multiple\" further down for the multi-program version.")

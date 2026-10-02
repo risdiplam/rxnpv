@@ -214,7 +214,10 @@ function glanceInputs(theCase, scenarioResults, impliedSolved, drivers) {
 }
 
 const GLANCE_HIDDEN_KEY = "rxnpv_glance_hidden";
-function CaseGlance({ theCase, scenarioResults, impliedSolved }) {
+// embedded: drawn inside the Overview's "Price vs. model" card, under its
+// numbers. That card already reads the price against Bear/Base/Bull, so the
+// Glance's own reading (which says much the same) is left to the report.
+function CaseGlance({ theCase, scenarioResults, impliedSolved, embedded }) {
   const h = React.createElement;
   const [hidden, setHidden] = React.useState(() => { try { return localStorage.getItem(GLANCE_HIDDEN_KEY) === "1"; } catch (e) { return false; } });
   const setHiddenSaved = v => { setHidden(v); try { localStorage.setItem(GLANCE_HIDDEN_KEY, v ? "1" : "0"); } catch (e) {} };
@@ -229,16 +232,16 @@ function CaseGlance({ theCase, scenarioResults, impliedSolved }) {
     }, drivers ? 450 : 0);
     return () => clearTimeout(t);
   }, [sig, hidden]);
-  if (hidden) return h("div", { style: { marginBottom: 10 } }, h("button", { type: "button", className: "link-btn", onClick: () => setHiddenSaved(false) }, "Show the case at a glance"));
+  if (hidden) return h("div", { style: { marginTop: embedded ? 10 : 0, marginBottom: 10 } }, h("button", { type: "button", className: "link-btn", onClick: () => setHiddenSaved(false) }, "Show the case at a glance"));
   const g = glanceInputs(theCase, scenarioResults, impliedSolved, drivers);
   if (!g) return null;
   const reading = readGlance(g.evidenceCount, Math.min(g.pos.bear, g.pos.bull), Math.max(g.pos.bear, g.pos.bull), g.value.bear, g.value.bull, g.value.price, drivers && drivers[0] ? GLANCE_DRIVER_NAME(drivers[0].name) : null);
-  return h(ExportSection, { title: "The case at a glance", reportSection: "glance", style: { marginBottom: 18 } },
+  return h(ExportSection, { title: "The case at a glance", reportSection: "glance", style: embedded ? { marginTop: 14, borderTop: "1px dashed var(--rule)", paddingTop: 12 } : { marginBottom: 18 } },
     h("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12, marginBottom: 4 } },
       h("div", { style: { fontSize: 13, fontFamily: "var(--display)", fontWeight: 600, color: "var(--ink-1)" } }, "The case at a glance"),
       h("button", { type: "button", className: "link-btn", "data-no-export": "", onClick: () => setHiddenSaved(true) }, "Hide")),
     h("div", { className: "prose", style: { ...UI.caption, marginBottom: 10 } }, "Every line is this case's own data: the evidence is its Evidence Log, the odds curve is your Bear–Base–Bull probability of launch, each line on the right is one input's own range, and the shading is your Bear to Bull range."),
     h(ExportableBlock, { title: (theCase.name || "Case") + " — the case at a glance" },
       h(CaseGlanceChart, { evidence: g.evidence, moreCount: g.moreCount, pos: g.pos, value: g.value })),
-    h(Explain, reading));
+    !embedded && h(Explain, reading));
 }

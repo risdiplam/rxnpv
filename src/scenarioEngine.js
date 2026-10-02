@@ -1310,6 +1310,28 @@ function buildModelSnapshot(theCase, today) {
   return { label: MODEL_SNAPSHOT_LABEL, classification: "inference", confidence: "moderate", source: "Generated from this case's model on " + date, date, thesis: parts.join(" ") };
 }
 
+// ── Red flags the user has marked "considered" ─────────────────────────────
+// A flag answered once (say, with an Evidence Log entry) used to show on every
+// visit, so the flags that still needed a look were lost among the ones that
+// did not. A flag is known by its program and its exact message; the message
+// carries the input values, so when an input changes the message changes and
+// the flag opens again by itself. theCase.consideredFlags: [{ key, at }].
+function redFlagKey(flag) { return (flag.programId || "") + "|" + flag.message; }
+function splitConsideredFlags(theCase, flags) {
+  const marked = {};
+  ((theCase && theCase.consideredFlags) || []).forEach(c => { if (c && c.key) marked[c.key] = c.at || ""; });
+  const open = [], considered = [];
+  flags.forEach(f => { const k = redFlagKey(f); if (k in marked) considered.push({ ...f, key: k, consideredAt: marked[k] }); else open.push({ ...f, key: k }); });
+  return { open, considered };
+}
+// The list after marking (or unmarking) one flag; marks that no longer match
+// any current flag are dropped, so the list never grows stale.
+function markFlagConsidered(theCase, flags, key, on, today) {
+  const live = {}; flags.forEach(f => { live[redFlagKey(f)] = true; });
+  const kept = ((theCase && theCase.consideredFlags) || []).filter(c => c && live[c.key] && c.key !== key);
+  return on ? kept.concat([{ key, at: today }]) : kept;
+}
+
 // The typed Napkin peak against the full build's own peak (US sales plus any
 // royalty, as the valuation would use it), when both exist and one is more
 // than 1.5x the other. Null otherwise.

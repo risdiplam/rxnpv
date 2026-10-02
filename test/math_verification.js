@@ -66,7 +66,7 @@ const EXPORTS = [
   "SCENARIO_PRESETS", "getEffectiveScenarioPreset", "applyBasePosAdjustment",
   "computeProgramValuation", "computeCaseValuation", "baseCaseFairValue", "computeProjectionRows", "computeSensitivityDrivers", "computeProgramRiskWaterfall",
   "computeEffectivePoS", "computeRnDToLaunch", "launchCurveForYears", "resolveLaunchYearOffset",
-  "computeFullCaseMonteCarlo", "solveImpliedPoSMultiplier", "solveImpliedVariable", "computeCompanyActiveByYear", "computeCompanyRiskAdjustedCF", "computeFailureFloor", "futureRaisePrice", "napkinBuildPeakMismatch", "buildModelSnapshot", "EXUS_LAUNCH_LAG_BENCHMARK", "effectiveCapitalStructure", "computeEquityBridgeSteps", "computeRedFlags", "quickModeTerritoryMismatch",
+  "computeFullCaseMonteCarlo", "solveImpliedPoSMultiplier", "solveImpliedVariable", "computeCompanyActiveByYear", "computeCompanyRiskAdjustedCF", "computeFailureFloor", "redFlagKey", "splitConsideredFlags", "markFlagConsidered", "futureRaisePrice", "napkinBuildPeakMismatch", "buildModelSnapshot", "EXUS_LAUNCH_LAG_BENCHMARK", "effectiveCapitalStructure", "computeEquityBridgeSteps", "computeRedFlags", "quickModeTerritoryMismatch",
   "computePortfolioSummary", "shrinkBinaryResponseRate", "shrinkHazardRatio",
   "BINARY_SHRINKAGE_FACTOR", "HR_SHRINKAGE_FACTOR",
   "MODALITY_OPTIONS", "getCogsBenchmark", "getErosionDefaults", "resolveErosionParams",
@@ -4737,6 +4737,27 @@ section("Raise priced as a discount to today, the Napkin-vs-build flag, the mode
     snap.thesis.includes("Base fair value ~$" + v("base")) && snap.thesis.includes("Bear ~$" + v("bear")) && snap.thesis.includes("Bull ~$" + v("bull")));
   ok("snapshot: the price-implied odds against the case's 65%", /The price implies ~55% odds of launch against this case's 65%/.test(snap.thesis));
   ok("snapshot: the failure floor by the case's method", /if the next readout fails, ~\$1\.30 is left \(the filing's cash/.test(snap.thesis));
+}
+report();
+
+section("Red flags marked considered");
+{
+  // Stoke's R&D timeline (1.4 years against a 4.3-year benchmark) flags every
+  // time. Marked considered, it moves to the considered list; change the input
+  // and its message changes, so it is open again; marks that match no current
+  // flag are dropped when the list is next written.
+  const st = JSON.parse(fs.readFileSync(path.join(__dirname, "fixtures", "stoke_sample_case.json"), "utf8"));
+  const flags = api.computeRedFlags(st);
+  const rd = flags.find(f => /R&D-to-launch override/.test(f.message));
+  ok("the sample has the R&D timeline flag", !!rd);
+  const marked = { ...st, consideredFlags: api.markFlagConsidered(st, flags, api.redFlagKey(rd), true, "2026-10-02") };
+  const split = api.splitConsideredFlags(marked, flags);
+  ok("marked: it leaves the open list and joins the considered one, dated", !split.open.some(f => f.key === api.redFlagKey(rd)) && split.considered.length === 1 && split.considered[0].consideredAt === "2026-10-02");
+  const changed = JSON.parse(JSON.stringify(marked)); changed.programs[0].rndOverride.totalYears = "1.2";
+  const flags2 = api.computeRedFlags(changed);
+  ok("the input changes: the flag is open again", api.splitConsideredFlags(changed, flags2).open.some(f => /R&D-to-launch override of 1\.2 years/.test(f.message)) && api.splitConsideredFlags(changed, flags2).considered.length === 0);
+  ok("the stale mark is dropped when the list is next written", api.markFlagConsidered(changed, flags2, "x|y", false, "2026-10-02").length === 0);
+  ok("unmarking reopens it", api.splitConsideredFlags({ ...st, consideredFlags: api.markFlagConsidered(marked, flags, api.redFlagKey(rd), false, "2026-10-02") }, flags).considered.length === 0);
 }
 report();
 

@@ -385,6 +385,20 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
     const stored = JSON.parse(w.localStorage.getItem("rxnpv_cases_v1")).find(c => c.name === "Stoke Therapeutics — sample case");
     const rsNow = [...d.querySelectorAll("[data-export-section]")].find(e => e.getAttribute("data-export-section") === "Before the next readout");
     ok(stored && stored.readoutScenarios && stored.readoutScenarios.clearOfWinsPct === "50" && /36%[\s\S]*36%[\s\S]*28%/.test(rsNow.querySelector("tbody").textContent), "Readout: an edit is saved on the case and splits wins 36/36 (a 72% positive readout, halved)");
+    // A red flag marked considered collapses to one dated line and stops
+    // counting on the Evidence tab's badge; Reopen brings it back.
+    const badge = () => { const t = d.getElementById("casetab-evidence"); const b = t && t.querySelector(".case-tab-count"); return b ? Number(b.textContent) : 0; };
+    click(d.getElementById("casetab-evidence")); await wait(300);
+    const before = badge();
+    const markBtn = [...d.querySelectorAll("button")].find(b => b.textContent === "Mark considered");
+    if (markBtn) { click(markBtn); await wait(300); }
+    const storedFlags = () => (JSON.parse(w.localStorage.getItem("rxnpv_cases_v1")).find(c => c.name === "Stoke Therapeutics — sample case").consideredFlags || []);
+    ok(!!markBtn && badge() === before - 1 && storedFlags().length === 1 && /^\d{4}-\d{2}-\d{2}$/.test(storedFlags()[0].at) && /\d+ considered/.test(d.getElementById("casepanel-evidence").textContent),
+      "Flags: 'Mark considered' collapses a flag, dates it and takes it off the badge (" + before + " → " + badge() + ")");
+    const reopen = [...d.querySelectorAll("button")].find(b => b.textContent === "Reopen");
+    if (reopen) { click(reopen); await wait(300); }
+    ok(!!reopen && badge() === before && storedFlags().length === 0, "Flags: Reopen puts it back");
+
     // "Snapshot from the model" rewrites the snapshot entry in place, dated,
     // from the live model (the sample's hand-written one is replaced).
     click(d.getElementById("casetab-evidence")); await wait(300);
