@@ -23,7 +23,7 @@ The packaged-app harness replaces only the native save sheet. Clicking **Export 
 ### 🟡 Decisions the October 2026 audit surfaced (the user's call)
 - **GAP-001 — Pipeline view / 10-K vs CT.gov mismatch: DECIDED 2026-10-03, moved to OPEN** in the Feature Map (the user: "go with your best recommendations"). The CT.gov half exists (Company Lookup, Asset Program); the 10-K half means reading free-text pipeline tables out of annual reports — fragile parsing of the kind this project has been burned by.
 - **GAP-002 — Payer coverage / formulary access** stays OPEN: no reliable free source. Not faked.
-- **P3 — pasting "$1,200.50" into a millions field leaves it blank.** Number inputs reject the text, so nothing wrong is stored, but the paste is silently dropped. Polish, not money.
+- **P3 — pasting "$1,200.50" into a millions field left it blank. FIXED 2026-10-03:** every number field now strips $, commas and spaces from a paste (`cleanPastedNumber`, helpers.js); text that is still not a number is left to the browser's own handling (Chromium keeps the digits of "about 12"). Test in `audit_regressions_test.js`, checked in the packaged app with a real paste.
 
 The two standing limitations are in CLAUDE.md under "Known limitations", and `RxNPV_Feature_Map.md` holds what is deliberately not built.
 

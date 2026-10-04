@@ -624,6 +624,29 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
     ok(cashIn().value === "117.238", "$M field shows three decimals after editing (" + cashIn().value + "), not 117");
   }
 
+  // Pasting a figure copied from a filing ("$1,200.50") into a number field.
+  // A number input rejects the "$" and commas, so the browser dropped the
+  // whole paste and the field stayed blank with nothing said (audit P3).
+  // The paste is cleaned of $, commas and spaces; text that is still not a
+  // number is left to the browser's own handling.
+  {
+    const cashIn = () => [...d.querySelectorAll("input")].find(i => i.getAttribute("aria-label") === "Cash & equivalents ($M)");
+    const paste = (el, text) => {
+      const ev = new w.Event("paste", { bubbles: true, cancelable: true });
+      ev.clipboardData = { getData: () => text };
+      el.dispatchEvent(ev); return ev.defaultPrevented;
+    };
+    const stored = () => { const cs = JSON.parse(w.localStorage.getItem("rxnpv_cases_v1")); return cs[cs.length - 1].capitalStructure.cash; };
+    cashIn().focus(); cashIn().dispatchEvent(new w.FocusEvent("focusin", { bubbles: true }));
+    const took = paste(cashIn(), "$1,200.50"); await wait(60);
+    ok(took && cashIn().value === "1200.50" && stored() === "1200500000", "Pasting \"$1,200.50\" into a $M field: shows " + cashIn().value + ", stores " + stored());
+    const left = paste(cashIn(), "about 12"); await wait(60);
+    ok(!left && stored() === "1200500000", "Pasted text that is not a number is left alone (stored " + stored() + ")");
+    const plain = paste(cashIn(), "45.5"); await wait(60);
+    ok(!plain, "A plain number pastes the browser's own way");
+    cashIn().blur(); cashIn().dispatchEvent(new w.FocusEvent("focusout", { bubbles: true })); await wait(60);
+  }
+
   if (errors.length) { console.log(errors.slice(0, 40).join("\n")); console.log("\n" + errors.length + " FAILURE(S) across " + checks + " checks"); process.exit(1); }
   console.log("ALL AUDIT REGRESSION CHECKS PASSED — " + checks + " checks");
   process.exit(0);

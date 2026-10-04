@@ -109,6 +109,13 @@ function getTrialDurationForArea(area, phaseKey) {
 
 // ── BenchField: the signature input component ──
 // props: label, value, onChange (v)=>{}, bench: {value, source} | null, suffix, placeholder, step, type, help
+// "$1,200.50" -> "1200.50"; null when what is left is not a number.
+function cleanPastedNumber(text) {
+  if (text == null) return null;
+  const clean = String(text).replace(/[$,\s]/g, "");
+  return clean !== "" && isFinite(Number(clean)) ? clean : null;
+}
+
 function BenchField({ label, value, onChange, bench, suffix, placeholder, step, type, help, wide, onFocus, onBlur }) {
   const h = React.createElement;
   const hasValue = value !== "" && value != null;
@@ -129,6 +136,14 @@ function BenchField({ label, value, onChange, bench, suffix, placeholder, step, 
         type: type || "number", step: step || "any", value: value == null ? "" : value, placeholder: placeholder,
         onChange: e => onChange(e.target.value),
         onFocus, onBlur,
+        // A number input rejects "$1,200.50" outright, so a figure copied
+        // from a filing used to vanish with nothing said. Clean it; leave
+        // plain numbers and real text to the browser.
+        onPaste: (type || "number") === "number" ? (e => {
+          const text = e.clipboardData && e.clipboardData.getData("text");
+          const clean = cleanPastedNumber(text);
+          if (clean != null && clean !== String(text).trim()) { e.preventDefault(); onChange(clean); }
+        }) : undefined,
         // The visible label sits two levels up in the DOM, so it isn't
         // programmatically associated with this input — a screen reader
         // announced these as bare, unnamed fields. aria-label carries the same
