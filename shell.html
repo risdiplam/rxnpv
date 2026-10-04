@@ -204,7 +204,9 @@
   .xm-case { display: flex; align-items: center; gap: 8px; font: 500 11px var(--sans); color: var(--ink-3); padding: 8px 4px 2px; }
   .xm-case select { flex: 1; min-height: 28px; padding: 3px 6px; border-radius: 6px; border: 1px solid var(--rule); background: var(--surface-2); color: var(--ink-1); font: 12px var(--sans); }
   /* ── Case sub-tabs ───────────────────────────────────────────────── */
-  .case-tabs { display: flex; gap: 24px; border-bottom: 1px solid var(--rule); margin: 6px 0 20px; overflow-x: auto; }
+  /* overflow-y hidden: overflow-x auto alone makes y auto too, and the row's
+     one pixel of overflow then showed a vertical scrollbar beside the tabs. */
+  .case-tabs { display: flex; gap: 24px; border-bottom: 1px solid var(--rule); margin: 6px 0 20px; overflow-x: auto; overflow-y: hidden; }
   /* A narrow window scrolled the last tab ("Saved 22") out of sight with no
      cue that the row scrolls. Tighter gaps, and a second line if it still
      does not fit, so every tab is always visible. */

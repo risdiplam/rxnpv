@@ -11,7 +11,7 @@
 //   · inputs/selects with no label, an input font under 12px, controls under
 //     28px tall
 //   · charts with no accessible name
-//   · sideways scrolling, console errors
+//   · sideways scrolling, a scrollbar for a few pixels of overflow, console errors
 // Screenshots of every stop go to the output folder for review by eye.
 //
 //   $E test/packaged/ui_audit.js --app=electron/dist/mac-arm64/RxNPV.app [--out=…] [--only=Tools] [--sample=stoke|pepgen]
@@ -128,6 +128,16 @@ window.__t = {
         if (!/^(INPUT|SELECT|TEXTAREA|BUTTON|IMG|svg)$/.test(el.tagName)) { const rg = document.createRange(); rg.selectNodeContents(el); r = rg.getBoundingClientRect(); }
         if (r.width > 0 && hit(r)) { out.push({ type: "export button overlaps content", text: (el.textContent || el.tagName).trim().slice(0, 50), detail: el.tagName.toLowerCase(), where: where(el) }); break; }
       }
+    });
+    // A scroll box that overflows by a pixel or four shows a scrollbar for
+    // nothing: the Workspace tab row (overflow-x auto, so y auto too) was
+    // 1px taller inside than out and drew one beside the tabs (October 2026).
+    document.querySelectorAll("body *").forEach(el => {
+      if (!el.getClientRects().length) return;
+      const cs = getComputedStyle(el);
+      const dy = el.scrollHeight - el.clientHeight, dx = el.scrollWidth - el.clientWidth;
+      if ((/auto|scroll/.test(cs.overflowY) && dy >= 1 && dy <= 4) || (/auto|scroll/.test(cs.overflowX) && dx >= 1 && dx <= 4))
+        out.push({ type: "scrollbar for a few pixels of overflow", text: (el.textContent || "").trim().slice(0, 50), detail: "x " + dx + "px · y " + dy + "px", where: where(el) });
     });
     const over = document.documentElement.scrollWidth - innerWidth;
     if (over > 1) out.push({ type: "sideways scroll", text: "", detail: over + "px" });
