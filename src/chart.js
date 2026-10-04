@@ -561,6 +561,60 @@ function OutcomeRangeStrip({ marks, band, label }) {
 // optional single "your case" point rendered distinctly so you can see where
 // your own assumption sits among real comps.
 // ════════════════════════════════════════════════════════════════════════════
+// Where the x = y line's label goes: the spot nearest the line's top-right
+// end (below the line) whose box stays 4px clear of the line and clear of
+// every point by its hover radius plus 4px. It used to sit at that one fixed
+// spot, which is exactly where the Portfolio's case landed at 65% modelled
+// against 55% implied — the label was drawn over the dot. Returns the text's
+// left edge and baseline; the fixed spot if nothing clears (never seen).
+function placeDiagonalLabel(text, pts, g) {
+  const w = measureLabel(text, 10), asc = 8, desc = 3, clear = 11;
+  const value = x => g.minX + ((x - g.padL) / g.plotW) * (g.maxX - g.minX);
+  const lineY = x => g.toY(value(x));
+  const fits = (x0, base) => {
+    const x1 = x0 + w, y0 = base - asc, y1 = base + desc;
+    if (x0 < g.padL + 4 || x1 > g.padL + g.plotW - 4 || y0 < g.padT + 2 || y1 > g.padT + g.plotH - 2) return false;
+    // The line rises to the right, so the box clears it if its top is below
+    // the line at its left edge, or its bottom above the line at its right.
+    if (!(y0 - 4 > lineY(x0)) && !(y1 + 4 < lineY(x1))) return false;
+    return pts.every(p => {
+      const cx = g.toX(p.x), cy = g.toY(p.y);
+      const dx = Math.max(x0 - cx, 0, cx - x1), dy = Math.max(y0 - cy, 0, cy - y1);
+      return dx * dx + dy * dy > clear * clear;
+    });
+  };
+  const px = g.toX(g.maxX) - 4 - w, py = g.toY(g.minX + 0.7 * (g.maxX - g.minX)) + 4;
+  let best = null, bestD = Infinity;
+  for (let x0 = g.padL + 4; x0 + w <= g.padL + g.plotW - 4; x0 += 4) {
+    for (let base = g.padT + 2 + asc; base + desc <= g.padT + g.plotH - 2; base += 3) {
+      const d = (x0 - px) * (x0 - px) + (base - py) * (base - py);
+      if (d < bestD && fits(x0, base)) { best = { x: x0, y: base }; bestD = d; }
+    }
+  }
+  return best || { x: px, y: py };
+}
+
+// A highlighted point's own label ("Your case"): the first of eight spots
+// around it (up-right first, as before) that stays inside the plot and clear
+// of every other point by its hover radius plus 4px. It used to sit up-right
+// whatever was there, so a case among a cluster of deals could have its name
+// drawn across one. Falls back to up-right.
+function placePointLabel(text, anchor, pts, g) {
+  const w = measureLabel(text, 10, 700), asc = 8, desc = 3, clear = 11;
+  const cx = g.toX(anchor.x), cy = g.toY(anchor.y);
+  const spots = [[12, -8], [12, 14], [-12 - w, -8], [-12 - w, 14], [-w / 2, -14], [-w / 2, 22], [12, 3], [-12 - w, 3]];
+  for (const [dx, dy] of spots) {
+    const x0 = cx + dx, base = cy + dy, x1 = x0 + w, y0 = base - asc, y1 = base + desc;
+    if (x0 < g.padL + 2 || x1 > g.padL + g.plotW || y0 < g.padT || y1 > g.padT + g.plotH) continue;
+    if (pts.every(p => {
+      const px = g.toX(p.x), py = g.toY(p.y);
+      const ex = Math.max(x0 - px, 0, px - x1), ey = Math.max(y0 - py, 0, py - y1);
+      return ex * ex + ey * ey > clear * clear;
+    })) return { x: x0, y: base };
+  }
+  return { x: cx + 12, y: cy - 8 };
+}
+
 function ScatterChart({ points, highlightPoint, xLabel, yLabel, xFmt, yFmt, height, label, diagonal }) {
   const h = React.createElement;
   height = height || 280;
@@ -614,8 +668,11 @@ function ScatterChart({ points, highlightPoint, xLabel, yLabel, xFmt, yFmt, heig
         h("text", { x: padL - 8, y: toY(v) + 3, textAnchor: "end", fontSize: 10, fontFamily: "var(--mono)", fill: "var(--ink-3)" }, fmtY(v))
       )),
       diagonal && h("line", { x1: toX(minX), y1: toY(minX), x2: toX(maxX), y2: toY(maxX), stroke: "var(--ink-3)", strokeWidth: 1.2, strokeDasharray: "6,4" }),
-      // Label sits below the line near its top end, clear of the dash.
-      diagonal && h("text", { x: toX(maxX) - 4, y: toY(minX + 0.7 * (maxX - minX)) + 4, textAnchor: "end", fontSize: 10, fontFamily: "var(--mono)", fill: "var(--ink-2)" }, typeof diagonal === "string" ? diagonal : "x = y"),
+      diagonal && (() => {
+        const text = typeof diagonal === "string" ? diagonal : "x = y";
+        const at = placeDiagonalLabel(text, allPoints, { toX, toY, minX, maxX, padL, padT, plotW, plotH });
+        return h("text", { x: at.x, y: at.y, textAnchor: "start", fontSize: 10, fontFamily: "var(--mono)", fill: "var(--ink-2)" }, text);
+      })(),
       xT.ticks.map((v, i) => h("text", { key: "x" + i, x: toX(v), y: H - padB + 16, textAnchor: "middle", fontSize: 10, fontFamily: "var(--mono)", fill: "var(--ink-3)" }, fmtX(v))),
       h("text", { x: padL + plotW / 2, y: H - 4, textAnchor: "middle", fontSize: 10, fontFamily: "var(--mono)", fill: "var(--ink-2)" }, xLabel || ""),
       h("text", { x: 14, y: padT + plotH / 2, textAnchor: "middle", fontSize: 10, fontFamily: "var(--mono)", fill: "var(--ink-2)", transform: `rotate(-90, 14, ${padT + plotH / 2})` }, yLabel || ""),
@@ -630,7 +687,11 @@ function ScatterChart({ points, highlightPoint, xLabel, yLabel, xFmt, yFmt, heig
           fill: "var(--amber)", stroke: "var(--ink-1)", strokeWidth: 2, style: { cursor: "help" },
           onMouseEnter: () => setHover({ kind: "highlight" }), onMouseLeave: () => setHover(null)
         }),
-        h("text", { x: toX(highlightPoint.x) + 12, y: toY(highlightPoint.y) - 8, fontSize: 10, fontFamily: "var(--mono)", fontWeight: 700, fill: "var(--amber)" }, highlightPoint.label || "Your case")
+        (() => {
+          const text = highlightPoint.label || "Your case";
+          const at = placePointLabel(text, highlightPoint, points, { toX, toY, padL, padT, plotW, plotH });
+          return h("text", { x: at.x, y: at.y, fontSize: 10, fontFamily: "var(--mono)", fontWeight: 700, fill: "var(--amber)" }, text);
+        })()
       )
     ),
     hoveredPoint && h("div", {

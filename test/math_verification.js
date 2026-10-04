@@ -80,7 +80,7 @@ const EXPORTS = [
   "computeBinaryEventImpliedPoS", "selectPeakSalesCompWindow",
   "applyTaxToCalendar", "computeMoleculeTypePoSRatios", "POS_BY_MOLECULE",
   "computeProgramValuation",
-  "revenueChartYScale", "niceAxisTicks", "histogramBins", "spreadLabels", "localDateStamp", "selectPeakSalesCompWindow",
+  "revenueChartYScale", "niceAxisTicks", "placeDiagonalLabel", "placePointLabel", "measureLabel", "histogramBins", "spreadLabels", "localDateStamp", "selectPeakSalesCompWindow",
   "readPriceVsScenarios", "readMonteCarlo", "readCashFlow", "readSotp", "readRiskWaterfall", "readTornado", "readPriceGrid", "readInterval", "readPValue", "readSingleArm", "readAssurance", "readPeakSalesRange", "readBinaryImplied", "readPremium", "readForwardRunway", "readBreakEven", "readPriceGap", "readOutcomeRange", "possessive", "aNum", "filterStudiesByCondition", "conditionQueryWords", "conditionDropNote", "compareTrials", "compareTrialsWeeks", "readTrialComparison",
   "measureStorage", "STORAGE_ASSUMED_QUOTA_BYTES", "STORAGE_WARN_FRACTION", "STORAGE_CRITICAL_FRACTION",
   "computeTreatedPopulation", "launchCurveForYears", "erosionMultiplier", "computeProgramRevenue",
@@ -1643,6 +1643,54 @@ section("Local date stamp");
   // Constructed in local time, so this holds in any time zone the suite runs in.
   ok("11:30pm on 23 Sep stamps as 2026-09-23 (not the UTC next day)", api.localDateStamp(new Date(2026, 8, 23, 23, 30)) === "2026-09-23");
   ok("single-digit month and day are zero-padded", api.localDateStamp(new Date(2026, 0, 5, 0, 1)) === "2026-01-05");
+}
+section("Scatter: the x = y label clears every point and the line");
+{
+  // The Portfolio scatter: 560 x 280, padding 60/20/16/40, so the plot is
+  // 480 x 224, both axes 0-80. One case at 65% modelled, 55% implied lands at
+  // x = 60 + 65/80*480 = 450, y = 16 + 224 - 55/80*224 = 86. The old fixed
+  // spot (right edge, baseline at the line's 70% height + 4 = 16 + 224*0.3
+  // + 4 = 87.2) put the text across that dot.
+  const g = { minX: 0, maxX: 80, padL: 60, padT: 16, plotW: 480, plotH: 224 };
+  g.toX = v => 60 + (v / 80) * 480; g.toY = v => 16 + 224 - (v / 80) * 224;
+  const text = "same as the market", w = api.measureLabel(text, 10);
+  const clears = (at, pts) => {
+    const x0 = at.x, x1 = at.x + w, y0 = at.y - 8, y1 = at.y + 3;
+    const lineY = x => g.toY(((x - 60) / 480) * 80);
+    const offLine = (y0 - 4 > lineY(x0)) || (y1 + 4 < lineY(x1));
+    const offPts = pts.every(p => { const cx = g.toX(p.x), cy = g.toY(p.y); const dx = Math.max(x0 - cx, 0, cx - x1), dy = Math.max(y0 - cy, 0, cy - y1); return Math.hypot(dx, dy) > 11; });
+    return offLine && offPts;
+  };
+  const pt = [{ x: 65, y: 55 }];
+  const old = { x: g.toX(80) - 4 - w, y: 16 + 224 * 0.3 + 4 };
+  ok("the old fixed spot did overlap the 65/55 point (what this fixes)", !clears(old, pt));
+  const at = api.placeDiagonalLabel(text, pt, g);
+  ok("placed clear of the point and the line (x " + at.x.toFixed(0) + ", baseline " + at.y.toFixed(0) + ")", clears(at, pt));
+  ok("inside the plot", at.x >= 64 && at.x + w <= 536 && at.y - 8 >= 18 && at.y + 3 <= 238);
+  const none = api.placeDiagonalLabel(text, [], g);
+  near("with no point in the way it stays at the old spot: left edge (4px grid)", none.x, old.x, 4);
+  near("... and baseline (3px grid)", none.y, old.y, 3);
+  const many = [{ x: 65, y: 55 }, { x: 70, y: 40 }, { x: 50, y: 30 }, { x: 20, y: 60 }, { x: 75, y: 62 }];
+  ok("five scattered points: still clear of all of them", clears(api.placeDiagonalLabel(text, many, g), many));
+}
+section("Scatter: a highlighted point's label clears the other points");
+{
+  // Plot 480 x 224 at (60, 16), both axes 0-100: value v sits at
+  // x = 60 + 4.8v, y = 240 - 2.24v. "Your case" at (50, 50) -> (300, 128).
+  const g = { padL: 60, padT: 16, plotW: 480, plotH: 224 };
+  g.toX = v => 60 + 4.8 * v; g.toY = v => 240 - 2.24 * v;
+  const text = "Your case", w = api.measureLabel(text, 10, 700), me = { x: 50, y: 50 };
+  const clearOf = (at, pts) => pts.every(p => { const cx = g.toX(p.x), cy = g.toY(p.y); const dx = Math.max(at.x - cx, 0, cx - at.x - w), dy = Math.max(at.y - 8 - cy, 0, cy - at.y - 3); return Math.hypot(dx, dy) > 11; });
+  const open = api.placePointLabel(text, me, [], g);
+  near("nothing nearby: up and to the right, as before: x 312", open.x, 312, 1e-9);
+  near("... y 120", open.y, 120, 1e-9);
+  // A deal right where the up-right label would go: (55, 54) -> (324, 119).
+  const blocker = [{ x: 55, y: 54 }];
+  const moved = api.placePointLabel(text, me, blocker, g);
+  ok("a deal under the up-right spot: the label moves (" + moved.x + ", " + moved.y + ")", !(Math.abs(moved.x - 312) < 1e-9 && Math.abs(moved.y - 120) < 1e-9) && clearOf(moved, blocker));
+  // At the plot's right edge the label goes to the left of the point.
+  const edge = api.placePointLabel(text, { x: 98, y: 50 }, [], g);
+  ok("at the right edge it sits left of the point", edge.x + w < g.toX(98));
 }
 section("Chart gridlines: niceAxisTicks");
 {
