@@ -20,6 +20,9 @@ Two of the four were settled by the methodology review (`RxNPV_rNPV_Methodology_
 ### 🔵 One manual click
 The packaged-app harness replaces only the native save sheet. Clicking **Export as PDF** once in the real app and choosing a location is the single step it cannot perform. **Last done 2026-10-02** (October audit, Phase 6): the installed app on a throwaway profile, Stoke sample → Generate Report → Export as PDF → the native sheet → Save; a 4-page vector report, every page rendered and looked at.
 
+### 🟢 Release candidate for the hands-on trial (2026-10-04)
+The installed build is the one to use; its stamp is at the foot of the sidebar. Every automated check passes on it (build log, Phase 51). What remains is the user's own trial: `RxNPV_Trial_Guide.md`. **Automatic backup is not yet turned on for the user's real data**: one click in Backup & restore, and the first step of the trial guide.
+
 ### 🟡 Decisions the October 2026 audit surfaced (the user's call)
 - **GAP-001 — Pipeline view / 10-K vs CT.gov mismatch: DECIDED 2026-10-03, moved to OPEN** in the Feature Map (the user: "go with your best recommendations"). The CT.gov half exists (Company Lookup, Asset Program); the 10-K half means reading free-text pipeline tables out of annual reports — fragile parsing of the kind this project has been burned by.
 - **GAP-002 — Payer coverage / formulary access** stays OPEN: no reliable free source. Not faked.

@@ -103,7 +103,7 @@ Suggested real-world inputs, most of them the cases used against the live servic
 | **Saved tab and worked examples** | Results saved from Tools and Simulation with their inputs; the sample cases carry one worked example per tool, each reopening its tool with sourced inputs. | Open the Stoke sample's Saved tab and open any example. |
 | **Sum-of-the-parts, risk waterfalls** | Per-program value contribution (needs 2+ programs); unrisked → risked NPV. | Add a second program. The SOTP and pipeline waterfall appear. |
 
-**Automated:** `final_regression_pass.js` covers the core valuation paths. `math_verification.js` (1,384 checks at the last update; it prints the current count) covers every formula against hand-derived values.
+**Automated:** `final_regression_pass.js` covers the core valuation paths. `math_verification.js` (1,396 checks at the last update; it prints the current count) covers every formula against hand-derived values.
 
 ### Tools: six workbenches, 19 tools, grouped by the question being asked
 
@@ -186,7 +186,7 @@ A cross-case summary: fair value against price, runway, modelled against implied
 
 | Suite | Covers |
 |---|---|
-| `math_verification.js` | 1,384 checks (at the last update; the suite prints the current count) of engine math against values derived by hand, from closed forms or from published constants. Never against the app's own output. Needs no DOM. |
+| `math_verification.js` | 1,396 checks (at the last update; the suite prints the current count) of engine math against values derived by hand, from closed forms or from published constants. Never against the app's own output. Needs no DOM. |
 | `net_test.js` | `resilientFetch`, the one fetch every integration uses: what is retried (dropped connections, timeouts, 408/425/429/5xx), what is not (400/403/404), and the waits. |
 | `backup_test.js` | Backup and restore (ADD vs REPLACE, unknown keys dropped, caches excluded) and both sample cases, pinned to the independent rebuilds. |
 | `worked_examples_test.js` | Every worked example in the sample cases opens its tool, fills it and runs; none reach the report. |
