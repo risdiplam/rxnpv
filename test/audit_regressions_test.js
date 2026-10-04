@@ -656,6 +656,13 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
     ok(utcStamps.length === 0, "No date stamped from UTC (" + utcStamps.length + " found" + (utcStamps.length ? ": " + utcStamps[0].trim().slice(0, 90) : "") + ")");
   }
 
+  // The sidebar names the build, so a problem found while using the app can
+  // be matched to the exact commit.
+  {
+    const st = d.querySelector(".build-stamp");
+    ok(!!st && /^RxNPV \d+\.\d+\.\d+ · [0-9a-f]{7,}( \+ local changes)? · built \d{4}-\d\d-\d\d$/.test(st.textContent), "Sidebar shows the build: " + (st ? st.textContent : "missing"));
+  }
+
   if (errors.length) { console.log(errors.slice(0, 40).join("\n")); console.log("\n" + errors.length + " FAILURE(S) across " + checks + " checks"); process.exit(1); }
   console.log("ALL AUDIT REGRESSION CHECKS PASSED — " + checks + " checks");
   process.exit(0);

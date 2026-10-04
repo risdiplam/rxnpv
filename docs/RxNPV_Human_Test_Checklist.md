@@ -4,6 +4,8 @@ This file used to hold a manual checklist written for the early Simulation build
 
 **Use instead:**
 
+- **Hands-on use as the finished product:** [`RxNPV_Trial_Guide.md`](RxNPV_Trial_Guide.md) — what to try, and how to report what you find.
+
 - **Manual test steps:** "Feature overview, and how to test each feature" in the root [`README.md`](../README.md).
 - **What only the packaged app can confirm** (offline launch, PNG/PDF export, report pin/reorder/retheme, window resize): `test/packaged/packaged_check.js` — `cd test && npm run packaged -- --mode=offline|reopen|live`, described in [`test/README.md`](../test/README.md). (The September B-001 – B-013 worklist in the Muse audit is the historical record it replaced.)
 

@@ -93,7 +93,21 @@ function reassemble() {
     console.error('❌ shell.html has no __SCRIPT__ placeholder — did it get modified?');
     process.exit(1);
   }
-  const combined = MODULE_ORDER.map(f => fs.readFileSync(path.join(SRC_DIR, f), 'utf8')).join('\n\n');
+  // Which build this is, shown at the foot of the sidebar, so a problem found
+  // while using the app can be matched to the exact commit. "+ local changes"
+  // means it was built from uncommitted work.
+  const buildInfo = (() => {
+    const run = cmd => { try { return execSync(cmd, { cwd: __dirname, stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim(); } catch (e) { return ''; } };
+    const d = new Date();
+    return {
+      version: JSON.parse(fs.readFileSync(path.join(__dirname, 'electron', 'package.json'), 'utf8')).version,
+      commit: run('git rev-parse --short HEAD'),
+      dirty: run('git status --porcelain -- src shell.html build.js') !== '',
+      built: d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0')
+    };
+  })();
+  const combined = 'var RXNPV_BUILD = ' + JSON.stringify(buildInfo) + ';\n\n'
+    + MODULE_ORDER.map(f => fs.readFileSync(path.join(SRC_DIR, f), 'utf8')).join('\n\n');
   // Using a replacer FUNCTION here, not a plain string, is deliberate and
   // load-bearing: String.prototype.replace() treats $-prefixed sequences
   // in a string replacement argument as special pattern tokens ($&, $`,

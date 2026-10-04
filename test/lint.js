@@ -29,7 +29,7 @@ const where = (l) => { let s = starts[0]; for (const st of starts) if (st[0] <= 
 (async () => {
   const eslint = new ESLint({ overrideConfigFile: true, overrideConfig: [{
     languageOptions: { ecmaVersion: 2023, sourceType: "script",
-      globals: { ...globals.browser, React: "readonly", ReactDOM: "readonly", module: "readonly", require: "readonly" } },
+      globals: { ...globals.browser, React: "readonly", ReactDOM: "readonly", RXNPV_BUILD: "readonly", module: "readonly", require: "readonly" } },
     rules: {
       // vars: "all" — a top-level function nothing calls is dead code too.
       "no-unused-vars": ["error", { vars: "all", args: "none", caughtErrors: "none", ignoreRestSiblings: true }],

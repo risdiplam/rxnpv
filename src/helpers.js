@@ -33,6 +33,12 @@ function localDateStamp(d) {
   d = d || new Date();
   return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
 }
+// "RxNPV 1.0.0 · 468576f · built 2026-10-03" (build.js writes RXNPV_BUILD).
+function buildStampText() {
+  const b = typeof RXNPV_BUILD !== "undefined" ? RXNPV_BUILD : null;
+  if (!b) return "RxNPV";
+  return "RxNPV " + b.version + (b.commit ? " · " + b.commit + (b.dirty ? " + local changes" : "") : "") + (b.built ? " · built " + b.built : "");
+}
 function fmtNum(v) { if (v == null || isNaN(v)) return "—"; return Math.round(v).toLocaleString(); }
 
 // Per-share dollar values (fair value, current price) — unlike fmtMoney,

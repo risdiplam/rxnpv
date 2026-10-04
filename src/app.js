@@ -257,7 +257,9 @@ function App() {
                 !hasDesktopBackup() ? "Export or import a file"
                 : !(autoBackup.status && autoBackup.status.folder) ? "Automatic backup is off"
                 : autoBackup.status.lastError || !autoBackup.status.folderExists ? "Needs attention"
-                : "Backed up " + describeBackupAge(autoBackup.status.lastAt))))
+                : "Backed up " + describeBackupAge(autoBackup.status.lastAt)))),
+          // Which build this is — quote it when reporting a problem.
+          h("div", { className: "build-stamp", title: "Quote this when reporting a problem: it names the exact code this app was built from", style: { ...UI.caption, marginTop: 10, fontSize: 10 } }, buildStampText())
         ),
         showBackup && h(BackupDialog, {
           cases, activeCase, onClose: () => setShowBackup(false),
