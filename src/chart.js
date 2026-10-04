@@ -562,19 +562,21 @@ function OutcomeRangeStrip({ marks, band, label }) {
 // your own assumption sits among real comps.
 // ════════════════════════════════════════════════════════════════════════════
 // Where the x = y line's label goes: hugging the line, 5px off it, as near
-// its top-right end as it can be while staying inside the plot and clear of
-// every point by its hover radius plus 4px — tried just below the line, then
-// just above, sliding down the line until one fits. It used to sit at one
+// its top-right end as it can be while staying inside the plot, off every
+// gridline, and 18px from every point (any closer and it reads as that
+// point's name) — tried just below the line, then just above, sliding down
+// the line until one fits. It used to sit at one
 // fixed spot, which is exactly where the Portfolio's case landed at 65%
 // modelled against 55% implied, so the label was drawn over the dot; kept
 // close to the line it reads as the line's name, not the point's. Returns
 // the text's left edge and baseline; the old fixed spot if nothing fits.
 function placeDiagonalLabel(text, pts, g) {
-  const w = measureLabel(text, 10), asc = 8, desc = 3, clear = 11, gap = 5;
+  const w = measureLabel(text, 10), asc = 8, desc = 3, clear = 18, gap = 5;
   const lineY = x => g.toY(g.minX + ((x - g.padL) / g.plotW) * (g.maxX - g.minX));
   const fits = (x0, base) => {
     const x1 = x0 + w, y0 = base - asc, y1 = base + desc;
     if (x0 < g.padL + 4 || x1 > g.padL + g.plotW - 4 || y0 < g.padT + 2 || y1 > g.padT + g.plotH - 2) return false;
+    if ((g.gridYs || []).some(gy => gy >= y0 - 1 && gy <= y1 + 1)) return false;
     return pts.every(p => {
       const cx = g.toX(p.x), cy = g.toY(p.y);
       const dx = Math.max(x0 - cx, 0, cx - x1), dy = Math.max(y0 - cy, 0, cy - y1);
@@ -592,8 +594,8 @@ function placeDiagonalLabel(text, pts, g) {
 }
 
 // A highlighted point's own label ("Your case"): the first of eight spots
-// around it (up-right first, as before) that stays inside the plot and clear
-// of every other point by its hover radius plus 4px. It used to sit up-right
+// around it (up-right first, as before) that stays inside the plot, off
+// every gridline, and clear of every other point by its hover radius plus 4px. It used to sit up-right
 // whatever was there, so a case among a cluster of deals could have its name
 // drawn across one. Falls back to up-right.
 function placePointLabel(text, anchor, pts, g) {
@@ -603,6 +605,7 @@ function placePointLabel(text, anchor, pts, g) {
   for (const [dx, dy] of spots) {
     const x0 = cx + dx, base = cy + dy, x1 = x0 + w, y0 = base - asc, y1 = base + desc;
     if (x0 < g.padL + 2 || x1 > g.padL + g.plotW || y0 < g.padT || y1 > g.padT + g.plotH) continue;
+    if ((g.gridYs || []).some(gy => gy >= y0 - 1 && gy <= y1 + 1)) continue;
     if (pts.every(p => {
       const px = g.toX(p.x), py = g.toY(p.y);
       const ex = Math.max(x0 - px, 0, px - x1), ey = Math.max(y0 - py, 0, py - y1);
@@ -667,7 +670,7 @@ function ScatterChart({ points, highlightPoint, xLabel, yLabel, xFmt, yFmt, heig
       diagonal && h("line", { x1: toX(minX), y1: toY(minX), x2: toX(maxX), y2: toY(maxX), stroke: "var(--ink-3)", strokeWidth: 1.2, strokeDasharray: "6,4" }),
       diagonal && (() => {
         const text = typeof diagonal === "string" ? diagonal : "x = y";
-        const at = placeDiagonalLabel(text, allPoints, { toX, toY, minX, maxX, padL, padT, plotW, plotH });
+        const at = placeDiagonalLabel(text, allPoints, { toX, toY, minX, maxX, padL, padT, plotW, plotH, gridYs: yT.ticks.map(toY) });
         return h("text", { x: at.x, y: at.y, textAnchor: "start", fontSize: 10, fontFamily: "var(--mono)", fill: "var(--ink-2)" }, text);
       })(),
       xT.ticks.map((v, i) => h("text", { key: "x" + i, x: toX(v), y: H - padB + 16, textAnchor: "middle", fontSize: 10, fontFamily: "var(--mono)", fill: "var(--ink-3)" }, fmtX(v))),
@@ -686,7 +689,7 @@ function ScatterChart({ points, highlightPoint, xLabel, yLabel, xFmt, yFmt, heig
         }),
         (() => {
           const text = highlightPoint.label || "Your case";
-          const at = placePointLabel(text, highlightPoint, points, { toX, toY, padL, padT, plotW, plotH });
+          const at = placePointLabel(text, highlightPoint, points, { toX, toY, padL, padT, plotW, plotH, gridYs: yT.ticks.map(toY) });
           return h("text", { x: at.x, y: at.y, fontSize: 10, fontFamily: "var(--mono)", fontWeight: 700, fill: "var(--amber)" }, text);
         })()
       )

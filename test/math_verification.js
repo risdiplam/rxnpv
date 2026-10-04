@@ -1644,41 +1644,36 @@ section("Local date stamp");
   ok("11:30pm on 23 Sep stamps as 2026-09-23 (not the UTC next day)", api.localDateStamp(new Date(2026, 8, 23, 23, 30)) === "2026-09-23");
   ok("single-digit month and day are zero-padded", api.localDateStamp(new Date(2026, 0, 5, 0, 1)) === "2026-01-05");
 }
-section("Scatter: the x = y label clears every point and the line");
+section("Scatter: the x = y label clears every point, the line and the gridlines");
 {
   // The Portfolio scatter: 560 x 280, padding 60/20/16/40, so the plot is
-  // 480 x 224, both axes 0-80. One case at 65% modelled, 55% implied lands at
-  // x = 60 + 65/80*480 = 450, y = 16 + 224 - 55/80*224 = 86. The old fixed
-  // spot (right edge, baseline at the line's 70% height + 4 = 16 + 224*0.3
-  // + 4 = 87.2) put the text across that dot.
-  const g = { minX: 0, maxX: 80, padL: 60, padT: 16, plotW: 480, plotH: 224 };
+  // 480 x 224, both axes 0-80 with gridlines every 20 (y = 240, 184, 128, 72,
+  // 16). One case at 65% modelled, 55% implied lands at x = 60 + 65/80*480 =
+  // 450, y = 16 + 224 - 55/80*224 = 86. The old fixed spot (right edge,
+  // baseline at the line's 70% height + 4 = 16 + 224*0.3 + 4 = 87.2) put the
+  // text across that dot.
+  const g = { minX: 0, maxX: 80, padL: 60, padT: 16, plotW: 480, plotH: 224, gridYs: [240, 184, 128, 72, 16] };
   g.toX = v => 60 + (v / 80) * 480; g.toY = v => 16 + 224 - (v / 80) * 224;
   const text = "same as the market", w = api.measureLabel(text, 10);
-  const clears = (at, pts) => {
-    const x0 = at.x, x1 = at.x + w, y0 = at.y - 8, y1 = at.y + 3;
-    const lineY = x => g.toY(((x - 60) / 480) * 80);
-    const offLine = (y0 - 4 > lineY(x0)) || (y1 + 4 < lineY(x1));
-    const offPts = pts.every(p => { const cx = g.toX(p.x), cy = g.toY(p.y); const dx = Math.max(x0 - cx, 0, cx - x1), dy = Math.max(y0 - cy, 0, cy - y1); return Math.hypot(dx, dy) > 11; });
-    return offLine && offPts;
-  };
-  const pt = [{ x: 65, y: 55 }];
-  const old = { x: g.toX(80) - 4 - w, y: 16 + 224 * 0.3 + 4 };
-  ok("the old fixed spot did overlap the 65/55 point (what this fixes)", !clears(old, pt));
-  const at = api.placeDiagonalLabel(text, pt, g);
-  ok("placed clear of the point and the line (x " + at.x.toFixed(0) + ", baseline " + at.y.toFixed(0) + ")", clears(at, pt));
-  ok("inside the plot", at.x >= 64 && at.x + w <= 536 && at.y - 8 >= 18 && at.y + 3 <= 238);
-  const none = api.placeDiagonalLabel(text, [], g);
-  // With nothing in the way: right edge 4px inside the plot (x0 = 536 - w),
-  // top 5px below the line at its left edge.
-  near("nothing in the way: at the line's top-right end, right edge 4px in", none.x + w, 536, 1e-9);
-  near("... its top 5px below the line", none.y - 8, g.toY(((none.x - 60) / 480) * 80) + 5, 1e-9);
-  // With the 65/55 case in the way it hugs the line: within 6px of it on
-  // whichever side it took (the box's near corner).
   const lineAt = x => g.toY(((x - 60) / 480) * 80);
-  const hug = Math.min(Math.abs((at.y - 8) - lineAt(at.x)), Math.abs((at.y + 3) - lineAt(at.x + w)));
-  ok("with the case in the way it still hugs the line (" + hug.toFixed(1) + "px)", hug <= 6);
+  const box = at => ({ x0: at.x, x1: at.x + w, y0: at.y - 8, y1: at.y + 3 });
+  const ptDist = (b, p) => { const cx = g.toX(p.x), cy = g.toY(p.y); return Math.hypot(Math.max(b.x0 - cx, 0, cx - b.x1), Math.max(b.y0 - cy, 0, cy - b.y1)); };
+  const offLine = b => (b.y0 - 4 > lineAt(b.x0)) || (b.y1 + 4 < lineAt(b.x1));
+  const offGrid = b => g.gridYs.every(gy => gy < b.y0 - 1 || gy > b.y1 + 1);
+  const hug = b => Math.min(Math.abs(b.y0 - lineAt(b.x0)), Math.abs(b.y1 - lineAt(b.x1)));
+  const inPlot = b => b.x0 >= 64 && b.x1 <= 536 && b.y0 >= 18 && b.y1 <= 238;
+  const pt = [{ x: 65, y: 55 }];
+  ok("the old fixed spot did overlap the 65/55 point (what this fixes)", ptDist(box({ x: g.toX(80) - 4 - w, y: 87.2 }), pt[0]) < 5);
+  const b1 = box(api.placeDiagonalLabel(text, pt, g));
+  ok("with the 65/55 case: 18px+ from it (" + ptDist(b1, pt[0]).toFixed(1) + "px), off the line, off every gridline, inside the plot", ptDist(b1, pt[0]) > 18 && offLine(b1) && offGrid(b1) && inPlot(b1));
+  near("... and 5px from the line", hug(b1), 5, 1e-9);
+  const b0 = box(api.placeDiagonalLabel(text, [], g));
+  ok("nothing in the way: off the line and every gridline, inside the plot", offLine(b0) && offGrid(b0) && inPlot(b0));
+  near("... 5px from the line", hug(b0), 5, 1e-9);
+  ok("... in the top-right half of the line (left edge past the middle, x " + b0.x0.toFixed(0) + ")", b0.x0 > 300);
   const many = [{ x: 65, y: 55 }, { x: 70, y: 40 }, { x: 50, y: 30 }, { x: 20, y: 60 }, { x: 75, y: 62 }];
-  ok("five scattered points: still clear of all of them", clears(api.placeDiagonalLabel(text, many, g), many));
+  const b2 = box(api.placeDiagonalLabel(text, many, g));
+  ok("five scattered points: 18px+ from all of them, off the line and gridlines", many.every(p => ptDist(b2, p) > 18) && offLine(b2) && offGrid(b2) && inPlot(b2));
 }
 section("Scatter: a highlighted point's label clears the other points");
 {
@@ -1698,6 +1693,9 @@ section("Scatter: a highlighted point's label clears the other points");
   // At the plot's right edge the label goes to the left of the point.
   const edge = api.placePointLabel(text, { x: 98, y: 50 }, [], g);
   ok("at the right edge it sits left of the point", edge.x + w < g.toX(98));
+  // A gridline through the up-right spot (box y 112-123): y = 118 moves it.
+  const gridded = api.placePointLabel(text, me, [], Object.assign({ gridYs: [118] }, g));
+  ok("a gridline through the up-right spot moves it off the line (baseline " + gridded.y.toFixed(0) + ")", gridded.y - 8 > 119 || gridded.y + 3 < 117);
 }
 section("Chart gridlines: niceAxisTicks");
 {
