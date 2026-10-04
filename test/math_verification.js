@@ -979,6 +979,24 @@ near("priorQuantile(normal, 0.975) = mean + sd*Φ⁻¹(0.975)", api.priorQuantil
   near("time-to-event assurance converges to Schoenfeld power at the average observed event count", empiricalPower, theoretical, 0.08);
   ok("time-to-event replicate produces a plausible event count (between 0 and total N)", avgEvents > 0 && avgEvents < design.nControl + design.nTreat);
 }
+// The observed hazard ratio each replicate reports (the assurance tab's
+// histogram) must centre on the true one. It was the treatment arm's
+// observed/expected alone, O1/E1, which sits between HR and 1: with equal
+// arms and most events seen it is ~2HR/(1+HR), 0.82 for a true 0.70, so the
+// histogram sat well right of the "prior mean" marker and read as trials
+// seeing a weaker effect than the truth. The log-rank estimate divides by
+// the control arm's O2/E2. 300 a side, 12-month control median, 18 months
+// accrual + 12 follow-up: ~440 events, SE of log HR ~ 2/sqrt(440) = 0.095,
+// so the median of 600 replicates is within ~0.005 on the log scale.
+{
+  const design = { nControl: 300, nTreat: 300, medianControl: 12, accrualPeriod: 18, followupPeriod: 12, sided: "two" };
+  for (const hr of [0.6, 0.7, 0.85]) {
+    const xs = [];
+    for (let i = 0; i < 600; i++) xs.push(api.simulateTimeToEventReplicate(design, hr).observedEffect);
+    xs.sort((a, b) => a - b);
+    near("observed hazard ratio centres on the true " + hr + " (median of 600 replicates)", xs[300], hr, 0.03);
+  }
+}
 report();
 
 // ════════════════════════════════════════════════════════════════════════════

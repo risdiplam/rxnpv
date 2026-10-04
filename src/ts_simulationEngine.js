@@ -73,8 +73,15 @@ function simulateTimeToEventReplicate(design, trueEffect) {
     subjects.push({ time: observedTime, event, arm });
   }
   const { pValue, O1, E1 } = STATS.logRankTest(subjects);
-  const observedHR = (O1 > 0 && E1 > 0) ? (O1 / E1) : NaN; // rough observed-vs-expected ratio, directional only
-  return { pValue, observedEffect: observedHR, totalEvents: subjects.filter(s => s.event === 1).length };
+  // The log-rank estimate of the hazard ratio: each arm's observed/expected,
+  // treatment over control. O1/E1 alone (what this was) sits between the HR
+  // and 1 — ~0.84 for a true 0.70 — so the assurance histogram read as
+  // trials seeing a weaker effect than the truth. Every event is expected in
+  // one arm or the other, so O2 = D - O1 and E2 = D - E1.
+  const D = subjects.filter(s => s.event === 1).length;
+  const O2 = D - O1, E2 = D - E1;
+  const observedHR = (O1 > 0 && E1 > 0 && O2 > 0 && E2 > 0) ? (O1 / E1) / (O2 / E2) : NaN;
+  return { pValue, observedEffect: observedHR, totalEvents: D };
 }
 
 const REPLICATORS = {

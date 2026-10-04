@@ -1571,9 +1571,9 @@ function runTrialOutcome() {
   const isBinary = endpointType === 'binary';
   const chartHtml = renderHistogram(result.observedEffects.filter(v => isFinite(v)), {
     title: 'Simulated observed effect across replicates',
-    xLabel: isBinary ? 'Observed difference in response rate (treatment − control)' : 'Observed effect',
+    xLabel: isBinary ? 'Observed difference in response rate (treatment − control)' : endpointType === 'timeToEvent' ? 'Observed hazard ratio (treatment ÷ control)' : 'Observed effect',
     markerValue: isBinary ? priorMean - design.controlRate : priorMean,
-    markerLabel: isBinary ? 'difference the prior implies' : 'prior mean'
+    markerLabel: isBinary ? 'difference the prior implies' : endpointType === 'timeToEvent' ? 'prior mean hazard ratio' : 'prior mean'
   });
   appendChartWithExport(resultsDiv, chartHtml, 'trial-outcome-assurance');
 
