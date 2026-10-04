@@ -52,6 +52,19 @@ Already the model for how a workbench should work. Mature.
 | PK/PD + receptor occupancy | **BUILT** |
 | **Control-arm / dropout stress** | **BUILT** | Under every Sample Size/Power result. Forces a choice between a constant-absolute and a constant-relative effect model, because they disagree materially (Phase 23) |
 
+### Survival-model refinements (external review by Grok, October 2026)
+
+Grok's case: the assurance simulator's time-to-event model (exponential survival, proportional hazards, log-rank, Schoenfeld) "flatters the readout", so add Weibull or piecewise hazards, a delayed effect, dropout as its own clock, and the distribution of observed effects. Checked against the code and the statistics, item by item:
+
+| Item | Status | Why |
+|---|---|---|
+| Distribution of the observed effect | **BUILT · bug fixed** | Already there (the assurance histogram); Grok said the loop "collapses to a hit rate", which is wrong. But for time-to-event its "observed HR" was O1/E1, biased toward 1 (~0.84 for a true 0.70), so the histogram sat right of its own marker. Now the log-rank estimate (O1/E1)/(O2/E2); 2026-10-04. |
+| Weibull / piecewise baseline hazard | **DECIDED — no** | Under proportional hazards, log-rank power depends on the number of events and the HR, not on the baseline curve's shape (Schoenfeld). A different shape changes only *when* events arrive, which a user can already vary through the control median and follow-up. It would not change the PoS the way the review claims. |
+| Delayed separation (non-proportional hazards) | **OPEN** | The one item that really can make the PoS optimistic: when curves separate late (typical of immuno-oncology), log-rank loses power and Schoenfeld overstates it. Worth building — one "effect starts at month X" field and a caveat on the Schoenfeld figure — the first time the user models an oncology or IO readout. Neither current case (Stoke, PepGen) has a time-to-event primary. |
+| Calendar time to the target event count | **OPEN** | When an event-driven trial reads out is itself a catalyst date. Cheap to add to the simulator; build it alongside delayed separation if an event-driven case comes up. |
+| Dropout as its own clock | **DECIDED — no** | Random dropout only reduces events, which the dropout stress panel already covers. Dropout that differs between arms is a bias question, not a power one; the Trial Decoder's results reader looks at it once results exist. |
+| Group sequential / alpha spending, MaxCombo, RMST, weighted log-rank, correlated PFS/OS, cure models, stratification, digitised Kaplan–Meier control arms | **DECIDED — no** | Trial-design-team tools. Group sequential was already declined (section 8). Fails the scope line. |
+
 ---
 
 ## 3. Science workbench
