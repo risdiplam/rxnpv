@@ -1668,8 +1668,15 @@ section("Scatter: the x = y label clears every point and the line");
   ok("placed clear of the point and the line (x " + at.x.toFixed(0) + ", baseline " + at.y.toFixed(0) + ")", clears(at, pt));
   ok("inside the plot", at.x >= 64 && at.x + w <= 536 && at.y - 8 >= 18 && at.y + 3 <= 238);
   const none = api.placeDiagonalLabel(text, [], g);
-  near("with no point in the way it stays at the old spot: left edge (4px grid)", none.x, old.x, 4);
-  near("... and baseline (3px grid)", none.y, old.y, 3);
+  // With nothing in the way: right edge 4px inside the plot (x0 = 536 - w),
+  // top 5px below the line at its left edge.
+  near("nothing in the way: at the line's top-right end, right edge 4px in", none.x + w, 536, 1e-9);
+  near("... its top 5px below the line", none.y - 8, g.toY(((none.x - 60) / 480) * 80) + 5, 1e-9);
+  // With the 65/55 case in the way it hugs the line: within 6px of it on
+  // whichever side it took (the box's near corner).
+  const lineAt = x => g.toY(((x - 60) / 480) * 80);
+  const hug = Math.min(Math.abs((at.y - 8) - lineAt(at.x)), Math.abs((at.y + 3) - lineAt(at.x + w)));
+  ok("with the case in the way it still hugs the line (" + hug.toFixed(1) + "px)", hug <= 6);
   const many = [{ x: 65, y: 55 }, { x: 70, y: 40 }, { x: 50, y: 30 }, { x: 20, y: 60 }, { x: 75, y: 62 }];
   ok("five scattered points: still clear of all of them", clears(api.placeDiagonalLabel(text, many, g), many));
 }

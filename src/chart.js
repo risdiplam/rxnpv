@@ -561,37 +561,34 @@ function OutcomeRangeStrip({ marks, band, label }) {
 // optional single "your case" point rendered distinctly so you can see where
 // your own assumption sits among real comps.
 // ════════════════════════════════════════════════════════════════════════════
-// Where the x = y line's label goes: the spot nearest the line's top-right
-// end (below the line) whose box stays 4px clear of the line and clear of
-// every point by its hover radius plus 4px. It used to sit at that one fixed
-// spot, which is exactly where the Portfolio's case landed at 65% modelled
-// against 55% implied — the label was drawn over the dot. Returns the text's
-// left edge and baseline; the fixed spot if nothing clears (never seen).
+// Where the x = y line's label goes: hugging the line, 5px off it, as near
+// its top-right end as it can be while staying inside the plot and clear of
+// every point by its hover radius plus 4px — tried just below the line, then
+// just above, sliding down the line until one fits. It used to sit at one
+// fixed spot, which is exactly where the Portfolio's case landed at 65%
+// modelled against 55% implied, so the label was drawn over the dot; kept
+// close to the line it reads as the line's name, not the point's. Returns
+// the text's left edge and baseline; the old fixed spot if nothing fits.
 function placeDiagonalLabel(text, pts, g) {
-  const w = measureLabel(text, 10), asc = 8, desc = 3, clear = 11;
-  const value = x => g.minX + ((x - g.padL) / g.plotW) * (g.maxX - g.minX);
-  const lineY = x => g.toY(value(x));
+  const w = measureLabel(text, 10), asc = 8, desc = 3, clear = 11, gap = 5;
+  const lineY = x => g.toY(g.minX + ((x - g.padL) / g.plotW) * (g.maxX - g.minX));
   const fits = (x0, base) => {
     const x1 = x0 + w, y0 = base - asc, y1 = base + desc;
     if (x0 < g.padL + 4 || x1 > g.padL + g.plotW - 4 || y0 < g.padT + 2 || y1 > g.padT + g.plotH - 2) return false;
-    // The line rises to the right, so the box clears it if its top is below
-    // the line at its left edge, or its bottom above the line at its right.
-    if (!(y0 - 4 > lineY(x0)) && !(y1 + 4 < lineY(x1))) return false;
     return pts.every(p => {
       const cx = g.toX(p.x), cy = g.toY(p.y);
       const dx = Math.max(x0 - cx, 0, cx - x1), dy = Math.max(y0 - cy, 0, cy - y1);
       return dx * dx + dy * dy > clear * clear;
     });
   };
-  const px = g.toX(g.maxX) - 4 - w, py = g.toY(g.minX + 0.7 * (g.maxX - g.minX)) + 4;
-  let best = null, bestD = Infinity;
-  for (let x0 = g.padL + 4; x0 + w <= g.padL + g.plotW - 4; x0 += 4) {
-    for (let base = g.padT + 2 + asc; base + desc <= g.padT + g.plotH - 2; base += 3) {
-      const d = (x0 - px) * (x0 - px) + (base - py) * (base - py);
-      if (d < bestD && fits(x0, base)) { best = { x: x0, y: base }; bestD = d; }
-    }
+  // The line rises to the right: a box below it clears it at its left edge,
+  // a box above it at its right edge.
+  for (let x0 = g.padL + g.plotW - 4 - w; x0 >= g.padL + 4; x0 -= 2) {
+    const below = lineY(x0) + gap + asc, above = lineY(x0 + w) - gap - desc;
+    if (fits(x0, below)) return { x: x0, y: below };
+    if (fits(x0, above)) return { x: x0, y: above };
   }
-  return best || { x: px, y: py };
+  return { x: g.toX(g.maxX) - 4 - w, y: g.toY(g.minX + 0.7 * (g.maxX - g.minX)) + 4 };
 }
 
 // A highlighted point's own label ("Your case"): the first of eight spots
