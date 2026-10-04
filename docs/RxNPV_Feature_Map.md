@@ -76,7 +76,7 @@ Already the model for how a workbench should work. Mature.
 | Cash Runway · Runway vs Catalyst | **BUILT** | |
 | Insider transactions (Form 4) | **BUILT** | Both tables, split by transaction code — P/S on one tab, awards and vesting on another (Phase 20) |
 | **Form 4 derivative coverage** | **BUILT** | Plus two real bugs found on the way: relevance-ordered discovery, and officer titles read as “Other” |
-| **Pipeline view / 10-K vs CT.gov mismatch** | **DECIDED — build · not yet built** | The two sources routinely disagree; the disagreement is itself the signal. Flagged by the October 2026 audit (GAP-001): nothing implements it yet. The CT.gov half exists (Company Lookup, Asset Program); the 10-K half means reading free-text pipeline tables, the fragile kind of parsing this app has been burned by before. Awaiting the user's call: build, or move to OPEN. |
+| Pipeline view / 10-K vs CT.gov mismatch | **OPEN** | The two sources routinely disagree, and the disagreement is itself the signal. Moved from "DECIDED — build" to OPEN on 2026-10-03 (October audit, GAP-001; the user accepted the recommendation). The CT.gov half already exists (Company Lookup, Asset Program). The 10-K half means reading free-text pipeline tables out of annual reports, the fragile kind of parsing this app has been burned by before. Worth building only if a structured source for company pipelines turns up. |
 | 13F institutional holdings | **DECIDED — no** | Different filing type, previously declined, still out |
 
 ---

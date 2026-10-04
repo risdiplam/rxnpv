@@ -21,7 +21,7 @@ Two of the four were settled by the methodology review (`RxNPV_rNPV_Methodology_
 The packaged-app harness replaces only the native save sheet. Clicking **Export as PDF** once in the real app and choosing a location is the single step it cannot perform. **Last done 2026-10-02** (October audit, Phase 6): the installed app on a throwaway profile, Stoke sample → Generate Report → Export as PDF → the native sheet → Save; a 4-page vector report, every page rendered and looked at.
 
 ### 🟡 Decisions the October 2026 audit surfaced (the user's call)
-- **GAP-001 — Pipeline view / 10-K vs CT.gov mismatch** is marked "DECIDED — build" in the Feature Map and nothing implements it. Recommendation: move it to OPEN. The CT.gov half exists (Company Lookup, Asset Program); the 10-K half means reading free-text pipeline tables out of annual reports — fragile parsing of the kind this project has been burned by. Left as is until the user says.
+- **GAP-001 — Pipeline view / 10-K vs CT.gov mismatch: DECIDED 2026-10-03, moved to OPEN** in the Feature Map (the user: "go with your best recommendations"). The CT.gov half exists (Company Lookup, Asset Program); the 10-K half means reading free-text pipeline tables out of annual reports — fragile parsing of the kind this project has been burned by.
 - **GAP-002 — Payer coverage / formulary access** stays OPEN: no reliable free source. Not faked.
 - **P3 — pasting "$1,200.50" into a millions field leaves it blank.** Number inputs reject the text, so nothing wrong is stored, but the paste is silently dropped. Polish, not money.
 
