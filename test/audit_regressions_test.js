@@ -647,6 +647,15 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
     cashIn().blur(); cashIn().dispatchEvent(new w.FocusEvent("focusout", { bubbles: true })); await wait(60);
   }
 
+  // A date the app stamps must be the user's own day. toISOString() is UTC,
+  // so after 8pm Eastern a flag marked considered and a saved note's
+  // "Written" date read as tomorrow (October 2026; localDateStamp exists for
+  // exactly this). The one UTC use left is a search window marked as such.
+  {
+    const utcStamps = html.split("\n").filter(l => /toISOString\(\)\.slice\(0, ?10\)/.test(l) && !/a day either way is harmless/.test(l));
+    ok(utcStamps.length === 0, "No date stamped from UTC (" + utcStamps.length + " found" + (utcStamps.length ? ": " + utcStamps[0].trim().slice(0, 90) : "") + ")");
+  }
+
   if (errors.length) { console.log(errors.slice(0, 40).join("\n")); console.log("\n" + errors.length + " FAILURE(S) across " + checks + " checks"); process.exit(1); }
   console.log("ALL AUDIT REGRESSION CHECKS PASSED — " + checks + " checks");
   process.exit(0);

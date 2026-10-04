@@ -653,7 +653,7 @@ async function searchCatalystFilings(cik, monthsBack) {
   const end = new Date();
   const start = new Date();
   start.setMonth(start.getMonth() - monthsBack);
-  const fmt = d => d.toISOString().slice(0, 10);
+  const fmt = d => d.toISOString().slice(0, 10); // a search window, a day either way is harmless
 
   const q = CATALYST_KEYWORDS.map(k => `"${k}"`).join(" OR ");
   const url = "https://efts.sec.gov/LATEST/search-index?q=" + encodeURIComponent(q)

@@ -1264,8 +1264,7 @@ function computeDilutionPath(theCase, scenario, discountRateBasePct, opts) {
 const MODEL_SNAPSHOT_LABEL = "What the model says (snapshot)";
 function buildModelSnapshot(theCase, today) {
   if (!theCase || !theCase.programs || !theCase.programs.length) return null;
-  const d = new Date();
-  const date = today || theCase.valuationDate || (d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"));
+  const date = today || theCase.valuationDate || localDateStamp();
   const multiple = theCase.valuationMethod === "multiple";
   const dr = theCase.discountRatePct !== "" && theCase.discountRatePct != null ? Number(theCase.discountRatePct) : DISCOUNT_RATE_GUIDANCE.earlyBiotechSelfView[0];
   const tv = theCase.terminalValue || { enabled: false };

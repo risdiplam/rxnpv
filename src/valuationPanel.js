@@ -139,7 +139,7 @@ function useValuationSections({ theCase, onChange, goToTab }) {
   // Flags marked "considered" collapse and stop counting toward the pointer
   // and the Evidence tab's badge (splitConsideredFlags).
   const { open: flags, considered: consideredFlags } = splitConsideredFlags(theCase, allFlags);
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localDateStamp();
   const setConsidered = (key, on) => update({ consideredFlags: markFlagConsidered(theCase, allFlags, key, on, today) });
   const renderPart = (part) => {
     const show = (p) => p.split("|").includes(part);

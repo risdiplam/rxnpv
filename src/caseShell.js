@@ -184,7 +184,7 @@ function SavedPanel({ theCase, onChange, onReopen }) {
         // Dated: a note quotes the case's numbers as they were when it was
         // written; opening the example runs it on today's case.
         openId === p.id && p.note && h("div", { className: "saved-preview prose", style: { ...UI.caption, color: "var(--ink-2)", lineHeight: 1.6 } },
-          p.capturedAt && h("span", { style: { color: "var(--ink-3)" } }, "Written " + new Date(p.capturedAt).toISOString().slice(0, 10) + " — figures as of then; opening it runs it on today's case. "),
+          p.capturedAt && h("span", { style: { color: "var(--ink-3)" } }, "Written " + localDateStamp(new Date(p.capturedAt)) + " — figures as of then; opening it runs it on today's case. "),
           p.note)))))));
 }
 // "Tools · Trial · Trial Decoder" → group "Tools · Trial", tool "Trial Decoder";
