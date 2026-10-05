@@ -20,6 +20,9 @@ Two of the four were settled by the methodology review (`RxNPV_rNPV_Methodology_
 ### 🔵 One manual click
 The packaged-app harness replaces only the native save sheet. Clicking **Export as PDF** once in the real app and choosing a location is the single step it cannot perform. **Last done 2026-10-02** (October audit, Phase 6): the installed app on a throwaway profile, Stoke sample → Generate Report → Export as PDF → the native sheet → Save; a 4-page vector report, every page rendered and looked at.
 
+### 🟢 Full audit after the product pass (2026-10-05)
+Every changed line of the pass read; four real defects found and fixed — every runway ran long by the months since the filing (now read from today), the options card read a market cap as a share price, Runway vs. Catalyst kept closed-out catalysts and listed ended windows as funded, impossible dates rolled into the next month — plus two Monte Carlo checks that could fail by chance (now seeded / four standard errors). Build log, Phase 53. Re-verified on the installed build, including the user's own two cases (on a copy).
+
 ### 🟢 Release candidate for the hands-on trial (2026-10-05, after the October product pass)
 The installed build is the one to use; its stamp is at the foot of the sidebar (`b41a52c`). Every automated check passes on it (build log, Phases 51–52): 16 suites in both modes, packaged offline/reopen/live, API health, canary, the UI audit, the button sweep and the export sweep on both samples. The one manual click below was last done before the decision memo existed; the trial guide's report step covers it. What remains is the user's own trial: `RxNPV_Trial_Guide.md`. **Automatic backup is not yet turned on for the user's real data**: one click in Backup & restore, and the first step of the trial guide.
 

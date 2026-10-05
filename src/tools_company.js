@@ -636,7 +636,7 @@ function RunwayTool({ cases, updateCase, activeCase }) {
               height: 160, showLegend: false
             })),
           h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginTop: 4 } }, "Below the zero line is the cumulative cash the plan would need raised — the model never raises money on its own, so where the line crosses zero is when a raise becomes necessary." +
-            (fr.monthsSinceCash >= 0.5 ? " The balance is the " + fr.cashAsOf + " filing's, so the runway is counted from today: the " + fr.monthsSinceCash.toFixed(1) + " months since then are taken off." : "")),
+            (fr.monthsSinceCash >= 0.5 && fr.runwayMonths != null ? " The balance is the " + fr.cashAsOf + " filing's, so the runway is counted from today: the " + fr.monthsSinceCash.toFixed(1) + " months since then are taken off." : "")),
           h(Explain, readForwardRunway(fr.runwayMonths, fr.path))
         )
       ]);
