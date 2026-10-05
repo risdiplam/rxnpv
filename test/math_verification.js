@@ -75,7 +75,7 @@ const EXPORTS = [
   "runPeakSalesSimulation", "driverSensitivity", "percentSpecToFraction", "percentSpecError", "renderIconArray",
   "niceTicks", "formatTick", "formatRegisteredP", "parseCatalystHit", "sponsorNameFromEntity", "renderLineChart", "renderHistogram", "renderForestPlot",
   "treasuryMethodShares", "ifConvertedShares", "computeEquityValue", "applyFutureRaise",
-  "classifyCatalystFunding", "computeRunwayVsCatalysts", "monthsUntil", "parseCatalystDate", "parseCatalystWindow", "nextCaseCatalyst", "computeFreshness", "newerFinancialFiling", "catalystPinLabel", "computeFailureFloorPair", "floorZeroReason", "impliedHeldFixed", "summarizeObservedEffects", "analogPriorPresets", "caseFacilities", "computeForwardRunway", "computeFinancingBridge", "forwardBalanceAt", "edgarCashSource", "baseCaseFairValue", "assuranceToCaseOdds", "applyAssuranceToProgram", "posFromSimulator", "describePosSource", "pendingCalibrationEntries", "failureFloorBurnPlan", "RUNWAY_CUSHION_MONTHS_DEFAULT",
+  "classifyCatalystFunding", "computeRunwayVsCatalysts", "monthsUntil", "parseCatalystDate", "parseCatalystWindow", "nextCaseCatalyst", "computeFreshness", "newerFinancialFiling", "catalystPinLabel", "computeFailureFloorPair", "floorZeroReason", "impliedHeldFixed", "summarizeObservedEffects", "analogPriorPresets", "optionsImpliedMove", "modelImpliedMove", "readImpliedMove", "orderByCompletion", "computePortfolioCatalysts", "addModelSnapshot", "isModelSnapshot", "modelSnapshotLabel", "buildDecisionMemo", "computeCaseValuation", "getEffectiveScenarioPreset", "caseFacilities", "computeForwardRunway", "computeFinancingBridge", "forwardBalanceAt", "edgarCashSource", "baseCaseFairValue", "assuranceToCaseOdds", "applyAssuranceToProgram", "posFromSimulator", "describePosSource", "pendingCalibrationEntries", "failureFloorBurnPlan", "RUNWAY_CUSHION_MONTHS_DEFAULT",
   "summarizeOrangeBookPatents", "isPediatricExtension", "parseFdaYyyymmdd",
   "computeBinaryEventImpliedPoS", "selectPeakSalesCompWindow",
   "applyTaxToCalendar", "computeMoleculeTypePoSRatios", "POS_BY_MOLECULE",
@@ -1192,6 +1192,83 @@ report();
 // whole point of the tool, so it is tested directly rather than only through
 // the UI. Boundaries matter here: "reaches it with exactly zero cushion" and
 // "runs out one day early" are different answers to an investor.
+section("Decision output: options move, completion order, the catalyst list, snapshots, the memo");
+{
+  // Options-implied move. A $6.50 straddle at $26: 6.5 / 26 = 25%. From
+  // implied volatility 140% over 45 days: 1.4 × √(45/365) × √(2/π)
+  // = 1.4 × 0.351123 × 0.797885 = 0.392216 → 39.22%.
+  near("straddle $6.50 at $26: ±25%", api.optionsImpliedMove({ straddle: "6.5" }, "26").pct, 25, 1e-9);
+  near("IV 140% over 45 days: ±39.22%", api.optionsImpliedMove({ iv: "140", days: "45" }, "26").pct, 140 * Math.sqrt(45 / 365) * Math.sqrt(2 / Math.PI), 1e-9);
+  ok("the straddle wins when both are given; nothing given: null", api.optionsImpliedMove({ straddle: "6.5", iv: "140", days: "45" }, "26").basis === "straddle" && api.optionsImpliedMove({}, "26") === null);
+  // The model's move: at $10, 60% chance of $15 (+50%) and 40% of $4 (−60%):
+  // 0.6 × 50 + 0.4 × 60 = 54.
+  const mm = api.modelImpliedMove("10", [{ prob: 0.6, value: 15 }, { prob: 0.4, value: 4 }]);
+  near("model move ±54%", mm.pct, 54, 1e-9);
+  ok("up +50% at 60%, down −60% at 40%", Math.abs(mm.upPct - 50) < 1e-9 && Math.abs(mm.upProb - 0.6) < 1e-9 && Math.abs(mm.downPct + 60) < 1e-9);
+  ok("readings: options 80 vs model 54 is bigger (ratio 1.48); 40 vs 54 smaller (0.74); 50 vs 54 about the same",
+    /^Options price a bigger move/.test(api.readImpliedMove(80, 54).verdict) && /^Your model expects a bigger move/.test(api.readImpliedMove(40, 54).verdict) && /about the same/.test(api.readImpliedMove(50, 54).verdict));
+
+  // Completion order against a pin opening 1 Jul 2027.
+  const now = new Date(2026, 9, 5);
+  const studies = [
+    { nctId: "A", primaryCompletionDate: "2027-03", sponsor: "Alpha" },
+    { nctId: "B", primaryCompletionDate: "2027-11-15", sponsor: "Beta" },
+    { nctId: "C", completionDate: "2026-12", sponsor: "Gamma" },
+    { nctId: "D", sponsor: "Delta" },
+    { nctId: "E", primaryCompletionDate: "2025-01", sponsor: "Old" } ];
+  const ord = api.orderByCompletion(studies, { now, pinWindow: api.parseCatalystWindow("H2 2027") });
+  ok("ordered by date, the long-past one dropped: C, A, B", ord.rows.map(r => r.nctId).join("") === "CAB");
+  ok("reads first: C and A complete before H2 2027 opens; B does not", ord.rows.filter(r => r.readsFirst).map(r => r.nctId).join("") === "CA" && ord.readsFirstCount === 2);
+  ok("primary completion is preferred and labelled; the undated one is counted", ord.rows[0].which === "completion" && ord.rows[1].which === "primary completion" && ord.undated === 1);
+
+  // The catalyst list. PepGen with a pinned Q1 next-year readout, a
+  // competitor completing before it, a closed-out pin; a second case with no pin.
+  const pg = JSON.parse(fs.readFileSync(path.join(__dirname, "fixtures", "pepgen_case.json"), "utf8"));
+  const y = now.getFullYear();
+  const withPin = { ...pg, id: "c1", name: "PepGen", ticker: "PEPG",
+    competitorReads: { condition: "DM1", at: "2026-10-05", rows: [{ nctId: "X1", sponsor: "Rival", phase: "PHASE2", date: y + "-12", which: "primary completion" }, { nctId: "X2", sponsor: "Later", phase: "PHASE2", date: (y + 2) + "-06", which: "primary completion" }] },
+    programs: [{ ...pg.programs[0], calibrationLog: [
+      { catalystLabel: "10 mg/kg data", catalystDate: (y + 1) + "-Q1", outcome: "pending", pin: { type: "topline", source: "guidance", at: "2026-10-01", sharedTag: "DM1 read" } },
+      { catalystLabel: "Old readout", catalystDate: "2026-09", outcome: "success", pin: { type: "topline", source: "x", at: "x" }, closeOut: { at: "2026-10-01", happened: "hit", changed: "more confident" } } ] }] };
+  const noPin = { ...pg, id: "c2", name: "NoPin", programs: [{ ...pg.programs[0], calibrationLog: [] }] };
+  const twin = { ...withPin, id: "c3", name: "Twin", competitorReads: null };
+  const pc = api.computePortfolioCatalysts([withPin, noPin, twin], now);
+  ok("two upcoming pins, one case without a pin counted", pc.count === 2 && pc.noPin === 1);
+  ok("grouped by the quarter the window opens: " + (y + 1) + " Q1", pc.groups.length === 1 && pc.groups[0].quarter === (y + 1) + " Q1");
+  ok("each with its funding state from Runway vs. Catalyst", pc.groups[0].items.every(it => ["funded", "tight", "inside", "gap"].includes(it.funding)));
+  ok("only the competitor completing before the pin is listed under it", pc.groups[0].items[0].competitors.map(c => c.nctId).join() === "X1");
+  ok("the explicit shared tag on both pins is reported", pc.sharedTags.join() === "DM1 read");
+  ok("the closed-out pin is listed as resolved, not upcoming", pc.resolved.length === 2 && pc.resolved[0].closeOut.happened === "hit");
+
+  // Snapshots kept, dated: same day replaces, another day adds.
+  const e1 = { label: api.modelSnapshotLabel("2026-10-01"), thesis: "a" };
+  let log = api.addModelSnapshot([{ label: "Other" }], e1, () => "id1").log;
+  log = api.addModelSnapshot(log, { ...e1, thesis: "b" }, () => "id2").log;
+  ok("a second snapshot the same day replaces that day's", log.length === 2 && log[1].thesis === "b" && log[1].id === "id1");
+  log = api.addModelSnapshot(log, { label: api.modelSnapshotLabel("2026-11-12"), thesis: "c" }, () => "id3").log;
+  ok("another day's is added beside it; both are snapshots, the other entry is not", log.length === 3 && log.filter(api.isModelSnapshot).length === 2 && !api.isModelSnapshot(log[0]) && api.isModelSnapshot({ label: "What the model says (snapshot)" }));
+
+  // Closing out clears the overdue prompt even when left unscored.
+  const overdueCase = { programs: [{ id: "p", calibrationLog: [{ id: "e", catalystLabel: "X", catalystDate: "2025-06", outcome: "pending", pin: { type: "topline" } }] }] };
+  ok("a passed pin is overdue", api.pendingCalibrationEntries(overdueCase).overdue.length === 1 && api.pendingCalibrationEntries(overdueCase).overdue[0].pinned);
+  overdueCase.programs[0].calibrationLog[0].closeOut = { at: "2026-10-05", happened: "", changed: "" };
+  ok("closed out, it is not", api.pendingCalibrationEntries(overdueCase).overdue.length === 0);
+
+  // The memo uses the engine's own numbers.
+  const st = JSON.parse(fs.readFileSync(path.join(__dirname, "fixtures", "stoke_sample_case.json"), "utf8"));
+  const memoCase = { ...st, optionsMove: { straddle: "6.2", asOf: "2026-10-05" }, memo: { efficacy: "needs a 40% cut", safety: "", cash: "no raise above $150M", competitor: "" } };
+  const m = api.buildDecisionMemo(memoCase, now);
+  const v = k => api.computeCaseValuation(memoCase, api.getEffectiveScenarioPreset(memoCase, k), k, Number(st.discountRatePct), st.terminalValue).equity.perShare;
+  near("memo Base = the engine's Base", m.scenarios.base, v("base"), 1e-9);
+  near("memo Bear = the engine's Bear", m.scenarios.bear, v("bear"), 1e-9);
+  ok("odds: yours, implied and the gap in whole points", m.odds && m.odds.gapPts === Math.round(m.odds.impliedPct) - Math.round(m.odds.yoursPct));
+  ok("the implied revenue variable for a Full build is peak share", m.implied && m.implied.variable === "peakShare");
+  ok("both floors, the stage one in use", m.floors && m.floors.active === "stage" && m.floors.burn != null);
+  ok("runway with facilities (Stoke's $194M ATM)", m.runway && m.runway.facilities.total === 194e6);
+  near("options: $6.20 at $24.80 = ±25%", m.options.pct, 25, 1e-9);
+  ok("the model's readout move is compared", m.options.model && m.options.model.pct > 0 && m.options.reading);
+  ok("what would change my mind: the two fields filled", m.changeMyMind.efficacy === "needs a 40% cut" && m.changeMyMind.cash === "no raise above $150M");
+}
 section("Simulator: delayed separation, readout timing, the editable discount, analog priors");
 {
   // Delayed separation, checked against the closed form. Control median 12

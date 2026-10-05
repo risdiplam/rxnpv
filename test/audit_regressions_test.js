@@ -784,6 +784,73 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
     click(btn("Workspace")); await wait(300);
   }
 
+  // Decision output (Batch 5), on the open PepGen case.
+  {
+    const pgCase = () => JSON.parse(w.localStorage.getItem("rxnpv_cases_v1")).filter(c => /^PepGen/.test(c.name)).pop();
+    const setTA = (el, v) => { const st = Object.getOwnPropertyDescriptor(w.HTMLTextAreaElement.prototype, "value").set; st.call(el, v); el.dispatchEvent(new w.Event("input", { bubbles: true })); };
+    click(btn("Workspace")); await wait(300);
+    click(d.getElementById("casetab-evidence")); await wait(300);
+    const ev = d.getElementById("casepanel-evidence");
+    const cmHead = [...ev.querySelectorAll('[role="button"]')].find(b => /^What would change my mind/.test(b.textContent));
+    if (cmHead && cmHead.getAttribute("aria-expanded") === "false") { click(cmHead); await wait(300); }
+    const eff = [...ev.querySelectorAll("textarea")].find(t => t.getAttribute("aria-label") === "Efficacy bar");
+    ok(!!eff && /What would change my mind/.test(ev.textContent), "Evidence: the 'What would change my mind' card");
+    if (eff) { setTA(eff, "the 10 mg/kg cohort needs at least 15 points of splicing correction over placebo"); await wait(300); }
+    ok(pgCase().memo && /15 points of splicing/.test(pgCase().memo.efficacy), "Evidence: the answer is saved on the case");
+
+    // Binary Event: the options card, saved for the memo.
+    click(btn("Tools")); await wait(500); click(btn("Valuation")); await wait(400); click(btn("Binary Event")); await wait(600);
+    const strad = [...d.querySelectorAll("input")].find(i => i.getAttribute("aria-label") === "Straddle price ($)");
+    if (strad) { setVal(strad, "0.70"); await wait(400); }
+    const om = d.querySelector(".options-move");
+    ok(!!om && /±30%/.test(om.textContent), "Binary Event: a $0.70 straddle at $2.34 prices about ±30% (" + (om && om.textContent.slice(0, 120)) + ")");
+    ok(pgCase().optionsMove && pgCase().optionsMove.straddle === "0.70" && /^\d{4}-\d\d-\d\d$/.test(pgCase().optionsMove.asOf), "Binary Event: the straddle is saved on the case, dated");
+
+    // The report's Decision memo preset.
+    click(btn("Workspace")); await wait(300);
+    [...d.querySelectorAll("button")].find(b => /Generate Report/.test(b.textContent)).click(); await wait(800);
+    click([...d.querySelectorAll("button")].find(b => /^Sections \(/.test(b.textContent))); await wait(300);
+    click(btn("Decision memo")); await wait(800);
+    const memo = d.querySelector(".decision-memo");
+    ok(!!memo && /Inputs and how fresh they are/.test(memo.textContent) && /What the case says, and what the price says/.test(memo.textContent) && /If it fails/.test(memo.textContent) && /Cash to the catalyst/.test(memo.textContent), "Report: the Decision memo preset shows the memo");
+    ok(!!memo && /15 points of splicing correction/.test(memo.textContent) && /What the options price/.test(memo.textContent), "Report: the memo prints the user's answers and the options move");
+    const inc = pgCase().reportInclusions || {};
+    ok(inc.memo === true && inc.summary === false && inc.glance === false, "Report: the preset turns the memo on and the rest off");
+    click(btn("← Back to Workspace")); await wait(400);
+
+    // Portfolio: the upcoming catalysts, pins only.
+    click(btn("Portfolio")); await wait(700);
+    const pcat = [...d.querySelectorAll("[data-export-section]")].find(e => e.getAttribute("data-export-section") === "Upcoming catalysts");
+    ok(!!pcat && pcat.querySelectorAll(".portfolio-catalyst").length >= 2 && /EMPEROR Phase 3 topline/.test(pcat.textContent) && /FREEDOM2 10 mg\/kg data/.test(pcat.textContent), "Portfolio: the upcoming pinned catalysts across cases");
+    ok(!!pcat && /has no pinned catalyst and is not listed|have no pinned catalyst and are not listed/.test(pcat.textContent), "Portfolio: cases with no pin are counted");
+
+    // Close-out: move PepGen's pin into the past through its Edit form, then
+    // close it out from the banner and take a dated snapshot.
+    click(btn("Workspace")); await wait(300);
+    click(d.getElementById("casetab-calibration")); await wait(300);
+    const cal = d.getElementById("casepanel-calibration");
+    const editBtn = [...cal.querySelectorAll("button")].find(b => b.textContent === "Edit");
+    if (editBtn) { click(editBtn); await wait(300); }
+    const dateIn = cal.querySelector('input[aria-label="Catalyst date"]');
+    if (dateIn) { setVal(dateIn, "2025-06"); await wait(100); }
+    const saveBtn = [...cal.querySelectorAll("button")].find(b => b.textContent === "Save");
+    if (saveBtn) { click(saveBtn); await wait(400); }
+    const closeBtn = [...d.querySelectorAll("button")].find(b => /^Close out “FREEDOM2 10 mg\/kg data”$/.test(b.textContent));
+    ok(!!closeBtn, "Close-out: a passed pin offers 'Close out' in the banner");
+    if (closeBtn) { click(closeBtn); await wait(300); }
+    const what = [...d.querySelectorAll("input")].find(i => i.getAttribute("aria-label") === "What happened");
+    if (what) { setVal(what, "splicing correction 18 points over placebo"); await wait(100); }
+    const resSel = [...d.querySelectorAll("select")].find(x => x.getAttribute("aria-label") === "Result");
+    if (resSel) { resSel.value = "success"; resSel.dispatchEvent(new w.Event("change", { bubbles: true })); await wait(100); }
+    click(btn("Save close-out")); await wait(400);
+    const entry = pgCase().programs[0].calibrationLog[0];
+    ok(entry.outcome === "success" && entry.closeOut && entry.closeOut.happened === "splicing correction 18 points over placebo", "Close-out: written to the same Calibration Log entry, scored");
+    const snapsBefore = pgCase().programs[0].evidenceLog.filter(e => /^What the model says \(snapshot, /.test(e.label)).length;
+    click(btn("Take a snapshot")); await wait(400);
+    ok(pgCase().programs[0].evidenceLog.filter(e => /^What the model says \(snapshot, /.test(e.label)).length === snapsBefore + 1, "Close-out: 'Take a snapshot' adds a dated snapshot, the older ones kept");
+    ok(![...d.querySelectorAll("button")].some(b => /^Close out “FREEDOM2/.test(b.textContent)), "Close-out: the prompt is gone once closed out");
+  }
+
   if (errors.length) { console.log(errors.slice(0, 40).join("\n")); console.log("\n" + errors.length + " FAILURE(S) across " + checks + " checks"); process.exit(1); }
   console.log("ALL AUDIT REGRESSION CHECKS PASSED — " + checks + " checks");
   process.exit(0);

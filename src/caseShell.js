@@ -569,7 +569,7 @@ function CalibrationNudge({ theCase, update, tab, setTab }) {
   if (overdue.length === 0) return null;
   const detail = overdue.slice(0, 3).map(e => e.programName + " — " + (e.catalystLabel || "prediction") + (e.catalystDate ? " (" + e.catalystDate + ")" : "")).join(" · ");
   const pinnedDue = overdue.filter(e => e.pinned).slice(0, 3);
-  const inputStyle = { padding: "5px 8px", borderRadius: 5, border: "1px solid var(--rule)", background: "var(--surface)", color: "var(--ink-1)", fontFamily: "var(--mono)", fontSize: 11 };
+  const inputStyle = { padding: "5px 8px", minHeight: 28, borderRadius: 5, border: "1px solid var(--rule)", background: "var(--surface)", color: "var(--ink-1)", fontFamily: "var(--mono)", fontSize: 11 };
   return h("div", { style: { padding: "7px 14px", marginBottom: 16, background: "var(--surface)", borderLeft: "2px solid var(--teal)", borderRadius: 4, fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-2)" } },
     h("div", null,
       h("span", { style: { color: "var(--teal)", fontWeight: 700 } }, overdue.length + " calibration prediction" + (overdue.length > 1 ? "s" : "") + " past its catalyst date"),
@@ -585,6 +585,6 @@ function CalibrationNudge({ theCase, update, tab, setTab }) {
               h("option", { value: "pending" }, "Result: leave unscored"), h("option", { value: "success" }, "Success"), h("option", { value: "failure" }, "Failure")),
             h("input", { type: "text", value: form.changed, "aria-label": "What this changed", placeholder: "What this changed in the thesis", onChange: e => setForm({ ...form, changed: e.target.value }), style: inputStyle }),
             h("div", { style: { display: "flex", gap: 8 } },
-              h("button", { type: "button", onClick: () => saveCloseOut(row), style: { padding: "4px 12px", borderRadius: 5, border: "none", background: "var(--teal-fill)", color: "var(--on-teal)", fontFamily: "var(--mono)", fontSize: 11, fontWeight: 700, cursor: "pointer" } }, "Save close-out"),
-              h("button", { type: "button", onClick: () => setOpen(null), style: { padding: "4px 12px", borderRadius: 5, border: "1px solid var(--rule)", background: "transparent", color: "var(--ink-2)", fontFamily: "var(--mono)", fontSize: 11, cursor: "pointer" } }, "Cancel"))))));
+              h("button", { type: "button", onClick: () => saveCloseOut(row), style: { padding: "4px 12px", minHeight: 28, borderRadius: 5, border: "none", background: "var(--teal-fill)", color: "var(--on-teal)", fontFamily: "var(--mono)", fontSize: 11, fontWeight: 700, cursor: "pointer" } }, "Save close-out"),
+              h("button", { type: "button", onClick: () => setOpen(null), style: { padding: "4px 12px", minHeight: 28, borderRadius: 5, border: "1px solid var(--rule)", background: "transparent", color: "var(--ink-2)", fontFamily: "var(--mono)", fontSize: 11, cursor: "pointer" } }, "Cancel"))))));
 }

@@ -681,6 +681,6 @@ function DecisionMemoSection({ theCase, rpt, cardStyle }) {
       "About ±" + m.options.pct.toFixed(0) + "% (" + (m.options.basis === "straddle" ? "from the straddle" : "from implied volatility") + (m.options.asOf ? ", entered " + m.options.asOf : "") + ")" + (m.options.model ? "; your readout outcomes average ±" + m.options.model.pct.toFixed(0) + "%." : "."),
       m.options.reading ? h("div", { style: { color: rpt.ink2 } }, m.options.reading.verdict + " " + m.options.reading.text) : null),
     head("What would change my mind"),
-    cm.length ? h("table", { style: { borderCollapse: "collapse", width: "100%" } }, h("tbody", null, cm.map(([k, label]) => row(label, m.changeMyMind[k]))))
+    cm.length ? h("table", { style: { borderCollapse: "collapse", width: "100%" } }, h("tbody", null, cm.map(([k, label]) => h(React.Fragment, { key: k }, row(label, m.changeMyMind[k])))))
       : h("div", { style: { fontSize: 12, color: rpt.ink3 } }, "Not written yet — the Evidence tab has four short fields for it."));
 }

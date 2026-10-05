@@ -254,6 +254,15 @@ function sampleCaseStoke() {
     valuationDate: SAMPLE_CASE_AS_OF,
     currentPrice: "24.80",
     priceAsOf: "2026-09-25", // the close it came from (Evidence Log: Share price)
+    // What would change this case's mind, written before EMPEROR reads out
+    // (Evidence tab; printed in the decision memo). Judgments that follow
+    // from the Evidence Log, not company statements.
+    memo: {
+      efficacy: "EMPEROR's week-28 seizure reduction should beat sham by a margin like the approved Dravet drugs' (fenfluramine's responders: 68% vs 13%). A soticlestat-like result (27% vs 10%, primary missed) would undercut the 65% odds.",
+      safety: "Any CSF-protein or hydrocephalus signal that forces a dose change, or a clinical hold.",
+      cash: "A raise beyond the $200M ATM before the readout, or guidance that the cash no longer reaches the early-2028 launch.",
+      competitor: "Encoded's ETX101 (a one-time gene therapy) showing comparable seizure control before EMPEROR reads out."
+    },
     discountRatePct: "12",
     valuationMethod: "dcf",
     corporateGA: { preCommercialAnnualM: "95", gaShareOfMatureSgaPct: "50", windDownYears: "1" },
@@ -491,6 +500,12 @@ function sampleCasePepGen() {
     valuationDate: "2026-09-30",
     currentPrice: "2.34",
     priceAsOf: "2026-09-29", // the close it came from (Evidence Log: Share price)
+    memo: {
+      efficacy: "The November 10 mg/kg data need splicing correction clearly above placebo — nearer the single-dose 29% than the multi-dose 5 mg/kg's 7%.",
+      safety: "Another kidney-biomarker dose-limiting event at 10 or 12.5 mg/kg, or the partial clinical hold widening.",
+      cash: "A deeply discounted raise before the 12.5 mg/kg results; the $100M ATM only helps if the stock trades enough to use it.",
+      competitor: "Another DM1 oligonucleotide program moving to an accelerated-approval filing before PepGen has a registrational design."
+    },
     discountRatePct: "14",
     valuationMethod: "dcf",
     corporateGA: { preCommercialAnnualM: "26", gaShareOfMatureSgaPct: "50", windDownYears: "1" },

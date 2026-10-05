@@ -319,7 +319,7 @@ function TrialResultsPanels({ results, study, onReopen, nctId }) {
     inputs.push({ id: "priorSource", value: nct + "'s posted primary result (hazard ratio " + hr + (sd ? ", " + (a.ciPct || "95") + "% CI " + a.lower + "–" + a.upper : "") + "), read " + localDateStamp() + (ns.length === 2 ? "; arm sizes " + ns.join(" and ") + " in registered order" : "") });
     return h("button", { type: "button", "data-no-export": "", onClick: () => onReopen({ view: "simulation", simTab: "trialOutcome", inputs }),
       title: "Opens Trial Outcome / PoS with this hazard ratio as the prior; you enter the control arm's median",
-      style: { marginTop: 6, padding: "4px 10px", borderRadius: 6, border: "1px solid var(--teal)", background: "transparent", color: "var(--teal)", fontFamily: "var(--mono)", fontSize: 10.5, cursor: "pointer" } }, "Use as a simulator starting point →");
+      style: { marginTop: 6, padding: "4px 10px", minHeight: 28, borderRadius: 6, border: "1px solid var(--teal)", background: "transparent", color: "var(--teal)", fontFamily: "var(--mono)", fontSize: 10.5, cursor: "pointer" } }, "Use as a simulator starting point →");
   };
 
   const analysisLine = (a, groupsById, nByGroup) => {
@@ -913,7 +913,7 @@ function TrialWatchTool({ activeCase, updateCase, initialNctId, onConsumedInitia
                         { id: "endpointType", value: "timeToEvent" }, { id: "priorType", value: "point" }, { id: "priorMean", value: value.toFixed(2) },
                         { id: "priorSource", value: "the analog board for \u201c" + cond + "\u201d (" + localDateStamp() + "): " + what + " of " + pre.n + " posted hazard ratio" + (pre.n === 1 ? "" : "s") + " — a percentile of what parsed, not of every trial" }] });
                       const b = (label, value, what, title) => h("button", { type: "button", title, onClick: () => open(value, what),
-                        style: { padding: "3px 9px", borderRadius: 6, border: "1px solid var(--rule)", background: "transparent", color: "var(--ink-2)", fontFamily: "var(--mono)", fontSize: 10, cursor: "pointer" } }, label);
+                        style: { padding: "3px 9px", minHeight: 28, borderRadius: 6, border: "1px solid var(--rule)", background: "transparent", color: "var(--ink-2)", fontFamily: "var(--mono)", fontSize: 10, cursor: "pointer" } }, label);
                       return h("div", { className: "analog-presets", style: { display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", marginBottom: 8, fontSize: 10.5, fontFamily: "var(--mono)", color: "var(--ink-3)" } },
                         "Simulator prior from the " + pre.n + " hazard ratio" + (pre.n === 1 ? "" : "s") + ":",
                         b("median " + pre.median.toFixed(2), pre.median, "the class median", "Open Trial Outcome / PoS with the class median as a fixed prior"),
@@ -1008,7 +1008,7 @@ function TrialWatchTool({ activeCase, updateCase, initialNctId, onConsumedInitia
             ord.undated > 0 && h("div", { style: { ...UI.caption, marginTop: 4 } }, ord.undated + " with no completion date left out."),
             activeCase && updateCase && h("button", { type: "button", "data-no-export": "",
               onClick: () => updateCase({ ...activeCase, competitorReads: { condition: ctCondition, phase: ctPhase, at: localDateStamp(), rows: ord.rows.slice(0, 10).map(r => ({ nctId: r.nctId, sponsor: r.sponsor, phase: r.phase, date: r.date, which: r.which })) }, updatedAt: Date.now() }),
-              style: { marginTop: 8, padding: "4px 10px", borderRadius: 6, border: "1px solid var(--rule)", background: "transparent", color: "var(--ink-2)", fontFamily: "var(--mono)", fontSize: 10.5, cursor: "pointer" } },
+              style: { marginTop: 8, padding: "4px 10px", minHeight: 28, borderRadius: 6, border: "1px solid var(--rule)", background: "transparent", color: "var(--ink-2)", fontFamily: "var(--mono)", fontSize: 10.5, cursor: "pointer" } },
               activeCase.competitorReads ? "Update the competitor list saved to " + caseDisplayName(activeCase) : "Save to " + caseDisplayName(activeCase) + " for the Portfolio catalyst list"),
             activeCase && activeCase.competitorReads && h("div", { style: { ...UI.caption, marginTop: 4 } }, "Saved " + activeCase.competitorReads.at + " from \u201c" + activeCase.competitorReads.condition + "\u201d."));
         })()
