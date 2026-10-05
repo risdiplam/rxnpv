@@ -1117,14 +1117,14 @@ function FreshnessStrip({ theCase }) {
   const amber = { color: "var(--warn)", fontWeight: 600 };
   const parts = [];
   if (f.price) parts.push(h("span", { key: "p", style: f.price.stale ? amber : null },
-    "Price " + fmtShare(f.price.value) + (f.price.asOf ? " entered " + f.price.asOf + " (" + freshnessAgo(f.price.days) + ")" : ", date not recorded") + (f.price.stale ? " — re-check it before acting on the gap" : "")));
+    "Price " + fmtShare(f.price.value) + (f.price.asOf ? " entered " + f.price.asOf + " (" + freshnessAgo(f.price.days) + ")" : ", date not recorded") + (f.price.stale ? " — re-check it" : "")));
   else parts.push(h("span", { key: "p" }, "No price entered"));
   if (f.cash) parts.push(h("span", { key: "c", title: filing && filing.status === "unavailable" ? "Could not check SEC for a newer filing: " + filing.reason : undefined },
     "Cash " + fmtMoney(f.cash.value) + (f.cash.asOf ? " as of " + f.cash.asOf + " (" + freshnessAgo(f.cash.days) + ")" : ", date not recorded") + (f.cash.rolled ? ", rolled forward" : "")));
   if (f.cash && f.cash.newer) parts.push(h("span", { key: "n", style: amber },
     "a newer " + f.cash.newer.form + " (period to " + f.cash.newer.period + ") was filed " + f.cash.newer.filed + " — refresh cash, burn and shares"));
-  if (f.catalyst) parts.push(h("span", { key: "k" },
-    "Next: " + f.catalyst.label.split(/[,(]/)[0].trim() + ", " + f.catalyst.date + (f.catalyst.pinned ? " (pinned" + (f.catalyst.source ? ": " + f.catalyst.source : "") + ")" : " (Calibration Log, not pinned)")));
+  if (f.catalyst) parts.push(h("span", { key: "k", title: f.catalyst.label + (f.catalyst.pinned ? " — pinned " + (f.catalyst.pinnedAt || "") + (f.catalyst.source ? "; source: " + f.catalyst.source : "") : "") },
+    "Next: " + f.catalyst.label.split(/[,(]/)[0].trim() + ", " + f.catalyst.date + (f.catalyst.pinned ? " (pinned)" : " (not pinned)")));
   if (f.odds) parts.push(h("span", { key: "o" },
     "Odds " + Math.round(f.odds.pct) + "%, " + (f.odds.source === "simulator" ? "from the simulator" + (f.odds.at ? " (" + f.odds.at + ")" : "") : f.odds.source === "typed" ? "your figure" : "the benchmark")));
   return h("div", { className: "freshness", role: "note", "aria-label": "How fresh these inputs are", style: { ...UI.caption, marginTop: 10, lineHeight: 1.6 } },

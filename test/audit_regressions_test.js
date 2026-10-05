@@ -319,7 +319,7 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
     // The freshness line under the headline numbers.
     const fr = panel && panel.querySelector('.freshness[role="note"]');
     ok(!!fr && /Price \$24\.80 entered 2026-09-25/.test(fr.textContent) && /Cash \$420\.0M as of 2026-06-30/.test(fr.textContent)
-      && /Next: EMPEROR Phase 3 topline, 2027-Q3 \(pinned: Company guidance/.test(fr.textContent) && /Odds 65%, your figure/.test(fr.textContent),
+      && /Next: EMPEROR Phase 3 topline, 2027-Q3 \(pinned\)/.test(fr.textContent) && /Company guidance, Q2 2026 10-Q/.test(fr.querySelector("[title*=pinned]") ? fr.querySelector("[title*=pinned]").title : "") && /Odds 65%, your figure/.test(fr.textContent),
       "Overview: the freshness line gives price date, cash date, the pinned catalyst and the odds' source (" + (fr && fr.textContent) + ")");
     const table = panel && panel.querySelector(".proj-table");
     ok(!!table && table.querySelectorAll("tbody tr").length === 16, "Projections: the table shows the first 16 years");
