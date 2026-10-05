@@ -619,11 +619,12 @@ function RunwayTool({ cases, updateCase, activeCase }) {
                 fr.runwayMonths != null ? fr.runwayMonths.toFixed(0) + " mo" : "25yr+ (beyond projection window)")),
             (() => {
               const fac = caseFacilities(fc);
-              if (!(fac.total > 0)) return null;
+              // A runway with no end cannot get longer, so the figure would only repeat it.
+              if (!(fac.total > 0) || fr.runwayMonths == null) return null;
               const frF = computeForwardRunway(fc, { extraCash: fac.total });
-              return h("div", null, h("div", { style: UI.caption }, "With facilities"),
+              return h("div", { title: fac.note || undefined }, h("div", { style: UI.caption }, "With facilities"),
                 h("div", { style: { fontSize: 22, fontFamily: "var(--mono)", fontWeight: 800, color: "var(--ink-2)" } }, frF.runwayMonths != null ? frF.runwayMonths.toFixed(0) + " mo" : "25yr+"),
-                h("div", { style: UI.caption }, "+ " + fmtMoney(fac.total) + " undrawn ATM, debt and expected milestones" + (fac.note ? " (" + fac.note + ")" : "")));
+                h("div", { style: UI.caption }, "+ " + fmtMoney(fac.total) + " " + facilitiesPhrase(fac)));
             })()
           ),
           h(ExportableBlock, { title: (fc ? fc.name + " — " : "") + "cash runway" },
@@ -713,12 +714,12 @@ function RunwayVsCatalystTool({ cases, updateCase, activeCase }) {
         h("div", null,
           h("div", { style: UI.caption }, "Dated catalysts"),
           h("div", { style: { fontSize: 26, fontFamily: "var(--mono)", fontWeight: 800, color: "var(--ink-1)" } }, String(res.rows.length))),
-        resFac && resFac.ok && h("div", null,
+        resFac && resFac.ok && !res.beyondHorizon && h("div", { title: fac.note || undefined },
           h("div", { style: UI.caption }, "With facilities"),
           h("div", { style: { fontSize: 26, fontFamily: "var(--mono)", fontWeight: 800, color: "var(--ink-2)" } },
             resFac.beyondHorizon ? "No end" : resFac.runwayMonths.toFixed(0) + " mo"),
           h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", maxWidth: 170, lineHeight: 1.4 } },
-            "+ " + fmtMoney(fac.total) + " undrawn ATM, debt and expected milestones" + (fac.note ? " (" + fac.note + ")" : ""))),
+            "+ " + fmtMoney(fac.total) + " " + facilitiesPhrase(fac))),
         res.gapCount > 0 && h("div", null,
           h("div", { style: UI.caption }, "UNFUNDED"),
           h("div", { style: { fontSize: 26, fontFamily: "var(--mono)", fontWeight: 800, color: "var(--red)" } }, String(res.gapCount)))
@@ -764,8 +765,8 @@ function RunwayVsCatalystTool({ cases, updateCase, activeCase }) {
         h("div", { style: { fontWeight: 700, marginBottom: 4 } }, "What reaching it would take"),
         h("div", null, "About ", h("b", null, fmtMoney(bridge.needed)), " to get past the end of \"" + bridge.catalyst.label.split(/[,(]/)[0].trim() + "\" (" + bridge.catalyst.dateText + ") with the " + bridge.cushionMonths + "-month cushion, at the model's burn."),
         bridge.facilities.total > 0 && (bridge.afterFacilities > 0
-          ? h("div", null, "Less " + fmtMoney(bridge.facilities.total) + " of undrawn ATM, debt and expected milestones" + (bridge.facilities.note ? " (" + bridge.facilities.note + ")" : "") + ": ", h("b", null, fmtMoney(bridge.afterFacilities)), " still to raise.")
-          : h("div", null, "The " + fmtMoney(bridge.facilities.total) + " of undrawn ATM, debt and expected milestones entered would cover it, if they can be drawn when needed" + (bridge.facilities.note ? " (" + bridge.facilities.note + ")" : "") + ". Drawing an ATM still means selling shares at the market.")),
+          ? h("div", null, "Less " + fmtMoney(bridge.facilities.total) + " of " + facilitiesPhrase(bridge.facilities) + (bridge.facilities.note ? " (" + bridge.facilities.note + ")" : "") + ": ", h("b", null, fmtMoney(bridge.afterFacilities)), " still to raise.")
+          : h("div", null, "The " + fmtMoney(bridge.facilities.total) + " of " + facilitiesPhrase(bridge.facilities) + " entered would cover it, if they can be drawn when needed" + (bridge.facilities.note ? " (" + bridge.facilities.note + ")" : "") + ". Drawing an ATM still means selling shares at the market.")),
         bridge.shelfShort > 0 && h("div", { style: { color: "var(--warn)" } }, "Needs about " + fmtMoney(bridge.afterFacilities) + "; " + fmtMoney(bridge.facilities.shelf) + " remains on the shelf as entered — a new registration or a different structure would be needed."),
         bridge.afterFacilities > 0 && bridge.coveredByModelled && h("div", null,
           "This case already models a raise of " + fmtMoney(bridge.modelledAmount) + ", which would cover it (Assumptions → Future financing), so the valuation already pays for it."),

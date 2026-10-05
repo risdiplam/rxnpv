@@ -75,7 +75,7 @@ const EXPORTS = [
   "runPeakSalesSimulation", "driverSensitivity", "percentSpecToFraction", "percentSpecError", "renderIconArray",
   "niceTicks", "formatTick", "formatRegisteredP", "parseCatalystHit", "sponsorNameFromEntity", "renderLineChart", "renderHistogram", "renderForestPlot",
   "treasuryMethodShares", "ifConvertedShares", "computeEquityValue", "applyFutureRaise",
-  "classifyCatalystFunding", "computeRunwayVsCatalysts", "monthsUntil", "parseCatalystDate", "parseCatalystWindow", "nextCaseCatalyst", "computeFreshness", "newerFinancialFiling", "catalystPinLabel", "computeFailureFloorPair", "floorZeroReason", "impliedHeldFixed", "summarizeObservedEffects", "analogPriorPresets", "applyIraClock", "suggestedIraYears", "matchLaunchShape", "applyConditionMerges", "summarizeAssetProgram", "findInsiderBuyCluster", "extractLimitationsOfUse", "labelDate", "biologicExclusivityFloor", "optionsImpliedMove", "modelImpliedMove", "readImpliedMove", "orderByCompletion", "computePortfolioCatalysts", "addModelSnapshot", "isModelSnapshot", "modelSnapshotLabel", "buildDecisionMemo", "computeCaseValuation", "getEffectiveScenarioPreset", "caseFacilities", "computeForwardRunway", "computeFinancingBridge", "forwardBalanceAt", "edgarCashSource", "baseCaseFairValue", "assuranceToCaseOdds", "applyAssuranceToProgram", "posFromSimulator", "describePosSource", "pendingCalibrationEntries", "failureFloorBurnPlan", "RUNWAY_CUSHION_MONTHS_DEFAULT",
+  "classifyCatalystFunding", "computeRunwayVsCatalysts", "monthsUntil", "parseCatalystDate", "parseCatalystWindow", "nextCaseCatalyst", "computeFreshness", "newerFinancialFiling", "catalystPinLabel", "computeFailureFloorPair", "floorZeroReason", "impliedHeldFixed", "summarizeObservedEffects", "analogPriorPresets", "applyIraClock", "suggestedIraYears", "matchLaunchShape", "applyConditionMerges", "summarizeAssetProgram", "findInsiderBuyCluster", "extractLimitationsOfUse", "labelDate", "biologicExclusivityFloor", "optionsImpliedMove", "modelImpliedMove", "readImpliedMove", "orderByCompletion", "computePortfolioCatalysts", "addModelSnapshot", "isModelSnapshot", "modelSnapshotLabel", "buildDecisionMemo", "computeCaseValuation", "getEffectiveScenarioPreset", "caseFacilities", "facilitiesPhrase", "computeForwardRunway", "computeFinancingBridge", "forwardBalanceAt", "edgarCashSource", "baseCaseFairValue", "assuranceToCaseOdds", "applyAssuranceToProgram", "posFromSimulator", "describePosSource", "pendingCalibrationEntries", "failureFloorBurnPlan", "RUNWAY_CUSHION_MONTHS_DEFAULT",
   "summarizeOrangeBookPatents", "isPediatricExtension", "parseFdaYyyymmdd",
   "computeBinaryEventImpliedPoS", "selectPeakSalesCompWindow",
   "applyTaxToCalendar", "computeMoleculeTypePoSRatios", "POS_BY_MOLECULE",
@@ -1425,6 +1425,11 @@ section("Cash to reach the catalyst: facilities and the financing bridge");
   ok("facilities: ATM + debt + milestones = $100M; the shelf is kept apart", fac.total === 100e6 && fac.shelf === 150e6 && fac.note === "Q2 10-Q");
   ok("an ATM and a shelf both entered: the double-count warning", fac.doubleCount === true && api.caseFacilities({ capitalStructure: { atmUndrawn: "1" } }).doubleCount === false);
   ok("blank fields: nothing", api.caseFacilities({ capitalStructure: {} }).any === false);
+  // Named from what was entered: all three listed, an ATM alone named alone,
+  // milestones alone not called "undrawn".
+  ok("facilities named: all three", api.facilitiesPhrase(fac) === "undrawn ATM, debt and expected milestones");
+  ok("facilities named: an ATM alone", api.facilitiesPhrase(api.caseFacilities({ capitalStructure: { atmUndrawn: "97000000", shelfRemaining: "400000000" } })) === "undrawn ATM");
+  ok("facilities named: milestones alone are not undrawn", api.facilitiesPhrase(api.caseFacilities({ capitalStructure: { milestoneExpected: "5000000" } })) === "expected milestones");
 
   // PepGen with its cash cut to $40M and a pinned catalyst at the end of
   // 2027: the cash runs out first.

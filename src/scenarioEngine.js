@@ -1151,6 +1151,19 @@ function caseFacilities(theCase) {
   return { atm, debt, milestones, shelf, total: atm + debt + milestones, note: cap.facilitiesNote || "", doubleCount: atm > 0 && shelf > 0, any: atm + debt + milestones + shelf > 0 };
 }
 
+// "undrawn ATM", "undrawn ATM and debt", "undrawn ATM, debt and expected
+// milestones" — only the kinds actually entered, so a case with an ATM alone
+// is not described as having credit lines and milestones too.
+function facilitiesPhrase(fac) {
+  const parts = [];
+  if (fac.atm > 0) parts.push("ATM");
+  if (fac.debt > 0) parts.push("debt");
+  if (fac.milestones > 0) parts.push("expected milestones");
+  if (!parts.length) return "";
+  const list = parts.length === 1 ? parts[0] : parts.slice(0, -1).join(", ") + " and " + parts[parts.length - 1];
+  return (fac.atm > 0 || fac.debt > 0 ? "undrawn " : "") + list;
+}
+
 function computeForwardRunway(theCase, opts) {
   const scenario = { label: "unrisked", shareMultiplierPct: 100, posMultiplierPct: 100, discountRateAddPct: 0, color: "" };
   const programVals = theCase.programs.map(p => computeProgramValuation({ ...p, posOverridePct: "100" }, scenario, null));

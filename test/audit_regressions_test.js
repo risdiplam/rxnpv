@@ -727,9 +727,9 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
     cashIn.focus(); setVal(cashIn, "20"); await wait(300); cashIn.blur(); await wait(200);
     click(btn("Tools")); await wait(500); click(btn("Company")); await wait(400); click(btn("Runway vs. Catalyst")); await wait(700);
     const card = [...d.querySelectorAll("[data-export-section]")].find(e => /does the cash reach/.test(e.textContent));
-    ok(!!card && /With facilities/.test(card.textContent) && /\+ \$97\.0M undrawn ATM, debt and expected milestones/.test(card.textContent), "Runway vs. Catalyst: the runway with facilities beside the modelled one");
+    ok(!!card && /With facilities/.test(card.textContent) && /\+ \$97\.0M undrawn ATM/.test(card.textContent), "Runway vs. Catalyst: the runway with facilities beside the modelled one");
     const fb = card && card.querySelector(".financing-bridge");
-    ok(!!fb && /About \$19\.0M to get past the end of "FREEDOM2 10 mg\/kg data" \(2026-11\) with the 6-month cushion/.test(fb.textContent) && /The \$97\.0M of undrawn ATM, debt and expected milestones entered would cover it/.test(fb.textContent), "Runway vs. Catalyst: the financing bridge, covered by the ATM (" + (fb && fb.textContent.slice(0, 300)) + ")");
+    ok(!!fb && /About \$19\.0M to get past the end of "FREEDOM2 10 mg\/kg data" \(2026-11\) with the 6-month cushion/.test(fb.textContent) && /The \$97\.0M of undrawn ATM entered would cover it/.test(fb.textContent), "Runway vs. Catalyst: the financing bridge, covered by the ATM (" + (fb && fb.textContent.slice(0, 300)) + ")");
     // Without the ATM, the $19M is a raise: shares, Base with and without.
     click(btn("Workspace")); await wait(300); click(d.getElementById("casetab-assumptions")); await wait(300);
     const atmIn = [...d.getElementById("casepanel-assumptions").querySelectorAll("input")].find(i => i.getAttribute("aria-label") === "Undrawn ATM ($M)");

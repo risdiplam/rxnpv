@@ -284,7 +284,7 @@ function sampleCaseStoke() {
       // $194M after Cantor's 3%. The automatic shelf has no fixed cap, so no
       // remaining-shelf figure. Feeds the "with facilities" runway only.
       atmUndrawn: String(194e6), debtUndrawn: "", milestoneExpected: "", shelfRemaining: "",
-      facilitiesNote: "424B5 2026-08-03: $200M Cantor ATM, $194M after 3% (also the modelled raise)"
+      facilitiesNote: "424B5 2026-08-03: $200M Cantor ATM, $194M after 3%; also the modelled raise"
     },
     // The fresh $200M ATM (424B5, 2026-08-03), net of Cantor's 3%: $194M at
     // $24.06 a share, i.e. $200M gross at today's $24.80. Dollars (MillionsField).
