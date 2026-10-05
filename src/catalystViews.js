@@ -149,14 +149,18 @@ function OutcomeTreeSection({ theCase, discountRatePct, tv, baseValue, onChange 
 }
 
 // ── Before the next readout: the three results as a table ──────────────────
-function readReadoutScenarios(rows, weighted, price, base) {
+// fda: the gate is the FDA decision (a filed program), so the results are a
+// broad label, a narrow one and a rejection rather than trial wins and a miss.
+function readReadoutScenarios(rows, weighted, price, base, fda) {
   if (!rows || rows.length !== 3) return null;
   const [clear, modest, miss] = rows;
+  const W = fda ? { A: "An approval", a: "an approval", clearA: "A broad label", modestA: "a narrow one", miss: "a rejection", Miss: "A rejection", even: "Even an approval" }
+    : { A: "A win", a: "a win", clearA: "A clear win", modestA: "a modest one", miss: "a miss", Miss: "The miss", even: "Even a win" };
   const move = v => (v >= price ? "+" : "−") + Math.abs(Math.round((v / price - 1) * 100)) + "%";
-  if (!(price > 0)) return { verdict: "A win is worth " + fmtShare(modest.value) + " to " + fmtShare(clear.value) + "; a miss leaves ≈" + fmtShare(miss.value) + ".",
+  if (!(price > 0)) return { verdict: W.A + " is worth " + fmtShare(modest.value) + " to " + fmtShare(clear.value) + "; " + W.miss + " leaves ≈" + fmtShare(miss.value) + ".",
     text: "Weighted by these chances, " + fmtShare(weighted) + (base != null ? ", against the Base case's " + fmtShare(base) : "") + "." };
   const lo = Math.min(clear.value, modest.value), hi = Math.max(clear.value, modest.value);
-  const winText = lo >= price ? "A win is worth " + move(lo) + " to " + move(hi) : hi >= price ? "A clear win is worth " + move(hi) + ", a modest one " + move(lo) : "Even a win is worth " + move(hi) + " at best";
+  const winText = lo >= price ? W.A + " is worth " + move(lo) + " to " + move(hi) : hi >= price ? W.clearA + " is worth " + move(hi) + ", " + W.modestA + " " + move(lo) : W.even + " is worth " + move(hi) + " at best";
   // "One time in four" only when the chance really is near one in N; a 63%
   // miss rounded to "one time in two" (PepGen). Otherwise say it in tenths.
   const words = ["no", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten"];
@@ -167,9 +171,9 @@ function readReadoutScenarios(rows, weighted, price, base) {
     : miss.prob < 0.075 ? "less than one time in ten"
     : tenths >= 10 ? "almost every time"
     : "about " + words[tenths] + " time" + (tenths === 1 ? "" : "s") + " in ten";
-  return { verdict: winText + "; a miss " + (miss.value < price ? "costs " + Math.abs(Math.round((miss.value / price - 1) * 100)) + "%" : "still clears today's price") + ".",
+  return { verdict: winText + "; " + W.miss + " " + (miss.value < price ? "costs " + Math.abs(Math.round((miss.value / price - 1) * 100)) + "%" : "still clears today's price") + ".",
     text: "Weighted by these chances, the three come to " + fmtShare(weighted) + " — " + Math.abs(Math.round((weighted / price - 1) * 100)) + "% " + (weighted >= price ? "above" : "below") + " today's price" +
-      (base != null ? ", against the Base case's " + fmtShare(base) : "") + "." + (freq ? " The miss happens " + freq + " in this case, so the question the price is asking is whether that is too generous." : "") };
+      (base != null ? ", against the Base case's " + fmtShare(base) : "") + "." + (freq ? " " + W.Miss + " happens " + freq + " in this case, so the question the price is asking is whether that is too generous." : "") };
 }
 
 function ReadoutScenariosSection({ theCase, discountRatePct, tv, baseValue, onChange }) {
@@ -191,7 +195,10 @@ function ReadoutScenariosSection({ theCase, discountRatePct, tv, baseValue, onCh
   const pct1 = v => Math.round(v * 10) / 10;
   const input = (key, placeholder, label) => h("input", { type: "number", min: 0, max: key.endsWith("SharePct") ? undefined : 100, step: 1, className: "rs-input",
     value: s[key] == null ? "" : s[key], placeholder: String(Math.round(placeholder)), "aria-label": label, onChange: e => setS({ [key]: e.target.value }) });
-  const names = { clear: "Clear win", modest: "Modest win", miss: "Miss" };
+  // A filed program's next gate is the FDA decision: an approval with a broad
+  // or a narrow label, or none (October 2026; the wording was a trial's).
+  const fda = r.gate.key === "regulatory";
+  const names = fda ? { clear: "Broad label", modest: "Narrow label", miss: "Not approved" } : { clear: "Clear win", modest: "Modest win", miss: "Miss" };
   const colors = { clear: "var(--green)", modest: "var(--teal)", miss: "var(--red)" };
   const axisHi = niceAxisTicks(0, Math.max(...r.rows.map(x => x.value), price || 0), 4).hi;
   const bar = row => h("svg", { viewBox: "0 0 220 22", width: 220, height: 22, "aria-hidden": "true", style: { display: "block" } },
@@ -201,7 +208,8 @@ function ReadoutScenariosSection({ theCase, discountRatePct, tv, baseValue, onCh
   return h(ExportSection, { title: "Before the next readout", style: { marginTop: 16, borderTop: "1px dashed var(--rule)", paddingTop: 14 } },
     h("div", { style: { fontSize: 13, fontFamily: "var(--display)", fontWeight: 600, color: "var(--ink-1)", marginBottom: 4 } }, name + ": what each result would do to the value"),
     h("div", { className: "prose", style: { ...UI.caption, marginBottom: 10 } },
-      "Each result run through the model as if already known. The chance of a positive readout (" + Math.round(r.gate.pass * 100) + "%) is this case's own; how wins split between clear and modest, and what each does to the odds and the share, are yours to set — blank fields use the defaults shown."),
+      fda ? "Each result run through the model as if already known. The chance of approval (" + Math.round(r.gate.pass * 100) + "%) is this case's own; how approvals split between a broad and a narrow label (a narrower population, restrictions, a boxed warning), and what each does to the share, are yours to set — blank fields use the defaults shown."
+        : "Each result run through the model as if already known. The chance of a positive readout (" + Math.round(r.gate.pass * 100) + "%) is this case's own; how wins split between clear and modest, and what each does to the odds and the share, are yours to set — blank fields use the defaults shown."),
     h("div", { className: "proj-table-wrap" },
       h("table", { className: "proj-table rs-table" },
         h("thead", null, h("tr", null, ["Result", "Odds to launch after it", "Peak share vs Base", "Chance", "Value / share", "vs today", price != null ? "│ today " + fmtShare(price) : ""].map((c, i) => h("th", { key: i, scope: "col", className: i === 0 || i === 6 ? "l" : "", style: i === 6 ? { color: "var(--warn)" } : null }, c)))),
@@ -215,12 +223,13 @@ function ReadoutScenariosSection({ theCase, discountRatePct, tv, baseValue, onCh
           h("td", { className: "l" }, bar(row))))),
         h("tfoot", null, h("tr", null,
           h("td", { className: "l" }, "Weighted by chance"),
-          h("td", { className: "l", colSpan: 2 }, h("span", { className: "rs-cell" }, "Clear wins are ", input("clearOfWinsPct", READOUT_DEFAULTS.clearOfWinsPct, "Clear wins as a share of all wins (%)"), "% of wins")),
+          h("td", { className: "l", colSpan: 2 }, h("span", { className: "rs-cell" }, fda ? "Broad labels are " : "Clear wins are ", input("clearOfWinsPct", READOUT_DEFAULTS.clearOfWinsPct, fda ? "Broad labels as a share of all approvals (%)" : "Clear wins as a share of all wins (%)"), fda ? "% of approvals" : "% of wins")),
           h("td", null, "100%"),
           h("td", null, fmtShare(r.weighted)),
           h("td", { style: price && r.weighted >= price ? { color: "var(--green)" } : null, className: price && r.weighted < price ? "neg" : "" }, move(r.weighted)),
           h("td", null, ""))))),
-    h(Explain, readReadoutScenarios(r.rows, r.weighted, price, baseValue)),
+    h(Explain, readReadoutScenarios(r.rows, r.weighted, price, baseValue, fda)),
     h("div", { className: "prose", style: { ...UI.caption, marginTop: 8 } },
-      "Defaults: a modest win leaves the odds this case already has after a positive readout (" + pct1(r.conditionalPosPct) + "%); a clear win closes 40% of the gap to certainty (" + pct1(r.defaults.clearPosPct) + "%). A miss is the failure floor. Values are the model re-run, not a forecast of the share price on the day."));
+      fda ? "Defaults: an approval means launch (odds 100%); a narrow label carries " + READOUT_DEFAULTS.modestSharePct + "% of Base peak share, a broad one " + READOUT_DEFAULTS.clearSharePct + "%. Not approved is the failure floor. Values are the model re-run, not a forecast of the share price on the day."
+        : "Defaults: a modest win leaves the odds this case already has after a positive readout (" + pct1(r.conditionalPosPct) + "%); a clear win closes 40% of the gap to certainty (" + pct1(r.defaults.clearPosPct) + "%). A miss is the failure floor. Values are the model re-run, not a forecast of the share price on the day."));
 }

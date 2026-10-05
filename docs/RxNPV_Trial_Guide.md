@@ -7,6 +7,10 @@ For the hands-on trial that started in October 2026: using the app as the finish
 1. **Turn on automatic backup.** Sidebar → *Backup & restore* → choose a folder (`~/Documents/RxNPV-backups` already holds the manual backups). From then on the app writes a fresh copy whenever your data changes, and the sidebar line says when it last did. Until a folder is chosen the line reads "Automatic backup is off".
 2. **Note the build.** The foot of the sidebar names it, e.g. `RxNPV 1.0.0 · 175f0be · built 2026-10-05`. That names the exact code you are running.
 
+## The checklist and the manual case
+
+[`RxNPV_Trial_Checklist.md`](RxNPV_Trial_Checklist.md) walks every feature in order, building **Spruce (SPRB)** from scratch with [`RxNPV_SPRB_Reference.md`](RxNPV_SPRB_Reference.md): every figure from Spruce's filings with its source, the judgment calls left to you, and what each screen should show. The two sample cases are the reference to compare against.
+
 ## Reporting what you find
 
 One line each is enough. A screenshot helps whenever the problem is something you can see.

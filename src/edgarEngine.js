@@ -357,10 +357,12 @@ function calcRunwayFromFacts(facts) {
   // as the operating loss (the same filing, normally).
   const useCash = opCash && opCash.value < 0 && (!opLoss || (opCash.end || "") >= (opLoss.end || ""));
   const burn = useCash ? opCash : opLoss;
-  if (!burn || burn.value >= 0) return { cashUSD: totalCash, cashTags: cashParts, debtUSD: extractDebt(ug), runwayMonths: null, asOf: cash?.end || invest?.end, note: "operating loss not available" };
+  const debt = extractDebt(ug, cash?.end || invest?.end);
+  const debtOut = { debtUSD: debt ? debt.value : null, debtTags: debt ? debt.tags : [], debtFaceUSD: debt ? debt.faceUSD : null };
+  if (!burn || burn.value >= 0) return { cashUSD: totalCash, cashTags: cashParts, ...debtOut, runwayMonths: null, asOf: cash?.end || invest?.end, note: "operating loss not available" };
   const monthlyBurn = Math.abs(burn.value) / burn.months;
   return {
-    cashUSD: totalCash, cashTags: cashParts, debtUSD: extractDebt(ug),
+    cashUSD: totalCash, cashTags: cashParts, ...debtOut,
     quarterlyBurnUSD: monthlyBurn * 3,          // normalised, whatever span was reported
     burnPeriodMonths: burn.months,              // what the filing actually reported
     burnBasis: useCash ? "cash used in operations" : "operating loss",
@@ -371,20 +373,31 @@ function calcRunwayFromFacts(facts) {
 }
 
 // New for RxNPV: total debt, to auto-fill the Capital Structure panel's debt field
-function extractDebt(ug) {
-  const debtTags = ["LongTermDebtNoncurrent", "LongTermDebt", "DebtCurrent", "NotesPayableCurrent"];
-  let total = 0, found = false;
-  for (const t of debtTags) {
-    const fact = ug[t];
-    if (!fact || !fact.units?.USD) continue;
-    const sorted = [...fact.units.USD].filter(p => (p.form === "10-Q" || p.form === "10-K") && p.val > 0).sort((a,b) => (b.end||"").localeCompare(a.end||""));
-    // Summed across same-date rows for the same reason as warrants/options:
-    // layered facilities (a senior term loan plus a separate equipment note)
-    // can land under one tag, and taking only the first row dropped the rest.
-    const part = sumTranchesAtLatestDate(sorted);
-    if (part) { total += part.value; found = true; }
-  }
-  return found ? total : null;
+// Debt as the balance sheet carries it, on the cash's own date (October 2026
+// audit). LongTermDebt is the TOTAL — current plus non-current — so adding it
+// to LongTermDebtNoncurrent counted debt twice (Spruce: $24.5M against a $7.1M
+// balance sheet). Components first (non-current + current), the total only
+// when no component is filed, and only facts dated with the cash, so a loan
+// repaid years ago (its tag simply no longer filed) is never counted. Where
+// the face amount is materially above the carrying value — a loan recorded
+// net of a large discount — it is reported beside it (faceUSD), not instead.
+function extractDebt(ug, asOf) {
+  const at = (tag) => {
+    const fact = ug[tag];
+    if (!fact || !fact.units || !fact.units.USD) return null;
+    const rows = fact.units.USD.filter(p => (p.form === "10-Q" || p.form === "10-K") && p.val > 0 && (!asOf || p.end === asOf))
+      .sort((a, b) => (b.end || "").localeCompare(a.end || ""));
+    const part = sumTranchesAtLatestDate(rows);
+    return part ? { tag, value: part.value, asOf: part.asOf } : null;
+  };
+  const nonCurrent = at("LongTermDebtNoncurrent");
+  const current = at("LongTermDebtCurrent") || at("DebtCurrent") || at("NotesPayableCurrent");
+  const parts = [nonCurrent, current].filter(Boolean);
+  const chosen = parts.length ? parts : [at("LongTermDebt")].filter(Boolean);
+  if (!chosen.length) return null;
+  const value = chosen.reduce((sum, x) => sum + x.value, 0);
+  const faceRow = at("DebtInstrumentCarryingAmount") || at("DebtInstrumentFaceAmount");
+  return { value, tags: chosen.map(x => ({ tag: x.tag, value: x.value })), faceUSD: faceRow && faceRow.value > value * 1.1 ? faceRow.value : null, faceTag: faceRow ? faceRow.tag : null };
 }
 
 // The most recent 10-Q or 10-K whose period ends after the case's cash date —
@@ -617,6 +630,11 @@ async function pullEdgarFinancials(companyName, force) {
   const runway = calcRunwayFromFacts(facts);
   const options = extractOptions(facts);
   const warrants = extractWarrants(facts);
+  // Potentially dilutive shares the filing excluded from EPS (options,
+  // warrants, RSUs, conversions — one total). Shown when options and warrants
+  // are not tagged, so a basic-only "fully diluted" count is never silent
+  // (Spruce tags neither: 409,850 excluded against 2.87M basic, October 2026).
+  const antidilutive = facts && facts.facts ? pickLatestUnit((facts.facts["us-gaap"] || {}).AntidilutiveSecuritiesExcludedFromComputationOfEarningsPerShareAmount, isFilingForm) : null;
   const converts = extractConvertibleNotes(facts);
   const recentFilings = subs ? recentFilingsByType(subs, ["10-K", "10-Q", "8-K"], 5) : [];
   const cikNumeric = String(Number(cikInfo.cik)); // strip leading zeros for the Archives URL format
@@ -631,7 +649,7 @@ async function pullEdgarFinancials(companyName, force) {
     ok: true, cik: cikInfo.cik, ticker: cikInfo.ticker, name: subs?.name || cikInfo.name,
     basicShares: shares ? shares.shares : null, basicSharesAsOf: shares ? shares.asOf : null,
     dilutedShares: diluted ? diluted.shares : null, dilutedSharesAsOf: diluted ? diluted.asOf : null,
-    cash: runway ? runway.cashUSD : null, cashTags: runway ? runway.cashTags || [] : [], debt: runway ? runway.debtUSD : null,
+    cash: runway ? runway.cashUSD : null, cashTags: runway ? runway.cashTags || [] : [], debt: runway ? runway.debtUSD : null, debtTags: runway ? runway.debtTags || [] : [], debtFace: runway ? runway.debtFaceUSD || null : null,
     asOf: runway ? runway.asOf : null,
     quarterlyBurnUSD: runway ? runway.quarterlyBurnUSD : null,
     burnBasis: runway ? runway.burnBasis || null : null, burnPeriodMonths: runway ? runway.burnPeriodMonths || null : null, burnPeriodEnd: runway ? runway.burnPeriodEnd || null : null,
@@ -640,6 +658,7 @@ async function pullEdgarFinancials(companyName, force) {
     options: options ? { count: options.count, avgStrike: options.avgStrike, priceFound: options.priceFound, asOf: options.asOf || null } : null,
     warrants: warrants ? { count: warrants.count, avgStrike: warrants.avgStrike, priceFound: warrants.priceFound, asOf: warrants.asOf || null } : null,
     convertibleFace: converts ? converts.faceValue : null,
+    antidilutive: antidilutive && antidilutive.value > 0 ? { count: antidilutive.value, asOf: antidilutive.asOf } : null,
     recentFilings, sourceFilingUrl,
     sourceFilingLabel: mostRecentFinancialFiling ? mostRecentFinancialFiling.form + " filed " + mostRecentFinancialFiling.date : null,
     edgarCompanyPageUrl

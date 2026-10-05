@@ -390,6 +390,10 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
     // miss $2 (-90%); weighted $24 = +20%; miss chance 0.25 -> "one time in four".
     const rr = w.readReadoutScenarios([{ value: 30, prob: 0.45 }, { value: 22, prob: 0.3 }, { value: 2, prob: 0.25 }], 24, 20, 25);
     ok(rr && rr.verdict === "A win is worth +10% to +50%; a miss costs 90%." && rr.text.includes("$24.00 — 20% above today's price, against the Base case's $25.00") && rr.text.includes("about one time in four"), "Readout: the reading states the moves and the weighted value");
+    // A filed program's gate is the FDA decision: the same numbers read as a
+    // broad label, a narrow one and a rejection (October 2026).
+    const rf = w.readReadoutScenarios([{ value: 30, prob: 0.45 }, { value: 22, prob: 0.3 }, { value: 2, prob: 0.25 }], 24, 20, 25, true);
+    ok(rf && rf.verdict === "An approval is worth +10% to +50%; a rejection costs 90%." && rf.text.includes("A rejection happens about one time in four"), "Readout at the FDA stage: approval and rejection, not a trial's win and miss (" + (rf && rf.verdict) + ")");
     // A 63% miss is "about six times in ten", not "one time in two" (PepGen);
     // 28% is "about three times in ten", 5% "less than one time in ten".
     const missSays = pm => (w.readReadoutScenarios([{ value: 30, prob: (1 - pm) / 2 }, { value: 22, prob: (1 - pm) / 2 }, { value: 2, prob: pm }], 10, 20, 25) || {}).text || "";

@@ -3319,6 +3319,18 @@ section("EDGAR — missing data degrades cleanly instead of throwing");
   ok("extractSharesOutstanding returns null", api.extractSharesOutstanding(empty) === null);
   ok("extractDilutedShares returns null", api.extractDilutedShares(empty) === null);
   ok("extractDebt returns null", api.extractDebt({}) === null);
+  // Spruce's own Q2 2026 tags (companyfacts, 2026-10-05): the balance sheet
+  // is $2.5M current + $4.591M non-current = $7.091M; LongTermDebt $19.944M is
+  // the repayment schedule with interest; DebtInstrumentCarryingAmount $16.6M
+  // is the face ($15M principal + the $1.6M final payment).
+  const q = v => ({ units: { USD: [{ val: v, end: "2026-06-30", form: "10-Q" }] } });
+  const sprb = { LongTermDebtNoncurrent: q(4591000), LongTermDebtCurrent: q(2500000), LongTermDebt: q(19944000), DebtInstrumentCarryingAmount: q(16600000) };
+  const dS = api.extractDebt(sprb, "2026-06-30");
+  ok("Spruce: the balance sheet's $7.091M, not the $24.5M sum that counted LongTermDebt on top", dS && dS.value === 7091000);
+  ok("... with the $16.6M face beside it, the tags named", dS.faceUSD === 16600000 && dS.tags.map(t => t.tag).join("+") === "LongTermDebtNoncurrent+LongTermDebtCurrent");
+  ok("only the total filed: the total is used", api.extractDebt({ LongTermDebt: q(30000000) }, "2026-06-30").value === 30000000);
+  ok("a loan whose tag stopped being filed years ago is not counted", api.extractDebt({ LongTermDebtNoncurrent: { units: { USD: [{ val: 9e6, end: "2022-12-31", form: "10-K" }] } } }, "2026-06-30") === null);
+  ok("no face reported when it is within 10% of the carrying value", api.extractDebt({ LongTermDebtNoncurrent: q(10e6), DebtInstrumentCarryingAmount: q(10.5e6) }, "2026-06-30").faceUSD === null);
   ok("calcRunwayFromFacts returns null", api.calcRunwayFromFacts(empty) === null);
   ok("calcRunwayFromFacts survives a malformed response", api.calcRunwayFromFacts(null) === null);
 }

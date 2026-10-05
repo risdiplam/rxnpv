@@ -191,7 +191,7 @@ function ProgramEditor({ program, onChange, onDelete, discountRatePct, terminalV
         h("div", { style: UI.fieldLabel }, "Current phase"),
         h("select", { "aria-label": "Current phase", value: program.currentPhase, onChange: e => set("currentPhase", e.target.value),
           style: UI.input },
-          ["phase1","phase2","phase3","filed","approved"].map(p => h("option", { key: p, value: p }, p.replace("phase","Phase "))))),
+          [["phase1", "Phase 1"], ["phase2", "Phase 2"], ["phase3", "Phase 3"], ["filed", "Filed (NDA/BLA)"], ["approved", "Approved"]].map(([p, label]) => h("option", { key: p, value: p }, label)))),
       h("div", { style: { flex: "1 1 140px" } },
         h("div", { style: UI.fieldLabel }, "Launch in year (from today)"),
         h("input", { type: "number", step: 1, min: 0, "aria-label": "Launch in year (from today)", value: program.launchYearOffset, onChange: e => set("launchYearOffset", e.target.value),

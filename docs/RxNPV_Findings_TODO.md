@@ -26,6 +26,9 @@ Every changed line of the pass read; four real defects found and fixed — every
 ### 🟢 Release candidate for the hands-on trial (2026-10-05, after the October product pass)
 The installed build is the one to use; its stamp is at the foot of the sidebar (`b41a52c`). Every automated check passes on it (build log, Phases 51–52): 16 suites in both modes, packaged offline/reopen/live, API health, canary, the UI audit, the button sweep and the export sweep on both samples. The one manual click below was last done before the decision memo existed; the trial guide's report step covers it. What remains is the user's own trial: `RxNPV_Trial_Guide.md`. **Automatic backup is not yet turned on for the user's real data**: one click in Backup & restore, and the first step of the trial guide.
 
+### 🟡 Royalties and milestones owed to a licensor (the user's call)
+Found preparing the SPRB manual case (2026-10-05). Partnership Economics models money a partner pays the company (out-licensing); nothing models what an in-licensing company owes its licensor — Spruce owes BioMarin up to $25.5M at approval plus high-single- to low-double-digit royalties, material on ~3M shares. Workaround in `RxNPV_SPRB_Reference.md` (royalty added to COGS %, the milestone to R&D to Launch's cost override). A proper input (royalty % owed, milestones at approval/sales) would be small and is common to many small-cap cases — a scope decision, not built.
+
 ### 🟡 Decisions the October 2026 audit surfaced (the user's call)
 - **GAP-001 — Pipeline view / 10-K vs CT.gov mismatch: DECIDED 2026-10-03, moved to OPEN** in the Feature Map (the user: "go with your best recommendations"). The CT.gov half exists (Company Lookup, Asset Program); the 10-K half means reading free-text pipeline tables out of annual reports — fragile parsing of the kind this project has been burned by.
 - **GAP-002 — Payer coverage / formulary access** stays OPEN: no reliable free source. Not faked.

@@ -49,6 +49,9 @@ function sampleCaseStoke() {
     // UK trials registered on ISRCTN, so they have no NCT number.
     trialIds: "NCT06872125, NCT04442295, NCT04740476",
     target: "SCN1A",
+    // The IRA clock, set and left off: an orphan-only drug is excluded from
+    // negotiation (Evidence Log: IRA price negotiation).
+    ira: { enabled: false, reductionPct: "", effectiveYears: "9" },
     posOverridePct: "65",
     // Company guides a US launch in early 2028, ~1.4 years out. The model works
     // in whole years, and year 1 puts the first sales year's cash at ~Sep 2028
@@ -144,8 +147,12 @@ function sampleCaseStoke() {
         "The $150M sales agreement under the March 2026 automatic shelf is essentially used: about 4.7M shares sold for $146.4M net (2.6M by June 30, $80.7M; 2.1M after, $65.7M, which is in this case's cash). A fresh $200M at-the-market prospectus with Cantor followed on August 3. Entered as $194M undrawn after the 3% commission, so the runway \"with facilities\" counts it; this case also models the same $194M as its future raise, which is the valuation's view of it. The automatic shelf has no fixed dollar cap, so remaining shelf capacity is left blank."),
       ev("Share price $24.80", "fact", "high", "Close on 2026-09-25 (stockanalysis.com)",
         "Down from $29.20 on Sep 22; the week included a board change (former CEO Edward Kaye resigned as a director, Bo Cumbo appointed; 8-K 2026-09-25). No clinical news. Update the price before relying on the upside figure."),
+      ev("IRA price negotiation: set, and left off", "inference", "moderate", "Social Security Act §1192(e)(3)(A), the orphan-drug exclusion (broadened in July 2025 to drugs for one or more rare diseases); Stoke 10-K FY2025 (orphan designation)",
+        "Zorevunersen would be approved under an NDA, so the negotiation clock is the small-molecule one: about 9 years from approval (selection at ~7, the price two years later). But a drug approved only for rare diseases is excluded from negotiation, and Dravet syndrome is one, so the clock is set to 9 years and left off — the cut is blank on purpose. Switch it on (Assumptions → Exclusivity & LOE) only if the label grows beyond rare indications."),
+      ev("Who reads out first: Dravet Phase 3 (ClinicalTrials.gov, read 2026-10-05)", "fact", "high", "ClinicalTrials.gov registry records, primary completion dates as registered",
+        "Saved to this case from Trial Explorer's competitor search (Dravet syndrome, Phase 3), Stoke's own three trials left out. Before EMPEROR's Q3 2027 window: Longboard's (now Lundbeck's) bexicaserin Phase 3, NCT06660394, primary completion 2026-12-31; Epygenix's EPX-100 (clemizole), NCT04462770, 2027-04; and UCB's NCT06118255 (2026-09-01, completed), a fenfluramine safety and pharmacokinetics study in young children rather than an efficacy readout. After it: Longboard's open-label NCT06908226 (2027-11). A completion date is when a trial stops collecting data, not when results come out; the Portfolio's catalyst list shows these under EMPEROR."),
       ev("Worked examples: what is and is not included", "inference", "high", "This case's Saved tab",
-        "Every tool and simulation has a worked example on the Saved tab, set up for this case with its sources. Two parts are deliberately left out. Non-inferiority: EMPEROR is a superiority trial against sham and no Dravet trial has used a non-inferiority design, so any example would be invented. Receptor occupancy and the PK/PD effect model: an antisense oligonucleotide acts by raising NaV1.1 protein over weeks, not by occupying a receptor in proportion to its concentration, so only the PK half of that tool is used. The comps these examples read — UCB–Zogenix, Spinraza, Fintepla and Epidiolex sales, and this Stoke–Biogen deal — were added to the app's tables from primary sources (docs/comps_candidates/2026-09-28-dravet.md).")
+        "Every tool and simulation has a worked example on the Saved tab, set up for this case with its sources. Two parts are deliberately left out. Non-inferiority: EMPEROR is a superiority trial against sham and no Dravet trial has used a non-inferiority design, so any example would be invented. Receptor occupancy and the PK/PD effect model: an antisense oligonucleotide acts by raising NaV1.1 protein over weeks, not by occupying a receptor in proportion to its concentration, so only the PK half of that tool is used. The options move (Binary Event → What the options price) is left empty: no options price is a sourced public figure here, so type the at-the-money straddle from your own broker. The comps these examples read — UCB–Zogenix, Spinraza, Fintepla and Epidiolex sales, and this Stoke–Biogen deal — were added to the app's tables from primary sources (docs/comps_candidates/2026-09-28-dravet.md).")
     ],
     calibrationLog: [
       { id: newId("cal"), catalystLabel: "EMPEROR Phase 3 topline, through to approval (PoS to launch)", catalystDate: "2027-Q3",
@@ -254,6 +261,13 @@ function sampleCaseStoke() {
     valuationDate: SAMPLE_CASE_AS_OF,
     currentPrice: "24.80",
     priceAsOf: "2026-09-25", // the close it came from (Evidence Log: Share price)
+    // Trial Explorer's "who reads out first", saved to the case (Evidence Log:
+    // Who reads out first). Feeds the Portfolio catalyst list.
+    competitorReads: { condition: "Dravet syndrome", phase: "PHASE3", at: "2026-10-05", rows: [
+      { nctId: "NCT06118255", sponsor: "UCB BIOSCIENCES, Inc.", phase: "PHASE3", date: "2026-09-01", which: "primary completion" },
+      { nctId: "NCT06660394", sponsor: "Longboard Pharmaceuticals", phase: "PHASE3", date: "2026-12-31", which: "primary completion" },
+      { nctId: "NCT04462770", sponsor: "Epygenix", phase: "PHASE3", date: "2027-04", which: "primary completion" },
+      { nctId: "NCT06908226", sponsor: "Longboard Pharmaceuticals", phase: "PHASE3", date: "2027-11-11", which: "primary completion" }] },
     // What would change this case's mind, written before EMPEROR reads out
     // (Evidence tab; printed in the decision memo). Judgments that follow
     // from the Evidence Log, not company statements.
@@ -342,6 +356,7 @@ function sampleCasePepGen() {
     // FREEDOM2 (Phase 2 MAD, lead), FREEDOM (single dose), and the open-label extension.
     trialIds: "NCT06667453, NCT06204809, NCT07220603",
     target: "DMPK",
+    ira: { enabled: false, reductionPct: "", effectiveYears: "9" },
     posOverridePct: "15",
     launchYearOffset: "5",
     revenueMode: "full",
@@ -414,8 +429,12 @@ function sampleCasePepGen() {
         "The explicit cash flows run through loss of exclusivity and the decline after it, so a terminal value on top would count value already written down. The exit multiples (3x / 4x / 5x) are filled so switching it on gives a sourced answer: Base would rise to ~$2.16."),
       ev("Napkin mode check", "inference", "high", "This case, Full vs Napkin",
         "The Napkin peaks are the Full build's own peak revenues ($1.26B Base, $0.75B Bear, $1.76B Bull). Napkin on those gives ~$1.96 against the Full model's $1.69. The gap is the Full build's cost detail and its ex-US sales starting 1.5 years after the US; one Quick curve starts everything on launch day, so it reads higher."),
+      ev("IRA price negotiation: set, and left off", "inference", "moderate", "Social Security Act §1192(e)(3)(A), the orphan-drug exclusion (broadened in July 2025 to drugs for one or more rare diseases); PepGen 10-K FY2025 (orphan designation)",
+        "PGN-EDODM1 is a peptide-conjugated oligonucleotide, so the negotiation clock would be the small-molecule one: about 9 years from approval. A drug approved only for rare diseases is excluded from negotiation, and DM1 is one, so the clock is set to 9 years and left off, with no cut entered. Switch it on (Assumptions → Exclusivity & LOE) only if the label grows beyond rare indications."),
+      ev("Who reads out first: DM1 Phase 3 (ClinicalTrials.gov, read 2026-10-05)", "fact", "high", "ClinicalTrials.gov registry records, primary completion dates as registered",
+        "Saved to this case from Trial Explorer's competitor search (myotonic dystrophy type 1, Phase 3). Avidity's del-desiran HARBOR, NCT06411288, completed 2026-07-23, before FREEDOM2's November window — and missed (Evidence: HARBOR failure). Still to come: AP-HP's metformin trial, NCT05532813 (2026-11); AMO's tideglusib, NCT05004129 (2026-12-31, congenital and childhood-onset DM1); Lupin's mexiletine PR, NCT06523400 (2027-06, a symptomatic treatment for myotonia, not disease-modifying); Dyne's zeleciment basivarsen Phase 3, NCT07486934 (2028-07; Evidence: Dyne). A Phase 2 search reads nothing out before FREEDOM2: Sarepta's SRP-1003 (2026-12-31) and Vertex's VX-670 (2027-02) come after it. A completion date is when a trial stops collecting data, not when results come out."),
       ev("Worked examples: what is and is not included", "inference", "high", "This case's Saved tab",
-        "Each tool and simulation with real DM1 data behind it has a worked example on the Saved tab. Left out, because there is nothing honest to put in: Launch & Actuals (no DM1 drug is approved, and Sarepta's PMOs, the closest modality, do not appear in Medicare's Part B or Part D spending files — checked 2026-09-30); the Phase 2→3 Translator, Meta-Analysis, Fragility Index, P-value↔CI, Single-Arm CI, 2×2 and Multiplicity (DM1 trials report splicing indices and timed functional tests, not responder counts, and none has posted controlled results); Non-Inferiority (no DM1 trial uses one). The PK/PD example is plasma pharmacokinetics from the approved PMO class, which clears within hours — muscle exposure is what PepGen measures, and the tool does not model tissue."),
+        "Each tool and simulation with real DM1 data behind it has a worked example on the Saved tab. Left out, because there is nothing honest to put in: Launch & Actuals (no DM1 drug is approved, and Sarepta's PMOs, the closest modality, do not appear in Medicare's Part B or Part D spending files — checked 2026-09-30); the Phase 2→3 Translator, Meta-Analysis, Fragility Index, P-value↔CI, Single-Arm CI, 2×2 and Multiplicity (DM1 trials report splicing indices and timed functional tests, not responder counts, and none has posted controlled results); Non-Inferiority (no DM1 trial uses one). The PK/PD example is plasma pharmacokinetics from the approved PMO class, which clears within hours — muscle exposure is what PepGen measures, and the tool does not model tissue. The options move (Binary Event → What the options price) is left empty: no options price is a sourced public figure here, so type the at-the-money straddle from your own broker."),
       ev("What the model says (snapshot)", "inference", "moderate", "This case, 2026-09-30",
         "At $2.34: Base fair value ~$1.69 (about 28% below the price), Bear ~$0.89, Bull ~$3.12, after the modelled $100M raise; peak revenue ~$1.26B in Base ($648M US). The price implies ~23% odds of launch against this case's 15%. If PGN-EDODM1 is approved it is worth ~$8.36 a share on Base inputs. The failure floor reads $0: from the $117.2M the filing reported, the model charges the whole benchmark-proportioned Phase 2 cost (~$58M) as still to come, plus G&A to the readout and a year of wind-down, although FREEDOM2 is mostly paid for. The rough burn estimate (switch it on under the floor's note) gives ~$0.89: $5.7M a month for five months to the logged November data, less a year of wind-down — it reads the November data as the catalyst that decides the programme. Loss of exclusivity: a small-molecule cliff gives ~$1.52, a biologic-style decline ~$1.94.")
     ],
@@ -500,6 +519,14 @@ function sampleCasePepGen() {
     valuationDate: "2026-09-30",
     currentPrice: "2.34",
     priceAsOf: "2026-09-29", // the close it came from (Evidence Log: Share price)
+    competitorReads: { condition: "Myotonic dystrophy type 1", phase: "PHASE3", at: "2026-10-05", rows: [
+      { nctId: "NCT06411288", sponsor: "Avidity Biosciences, Inc.", phase: "PHASE3", date: "2026-07-23", which: "primary completion" },
+      { nctId: "NCT05532813", sponsor: "Assistance Publique - Hôpitaux de Paris", phase: "PHASE3", date: "2026-11", which: "primary completion" },
+      { nctId: "NCT05004129", sponsor: "AMO Pharma Limited", phase: "PHASE2/PHASE3", date: "2026-12-31", which: "primary completion" },
+      { nctId: "NCT06523400", sponsor: "Lupin Ltd.", phase: "PHASE3", date: "2027-06", which: "primary completion" },
+      { nctId: "NCT06549400", sponsor: "Lupin Ltd.", phase: "PHASE3", date: "2028-05-29", which: "primary completion" },
+      { nctId: "NCT07486934", sponsor: "Dyne Therapeutics", phase: "PHASE3", date: "2028-07", which: "primary completion" },
+      { nctId: "NCT07008469", sponsor: "Avidity Biosciences, Inc.", phase: "PHASE3", date: "2030-10", which: "primary completion" }] },
     memo: {
       efficacy: "The November 10 mg/kg data need splicing correction clearly above placebo — nearer the single-dose 29% than the multi-dose 5 mg/kg's 7%.",
       safety: "Another kidney-biomarker dose-limiting event at 10 or 12.5 mg/kg, or the partial clinical hold widening.",

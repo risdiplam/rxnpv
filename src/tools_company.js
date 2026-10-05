@@ -95,7 +95,7 @@ function CompanyLookupTool({ cases, updateCase, activeCase, onWatchTrial }) {
       programs: appendEdgarEvidenceToPrograms(c.programs, edgarResult, "Company Lookup's EDGAR pull"),
       updatedAt: Date.now()
     });
-    setExportMsg("Exported to \"" + c.name + "\"");
+    setExportMsg("Exported to \"" + c.name + "\"" + (!edgarResult.options && !edgarResult.warrants ? " — shares are basic only; add options and warrants yourself" : ""));
   };
 
   const loadInsiderActivity = async () => {
@@ -132,13 +132,16 @@ function CompanyLookupTool({ cases, updateCase, activeCase, onWatchTrial }) {
           h("div", null, "Basic shares: ", edgarResult.basicShares != null ? fmtNum(edgarResult.basicShares) + edgarAsOf(edgarResult.basicSharesAsOf) : "n/a"),
           edgarResult.dilutedShares != null && h("div", { title: "The weighted-average share count used for earnings per share. A loss-making company excludes options and warrants from it, so it is not a fully diluted count; the export builds that from basic shares, options and warrants instead." },
             "Weighted-average diluted, for EPS: ", fmtNum(edgarResult.dilutedShares), edgarAsOf(edgarResult.dilutedSharesAsOf), " — not a fully diluted count"),
-          h("div", null, "Cash & marketable securities: ", edgarResult.cash != null ? fmtMoney(edgarResult.cash) + edgarAsOf(edgarResult.asOf) : "n/a", " · Debt: ", edgarResult.debt != null ? fmtMoney(edgarResult.debt) : "n/a"),
+          h("div", null, "Cash & marketable securities: ", edgarResult.cash != null ? fmtMoney(edgarResult.cash) + edgarAsOf(edgarResult.asOf) : "n/a", " · Debt: ", edgarResult.debt != null ? fmtMoney(edgarResult.debt) + (edgarResult.debtFace ? " on the balance sheet (" + fmtMoney(edgarResult.debtFace) + " face — recorded net of a discount; the face is what is repaid)" : "") : "n/a"),
+          edgarResult.debtTags && edgarResult.debtTags.length > 0 && h("div", { style: { color: "var(--ink-3)", fontSize: 10 } }, "Debt is " + edgarResult.debtTags.map(t => t.tag + " " + fmtMoney(t.value)).join(" + ") + " (XBRL tags)."),
           edgarResult.cashTags && edgarResult.cashTags.length > 0 && h("div", { style: { color: "var(--ink-3)", fontSize: 10 } }, "Cash is " + edgarResult.cashTags.map(t => t.tag + " " + fmtMoney(t.value)).join(" + ") + " (XBRL tags)."),
           (edgarResult.options || edgarResult.warrants) && h("div", null,
             edgarResult.options && edgarResult.options.count != null && ("Options: " + fmtNum(edgarResult.options.count) + (edgarResult.options.priceFound ? " @ avg $" + edgarResult.options.avgStrike.toFixed(2) : " (strike not tagged)") + edgarAsOf(edgarResult.options.asOf)),
             edgarResult.options && edgarResult.warrants ? " · " : "",
             edgarResult.warrants && edgarResult.warrants.count != null && ("Warrants: " + fmtNum(edgarResult.warrants.count) + (edgarResult.warrants.priceFound ? " @ avg $" + edgarResult.warrants.avgStrike.toFixed(2) : " (strike not tagged)") + edgarAsOf(edgarResult.warrants.asOf))
           ),
+          !edgarResult.options && !edgarResult.warrants && h("div", { className: "dilution-untagged", style: { color: "var(--warn)", marginTop: 2 } },
+            "Options and warrants are not tagged in this company's filings" + (edgarResult.antidilutive ? "; its " + edgarResult.antidilutive.asOf + " filing excludes " + fmtNum(edgarResult.antidilutive.count) + " potentially dilutive shares (options, warrants, RSUs, conversions) from EPS" : "") + ". The export uses basic shares only: add them from the filing's equity note (Assumptions → Capital structure → Detailed)."),
           edgarResult.sourceFilingUrl && h("div", { style: { marginTop: 4 } }, h(ExternalLink, { href: edgarResult.sourceFilingUrl, style: { fontSize: 10 } }, "→ View source filing" + (edgarResult.sourceFilingLabel ? " (" + edgarResult.sourceFilingLabel + ")" : "")))
         ),
         h("div", { style: { display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginTop: 10, paddingTop: 10, borderTop: "1px dashed var(--rule)" } },

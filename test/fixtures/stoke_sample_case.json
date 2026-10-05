@@ -102,6 +102,11 @@
       "valueM": 100
      }
     ]
+   },
+   "ira": {
+    "enabled": false,
+    "reductionPct": "",
+    "effectiveYears": "9"
    }
   }
  ],
@@ -161,6 +166,41 @@
   }
  },
  "valuationDate": "2026-09-28",
+ "competitorReads": {
+  "condition": "Dravet syndrome",
+  "phase": "PHASE3",
+  "at": "2026-10-05",
+  "rows": [
+   {
+    "nctId": "NCT06118255",
+    "sponsor": "UCB BIOSCIENCES, Inc.",
+    "phase": "PHASE3",
+    "date": "2026-09-01",
+    "which": "primary completion"
+   },
+   {
+    "nctId": "NCT06660394",
+    "sponsor": "Longboard Pharmaceuticals",
+    "phase": "PHASE3",
+    "date": "2026-12-31",
+    "which": "primary completion"
+   },
+   {
+    "nctId": "NCT04462770",
+    "sponsor": "Epygenix",
+    "phase": "PHASE3",
+    "date": "2027-04",
+    "which": "primary completion"
+   },
+   {
+    "nctId": "NCT06908226",
+    "sponsor": "Longboard Pharmaceuticals",
+    "phase": "PHASE3",
+    "date": "2027-11-11",
+    "which": "primary completion"
+   }
+  ]
+ },
  "valuationMethod": "dcf",
  "futureRaise": {
   "enabled": true,
