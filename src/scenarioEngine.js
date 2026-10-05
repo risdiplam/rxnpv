@@ -545,6 +545,50 @@ function computeFailureFloor(theCase, throughStage) {
   return Object.assign({ perShare: Math.max(0, equity / shares), equity, shares, netCash: netCashAt(Math.max(0, equity / shares)), trialCost, gaToReadout, windDown, windDownYears, readoutYears: years, stageLabel: stage.label, cashShort: equity < 0,
     method: burnPlan ? "burn" : "stage", burnMissing: failureFloorWantsBurn(theCase) && !burnPlan }, burnPlan || {});
 }
+// What "the price implies X%" holds fixed (October 2026): the reverse-solve
+// moves only the odds, so the figure means nothing without the inputs it
+// held still. Single program; null otherwise.
+function impliedHeldFixed(theCase) {
+  if (!theCase || !theCase.programs || theCase.programs.length !== 1) return null;
+  const p = theCase.programs[0];
+  const items = [];
+  try {
+    const peak = getProgramRevenueResult(p, 25).peakTotalRevenue;
+    if (peak > 0) items.push("Base peak revenue " + fmtMoney(peak) + ((p.revenueMode || "quick") === "full" ? " (the full build)" : " (Napkin)"));
+  } catch (e) { /* no revenue yet */ }
+  try { items.push("launch in year " + resolveLaunchYearOffset(p)); } catch (e) { /* no timeline */ }
+  const dr = theCase.discountRatePct !== "" && theCase.discountRatePct != null ? Number(theCase.discountRatePct) : DISCOUNT_RATE_GUIDANCE.earlyBiotechSelfView[0];
+  items.push(dr + "% discount rate");
+  const cs = computeCapitalStructure({ ...effectiveCapitalStructure(theCase), currentPrice: theCase.currentPrice });
+  items.push("net cash " + fmtMoney(cs.netCash));
+  if (cs.dilutedShares > 0) items.push((cs.dilutedShares / 1e6).toFixed(1) + "M diluted shares");
+  const fr = theCase.futureRaise || {};
+  if (fr.enabled) items.push("the modelled raise");
+  if ((theCase.dilutionPath || {}).enabled) items.push("the dilution path");
+  items.push("terminal value " + ((theCase.terminalValue || {}).enabled ? "on" : "off"));
+  return items;
+}
+
+// Both definitions of "if it fails", side by side (October 2026): the
+// stage-cost floor (the default) and the rough burn floor, with which one
+// the failure figures use. The swing between them was invisible unless the
+// switch was opened. burn is null when there is no monthly burn to use.
+function computeFailureFloorPair(theCase) {
+  if (!theCase || !theCase.programs || theCase.programs.length !== 1) return null;
+  const ff = theCase.failureFloor || {};
+  const stage = computeFailureFloor({ ...theCase, failureFloor: { ...ff, method: "stage" } });
+  if (!stage) return null;
+  const burnRun = computeFailureFloor({ ...theCase, failureFloor: { ...ff, method: "burn" } });
+  const burn = burnRun && burnRun.method === "burn" ? burnRun : null;
+  return { stage, burn, active: failureFloorWantsBurn(theCase) && burn ? "burn" : "stage" };
+}
+// Why a floor reads $0, in words — a bare $0 reads as "worthless" rather
+// than "this definition spends more than the cash". Null when it is above 0.
+function floorZeroReason(f) {
+  if (!f || f.perShare > 0) return null;
+  if (f.method === "burn") return "burning " + fmtMoney(f.monthlyBurn) + " a month for " + f.monthsToReadout.toFixed(1) + " months to the readout (" + fmtMoney(f.burnToReadout) + ")" + (f.windDown > 0 ? " and " + f.windDownYears + " year" + (f.windDownYears === 1 ? "" : "s") + " of wind-down (" + fmtMoney(f.windDown) + ")" : "") + " uses up the " + fmtMoney(f.netCash) + " of net cash";
+  return "charging the " + f.stageLabel + " cost still to come (" + fmtMoney(f.trialCost) + "), G&A to the readout (" + fmtMoney(f.gaToReadout) + ")" + (f.windDown > 0 ? " and " + f.windDownYears + " year" + (f.windDownYears === 1 ? "" : "s") + " of wind-down (" + fmtMoney(f.windDown) + ")" : "") + " uses up the " + fmtMoney(f.netCash) + " of net cash";
+}
 function failureFloorWantsBurn(theCase) {
   return !!(theCase && theCase.failureFloor && theCase.failureFloor.method === "burn");
 }
@@ -1291,7 +1335,7 @@ function computeFreshness(theCase, today, newerFiling) {
     const typed = p.posOverridePct !== "" && p.posOverridePct != null;
     let pct = null;
     try { pct = typed ? Number(p.posOverridePct) : computePoSWeighting(p).posToLaunch * 100; } catch (e) { pct = null; }
-    const from = p.posSource && typed ? p.posSource : null;   // set by "Use as this case's odds" (simulator)
+    const from = posFromSimulator(p) ? p.posSource : null;   // set by "Use as this case's odds" (simulator)
     odds = pct != null && isFinite(pct) ? { pct, source: from ? "simulator" : typed ? "typed" : "benchmark", at: from ? from.at || null : null } : null;
   }
   return { price, cash, catalyst, odds, amber: !!((price && price.stale) || (cash && cash.newer)) };

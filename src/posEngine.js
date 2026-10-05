@@ -189,3 +189,60 @@ function riskAdjustRnDCost(rnd, posWeighting) {
   }));
   return { items, totalRiskAdjCostM: items.reduce((s, i) => s + i.riskAdjCostM, 0) };
 }
+
+// ── "Use as this case's odds" (October 2026) ───────────────────────────────
+// The trial-outcome simulator gives the chance that ONE trial reads out
+// significant. The case's odds are the chance of reaching launch, so writing
+// the first into the second would skip every step after the trial. Instead:
+// the trial's chance of a win in the expected direction × the benchmark odds
+// of each later step (this program's own benchmarks, with its attributes),
+// written into the existing cumulative override with a record of the run.
+// The simulated trial is taken to be the program's current stage. Null with a
+// reason when there is no trial left to simulate.
+function assuranceToCaseOdds(program, trialWinProb) {
+  if (!(trialWinProb >= 0 && trialWinProb <= 1)) return { ok: false, reason: "No simulated win rate to use." };
+  const w = computePoSWeighting({ ...program, posOverridePct: "" });
+  const stages = w.stages || [];
+  if (!stages.length) return { ok: false, reason: "This program is already approved, so there is no trial left to simulate." };
+  if (stages[0].key === "regulatory") return { ok: false, reason: "This program is at the FDA stage, so its odds are the regulatory decision, not a trial readout." };
+  const later = stages.slice(1);
+  const laterOdds = later.reduce((p, s) => p * s.pos, 1);
+  const typed = program.posOverridePct !== "" && program.posOverridePct != null && isFinite(Number(program.posOverridePct));
+  return {
+    ok: true, trialStage: stages[0].label, trialStageKey: stages[0].key,
+    laterStages: later.map(s => ({ label: s.label, pos: s.pos })), laterOdds,
+    oddsPct: trialWinProb * laterOdds * 100,
+    beforePct: typed ? Number(program.posOverridePct) : w.posToLaunch * 100, beforeSource: typed ? "typed" : "benchmark",
+    // Advancing past Phase 2 and hitting its primary endpoint are not the
+    // same event: plenty of drugs go on to Phase 3 after missing it.
+    looseFit: stages[0].key === "phase1" || stages[0].key === "phase2"
+  };
+}
+// The program with the converted odds written in, and the run that produced
+// them kept beside it (program.posSource). `run`: { endpointType, design,
+// prior, alpha, sided, iterations, pos, posDirectional, posStdErr }.
+function applyAssuranceToProgram(program, conv, run, today) {
+  const writtenPct = Math.round(conv.oddsPct * 10) / 10;
+  return { ...program, posOverridePct: String(writtenPct), posSource: {
+    kind: "simulator", at: today, writtenPct, beforePct: Math.round(conv.beforePct * 10) / 10, beforeSource: conv.beforeSource,
+    trialStage: conv.trialStage, laterOdds: conv.laterOdds, looseFit: conv.looseFit,
+    trialWin: run.posDirectional != null ? run.posDirectional : run.pos, assurance: run.pos, mcSE: run.posStdErr,
+    endpointType: run.endpointType, design: run.design, prior: run.prior, alpha: run.alpha, sided: run.sided, iterations: run.iterations } };
+}
+// True while the program's odds are still the ones the simulator wrote
+// (editing the field by hand makes them the user's own again).
+function posFromSimulator(program) {
+  const s = program && program.posSource;
+  return !!(s && s.kind === "simulator" && program.posOverridePct !== "" && Math.abs(Number(program.posOverridePct) - s.writtenPct) < 1e-9);
+}
+// One plain sentence for wherever the odds are shown.
+function describePosSource(s) {
+  if (!s) return "";
+  const prior = s.prior ? (s.prior.type === "point" ? "a fixed " + s.prior.value : "a normal prior, mean " + s.prior.mean + " (SD " + s.prior.sd + ")") : "";
+  const d = s.design || {};
+  const n = d.nTreat != null ? d.nTreat + " vs " + d.nControl + " patients" : "";
+  return "From the trial simulator on " + s.at + ": " + (s.trialWin * 100).toFixed(1) + "% chance this " + (s.trialStage || "trial") + " reads out significant in the expected direction (" +
+    [s.endpointType === "timeToEvent" ? "time-to-event" : s.endpointType, prior, n, "α " + s.alpha + " " + (s.sided === "one" ? "one-sided" : "two-sided"), (s.iterations || 0).toLocaleString() + " runs, ±" + ((s.mcSE || 0) * 100).toFixed(2) + "pp"].filter(Boolean).join("; ") +
+    ") × " + (s.laterOdds * 100).toFixed(0) + "% benchmark odds of the steps after it = " + s.writtenPct + "% (it was " + s.beforePct + "%, " + (s.beforeSource === "typed" ? "your figure" : "the benchmark") + ")." +
+    (s.looseFit ? " A Phase 2 result is a looser fit: drugs often advance to Phase 3 without hitting their Phase 2 primary." : "");
+}

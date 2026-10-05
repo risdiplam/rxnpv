@@ -1611,6 +1611,68 @@ function runTrialOutcome() {
         `At HR ${hr.toFixed(3)}, median survival goes from ${medianControl.toFixed(1)} months (control) to ${medianTreat.toFixed(1)} months (treatment) — a gain of ${(medianTreat - medianControl).toFixed(1)} months. Exponential (constant-hazard) survival, the same model the replicate simulation uses; real curves with a changing hazard over time will differ in shape while landing on the same overall hazard ratio.`));
     }
   }
+  renderUseAsCaseOdds(resultsDiv, result, { endpointType, design, prior, alpha, sided, iterations, pos: result.pos, posDirectional: result.posDirectional, posStdErr: result.posStdErr });
+}
+
+// "Use as this case's odds" (October 2026). The run above is ONE trial; the
+// case's odds are the chance of reaching launch. So the panel shows the
+// conversion — this trial's chance of a win in the expected direction × the
+// benchmark odds of every step after it — and the case's odds before and
+// after, and writes nothing until the user confirms (assuranceToCaseOdds /
+// applyAssuranceToProgram in posEngine.js).
+function renderUseAsCaseOdds(resultsDiv, result, run) {
+  const bridge = window.rxnpvSimBridge, theCase = bridge && bridge.activeCase;
+  const box = el('div', { class: 'use-odds', style: 'margin-top:18px;padding:12px 14px;border-radius:8px;border:1px solid var(--rule);background:var(--surface-2)' });
+  resultsDiv.appendChild(box);
+  if (!theCase || !theCase.programs || !theCase.programs.length) {
+    box.appendChild(el('div', { class: 'subtle' }, 'Open a case to use this result as one of its programs\u2019 odds of launch.'));
+    return;
+  }
+  let progIdx = 0;
+  const win = run.posDirectional != null ? run.posDirectional : run.pos;
+  const draw = () => {
+    box.innerHTML = '';
+    box.appendChild(el('div', { style: 'font-weight:700;margin-bottom:6px' }, 'Use as this case\u2019s odds'));
+    if (theCase.programs.length > 1) {
+      const sel = el('select', { 'aria-label': 'Program to apply the odds to', onchange: e => { progIdx = Number(e.target.value); draw(); } },
+        theCase.programs.map((p, i) => { const o = el('option', { value: String(i) }, p.drugName || p.name || ('Program ' + (i + 1))); if (i === progIdx) o.selected = true; return o; }));
+      box.appendChild(el('div', { style: 'margin-bottom:8px' }, ['Program: ', sel]));
+    }
+    const program = theCase.programs[progIdx];
+    const conv = assuranceToCaseOdds(program, win);
+    if (!conv.ok) { box.appendChild(el('div', { class: 'subtle' }, conv.reason)); return; }
+    const pct = v => (Math.round(v * 10) / 10).toFixed(1) + '%';
+    const lines = [
+      el('div', {}, [el('b', {}, pct(win * 100)), ' chance this ' + conv.trialStage + ' trial reads out significant in the direction you expect' +
+        (run.posDirectional != null && run.posDirectional < run.pos - 0.0005 ? ' (the ' + pct(run.pos * 100) + ' above also counts significant results the wrong way)' : '')]),
+      el('div', {}, ['\u00d7 ', el('b', {}, pct(conv.laterOdds * 100)), ' benchmark odds of the steps after it (' + conv.laterStages.map(s => s.label + ' ' + Math.round(s.pos * 100) + '%').join(', ') + ')']),
+      el('div', {}, ['= ', el('b', {}, pct(conv.oddsPct)), ' odds of reaching launch for ' + (program.drugName || program.name || 'this program') + ', against ', el('b', {}, pct(conv.beforePct)), ' now (' + (conv.beforeSource === 'typed' ? 'your figure' : 'the benchmark') + ').'])
+    ];
+    lines.forEach(l => { l.style.marginBottom = '3px'; box.appendChild(l); });
+    box.appendChild(el('div', { class: 'subtle', style: 'margin-top:6px' }, 'It counts only a significant result on this endpoint under your prior. A safety problem, a primary endpoint different from the one simulated, or a prior that is too hopeful are not in it — a reason the case\u2019s own figure can sit lower.'));
+    if (conv.looseFit) box.appendChild(el('div', { class: 'subtle', style: 'margin-top:6px' }, 'A Phase 2 result is a looser fit: plenty of drugs advance to Phase 3 without hitting their Phase 2 primary endpoint, and some that hit it do not advance.'));
+    const row = el('div', { 'data-no-export': '', style: 'display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap' });
+    box.appendChild(row);
+    const useBtn = el('button', { class: 'runbtn', type: 'button' }, 'Use ' + pct(conv.oddsPct) + ' as the case\u2019s odds');
+    useBtn.addEventListener('click', () => {
+      row.innerHTML = '';
+      row.appendChild(el('span', {}, 'Replace ' + pct(conv.beforePct) + ' with ' + pct(conv.oddsPct) + '?'));
+      const yes = el('button', { class: 'runbtn', type: 'button' }, 'Confirm');
+      const no = el('button', { type: 'button', style: 'padding:6px 12px;border-radius:6px;border:1px solid var(--rule);background:transparent;color:var(--ink-2);cursor:pointer' }, 'Cancel');
+      yes.addEventListener('click', () => {
+        // Re-read the case at click time: the one this panel drew may be stale.
+        const live = window.rxnpvSimBridge, c = live && live.activeCase && live.activeCase.id === theCase.id ? live.activeCase : theCase;
+        const progs = c.programs.map((p, i) => i === progIdx ? applyAssuranceToProgram(p, assuranceToCaseOdds(p, win), run, localDateStamp()) : p);
+        live.updateCase({ ...c, programs: progs, updatedAt: Date.now() });
+        row.innerHTML = '';
+        row.appendChild(el('span', { style: 'color:var(--teal);font-weight:700' }, 'Done: the case\u2019s odds are now ' + pct(conv.oddsPct) + '. The run is recorded beside the odds on the Assumptions tab.'));
+      });
+      no.addEventListener('click', draw);
+      row.appendChild(yes); row.appendChild(no);
+    });
+    row.appendChild(useBtn);
+  };
+  draw();
 }
 
 // ── Tab: Peak Sales ──────────────────────────────────────────────────────

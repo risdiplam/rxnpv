@@ -575,6 +575,7 @@ function ProgramEditor({ program, onChange, onDelete, discountRatePct, terminalV
           })()
         ),
 
+        posFromSimulator(program) && h("div", { className: "prose", style: { ...UI.caption, flex: "1 1 100%", lineHeight: 1.6, marginBottom: 6 } }, describePosSource(program.posSource)),
         h(BenchField, { label: "Cumulative PoS to launch (Base case)", value: overridePct, onChange: v => set("posOverridePct", v), suffix: "%",
           bench: { value: Math.round(cumulativePoS * 10) / 10, source: "Computed from " + program.therapeuticArea + " phase-by-phase benchmarks through to launch" + (mods.applied.length ? ", adjusted for " + mods.applied.map(a => a.label.toLowerCase()).join(" + ") + " (" + mods.source + ")" : "") },
           help: "Override when you have a specific reason beyond the attributes above. Fixes the CUMULATIVE odds to launch — not how attrition spreads across phases, which still comes from the benchmarks. So two programs with the same override but different modality can still differ modestly in value, since they spend different amounts on late-stage trials getting there. Bear/Bull scale off whatever you set." })

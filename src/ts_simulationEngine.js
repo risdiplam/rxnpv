@@ -98,17 +98,30 @@ function runAssuranceSimulation(config) {
   if (!replicate) throw new Error('Unknown endpoint type: ' + endpointType);
   design.sided = sided; // threaded through to the test functions
 
-  let hits = 0;
+  // The direction the prior expects: a treated response rate above the
+  // control's, a positive mean difference, a hazard ratio below 1. A two-
+  // sided test also counts a significant result the other way as a "hit";
+  // posDirectional counts only wins in the expected direction, which is what
+  // a trial succeeding means (and what "Use as this case's odds" reads).
+  const priorMean = prior.type === 'point' ? prior.value : prior.mean;
+  const expected = endpointType === 'binary' ? priorMean - design.controlRate
+    : endpointType === 'continuous' ? priorMean : 1 - priorMean;
+  const towardBenefit = v => (endpointType === 'timeToEvent' ? 1 - v : v);
+  let hits = 0, directionalHits = 0;
   const observedEffects = [];
   for (let i = 0; i < iterations; i++) {
     const trueEffect = samplePrior(prior);
     const { pValue, observedEffect } = replicate(design, trueEffect);
     const isHit = alpha ? (pValue < alpha) : false;
-    if (isHit) hits++;
+    if (isHit) {
+      hits++;
+      if (expected !== 0 && isFinite(observedEffect) && Math.sign(towardBenefit(observedEffect)) === Math.sign(expected)) directionalHits++;
+    }
     observedEffects.push(observedEffect);
   }
 
   const pos = hits / iterations;
+  const posDirectional = expected !== 0 && isFinite(expected) ? directionalHits / iterations : null;
   const posStdErr = Math.sqrt(pos * (1 - pos) / iterations);
 
   // Conditional power at fixed prior quantiles, as a closed-form cross-check
@@ -122,6 +135,7 @@ function runAssuranceSimulation(config) {
   return {
     pos,
     posStdErr,
+    posDirectional,
     iterations,
     conditionalEffectQuantiles: conditional,
     observedEffects // caller bins this into a histogram for display

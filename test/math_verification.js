@@ -75,7 +75,7 @@ const EXPORTS = [
   "runPeakSalesSimulation", "driverSensitivity", "percentSpecToFraction", "percentSpecError", "renderIconArray",
   "niceTicks", "formatTick", "formatRegisteredP", "parseCatalystHit", "sponsorNameFromEntity", "renderLineChart", "renderHistogram", "renderForestPlot",
   "treasuryMethodShares", "ifConvertedShares", "computeEquityValue", "applyFutureRaise",
-  "classifyCatalystFunding", "computeRunwayVsCatalysts", "monthsUntil", "parseCatalystDate", "parseCatalystWindow", "nextCaseCatalyst", "computeFreshness", "newerFinancialFiling", "catalystPinLabel", "pendingCalibrationEntries", "failureFloorBurnPlan", "RUNWAY_CUSHION_MONTHS_DEFAULT",
+  "classifyCatalystFunding", "computeRunwayVsCatalysts", "monthsUntil", "parseCatalystDate", "parseCatalystWindow", "nextCaseCatalyst", "computeFreshness", "newerFinancialFiling", "catalystPinLabel", "computeFailureFloorPair", "floorZeroReason", "impliedHeldFixed", "assuranceToCaseOdds", "applyAssuranceToProgram", "posFromSimulator", "describePosSource", "pendingCalibrationEntries", "failureFloorBurnPlan", "RUNWAY_CUSHION_MONTHS_DEFAULT",
   "summarizeOrangeBookPatents", "isPediatricExtension", "parseFdaYyyymmdd",
   "computeBinaryEventImpliedPoS", "selectPeakSalesCompWindow",
   "applyTaxToCalendar", "computeMoleculeTypePoSRatios", "POS_BY_MOLECULE",
@@ -1192,6 +1192,78 @@ report();
 // whole point of the tool, so it is tested directly rather than only through
 // the UI. Boundaries matter here: "reaches it with exactly zero cushion" and
 // "runs out one day early" are different answers to an investor.
+section("What 'the price implies' holds fixed");
+{
+  const st = JSON.parse(fs.readFileSync(path.join(__dirname, "fixtures", "stoke_sample_case.json"), "utf8"));
+  const held = api.impliedHeldFixed(st);
+  const peak = api.getProgramRevenueResult(st.programs[0], 25).peakTotalRevenue;
+  ok("Stoke: the Base peak from the full build, to the nearest $10M ($" + (peak / 1e9).toFixed(2) + "B)", held[0] === "Base peak revenue $" + (peak / 1e9).toFixed(2) + "B (the full build)");
+  ok("... launch year, discount rate, net cash, shares, raise and terminal value", held.includes("launch in year " + st.programs[0].launchYearOffset) && held.includes(st.discountRatePct + "% discount rate") && held.some(x => /^net cash \$/.test(x)) && held.some(x => /M diluted shares$/.test(x)) && held.includes("terminal value off"));
+  ok("... the modelled raise is listed because it is on", held.includes("the modelled raise") === !!(st.futureRaise && st.futureRaise.enabled));
+  ok("two programs: nothing (no single implied figure)", api.impliedHeldFixed({ ...st, programs: [st.programs[0], st.programs[0]] }) === null);
+}
+section("Both failure floors, side by side");
+{
+  // PepGen: the stage-cost floor charges all of Phase 2's benchmark cost and
+  // reads $0; the burn floor (the November readout at $5.7M a month) is the
+  // $0.8895 worked out in "The rough failure estimate from the burn".
+  const pg = JSON.parse(fs.readFileSync(path.join(__dirname, "fixtures", "pepgen_case.json"), "utf8"));
+  pg.programs[0].calibrationLog = [{ catalystLabel: "FREEDOM2 10 mg/kg data", catalystDate: "2026-11", outcome: "pending" }];
+  const pair = api.computeFailureFloorPair(pg);
+  ok("PepGen: the stage floor is $0 and the burn floor is positive; the stage one is in use by default", pair.stage.perShare === 0 && pair.burn.perShare > 0.8 && pair.active === "stage");
+  near("... the burn floor is the $0.8895 worked out longhand", pair.burn.perShare, (117.238e6 - 5.7e6 * (153 / (365.25 / 12)) - 26e6) / 70360627, 1e-9);
+  const why = api.floorZeroReason(pair.stage);
+  ok("the $0 says what used the cash up (" + why + ")", /^charging the Phase 2 cost still to come \(\$[\d.]+M\), G&A to the readout \(\$[\d.]+M\) and 1 year of wind-down \(\$26\.0M\) uses up the \$[\d.]+M of net cash$/.test(why));
+  ok("a positive floor has no $0 reason", api.floorZeroReason(pair.burn) === null);
+  ok("switched to the burn method, it is the one in use", api.computeFailureFloorPair({ ...pg, failureFloor: { method: "burn" } }).active === "burn");
+  const noBurn = { ...pg, capitalStructure: { ...pg.capitalStructure, monthlyBurn: "" } };
+  ok("no monthly burn: the burn figure is absent, the stage one stays", (() => { const p = api.computeFailureFloorPair(noBurn); return p.burn === null && p.active === "stage"; })());
+  ok("two programs: no pair", api.computeFailureFloorPair({ ...pg, programs: [pg.programs[0], pg.programs[0]] }) === null);
+}
+section("Simulator → case odds: a trial's win is not the odds of launch");
+{
+  // Direction: a two-sided test counts a significant result the WRONG way as
+  // a hit too. With a weak true effect (HR 0.97, point prior) and a small
+  // trial, wrong-way wins are a visible share; posDirectional drops them.
+  const d = { nControl: 60, nTreat: 60, medianControl: 12, accrualPeriod: 12, followupPeriod: 12 };
+  const weak = api.runAssuranceSimulation({ endpointType: "timeToEvent", design: { ...d }, prior: { type: "point", value: 0.97 }, alpha: 0.05, sided: "two", iterations: 4000 });
+  ok("HR 0.97: wins in the expected direction are fewer than all hits (" + weak.posDirectional.toFixed(3) + " < " + weak.pos.toFixed(3) + ")", weak.posDirectional < weak.pos);
+  const strong = api.runAssuranceSimulation({ endpointType: "timeToEvent", design: { ...d, nControl: 200, nTreat: 200 }, prior: { type: "point", value: 0.6 }, alpha: 0.05, sided: "two", iterations: 3000 });
+  near("HR 0.6, 200 a side: nearly every hit is the right way", strong.posDirectional, strong.pos, 0.005);
+  ok("a prior exactly at the null has no expected direction", api.runAssuranceSimulation({ endpointType: "timeToEvent", design: { ...d }, prior: { type: "point", value: 1 }, alpha: 0.05, sided: "two", iterations: 500 }).posDirectional === null);
+  const bin = api.runAssuranceSimulation({ endpointType: "binary", design: { nControl: 80, nTreat: 80, controlRate: 0.3 }, prior: { type: "point", value: 0.45 }, alpha: 0.05, sided: "two", iterations: 3000 });
+  ok("binary 45% vs 30%: directional ≤ all hits, both well above alpha", bin.posDirectional <= bin.pos && bin.posDirectional > 0.4);
+
+  // Conversion: a Phase 3 program — the only step left after the trial is
+  // the FDA, at this program's own regulatory benchmark. A Phase 2 program
+  // — Phase 3 and the FDA both follow. Neurology, no attributes.
+  const prog = phase => ({ therapeuticArea: "Neurology", currentPhase: phase, posOverridePct: "", modality: "smallMolecule" });
+  const w3 = api.computePoSWeighting(prog("phase3")), w2 = api.computePoSWeighting(prog("phase2"));
+  const reg = w3.stages.find(s => s.key === "regulatory").pos;
+  const c3 = api.assuranceToCaseOdds(prog("phase3"), 0.70);
+  near("Phase 3: odds = 70% × the regulatory benchmark", c3.oddsPct, 70 * reg, 1e-9);
+  ok("... the trial is Phase 3, the later step the FDA", c3.trialStage === "Phase 3" && c3.laterStages.length === 1 && c3.laterStages[0].label === "Regulatory" && !c3.looseFit);
+  const p3 = w2.stages.find(s => s.key === "phase3").pos;
+  const c2 = api.assuranceToCaseOdds(prog("phase2"), 0.70);
+  near("Phase 2: odds = 70% × Phase 3 × the FDA", c2.oddsPct, 70 * p3 * w2.stages.find(s => s.key === "regulatory").pos, 1e-9);
+  ok("a later stage remains, so the odds move by less than the trial's 70% (" + c2.oddsPct.toFixed(1) + "%)", c2.oddsPct < 70 && c3.oddsPct < 70);
+  ok("Phase 2 carries the loose-fit caveat", c2.looseFit === true);
+  near("before: the benchmark odds to launch", c2.beforePct, w2.posToLaunch * 100, 1e-9);
+  ok("at the FDA stage there is no trial to simulate", api.assuranceToCaseOdds(prog("filed"), 0.7).ok === false);
+  ok("approved: nothing to simulate", api.assuranceToCaseOdds(prog("approved"), 0.7).ok === false);
+
+  // Writing it: the override, and the run kept beside it.
+  const run = { endpointType: "timeToEvent", design: d, prior: { type: "normal", mean: 0.7, sd: 0.1 }, alpha: 0.05, sided: "two", iterations: 10000, pos: 0.73, posDirectional: 0.70, posStdErr: 0.0045 };
+  const before = { ...prog("phase3"), posOverridePct: "65" };
+  const cv = api.assuranceToCaseOdds(before, run.posDirectional);
+  const after = api.applyAssuranceToProgram(before, cv, run, "2026-10-04");
+  ok("written: the override is the converted odds to one decimal, the typed 65% recorded as before", after.posOverridePct === String(Math.round(70 * reg * 10) / 10) && after.posSource.beforePct === 65 && after.posSource.beforeSource === "typed");
+  ok("the run is kept: direction-only win, all hits, SE, prior, alpha, sidedness, runs, date", after.posSource.trialWin === 0.70 && after.posSource.assurance === 0.73 && after.posSource.mcSE === 0.0045 && after.posSource.prior.sd === 0.1 && after.posSource.sided === "two" && after.posSource.iterations === 10000 && after.posSource.at === "2026-10-04");
+  near("the valuation's odds to launch are the written figure", api.computeEffectivePoS(after, api.SCENARIO_PRESETS.base).posToLaunch, Number(after.posOverridePct) / 100, 1e-9);
+  ok("still from the simulator until the field is edited by hand", api.posFromSimulator(after) && !api.posFromSimulator({ ...after, posOverridePct: "60" }));
+  ok("the sentence names the trial, the prior and the later odds", /70\.0% chance this Phase 3 reads out significant in the expected direction \(time-to-event; a normal prior, mean 0\.7 \(SD 0\.1\); 60 vs 60 patients; α 0\.05 two-sided; 10,000 runs, ±0\.45pp\)/.test(api.describePosSource(after.posSource)));
+  ok("the freshness line says the odds came from the simulator", api.computeFreshness({ currentPrice: "", capitalStructure: {}, programs: [after] }, new Date(2026, 9, 4)).odds.source === "simulator");
+}
 section("Freshness: how old the inputs behind the headline are");
 {
   // A submissions index shaped like SEC's (reverse-chronological, reportDate

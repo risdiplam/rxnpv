@@ -321,6 +321,15 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
     ok(!!fr && /Price \$24\.80 entered 2026-09-25/.test(fr.textContent) && /Cash \$420\.0M as of 2026-06-30/.test(fr.textContent)
       && /Next: EMPEROR Phase 3 topline, 2027-Q3 \(pinned\)/.test(fr.textContent) && /Company guidance, Q2 2026 10-Q/.test(fr.querySelector("[title*=pinned]") ? fr.querySelector("[title*=pinned]").title : "") && /Odds 65%, your figure/.test(fr.textContent),
       "Overview: the freshness line gives price date, cash date, the pinned catalyst and the odds' source (" + (fr && fr.textContent) + ")");
+    // The odds gap in points (55% implied against 65%), and what it held fixed.
+    const gapEl = panel && panel.querySelector(".implied-gap");
+    ok(!!gapEl && /−10 pts vs yours/.test(gapEl.textContent), "Overview: the price-implied odds show the gap in points (" + (gapEl && gapEl.textContent) + ")");
+    const heldBtn = gapEl && [...gapEl.querySelectorAll("button")].find(b => b.textContent === "held fixed");
+    if (heldBtn) { click(heldBtn); await wait(200); }
+    ok(!!gapEl && /everything else held: Base peak revenue \$1\.31B \(the full build\), launch in year 1/.test(gapEl.textContent), "Overview: 'held fixed' lists what the reverse-solve held still");
+    // Both failure floors under the range strip.
+    const fp = panel && panel.querySelector(".floor-pair");
+    ok(!!fp && /≈\$1\.30\s*charging the rest of Phase 3 at its benchmark cost\s*\(in use\)/.test(fp.textContent) && /≈\$0\.46\s*burning \$19\.5M a month to the readout/.test(fp.textContent), "Overview: both failure floors, the stage one in use (" + (fp && fp.textContent) + ")");
     const table = panel && panel.querySelector(".proj-table");
     ok(!!table && table.querySelectorAll("tbody tr").length === 16, "Projections: the table shows the first 16 years");
     ok(!!table && /Enterprise value \$1\.62B/.test(table.querySelector("tfoot").textContent), "Projections: the table ends at the Base enterprise value");
@@ -670,6 +679,37 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
   {
     const st = d.querySelector(".build-stamp");
     ok(!!st && /^RxNPV \d+\.\d+\.\d+ · [0-9a-f]{7,}( \+ local changes)? · built \d{4}-\d\d-\d\d$/.test(st.textContent), "Sidebar shows the build: " + (st ? st.textContent : "missing"));
+  }
+
+  // "Use as this case's odds": a trial-outcome run converted to odds of
+  // launch (× the steps after it), written only on Confirm, with the run kept.
+  {
+    click(btn("Workspace")); await wait(300);
+    click(btn("Load sample case")); await wait(200); click(btn("Stoke — Dravet, Phase 3")); await wait(600);
+    click(btn("Simulation")); await wait(700);
+    click(btn("Trial Outcome / PoS")); await wait(400);
+    const setNum = (id, v) => { const e = d.getElementById(id); if (e) e.value = v; };
+    setNum("nControl", "81"); setNum("nTreat", "81"); setNum("controlRate", "0.15"); setNum("iterations", "2000");
+    const pm = d.getElementById("priorMean"); if (pm) pm.value = "0.5";
+    const psd = d.getElementById("priorSd"); if (psd) psd.value = "0.12";
+    click(btn("Run simulation")); await wait(800);
+    const box = d.querySelector("#trialOutcomeResults .use-odds");
+    ok(!!box && /chance this Phase 3 trial reads out significant in the direction you expect/.test(box.textContent) && /benchmark odds of the steps after it \(Regulatory 98%\)/.test(box.textContent) && /odds of reaching launch for Zorevunersen, against\s*65\.0%\s*now \(your figure\)/.test(box.textContent),
+      "Simulator: the conversion panel shows the trial, the later steps and the case's odds before (" + (box && box.textContent.slice(0, 260)) + ")");
+    const casesNow = () => JSON.parse(w.localStorage.getItem("rxnpv_cases_v1"));
+    const stokeNow = () => casesNow().filter(c => /^Stoke/.test(c.name)).pop();
+    const useBtn = box && [...box.querySelectorAll("button")].find(b => /^Use .* as the case’s odds$/.test(b.textContent));
+    click(useBtn); await wait(200);
+    ok(stokeNow().programs[0].posOverridePct === "65", "Simulator: nothing is written before Confirm");
+    click([...box.querySelectorAll("button")].find(b => b.textContent === "Confirm")); await wait(400);
+    const prog = stokeNow().programs[0];
+    ok(prog.posSource && prog.posSource.kind === "simulator" && Number(prog.posOverridePct) > 80 && Number(prog.posOverridePct) <= 97.6 && prog.posSource.beforePct === 65 && prog.posSource.iterations === 2000,
+      "Simulator: Confirm writes the converted odds (" + prog.posOverridePct + "%, at most the 97.6% FDA benchmark) with the run recorded");
+    click(btn("Workspace")); await wait(400);
+    click(d.getElementById("casetab-assumptions")); await wait(400);
+    ok(/From the trial simulator on \d{4}-\d\d-\d\d: [\d.]+% chance this Phase 3 reads out significant/.test(d.getElementById("casepanel-assumptions").textContent), "Workspace: the odds field says where they came from");
+    click(d.getElementById("casetab-overview")); await wait(300);
+    ok(/Odds [\d]+%, from the simulator/.test((d.querySelector("#casepanel-overview .freshness") || {}).textContent || ""), "Overview: the freshness line says the odds came from the simulator");
   }
 
   if (errors.length) { console.log(errors.slice(0, 40).join("\n")); console.log("\n" + errors.length + " FAILURE(S) across " + checks + " checks"); process.exit(1); }

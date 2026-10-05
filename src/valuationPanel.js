@@ -221,7 +221,7 @@ function useValuationSections({ theCase, onChange, goToTab }) {
             h("div", { style: UI.caption }, "Price implies"),
             h("div", { style: { fontSize: 22, fontFamily: "var(--mono)", fontWeight: 800, color: impliedSolved.impliedAbsolutePct >= impliedSolved.baseAbsolutePct ? "var(--green)" : "var(--red)" } },
               impliedSolved.impliedAbsolutePct.toFixed(0) + "%"),
-            h("div", { className: "pvm-move" }, impliedSolved.multiplierPct.toFixed(0) + "% of your odds"))
+            h(ImpliedGap, { theCase, implied: impliedSolved.impliedAbsolutePct, yours: impliedSolved.baseAbsolutePct }))
         ),
         h(FreshnessStrip, { theCase }),
         (() => { const by = k => (scenarioResults.find(s => s.key === k) || { result: { equity: {} } }).result.equity.perShare;
@@ -274,6 +274,26 @@ function useValuationSections({ theCase, onChange, goToTab }) {
         h("div", { className: "prose", style: { ...UI.caption, marginBottom: 6 } }, (Math.abs((success || 0) - by("base")) < 0.005 ? "Your scenarios and today's price on one line; with no catalyst left to fail, there is no failure floor." : (floor ? "From what is left if the next readout fails" : "From your Bear case") + " to what it is worth if it works, with your scenarios and today's price in between.") + " The shaded stretch is Bear to Bull."),
         h(ExportableBlock, { title: (theCase.name || "Case") + " — range of outcomes per share" },
           h(OutcomeRangeStrip, { marks, band: [Math.min(by("bear"), by("bull")), Math.max(by("bear"), by("bull"))], label: "Range of outcomes per share: failure, scenarios, today's price and success" })),
+        // Both definitions of "if it fails", the one in use marked, each
+        // switchable here; a $0 says what used the cash up.
+        floor && (() => {
+          const pair = computeFailureFloorPair(theCase);
+          if (!pair) return null;
+          const setMethod = m => update({ failureFloor: { ...(theCase.failureFloor || {}), method: m } });
+          const item = (f, key, desc) => {
+            const active = pair.active === key, zero = floorZeroReason(f);
+            return h("div", { key, className: "floor-def" + (active ? " active" : ""), style: { display: "flex", gap: 8, alignItems: "baseline", flexWrap: "wrap" } },
+              h("b", { style: { fontFamily: "var(--mono)", color: active ? "var(--red)" : "var(--ink-2)" } }, "≈" + fmtShare(f.perShare)),
+              h("span", null, desc + (zero ? " — $0: " + zero : "")),
+              active ? h("span", { style: { color: "var(--ink-3)" } }, "(in use)")
+                : h("button", { type: "button", className: "link-btn", "data-no-export": "", onClick: () => setMethod(key), style: { fontSize: 11 } }, "Use this"));
+          };
+          return h("div", { className: "floor-pair", role: "group", "aria-label": "If it fails: both definitions", style: { ...UI.caption, marginTop: 8, display: "flex", flexDirection: "column", gap: 4, lineHeight: 1.55 } },
+            h("div", { style: { color: "var(--ink-2)", fontWeight: 600 } }, "If it fails, two ways of counting:"),
+            item(pair.stage, "stage", "charging the rest of " + pair.stage.stageLabel + " at its benchmark cost"),
+            pair.burn ? item(pair.burn, "burn", "burning " + fmtMoney(pair.burn.monthlyBurn) + " a month to the readout (" + pair.burn.readoutSource + ")")
+              : h("div", { key: "nb", style: { color: "var(--ink-3)" } }, "Add a monthly burn (Assumptions → Capital structure) to see the burn-based figure beside it."));
+        })(),
         floor && h(Explain, readOutcomeRange(floor.perShare, success, price, one ? impliedSolved.impliedAbsolutePct : null)),
         floor && h("div", { style: { marginTop: 8 } }, h(Note, { summary: "How “if it fails” is worked out" + (floor.method === "burn" ? " (rough estimate on)" : ""), open: floor.method === "burn" || floor.burnMissing },
           h("div", null,
@@ -1129,4 +1149,19 @@ function FreshnessStrip({ theCase }) {
     "Odds " + Math.round(f.odds.pct) + "%, " + (f.odds.source === "simulator" ? "from the simulator" + (f.odds.at ? " (" + f.odds.at + ")" : "") : f.odds.source === "typed" ? "your figure" : "the benchmark")));
   return h("div", { className: "freshness", role: "note", "aria-label": "How fresh these inputs are", style: { ...UI.caption, marginTop: 10, lineHeight: 1.6 } },
     parts.reduce((acc, el, i) => i ? acc.concat([h("span", { key: "s" + i, "aria-hidden": "true", style: { color: "var(--ink-3)" } }, " · "), el]) : [el], []));
+}
+
+// The gap between the odds the price implies and the case's own, in
+// percentage points, with what the reverse-solve held fixed one click away
+// (October 2026). Replaces "N% of your odds", a ratio nobody acts on.
+function ImpliedGap({ theCase, implied, yours }) {
+  const h = React.createElement;
+  const [open, setOpen] = React.useState(false);
+  const gap = Math.round(implied) - Math.round(yours);
+  const held = impliedHeldFixed(theCase);
+  return h("div", { className: "pvm-move implied-gap" },
+    gap === 0 ? "same as yours" : (gap > 0 ? "+" : "−") + Math.abs(gap) + " pts vs yours",
+    held && h("button", { type: "button", className: "link-btn", "data-no-export": "", "aria-expanded": open, onClick: () => setOpen(!open), style: { fontSize: 11, marginLeft: 6 } }, open ? "hide" : "held fixed"),
+    held && open && h("div", { className: "held-fixed", style: { ...UI.caption, marginTop: 4, maxWidth: 360, whiteSpace: "normal", lineHeight: 1.5 } },
+      "Solving for the odds that make the fair value equal today's price, with everything else held: " + andList(held) + "."));
 }
