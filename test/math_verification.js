@@ -1255,7 +1255,7 @@ section("Smaller items: insider clusters, label limitations, the biologic floor"
   ok("limitations of use: the sentence after the heading, up to the next numbered section", api.extractLimitationsOfUse(ind) === "DRUGX has not been studied in patients over 18 years.");
   // The shape of Wegovy's live label (2024-04-23): the limitation, then
   // openFDA's field repeats the highlights, starting "WEGOVY is a …".
-  ok("stops where the label's highlights repeat (Wegovy's shape)", api.extractLimitationsOfUse("with obesity. Limitations of Use • WEGOVY contains semaglutide. Coadministration with other GLP-1 receptor agonists is not recommended. WEGOVY is a glucagon-like peptide-1 (GLP-1) receptor agonist indicated in combination with diet") === "• WEGOVY contains semaglutide. Coadministration with other GLP-1 receptor agonists is not recommended.");
+  ok("stops where the label's highlights repeat (Wegovy's shape)", api.extractLimitationsOfUse("with obesity. Limitations of Use • WEGOVY contains semaglutide. Coadministration with other GLP-1 receptor agonists is not recommended. WEGOVY is a glucagon-like peptide-1 (GLP-1) receptor agonist indicated in combination with diet") === "WEGOVY contains semaglutide. Coadministration with other GLP-1 receptor agonists is not recommended.");
   ok("no such heading: null (nothing about accelerated approval is extracted)", api.extractLimitationsOfUse("1 INDICATIONS AND USAGE DRUGX is indicated for X.") === null);
   ok("label date from openFDA's effective_time", api.labelDate("20240315") === "2024-03-15" && api.labelDate("") === null);
 

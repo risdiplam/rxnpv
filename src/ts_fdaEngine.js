@@ -91,7 +91,7 @@ function extractLimitationsOfUse(indicationsText) {
   // limitations, starting "WEGOVY is a …" — that ends it too.
   const m = String(indicationsText).match(/[Ll]imitations?\s+[Oo]f\s+[Uu]se\s*[:.\-–]?\s*([\s\S]*?)(?=\s+\d{1,2}(?:\.\d+)?\s+[A-Z]{2,}|\s+[A-Z][A-Z0-9\u00ae-]{2,}\s+is\s+(?:a|an|indicated)\b|\s*$)/);
   if (!m) return null;
-  const t = m[1].replace(/\s+/g, " ").trim();
+  const t = m[1].replace(/\s+/g, " ").trim().replace(/^[•·▪\-–]\s*/, "");
   return t ? (t.length > 700 ? t.slice(0, 700).replace(/\s\S*$/, "") + " …" : t) : null;
 }
 function labelDate(effectiveTime) {
