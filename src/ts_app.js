@@ -1586,7 +1586,12 @@ function runTrialOutcome() {
   const resultsDiv = document.getElementById('trialOutcomeResults');
   if (!resultsDiv) return;  // tab changed before this ran — nothing to write into
   // A design seeded from a posted result (Trial Decoder) carries the effect
-  // but not the control arm: say what is missing rather than simulate NaN.
+  // but not always the arms: say what is missing rather than simulate NaN.
+  if (!(design.nControl >= 1 && design.nTreat >= 1)) {
+    resultsDiv.innerHTML = '';
+    resultsDiv.appendChild(el('p', { class: 'error' }, 'Enter the number of patients in each arm to run.'));
+    return;
+  }
   if (endpointType === 'timeToEvent' && !(design.medianControl > 0)) {
     resultsDiv.innerHTML = '';
     resultsDiv.appendChild(el('p', { class: 'error' }, 'Enter the control arm\u2019s median (months) to run: it is in the results table or the paper. A registered result rarely carries it in a form that can be read automatically.'));

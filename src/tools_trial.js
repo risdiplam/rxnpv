@@ -268,7 +268,7 @@ function AssetProgramTool({ activeCase, onDecodeTrial, onWatchTrial }) {
 // actually reported. Deliberately rendered below the design cards, in that
 // order, because the whole point is to read the architecture first and the
 // outcome second. Engine in trialResults.js; this file only lays it out.
-function TrialResultsPanels({ results, study, onReopen }) {
+function TrialResultsPanels({ results, study, onReopen, nctId }) {
   const h = React.createElement;
   const [openSecondary, setOpenSecondary] = React.useState(false);
   const [openPeriods, setOpenPeriods] = React.useState(false);
@@ -300,7 +300,7 @@ function TrialResultsPanels({ results, study, onReopen }) {
   // from the log-scale standard error), and the compared arms' sizes in the
   // order registered. The control arm's median is never seeded — the record
   // does not say which arm is the drug — so the simulator asks for it.
-  const nct = study && study.protocolSection && study.protocolSection.identificationModule ? study.protocolSection.identificationModule.nctId : "";
+  const nct = nctId || (study && study.protocolSection && study.protocolSection.identificationModule ? study.protocolSection.identificationModule.nctId : "") || "The trial";
   const seedButton = (a, nByGroup) => {
     const spec = typeof tsClassifyEffectParam === "function" ? tsClassifyEffectParam(a.paramType) : null;
     const hr = Number(a.value);
@@ -311,7 +311,10 @@ function TrialResultsPanels({ results, study, onReopen }) {
     const ns = (a.groupIds || []).map(g => nByGroup[g]).filter(v => v > 0);
     const inputs = [{ id: "endpointType", value: "timeToEvent" }, { id: "priorType", value: sd ? "normal" : "point" }, { id: "priorMean", value: hr.toFixed(3) }];
     if (sd) inputs.push({ id: "priorSd", value: sd.toFixed(3) });
-    if (ns.length === 2) { inputs.push({ id: "nTreat", value: String(ns[0]) }, { id: "nControl", value: String(ns[1]) }); }
+    // Arm sizes only when the analysis names both arms; otherwise blanked, so
+    // an earlier run's sizes never pass for this trial's.
+    if (ns.length === 2) inputs.push({ id: "nTreat", value: String(ns[0]) }, { id: "nControl", value: String(ns[1]) });
+    else inputs.push({ id: "nTreat", value: "" }, { id: "nControl", value: "" });
     inputs.push({ id: "medianControl", value: "" });
     inputs.push({ id: "priorSource", value: nct + "'s posted primary result (hazard ratio " + hr + (sd ? ", " + (a.ciPct || "95") + "% CI " + a.lower + "–" + a.upper : "") + "), read " + localDateStamp() + (ns.length === 2 ? "; arm sizes " + ns.join(" and ") + " in registered order" : "") });
     return h("button", { type: "button", "data-no-export": "", onClick: () => onReopen({ view: "simulation", simTab: "trialOutcome", inputs }),
@@ -681,7 +684,7 @@ function TrialDecoderTool({ activeCase, initialNctId, onConsumedInitialNctId, on
               )))
       ]),
 
-      results && h(TrialResultsPanels, { results: results, study: raw, onReopen }),
+      results && h(TrialResultsPanels, { results: results, study: raw, onReopen, nctId: decoded && decoded.nctId }),
 
       !results && decoded.hasResults && toolCard(h, [
         h("div", { style: { fontSize: 11.5, fontFamily: "var(--sans)", color: "var(--warn)", lineHeight: 1.6 } },
