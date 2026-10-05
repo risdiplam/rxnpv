@@ -138,7 +138,13 @@
   "war": "2157698",
   "warK": "0",
   "convFace": "0",
-  "convPrice": "0"
+  "convPrice": "0",
+  "cashSource": "Q2 2026 10-Q, period ending 2026-06-30: $354.3M cash, cash equivalents and marketable securities + $65.7M ATM proceeds after the quarter",
+  "atmUndrawn": "194000000",
+  "debtUndrawn": "",
+  "milestoneExpected": "",
+  "shelfRemaining": "",
+  "facilitiesNote": "424B5 2026-08-03: $200M Cantor ATM, $194M after 3% (also the modelled raise)"
  },
  "scenarioOverrides": {
   "bear": {

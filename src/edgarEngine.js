@@ -303,7 +303,7 @@ function calcRunwayFromFacts(facts) {
     const all = fact.units.USD.filter(p => p.form === "10-Q" || p.form === "10-K");
     if (!all.length) return null;
     all.sort((a, b) => (b.end || "").localeCompare(a.end || ""));
-    return { value: all[0].val, end: all[0].end, form: all[0].form };
+    return { value: all[0].val, end: all[0].end, form: all[0].form, tag };
   };
   let cash = null, invest = null, longInvest = null;
   for (const t of cashTags) { cash = pickLatest(t); if (cash) break; }
@@ -314,6 +314,9 @@ function calcRunwayFromFacts(facts) {
   for (const t of longInvestmentTags) { longInvest = sameDate(pickLatest(t)); if (longInvest) break; }
   const totalCash = (cash?.value || 0) + (invest?.value || 0) + (longInvest?.value || 0);
   if (!totalCash) return null;
+  // Which XBRL tags the cash figure is made of: the choice moves the runway,
+  // and it is the usual answer to "why does this differ from the 10-Q?"
+  const cashParts = [cash, invest, longInvest].filter(Boolean).map(x => ({ tag: x.tag, value: x.value }));
   // Burn is the cash the business actually used: operating cash flow from the
   // cash-flow statement, which excludes non-cash stock compensation. Operating
   // loss includes it, so it overstates burn — Stoke's Q2 2026 operating loss
@@ -354,10 +357,10 @@ function calcRunwayFromFacts(facts) {
   // as the operating loss (the same filing, normally).
   const useCash = opCash && opCash.value < 0 && (!opLoss || (opCash.end || "") >= (opLoss.end || ""));
   const burn = useCash ? opCash : opLoss;
-  if (!burn || burn.value >= 0) return { cashUSD: totalCash, debtUSD: extractDebt(ug), runwayMonths: null, asOf: cash?.end || invest?.end, note: "operating loss not available" };
+  if (!burn || burn.value >= 0) return { cashUSD: totalCash, cashTags: cashParts, debtUSD: extractDebt(ug), runwayMonths: null, asOf: cash?.end || invest?.end, note: "operating loss not available" };
   const monthlyBurn = Math.abs(burn.value) / burn.months;
   return {
-    cashUSD: totalCash, debtUSD: extractDebt(ug),
+    cashUSD: totalCash, cashTags: cashParts, debtUSD: extractDebt(ug),
     quarterlyBurnUSD: monthlyBurn * 3,          // normalised, whatever span was reported
     burnPeriodMonths: burn.months,              // what the filing actually reported
     burnBasis: useCash ? "cash used in operations" : "operating loss",
@@ -388,6 +391,12 @@ function extractDebt(ug) {
 // a filing the case has not caught up with. Reads the submissions index
 // (reverse-chronological; reportDate is the period end). Null when the case
 // is current or there is nothing to compare.
+// "EDGAR XBRL, period ending 2026-06-30: CashAndCashEquivalentsAtCarryingValue
+// $110.0M + …" — stored on the case with the cash so the figure can be traced.
+function edgarCashSource(r) {
+  if (!r || !r.cashTags || !r.cashTags.length) return "";
+  return "EDGAR XBRL" + (r.asOf ? ", period ending " + r.asOf : "") + ": " + r.cashTags.map(t => t.tag + " " + fmtMoney(t.value)).join(" + ");
+}
 function newerFinancialFiling(submissions, cashAsOf) {
   if (!submissions || !submissions.filings || !submissions.filings.recent || !cashAsOf) return null;
   const r = submissions.filings.recent;
@@ -622,7 +631,7 @@ async function pullEdgarFinancials(companyName, force) {
     ok: true, cik: cikInfo.cik, ticker: cikInfo.ticker, name: subs?.name || cikInfo.name,
     basicShares: shares ? shares.shares : null, basicSharesAsOf: shares ? shares.asOf : null,
     dilutedShares: diluted ? diluted.shares : null, dilutedSharesAsOf: diluted ? diluted.asOf : null,
-    cash: runway ? runway.cashUSD : null, debt: runway ? runway.debtUSD : null,
+    cash: runway ? runway.cashUSD : null, cashTags: runway ? runway.cashTags || [] : [], debt: runway ? runway.debtUSD : null,
     asOf: runway ? runway.asOf : null,
     quarterlyBurnUSD: runway ? runway.quarterlyBurnUSD : null,
     burnBasis: runway ? runway.burnBasis || null : null, burnPeriodMonths: runway ? runway.burnPeriodMonths || null : null, burnPeriodEnd: runway ? runway.burnPeriodEnd || null : null,

@@ -77,7 +77,8 @@ function CompanyLookupTool({ cases, updateCase, activeCase, onWatchTrial }) {
     if (!c || !edgarResult) return;
     const cap = c.capitalStructure || { mode: "simple" };
     const patch = { cash: edgarResult.cash != null ? String(edgarResult.cash) : cap.cash, debt: edgarResult.debt != null ? String(edgarResult.debt) : cap.debt,
-      cashAsOf: edgarResult.cash != null && edgarResult.asOf ? edgarResult.asOf : cap.cashAsOf, monthlyBurn: edgarResult.quarterlyBurnUSD > 0 ? String(Math.round(edgarResult.quarterlyBurnUSD / 3)) : cap.monthlyBurn };
+      cashAsOf: edgarResult.cash != null && edgarResult.asOf ? edgarResult.asOf : cap.cashAsOf, monthlyBurn: edgarResult.quarterlyBurnUSD > 0 ? String(Math.round(edgarResult.quarterlyBurnUSD / 3)) : cap.monthlyBurn,
+      cashSource: edgarResult.cash != null ? edgarCashSource(edgarResult) : cap.cashSource };
     if (cap.mode === "simple") {
       const fd = edgarFullyDilutedShares(edgarResult, c.currentPrice);
       patch.dilutedSharesSimple = fd ? String(fd.shares) : cap.dilutedSharesSimple;
@@ -132,6 +133,7 @@ function CompanyLookupTool({ cases, updateCase, activeCase, onWatchTrial }) {
           edgarResult.dilutedShares != null && h("div", { title: "The weighted-average share count used for earnings per share. A loss-making company excludes options and warrants from it, so it is not a fully diluted count; the export builds that from basic shares, options and warrants instead." },
             "Weighted-average diluted, for EPS: ", fmtNum(edgarResult.dilutedShares), edgarAsOf(edgarResult.dilutedSharesAsOf), " — not a fully diluted count"),
           h("div", null, "Cash & marketable securities: ", edgarResult.cash != null ? fmtMoney(edgarResult.cash) + edgarAsOf(edgarResult.asOf) : "n/a", " · Debt: ", edgarResult.debt != null ? fmtMoney(edgarResult.debt) : "n/a"),
+          edgarResult.cashTags && edgarResult.cashTags.length > 0 && h("div", { style: { color: "var(--ink-3)", fontSize: 10 } }, "Cash is " + edgarResult.cashTags.map(t => t.tag + " " + fmtMoney(t.value)).join(" + ") + " (XBRL tags)."),
           (edgarResult.options || edgarResult.warrants) && h("div", null,
             edgarResult.options && edgarResult.options.count != null && ("Options: " + fmtNum(edgarResult.options.count) + (edgarResult.options.priceFound ? " @ avg $" + edgarResult.options.avgStrike.toFixed(2) : " (strike not tagged)") + edgarAsOf(edgarResult.options.asOf)),
             edgarResult.options && edgarResult.warrants ? " · " : "",
@@ -532,7 +534,8 @@ function RunwayTool({ cases, updateCase, activeCase }) {
     const cap = c.capitalStructure || {};
     updateCase({
       ...c, capitalStructure: { ...cap, cash: String(cash), debt: debt != null ? String(debt) : cap.debt,
-        cashAsOf: pullResult && pullResult.asOf ? pullResult.asOf : cap.cashAsOf, monthlyBurn: pullResult && pullResult.quarterlyBurnUSD > 0 ? String(Math.round(pullResult.quarterlyBurnUSD / 3)) : cap.monthlyBurn },
+        cashAsOf: pullResult && pullResult.asOf ? pullResult.asOf : cap.cashAsOf, monthlyBurn: pullResult && pullResult.quarterlyBurnUSD > 0 ? String(Math.round(pullResult.quarterlyBurnUSD / 3)) : cap.monthlyBurn,
+        cashSource: pullResult ? edgarCashSource(pullResult) : "typed in Cash Runway" },
       programs: appendEdgarEvidenceToPrograms(c.programs, pullResult, "Cash Runway's EDGAR pull"),
       updatedAt: Date.now()
     });
@@ -560,7 +563,8 @@ function RunwayTool({ cases, updateCase, activeCase }) {
         h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-2)", marginBottom: 8 } }, "✓ ", h("b", { style: { color: "var(--teal)" } }, pullResult.name), pullResult.asOf ? " · as of " + pullResult.asOf : ""),
         h("div", { style: { display: "flex", gap: 24, flexWrap: "wrap" } },
           h("div", null, h("div", { style: UI.caption }, "Cash & investments"),
-            h("div", { style: UI.stat }, pullResult.cash != null ? fmtMoney(pullResult.cash) : "n/a")),
+            h("div", { style: UI.stat }, pullResult.cash != null ? fmtMoney(pullResult.cash) : "n/a"),
+            pullResult.cashTags && pullResult.cashTags.length > 0 && h("div", { style: { ...UI.caption, maxWidth: 260 } }, pullResult.cashTags.map(t => t.tag + " " + fmtMoney(t.value)).join(" + "))),
           h("div", null, h("div", { style: UI.caption }, "Quarterly burn"),
             h("div", { style: UI.stat }, pullResult.quarterlyBurnUSD != null ? fmtMoney(pullResult.quarterlyBurnUSD) : "n/a"),
             pullResult.burnBasis && h("div", { style: UI.caption }, pullResult.burnBasis + (pullResult.burnPeriodMonths ? ", " + pullResult.burnPeriodMonths + " months" + (pullResult.burnPeriodEnd ? " to " + pullResult.burnPeriodEnd : "") + (pullResult.burnPeriodMonths !== 3 ? ", per quarter" : "") : ""))),
@@ -606,7 +610,15 @@ function RunwayTool({ cases, updateCase, activeCase }) {
               h("div", { style: UI.stat }, fmtMoney(fr.startingCash))),
             h("div", null, h("div", { style: UI.caption }, "Modeled runway"),
               h("div", { style: { fontSize: 22, fontFamily: "var(--mono)", fontWeight: 800, color: fr.runwayMonths != null && fr.runwayMonths < 12 ? "var(--red)" : "var(--green)" } },
-                fr.runwayMonths != null ? fr.runwayMonths.toFixed(0) + " mo" : "25yr+ (beyond projection window)"))
+                fr.runwayMonths != null ? fr.runwayMonths.toFixed(0) + " mo" : "25yr+ (beyond projection window)")),
+            (() => {
+              const fac = caseFacilities(fc);
+              if (!(fac.total > 0)) return null;
+              const frF = computeForwardRunway(fc, { extraCash: fac.total });
+              return h("div", null, h("div", { style: UI.caption }, "With facilities"),
+                h("div", { style: { fontSize: 22, fontFamily: "var(--mono)", fontWeight: 800, color: "var(--ink-2)" } }, frF.runwayMonths != null ? frF.runwayMonths.toFixed(0) + " mo" : "25yr+"),
+                h("div", { style: UI.caption }, "+ " + fmtMoney(fac.total) + " undrawn ATM, debt and expected milestones" + (fac.note ? " (" + fac.note + ")" : "")));
+            })()
           ),
           h(ExportableBlock, { title: (fc ? fc.name + " — " : "") + "cash runway" },
             h(RevenueChart, {
@@ -637,7 +649,7 @@ function RunwayTool({ cases, updateCase, activeCase }) {
 // own modeled burn (computeForwardRunway), catalyst dates from each program's
 // calibration log. Import-only for the same reason SensitivityTool is: there
 // is no meaningful standalone answer without a case's own burn and dates.
-function RunwayVsCatalystTool({ cases, activeCase }) {
+function RunwayVsCatalystTool({ cases, updateCase, activeCase }) {
   const h = React.createElement;
   const [caseId, setCaseId] = useActiveCaseId(activeCase);
   const [cushion, setCushion] = React.useState("6");
@@ -645,6 +657,13 @@ function RunwayVsCatalystTool({ cases, activeCase }) {
   const rvcRef = React.useRef(null);
   const cushionNum = cushion === "" ? 0 : Number(cushion);
   const res = theCase ? computeRunwayVsCatalysts(theCase, { cushionMonths: isFinite(cushionNum) ? cushionNum : 6 }) : null;
+  // The same check if the undrawn ATM, debt and expected milestones come in.
+  const fac = theCase ? caseFacilities(theCase) : null;
+  const resFac = theCase && fac.total > 0 ? computeRunwayVsCatalysts(theCase, { cushionMonths: isFinite(cushionNum) ? cushionNum : 6, withFacilities: true }) : null;
+  let bridge = null;
+  try { bridge = theCase && res && res.ok ? computeFinancingBridge(theCase, { cushionMonths: isFinite(cushionNum) ? cushionNum : 6 }) : null; } catch (e) { bridge = null; }
+  const [confirmRaise, setConfirmRaise] = React.useState(false);
+  const [raiseMsg, setRaiseMsg] = React.useState("");
 
   const STATUS = {
     funded: { color: "var(--teal)", word: "Funded through it" },
@@ -688,6 +707,12 @@ function RunwayVsCatalystTool({ cases, activeCase }) {
         h("div", null,
           h("div", { style: UI.caption }, "Dated catalysts"),
           h("div", { style: { fontSize: 26, fontFamily: "var(--mono)", fontWeight: 800, color: "var(--ink-1)" } }, String(res.rows.length))),
+        resFac && resFac.ok && h("div", null,
+          h("div", { style: UI.caption }, "With facilities"),
+          h("div", { style: { fontSize: 26, fontFamily: "var(--mono)", fontWeight: 800, color: "var(--ink-2)" } },
+            resFac.beyondHorizon ? "No end" : resFac.runwayMonths.toFixed(0) + " mo"),
+          h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", maxWidth: 170, lineHeight: 1.4 } },
+            "+ " + fmtMoney(fac.total) + " undrawn ATM, debt and expected milestones" + (fac.note ? " (" + fac.note + ")" : ""))),
         res.gapCount > 0 && h("div", null,
           h("div", { style: UI.caption }, "UNFUNDED"),
           h("div", { style: { fontSize: 26, fontFamily: "var(--mono)", fontWeight: 800, color: "var(--red)" } }, String(res.gapCount)))
@@ -727,6 +752,32 @@ function RunwayVsCatalystTool({ cases, activeCase }) {
                     ? "This case never runs out of cash in the 25-year projection — modeled cash flow turns positive first, so no dated catalyst is financing-constrained. That is a property of your revenue assumptions, so it is only as safe as they are."
                     : "Runway covers all " + res.rows.length + " with at least the " + res.cushionMonths + "-month cushion. That removes forced-financing risk from the thesis — it does not remove the risk of an opportunistic raise into strength.")
           ),
+
+      // How much a raise would need to be, and what it does to a share.
+      bridge && h("div", { className: "financing-bridge", style: { marginTop: 14, padding: "12px 14px", borderRadius: 8, background: "var(--surface-2)", fontFamily: "var(--sans)", fontSize: 12, lineHeight: 1.65, color: "var(--ink-1)" } },
+        h("div", { style: { fontWeight: 700, marginBottom: 4 } }, "What reaching it would take"),
+        h("div", null, "About ", h("b", null, fmtMoney(bridge.needed)), " to get past the end of \"" + bridge.catalyst.label.split(/[,(]/)[0].trim() + "\" (" + bridge.catalyst.dateText + ") with the " + bridge.cushionMonths + "-month cushion, at the model's burn."),
+        bridge.facilities.total > 0 && (bridge.afterFacilities > 0
+          ? h("div", null, "Less " + fmtMoney(bridge.facilities.total) + " of undrawn ATM, debt and expected milestones" + (bridge.facilities.note ? " (" + bridge.facilities.note + ")" : "") + ": ", h("b", null, fmtMoney(bridge.afterFacilities)), " still to raise.")
+          : h("div", null, "The " + fmtMoney(bridge.facilities.total) + " of undrawn ATM, debt and expected milestones entered would cover it, if they can be drawn when needed" + (bridge.facilities.note ? " (" + bridge.facilities.note + ")" : "") + ". Drawing an ATM still means selling shares at the market.")),
+        bridge.shelfShort > 0 && h("div", { style: { color: "var(--warn)" } }, "Needs about " + fmtMoney(bridge.afterFacilities) + "; " + fmtMoney(bridge.facilities.shelf) + " remains on the shelf as entered — a new registration or a different structure would be needed."),
+        bridge.afterFacilities > 0 && bridge.coveredByModelled && h("div", null,
+          "This case already models a raise of " + fmtMoney(bridge.modelledAmount) + ", which would cover it (Assumptions → Future financing), so the valuation already pays for it."),
+        bridge.afterFacilities > 0 && !bridge.coveredByModelled && bridge.newShares != null && h("div", null,
+          "Raised at " + bridge.discountPct + "% below today's price ($" + bridge.raisePrice.toFixed(2) + "), that is about " + (bridge.newShares / 1e6).toFixed(1) + "M new shares" +
+          (bridge.baseNow != null && bridge.baseWith != null ? "; Base fair value would be " + fmtShare(bridge.baseWith) + " with it" + (bridge.alreadyModelled ? " in place of the modelled " + fmtMoney(bridge.modelledAmount) + " raise" : "") + ", against " + fmtShare(bridge.baseNow) + " now" +
+            (bridge.alreadyModelled ? "." : bridge.raisePrice > bridge.baseNow ? " — the shares would be sold above this case's own value per share, so the raise adds more than it dilutes." : " — the cost of selling shares below this case's own value per share.") : ".")),
+        bridge.afterFacilities > 0 && bridge.newShares == null && h("div", { style: UI.caption }, "Set a current price on the case to size the raise in shares."),
+        bridge.zeroDate != null && h("div", { style: UI.caption }, "With no raise at all, the modelled cash reaches zero about " + bridge.zeroDate.toFixed(0) + " months from today."),
+        bridge.afterFacilities > 0 && !bridge.coveredByModelled && bridge.newShares != null && updateCase && h("div", { "data-no-export": "", style: { display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginTop: 8 } },
+          !confirmRaise
+            ? h("button", { type: "button", onClick: () => { setConfirmRaise(true); setRaiseMsg(""); }, style: { padding: "6px 12px", borderRadius: 6, border: "1px solid var(--teal)", background: "var(--teal-bg)", color: "var(--teal)", fontFamily: "var(--mono)", fontSize: 11, fontWeight: 700, cursor: "pointer" } }, "Model this raise")
+            : h(React.Fragment, null,
+                h("span", null, (bridge.alreadyModelled ? "Replace the case's modelled raise with " : "Add ") + fmtMoney(bridge.afterFacilities) + " at " + bridge.discountPct + "% below today's price? This changes the valuation."),
+                h("button", { type: "button", onClick: () => { updateCase({ ...theCase, futureRaise: { ...(theCase.futureRaise || {}), ...bridge.raise }, updatedAt: Date.now() }); setConfirmRaise(false); setRaiseMsg("Added to the case: Assumptions → Future financing shows it."); },
+                  style: { padding: "6px 12px", borderRadius: 6, border: "none", background: "var(--teal-fill)", color: "var(--on-teal)", fontFamily: "var(--mono)", fontSize: 11, fontWeight: 700, cursor: "pointer" } }, "Confirm"),
+                h("button", { type: "button", onClick: () => setConfirmRaise(false), style: { padding: "6px 12px", borderRadius: 6, border: "1px solid var(--rule)", background: "transparent", color: "var(--ink-2)", fontFamily: "var(--mono)", fontSize: 11, cursor: "pointer" } }, "Cancel"))),
+        raiseMsg && h("div", { style: { color: "var(--teal)", marginTop: 6 } }, raiseMsg)),
 
       // Timeline: runway as a bar, catalysts as markers along the same axis.
       (() => {
@@ -785,7 +836,7 @@ function RunwayVsCatalystTool({ cases, activeCase }) {
       h("div", { style: { marginTop: 14 } },
         h(Note, { summary: "What this runway figure doesn't know about" },
           h("div", { style: { lineHeight: 1.6 } },
-            "It is the case's own modeled burn carried forward in nominal dollars. It does not know about an ATM already in place, an undrawn credit facility, or partnership milestone cash — all of which push the line right. Treat a gap as \"check how they intend to fund this\", not as a prediction that they won't.")))
+            "It is the case's own modeled burn carried forward in nominal dollars. It does not know about an ATM already in place, an undrawn credit facility, or partnership milestone cash unless you enter them (Assumptions → Capital structure → Undrawn ATM, debt, milestones and shelf); then the runway “with facilities” appears beside it. Treat a gap as \"check how they intend to fund this\", not as a prediction that they won't.")))
     ]))
   );
 }

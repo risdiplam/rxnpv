@@ -127,7 +127,7 @@ function ToolsView({ cases, updateCase, activeCase, navRequest, onSelectCase, on
     tab === "lookup" ? h(CompanyLookupTool, { cases, updateCase, activeCase, onWatchTrial: goToTrialWatch }) :
     tab === "fdmc" ? h(FdmcTool, { cases, updateCase, activeCase }) :
     tab === "runway" ? h(RunwayTool, { cases, updateCase, activeCase }) :
-    tab === "runwayCatalyst" ? h(RunwayVsCatalystTool, { cases, activeCase }) :
+    tab === "runwayCatalyst" ? h(RunwayVsCatalystTool, { cases, updateCase, activeCase }) :
     tab === "binaryEvent" ? h(BinaryEventTool, { cases, activeCase }) :
     tab === "peaksales" ? h(PeakSalesCompsTool, { cases, updateCase, activeCase }) :
     tab === "licensing" ? h(LicensingCompsTool, { cases, updateCase, activeCase }) :

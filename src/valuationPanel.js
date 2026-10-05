@@ -565,13 +565,15 @@ function useValuationSections({ theCase, onChange, goToTab }) {
             h(BenchField, { label: "Fully diluted shares outstanding", value: cap.dilutedSharesSimple, onChange: v => setCap({ dilutedSharesSimple: v }), placeholder: "e.g. 50000000" }),
             h(MillionsField, { label: "Cash & equivalents", value: cap.cash, onChange: v => setCap({ cash: v }) }),
             h(MillionsField, { label: "Debt", value: cap.debt, onChange: v => setCap({ debt: v }) }),
-            h(CashAsOfFields, { cap, setCap, theCase, update })
+            h(CashAsOfFields, { cap, setCap, theCase, update }),
+            h(FacilitiesFields, { cap, setCap })
           )
         : h("div", { style: { display: "flex", gap: 16, flexWrap: "wrap" } },
             h(BenchField, { label: "Basic shares outstanding", value: cap.basicShares, onChange: v => setCap({ basicShares: v }) }),
             h(MillionsField, { label: "Cash & equivalents", value: cap.cash, onChange: v => setCap({ cash: v }) }),
             h(MillionsField, { label: "Debt", value: cap.debt, onChange: v => setCap({ debt: v }) }),
             h(CashAsOfFields, { cap, setCap, theCase, update }),
+            h(FacilitiesFields, { cap, setCap }),
             h("div", { style: { flex: "1 1 100%", fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", margin: "4px 0" } }, "Options / warrants (treasury method — dilutive only if in the money; uses Current price above)"),
             h(BenchField, { label: "Options outstanding", value: cap.opts, onChange: v => setCap({ opts: v }) }),
             h(BenchField, { label: "Options avg strike", value: cap.optK, onChange: v => setCap({ optK: v }), suffix: "$" }),
@@ -1141,7 +1143,8 @@ function FreshnessStrip({ theCase }) {
   if (f.price) parts.push(h("span", { key: "p", style: f.price.stale ? amber : null },
     "Price " + fmtShare(f.price.value) + (f.price.asOf ? " entered " + f.price.asOf + " (" + freshnessAgo(f.price.days) + ")" : ", date not recorded") + (f.price.stale ? " — re-check it" : "")));
   else parts.push(h("span", { key: "p" }, "No price entered"));
-  if (f.cash) parts.push(h("span", { key: "c", title: filing && filing.status === "unavailable" ? "Could not check SEC for a newer filing: " + filing.reason : undefined },
+  const cashSrc = (theCase.capitalStructure || {}).cashSource;
+  if (f.cash) parts.push(h("span", { key: "c", title: [cashSrc, filing && filing.status === "unavailable" ? "Could not check SEC for a newer filing: " + filing.reason : null].filter(Boolean).join(" — ") || undefined },
     "Cash " + fmtMoney(f.cash.value) + (f.cash.asOf ? " as of " + f.cash.asOf + " (" + freshnessAgo(f.cash.days) + ")" : ", date not recorded") + (f.cash.rolled ? ", rolled forward" : "")));
   if (f.cash && f.cash.newer) parts.push(h("span", { key: "n", style: amber },
     "a newer " + f.cash.newer.form + " (period to " + f.cash.newer.period + ") was filed " + f.cash.newer.filed + " — refresh cash, burn and shares"));
@@ -1166,4 +1169,26 @@ function ImpliedGap({ theCase, implied, yours }) {
     held && h("button", { type: "button", className: "link-btn", "data-no-export": "", "aria-expanded": open, onClick: () => setOpen(!open), style: { fontSize: 11, marginLeft: 6 } }, open ? "hide" : "held fixed"),
     held && open && h("div", { className: "held-fixed", style: { ...UI.caption, marginTop: 4, maxWidth: 360, whiteSpace: "normal", lineHeight: 1.5 } },
       "Solving for the odds that make the fair value equal today's price, with everything else held: " + andList(held) + "."));
+}
+
+// Money not on the balance sheet yet (October 2026): optional, folded away,
+// none of it in the valuation. It feeds the "with facilities" runway and the
+// dollars-needed line in Runway vs. Catalyst.
+function FacilitiesFields({ cap, setCap }) {
+  const h = React.createElement;
+  const fac = caseFacilities({ capitalStructure: cap });
+  return h("div", { style: { flex: "1 1 100%" } },
+    h(Note, { summary: "Undrawn ATM, debt, milestones and shelf (optional)" + (fac.any ? " · " + fmtMoney(fac.total) + " reachable" : ""), open: fac.any },
+      h("div", null,
+        h("div", { style: { marginBottom: 10, lineHeight: 1.6 } }, "Money the company can reach that is not in the cash above. None of it changes the valuation: it extends the runway “with facilities” in Cash Runway and Runway vs. Catalyst, and sizes the dollars a raise would need. Type what the latest filing says; nothing here is read from filings."),
+        h("div", { style: { display: "flex", gap: 16, flexWrap: "wrap" } },
+          h(MillionsField, { label: "Undrawn ATM", value: cap.atmUndrawn || "", onChange: v => setCap({ atmUndrawn: v }) }),
+          h(MillionsField, { label: "Undrawn debt facility", value: cap.debtUndrawn || "", onChange: v => setCap({ debtUndrawn: v }) }),
+          h(MillionsField, { label: "Milestone cash expected before the next catalyst", value: cap.milestoneExpected || "", onChange: v => setCap({ milestoneExpected: v }), help: "Expected, not contracted, unless you know otherwise. Only ever added to the “with facilities” runway." }),
+          h(MillionsField, { label: "Remaining shelf capacity", value: cap.shelfRemaining || "", onChange: v => setCap({ shelfRemaining: v }), help: "Registration room, not money: kept out of the runway, compared with any raise needed." })),
+        h("label", { style: { display: "flex", flexDirection: "column", gap: 4, fontSize: 12, fontFamily: "var(--sans)", color: "var(--ink-2)", marginTop: 4 } },
+          "As of / source",
+          h("input", { type: "text", value: cap.facilitiesNote || "", "aria-label": "Facilities as of / source", placeholder: "e.g. Q2 2026 10-Q, note 9", onChange: e => setCap({ facilitiesNote: e.target.value }),
+            style: { padding: "7px 10px", borderRadius: 6, border: "1.5px solid var(--rule)", background: "var(--surface)", color: "var(--ink-1)", fontFamily: "var(--mono)", fontSize: 12, maxWidth: 420 } })),
+        fac.doubleCount && h("div", { style: { marginTop: 8, color: "var(--warn)" } }, "An ATM usually sits inside the shelf: these may be the same money entered twice. The shelf is never added to the runway, so nothing is counted twice there."))));
 }

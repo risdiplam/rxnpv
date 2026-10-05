@@ -1616,7 +1616,9 @@ function computeRunwayVsCatalysts(theCase, opts) {
   let runwayMonths = o.runwayMonthsOverride;
   if (runwayMonths == null) {
     try {
-      const fr = computeForwardRunway(theCase);
+      // withFacilities: the runway if the undrawn ATM, debt and expected
+      // milestones the user entered come in (never the default).
+      const fr = computeForwardRunway(theCase, o.withFacilities ? { extraCash: caseFacilities(theCase).total } : undefined);
       // null from computeForwardRunway is ambiguous — it means "balance never
       // crossed zero in the 25-year window", which is either "no cash modelled
       // at all" or "turns cash-flow positive and never runs out". Starting cash

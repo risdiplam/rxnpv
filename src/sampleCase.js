@@ -140,6 +140,8 @@ function sampleCaseStoke() {
         "Napkin (Quick) mode has no US/ex-US split, so it treats a partnership as covering all revenue — with Biogen's 15% royalty left on, the Napkin figure is badly understated. With Partnership Economics switched off, Napkin on this case's own peaks ($1.31B Base: US sales plus the ex-US royalty) gives about $30.7 against the Full model's $28.76 — close, and the gap is the Full build's cost detail and its ex-US royalty starting 1.5 years after the US launch, which one Quick curve cannot show. Compare the two modes that way."),
       ev("What the model says (snapshot)", "inference", "moderate", "This case, 2026-09-28",
         "At $24.80: Base fair value ~$28.76 (about 16% above the price), Bear ~$17.26, Bull ~$41.87; peak revenue ~$1.31B in Base (US sales plus the ex-US royalty). The price implies ~55% odds of reaching launch against this case's 65%, so this case is somewhat more confident than the market. If approved, with no failure weighting, a share is worth ~$42.01 on Base inputs; if EMPEROR fails, ~$1.30 is left (the filing's cash less the Phase 3 still to pay, G&A to the readout and a year of wind-down, before any raise) — or ~$0.46 on the rough burn estimate ($19.5M a month for 15 months to the logged 2027-Q3 readout). The judgment that moves it most after peak share and PoS is what happens at loss of exclusivity: a small-molecule generic cliff gives ~$25.87, a biologic-style decline ~$32.15, and this case sits between them. The full $200M ATM costs ~$0.51 a share (Base $29.27 without it); switching terminal value on would add ~$6.50, which is why it stays off."),
+      ev("Undrawn ATM: $200M (Cantor, August 2026)", "fact", "high", "424B5 filed 2026-08-03; Q2 2026 10-Q, note 1",
+        "The $150M sales agreement under the March 2026 automatic shelf is essentially used: about 4.7M shares sold for $146.4M net (2.6M by June 30, $80.7M; 2.1M after, $65.7M, which is in this case's cash). A fresh $200M at-the-market prospectus with Cantor followed on August 3. Entered as $194M undrawn after the 3% commission, so the runway \"with facilities\" counts it; this case also models the same $194M as its future raise, which is the valuation's view of it. The automatic shelf has no fixed dollar cap, so remaining shelf capacity is left blank."),
       ev("Share price $24.80", "fact", "high", "Close on 2026-09-25 (stockanalysis.com)",
         "Down from $29.20 on Sep 22; the week included a board change (former CEO Edward Kaye resigned as a director, Bo Cumbo appointed; 8-K 2026-09-25). No clinical news. Update the price before relying on the upside figure."),
       ev("Worked examples: what is and is not included", "inference", "high", "This case's Saved tab",
@@ -267,7 +269,13 @@ function sampleCaseStoke() {
       cashAsOf: "2026-06-30", monthlyBurn: String(19.5e6), carryCashForward: false,
       opts: "11532638", optK: "13.84",
       war: "2157698", warK: "0",
-      convFace: "0", convPrice: "0"
+      convFace: "0", convPrice: "0",
+      cashSource: "Q2 2026 10-Q, period ending 2026-06-30: $354.3M cash, cash equivalents and marketable securities + $65.7M ATM proceeds after the quarter",
+      // Reachable but not in the cash: the fresh $200M ATM (424B5, 2026-08-03),
+      // $194M after Cantor's 3%. The automatic shelf has no fixed cap, so no
+      // remaining-shelf figure. Feeds the "with facilities" runway only.
+      atmUndrawn: String(194e6), debtUndrawn: "", milestoneExpected: "", shelfRemaining: "",
+      facilitiesNote: "424B5 2026-08-03: $200M Cantor ATM, $194M after 3% (also the modelled raise)"
     },
     // The fresh $200M ATM (424B5, 2026-08-03), net of Cantor's 3%: $194M at
     // $24.06 a share, i.e. $200M gross at today's $24.80. Dollars (MillionsField).
@@ -379,6 +387,8 @@ function sampleCasePepGen() {
         "Cash used in operations was $34.2M in H1 2026, $5.7M a month; Q2 R&D $12.5M and G&A $6.4M (so G&A runs ~$26M a year). $117.2M at that rate lasts about 20 months, but spending rises with the 12.5 mg/kg cohort and registrational preparation, which is why the company says Q4 2027."),
       ev("A $100M raise at $1.99; the dilution path left off", "inference", "moderate", "Judgment; runway guidance into Q4 2027",
         "Cash runs out before a registrational trial could even start, so a raise is certain: $100M at $1.99 (15% below $2.34) is modelled as the next financing (50.3M shares). Without it Base is ~$1.47, lower than with it — the raise is priced above this case's own fair value, so new investors pay more per share than the case thinks a share is worth. The dilution-path inputs are filled but switched off. Switched on, it projects ~$361M of raises over the years to launch, each counted with the odds the company is still going when it would happen (~$298M expected) and bringing its cash with its shares; at today's price less 15% they end with ~271M shares and Base ~$1.85, and priced at the case's own value they leave Base unchanged. Raises after positive data would be priced far higher than today's."),
+      ev("Undrawn ATM $100M inside a $400M shelf", "fact", "high", "Q2 2026 10-Q (Liquidity; statement of stockholders' equity)",
+        "A new $400M S-3 went effective on May 21, 2026, with a $100M Stifel at-the-market agreement under it from May 2026. The 237,500 shares sold in 2026 ($1.5M net) were all in Q1, under the old agreement, so the new one was unused at June 30. Entered as $97M undrawn (after a 3% commission) and $400M of shelf; the ATM sits inside the shelf, so the panel's \"may be the same money\" warning is right here, and the shelf never enters the runway. ATM sales depend on the stock trading enough to absorb them."),
       ev("Share price $2.34", "fact", "high", "Close on 2026-09-29 (stockanalysis.com)",
         "Down 9.7% that day and about 60% year to date, after the March 5 mg/kg data and HARBOR's failure on September 8. At $2.34 the market capitalisation is ~$162M against $117M of cash — an enterprise value of about $45M for the program. Update the price before relying on the upside figure."),
       ev("Incidence alternative: 450 a year for 55 years", "inference", "low", "Johnson et al., Neurology 2021 (genetic prevalence); PepGen 10-K FY2025 (clinical prevalence 1 in 8,000)",
@@ -497,7 +507,14 @@ function sampleCasePepGen() {
       cashAsOf: "2026-06-30", monthlyBurn: String(5.7e6), carryCashForward: false,
       opts: "8139082", optK: "4.89",
       war: "1101110", warK: "0",
-      convFace: "0", convPrice: "0"
+      convFace: "0", convPrice: "0",
+      cashSource: "Q2 2026 10-Q, period ending 2026-06-30: $117.2M cash, cash equivalents and marketable securities",
+      // The $100M Stifel ATM (May 2026) was unused at June 30 — the 237,500
+      // shares sold in 2026 were in Q1, under the old agreement — ~$97M after
+      // 3%; it sits inside the $400M S-3 effective May 21, 2026, so the panel
+      // warns the two may be the same money (they partly are).
+      atmUndrawn: String(97e6), debtUndrawn: "", milestoneExpected: "", shelfRemaining: String(400e6),
+      facilitiesNote: "Q2 2026 10-Q: $100M Stifel ATM (May 2026) unused at Jun 30; $400M S-3 effective May 21, 2026"
     },
     // 15% below today's price, so it follows the stock ($1.99 on the day).
     futureRaise: { enabled: true, amountM: String(100e6), priceMode: "discount", discountPct: "15", priceOverride: "1.99" },

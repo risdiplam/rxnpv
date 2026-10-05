@@ -1138,7 +1138,20 @@ function solveImpliedVariable(theCase, discountRateBasePct, terminalValueParams,
 // operating costs, so subtracting it here would conflate two different
 // questions. Cash flows are NOT time-discounted — this walks nominal
 // dollars forward year by year, not a present-value calculation.
-function computeForwardRunway(theCase) {
+// Money the company can reach that is not on the balance sheet yet
+// (October 2026): an undrawn ATM, an undrawn debt facility, and milestone cash
+// expected before the next catalyst — all typed by the user, never parsed,
+// none of it in the valuation. Remaining shelf capacity is registration room,
+// not money, so it is kept apart (and an ATM usually sits inside the shelf,
+// hence the double-count warning).
+function caseFacilities(theCase) {
+  const cap = (theCase && theCase.capitalStructure) || {};
+  const v = k => Math.max(0, numOr(cap[k], 0));
+  const atm = v("atmUndrawn"), debt = v("debtUndrawn"), milestones = v("milestoneExpected"), shelf = v("shelfRemaining");
+  return { atm, debt, milestones, shelf, total: atm + debt + milestones, note: cap.facilitiesNote || "", doubleCount: atm > 0 && shelf > 0, any: atm + debt + milestones + shelf > 0 };
+}
+
+function computeForwardRunway(theCase, opts) {
   const scenario = { label: "unrisked", shareMultiplierPct: 100, posMultiplierPct: 100, discountRateAddPct: 0, color: "" };
   const programVals = theCase.programs.map(p => computeProgramValuation({ ...p, posOverridePct: "100" }, scenario, null));
 
@@ -1148,7 +1161,8 @@ function computeForwardRunway(theCase) {
   const calendar = applyTaxToCalendar(computeCompanyRiskAdjustedCF(programVals, corpGA, 25), theCase.taxation);
 
   const capStruct = effectiveCapitalStructure(theCase);
-  const startingCash = numOr(capStruct.cash, 0);
+  // extraCash: the facilities above, for the "with facilities" runway only.
+  const startingCash = numOr(capStruct.cash, 0) + ((opts && opts.extraCash) || 0);
 
   let balance = startingCash;
   const path = [];
@@ -1166,6 +1180,60 @@ function computeForwardRunway(theCase) {
   if (runwayYears == null && startingCash <= 0) runwayYears = 0;
 
   return { startingCash, path, runwayYears, runwayMonths: runwayYears != null ? runwayYears * 12 : null };
+}
+
+// The modelled cash balance after `months`, read along the forward runway's
+// yearly path (linear within a year, as the runway itself is).
+function forwardBalanceAt(fr, months) {
+  const t = months / 12;
+  let start = fr.startingCash;
+  for (let y = 0; y < fr.path.length; y++) {
+    const end = fr.path[y].balanceEnd;
+    if (t <= y + 1) return start + (end - start) * Math.max(0, t - y);
+    start = end;
+  }
+  return start;
+}
+
+// How much must the company raise to reach its next catalyst with a cushion,
+// and what does that do to a share (October 2026)? The binding catalyst is the
+// earliest one Runway vs. Catalyst does not call funded; the dollars needed
+// are the modelled shortfall at the END of its window plus the cushion. Before
+// and after any facilities the user entered (never netted silently), against
+// the shelf, and — at a discount to today's price — the shares and the Base
+// fair value with that raise in place. Null when nothing is short.
+function computeFinancingBridge(theCase, opts) {
+  const o = opts || {};
+  const cushion = o.cushionMonths == null ? RUNWAY_CUSHION_MONTHS_DEFAULT : o.cushionMonths;
+  const rv = computeRunwayVsCatalysts(theCase, { cushionMonths: cushion, now: o.now });
+  if (!rv.ok || !rv.firstProblem) return null;
+  let fr;
+  try { fr = computeForwardRunway(theCase); } catch (e) { return null; }
+  const target = rv.firstProblem;
+  const months = Math.max(0, target.monthsAway) + cushion;
+  const needed = Math.max(0, -forwardBalanceAt(fr, months));
+  if (!(needed > 0)) return null;
+  const fac = caseFacilities(theCase);
+  const afterFacilities = Math.max(0, needed - fac.total);
+  const price = numOr(theCase.currentPrice, 0);
+  const fr0 = theCase.futureRaise || {};
+  const discountPct = o.discountPct != null ? o.discountPct : (fr0.priceMode === "discount" && fr0.discountPct !== "" && fr0.discountPct != null ? Number(fr0.discountPct) : 15);
+  const raisePrice = price > 0 ? price * (1 - Math.min(100, Math.max(0, discountPct)) / 100) : 0;
+  const amount = afterFacilities;
+  const raise = { enabled: true, amountM: String(Math.round(amount)), priceMode: "discount", discountPct: String(discountPct) };
+  let baseNow = null, baseWith = null;
+  try { baseNow = baseCaseFairValue(theCase); baseWith = amount > 0 && raisePrice > 0 ? baseCaseFairValue({ ...theCase, futureRaise: { ...fr0, ...raise } }) : baseNow; } catch (e) { /* no valuation yet */ }
+  // A raise the case already models (futureRaise) brings cash the forward
+  // runway does not count; if it is at least what is needed, it covers it.
+  const modelledAmount = fr0.enabled ? Math.max(0, numOr(fr0.amountM, 0)) : 0;
+  return {
+    catalyst: target, cushionMonths: cushion, months, needed, facilities: fac, afterFacilities,
+    modelledAmount, coveredByModelled: modelledAmount > 0 && modelledAmount >= afterFacilities,
+    shelfShort: fac.shelf > 0 && fac.shelf < afterFacilities ? afterFacilities - fac.shelf : 0,
+    discountPct, raisePrice, newShares: raisePrice > 0 ? amount / raisePrice : null,
+    raise, alreadyModelled: !!(fr0.enabled && numOr(fr0.amountM, 0) > 0), baseNow, baseWith,
+    zeroDate: fr.runwayMonths != null ? fr.runwayMonths : null
+  };
 }
 
 // ── Dilution-path financing — connects two things the engine already

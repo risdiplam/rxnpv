@@ -712,6 +712,44 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
     ok(/Odds [\d]+%, from the simulator/.test((d.querySelector("#casepanel-overview .freshness") || {}).textContent || ""), "Overview: the freshness line says the odds came from the simulator");
   }
 
+  // Cash to reach the catalyst: facilities and the financing bridge.
+  {
+    click(btn("Workspace")); await wait(300);
+    click(btn("Load sample case")); await wait(200); click(btn("PepGen — DM1, Phase 2")); await wait(700);
+    click(d.getElementById("casetab-assumptions")); await wait(400);
+    const asm = d.getElementById("casepanel-assumptions");
+    ok(/Undrawn ATM, debt, milestones and shelf \(optional\) · \$97\.0M reachable/.test(asm.textContent) && /may be the same money entered twice/.test(asm.textContent), "Assumptions: PepGen's ATM and shelf, with the double-count warning");
+    // Cut the cash to $20M: the November readout is still reached, the H1
+    // 2027 window is not.
+    const cashIn = [...asm.querySelectorAll("input")].find(i => i.getAttribute("aria-label") === "Cash & equivalents ($M)");
+    cashIn.focus(); setVal(cashIn, "20"); await wait(300); cashIn.blur(); await wait(200);
+    click(btn("Tools")); await wait(500); click(btn("Company")); await wait(400); click(btn("Runway vs. Catalyst")); await wait(700);
+    const card = [...d.querySelectorAll("[data-export-section]")].find(e => /does the cash reach/.test(e.textContent));
+    ok(!!card && /With facilities/.test(card.textContent) && /\+ \$97\.0M undrawn ATM, debt and expected milestones/.test(card.textContent), "Runway vs. Catalyst: the runway with facilities beside the modelled one");
+    const fb = card && card.querySelector(".financing-bridge");
+    ok(!!fb && /About \$19\.0M to get past the end of "FREEDOM2 10 mg\/kg data" \(2026-11\) with the 6-month cushion/.test(fb.textContent) && /The \$97\.0M of undrawn ATM, debt and expected milestones entered would cover it/.test(fb.textContent), "Runway vs. Catalyst: the financing bridge, covered by the ATM (" + (fb && fb.textContent.slice(0, 300)) + ")");
+    // Without the ATM, the $19M is a raise: shares, Base with and without.
+    click(btn("Workspace")); await wait(300); click(d.getElementById("casetab-assumptions")); await wait(300);
+    const atmIn = [...d.getElementById("casepanel-assumptions").querySelectorAll("input")].find(i => i.getAttribute("aria-label") === "Undrawn ATM ($M)");
+    atmIn.focus(); setVal(atmIn, ""); await wait(300); atmIn.blur(); await wait(200);
+    click(btn("Tools")); await wait(500); click(btn("Company")); await wait(400); click(btn("Runway vs. Catalyst")); await wait(700);
+    const fb2 = [...d.querySelectorAll(".financing-bridge")].pop();
+    ok(!!fb2 && /This case already models a raise of \$100\.0M, which would cover it/.test(fb2.textContent) && !/Model this raise/.test(fb2.textContent), "Runway vs. Catalyst: without the ATM, the case's own modelled $100M raise covers it (" + (fb2 && fb2.textContent.slice(0, 300)) + ")");
+    // Switch the modelled raise off: now the $19M is a raise to model.
+    click(btn("Workspace")); await wait(300); click(d.getElementById("casetab-assumptions")); await wait(300);
+    const frBox = [...d.getElementById("casepanel-assumptions").querySelectorAll("label")].find(l => /Model a future capital raise/.test(l.textContent) && l.querySelector("input[type=checkbox]") && l.querySelector("input[type=checkbox]").checked);
+    if (frBox) { click(frBox.querySelector("input[type=checkbox]")); await wait(300); }
+    click(btn("Tools")); await wait(500); click(btn("Company")); await wait(400); click(btn("Runway vs. Catalyst")); await wait(700);
+    const fb3 = [...d.querySelectorAll(".financing-bridge")].pop();
+    ok(!!frBox && !!fb3 && /Raised at 15% below today's price \(\$1\.99\), that is about 9\.[56]M new shares; Base fair value would be \$[\d.]+ with it, against \$[\d.]+ now — the shares would be sold above this case's own value per share/.test(fb3.textContent), "Runway vs. Catalyst: with no modelled raise, the $19M as shares and Base with it (" + (fb3 && fb3.textContent.slice(0, 360)) + ")");
+    const pg = () => JSON.parse(w.localStorage.getItem("rxnpv_cases_v1")).filter(c => /^PepGen/.test(c.name)).pop();
+    const fbNow = () => [...d.querySelectorAll(".financing-bridge")].pop();
+    click([...fbNow().querySelectorAll("button")].find(b => b.textContent === "Model this raise")); await wait(200);
+    ok(pg().futureRaise.enabled === false && /^Add \$19\.\dM at 15% below today's price\? This changes the valuation\./.test([...fbNow().querySelectorAll("span")].map(x => x.textContent).find(t => /^Add/.test(t)) || ""), "Model this raise: asks first, changes nothing yet");
+    click([...fbNow().querySelectorAll("button")].find(b => b.textContent === "Confirm")); await wait(400);
+    ok(pg().futureRaise.enabled === true && Math.abs(Number(pg().futureRaise.amountM) - 19e6) < 1e6 && pg().futureRaise.priceMode === "discount" && pg().futureRaise.discountPct === "15", "Model this raise: Confirm writes the raise into the case (" + pg().futureRaise.amountM + ")");
+  }
+
   if (errors.length) { console.log(errors.slice(0, 40).join("\n")); console.log("\n" + errors.length + " FAILURE(S) across " + checks + " checks"); process.exit(1); }
   console.log("ALL AUDIT REGRESSION CHECKS PASSED — " + checks + " checks");
   process.exit(0);

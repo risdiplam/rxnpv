@@ -75,7 +75,7 @@ const EXPORTS = [
   "runPeakSalesSimulation", "driverSensitivity", "percentSpecToFraction", "percentSpecError", "renderIconArray",
   "niceTicks", "formatTick", "formatRegisteredP", "parseCatalystHit", "sponsorNameFromEntity", "renderLineChart", "renderHistogram", "renderForestPlot",
   "treasuryMethodShares", "ifConvertedShares", "computeEquityValue", "applyFutureRaise",
-  "classifyCatalystFunding", "computeRunwayVsCatalysts", "monthsUntil", "parseCatalystDate", "parseCatalystWindow", "nextCaseCatalyst", "computeFreshness", "newerFinancialFiling", "catalystPinLabel", "computeFailureFloorPair", "floorZeroReason", "impliedHeldFixed", "assuranceToCaseOdds", "applyAssuranceToProgram", "posFromSimulator", "describePosSource", "pendingCalibrationEntries", "failureFloorBurnPlan", "RUNWAY_CUSHION_MONTHS_DEFAULT",
+  "classifyCatalystFunding", "computeRunwayVsCatalysts", "monthsUntil", "parseCatalystDate", "parseCatalystWindow", "nextCaseCatalyst", "computeFreshness", "newerFinancialFiling", "catalystPinLabel", "computeFailureFloorPair", "floorZeroReason", "impliedHeldFixed", "caseFacilities", "computeForwardRunway", "computeFinancingBridge", "forwardBalanceAt", "edgarCashSource", "baseCaseFairValue", "assuranceToCaseOdds", "applyAssuranceToProgram", "posFromSimulator", "describePosSource", "pendingCalibrationEntries", "failureFloorBurnPlan", "RUNWAY_CUSHION_MONTHS_DEFAULT",
   "summarizeOrangeBookPatents", "isPediatricExtension", "parseFdaYyyymmdd",
   "computeBinaryEventImpliedPoS", "selectPeakSalesCompWindow",
   "applyTaxToCalendar", "computeMoleculeTypePoSRatios", "POS_BY_MOLECULE",
@@ -1192,6 +1192,57 @@ report();
 // whole point of the tool, so it is tested directly rather than only through
 // the UI. Boundaries matter here: "reaches it with exactly zero cushion" and
 // "runs out one day early" are different answers to an investor.
+section("Cash to reach the catalyst: facilities and the financing bridge");
+{
+  const fac = api.caseFacilities({ capitalStructure: { atmUndrawn: "60000000", debtUndrawn: "25000000", milestoneExpected: "15000000", shelfRemaining: "150000000", facilitiesNote: "Q2 10-Q" } });
+  ok("facilities: ATM + debt + milestones = $100M; the shelf is kept apart", fac.total === 100e6 && fac.shelf === 150e6 && fac.note === "Q2 10-Q");
+  ok("an ATM and a shelf both entered: the double-count warning", fac.doubleCount === true && api.caseFacilities({ capitalStructure: { atmUndrawn: "1" } }).doubleCount === false);
+  ok("blank fields: nothing", api.caseFacilities({ capitalStructure: {} }).any === false);
+
+  // PepGen with its cash cut to $40M and a pinned catalyst at the end of
+  // 2027: the cash runs out first.
+  const pg = JSON.parse(fs.readFileSync(path.join(__dirname, "fixtures", "pepgen_case.json"), "utf8"));
+  const y = new Date().getFullYear();
+  const thin = { ...pg, capitalStructure: { ...pg.capitalStructure, cash: "40000000" }, futureRaise: { enabled: false },
+    programs: [{ ...pg.programs[0], calibrationLog: [{ catalystLabel: "Pivotal data", catalystDate: (y + 1) + "-Q4", outcome: "pending", pin: { type: "topline", source: "x", at: "x" } }] }] };
+  const fr = api.computeForwardRunway(thin);
+  const frX = api.computeForwardRunway(thin, { extraCash: 100e6 });
+  ok("extra cash lengthens the runway (" + fr.runwayMonths.toFixed(1) + " → " + frX.runwayMonths.toFixed(1) + " mo) and the yearly flows are the same", frX.runwayMonths > fr.runwayMonths && frX.path[0].flow === fr.path[0].flow);
+  const now = new Date(y, 0, 15);
+  const b = api.computeFinancingBridge(thin, { cushionMonths: 6, now, discountPct: 20 });
+  // Independent: the balance after T months, read linearly along the yearly path.
+  const T = api.monthsUntil(now, new Date(y + 1, 11, 31)) + 6;
+  const yr = Math.floor(T / 12), within = T / 12 - yr;
+  const startY = yr === 0 ? fr.startingCash : fr.path[yr - 1].balanceEnd;
+  const balT = startY + (fr.path[yr].balanceEnd - startY) * within;
+  ok("the binding catalyst is the pinned Q4 one", b && b.catalyst.label === "Pivotal data");
+  near("dollars needed = the modelled shortfall at the window's end + 6 months", b.needed, -balT, 1);
+  ok("with no facilities, all of it is still to raise", b.afterFacilities === b.needed);
+  const price = Number(thin.currentPrice);
+  near("shares = amount / (price × 0.8)", b.newShares, b.afterFacilities / (price * 0.8), 1e-6);
+  // Selling shares at $1.87 when this thin case values them at ~$0.37 brings
+  // in more per share than it dilutes, so Base rises; selling below the
+  // case's own value lowers it. Either way the direction follows the price.
+  ok("a raise above the case's own value per share lifts Base (" + b.baseNow.toFixed(4) + " → " + b.baseWith.toFixed(4) + " at $" + b.raisePrice.toFixed(2) + ")", b.raisePrice > b.baseNow && b.baseWith > b.baseNow);
+  const rich = { ...thin, currentPrice: "0.30" };
+  const b3 = api.computeFinancingBridge(rich, { cushionMonths: 6, now, discountPct: 20 });
+  ok("... and one below it lowers Base (" + b3.baseNow.toFixed(4) + " → " + b3.baseWith.toFixed(4) + " at $" + b3.raisePrice.toFixed(2) + ")", b3.raisePrice < b3.baseNow && b3.baseWith < b3.baseNow);
+  const withFac = { ...thin, capitalStructure: { ...thin.capitalStructure, atmUndrawn: "30000000", shelfRemaining: "10000000" } };
+  const b2 = api.computeFinancingBridge(withFac, { cushionMonths: 6, now, discountPct: 20 });
+  near("facilities come off the amount: needed − $30M", b2.afterFacilities, Math.max(0, b2.needed - 30e6), 1e-6);
+  near("a $10M shelf against it: short by the rest", b2.shelfShort, b2.afterFacilities > 10e6 ? b2.afterFacilities - 10e6 : 0, 1e-6);
+  ok("no raise modelled: nothing covers it", b.modelledAmount === 0 && b.coveredByModelled === false);
+  const modelled = { ...thin, futureRaise: { enabled: true, amountM: String(Math.ceil(b.needed) + 1e6), priceMode: "discount", discountPct: "15" } };
+  const bm = api.computeFinancingBridge(modelled, { cushionMonths: 6, now, discountPct: 20 });
+  ok("a modelled raise at least as large as the need covers it", bm.coveredByModelled === true && bm.alreadyModelled === true);
+  const small = { ...thin, futureRaise: { enabled: true, amountM: "1000000", priceMode: "discount", discountPct: "15" } };
+  ok("a smaller modelled raise does not", api.computeFinancingBridge(small, { cushionMonths: 6, now, discountPct: 20 }).coveredByModelled === false);
+  ok("a funded case has no bridge", api.computeFinancingBridge({ ...thin, capitalStructure: { ...thin.capitalStructure, cash: "2000000000" } }, { now }) === null);
+  // None of the fields touch the valuation.
+  near("facility fields leave Base unchanged to the cent", api.baseCaseFairValue(withFac), api.baseCaseFairValue(thin), 1e-9);
+
+  ok("the cash source names the XBRL tags", api.edgarCashSource({ asOf: "2026-06-30", cashTags: [{ tag: "CashAndCashEquivalentsAtCarryingValue", value: 110e6 }, { tag: "AvailableForSaleSecuritiesDebtSecuritiesCurrent", value: 182.8e6 }] }) === "EDGAR XBRL, period ending 2026-06-30: CashAndCashEquivalentsAtCarryingValue $110.0M + AvailableForSaleSecuritiesDebtSecuritiesCurrent $182.8M");
+}
 section("What 'the price implies' holds fixed");
 {
   const st = JSON.parse(fs.readFileSync(path.join(__dirname, "fixtures", "stoke_sample_case.json"), "utf8"));
