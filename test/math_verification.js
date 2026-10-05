@@ -75,7 +75,7 @@ const EXPORTS = [
   "runPeakSalesSimulation", "driverSensitivity", "percentSpecToFraction", "percentSpecError", "renderIconArray",
   "niceTicks", "formatTick", "formatRegisteredP", "parseCatalystHit", "sponsorNameFromEntity", "renderLineChart", "renderHistogram", "renderForestPlot",
   "treasuryMethodShares", "ifConvertedShares", "computeEquityValue", "applyFutureRaise",
-  "classifyCatalystFunding", "computeRunwayVsCatalysts", "monthsUntil", "parseCatalystDate", "RUNWAY_CUSHION_MONTHS_DEFAULT",
+  "classifyCatalystFunding", "computeRunwayVsCatalysts", "monthsUntil", "parseCatalystDate", "parseCatalystWindow", "nextCaseCatalyst", "computeFreshness", "newerFinancialFiling", "catalystPinLabel", "pendingCalibrationEntries", "failureFloorBurnPlan", "RUNWAY_CUSHION_MONTHS_DEFAULT",
   "summarizeOrangeBookPatents", "isPediatricExtension", "parseFdaYyyymmdd",
   "computeBinaryEventImpliedPoS", "selectPeakSalesCompWindow",
   "applyTaxToCalendar", "computeMoleculeTypePoSRatios", "POS_BY_MOLECULE",
@@ -1192,6 +1192,99 @@ report();
 // whole point of the tool, so it is tested directly rather than only through
 // the UI. Boundaries matter here: "reaches it with exactly zero cushion" and
 // "runs out one day early" are different answers to an investor.
+section("Freshness: how old the inputs behind the headline are");
+{
+  // A submissions index shaped like SEC's (reverse-chronological, reportDate
+  // = period end). Cash dated 2026-06-30: the Q3 10-Q (period 2026-09-30,
+  // filed 2026-11-03) is newer; an 8-K never counts; a 10-Q for the same
+  // period as the cash is not newer.
+  const subs = { filings: { recent: {
+    form: ["8-K", "10-Q", "10-Q", "10-K"], filingDate: ["2026-11-05", "2026-11-03", "2026-08-03", "2026-03-16"],
+    reportDate: ["2026-11-05", "2026-09-30", "2026-06-30", "2025-12-31"] } } };
+  const nf = api.newerFinancialFiling(subs, "2026-06-30");
+  ok("cash at 2026-06-30: the Q3 10-Q (period 2026-09-30, filed 2026-11-03) is newer", nf && nf.form === "10-Q" && nf.period === "2026-09-30" && nf.filed === "2026-11-03");
+  ok("cash at 2026-09-30: nothing newer (the 8-K does not count)", api.newerFinancialFiling(subs, "2026-09-30") === null);
+  ok("no cash date: nothing to compare", api.newerFinancialFiling(subs, "") === null);
+
+  const today = new Date(2026, 9, 4); // 4 Oct 2026
+  const base = { currentPrice: "24.80", priceAsOf: "2026-09-25", capitalStructure: { cash: "420000000", cashAsOf: "2026-06-30" },
+    programs: [{ posOverridePct: "65", calibrationLog: [{ catalystLabel: "EMPEROR topline, through to approval", catalystDate: "2027-Q3", outcome: "pending", pin: { type: "topline", source: "guidance", at: "2026-09-28" } }] }] };
+  const f = api.computeFreshness(base, today, null);
+  ok("price entered 2026-09-25 is 9 days old on 4 Oct: stale (more than 7)", f.price.days === 9 && f.price.stale === true);
+  const f2 = api.computeFreshness({ ...base, priceAsOf: "2026-09-28" }, today, null);
+  ok("... entered 2026-09-28, 6 days: fresh", f2.price.days === 6 && f2.price.stale === false && f2.amber === false);
+  ok("cash as of 2026-06-30 is 96 days old on 4 Oct (30+31+31+4)", f.cash.days === 96 && f.cash.newer === null);
+  ok("the pinned catalyst, with its type and source", f.catalyst && f.catalyst.pinned && f.catalyst.type === "Topline data" && f.catalyst.source === "guidance" && f.catalyst.date === "2027-Q3");
+  ok("odds: the typed 65%", f.odds && f.odds.pct === 65 && f.odds.source === "typed");
+  const f3 = api.computeFreshness({ ...base, priceAsOf: "2026-10-03" }, today, nf);
+  ok("a newer filing makes it amber even with a fresh price", f3.amber === true && f3.cash.newer.form === "10-Q");
+  ok("no price: price is null, not a zero", api.computeFreshness({ ...base, currentPrice: "" }, today, null).price === null);
+  ok("a price with no date: days unknown, never stale", (() => { const g = api.computeFreshness({ ...base, priceAsOf: "" }, today, null).price; return g.days === null && g.stale === false; })());
+  ok("two programs: no single odds figure", api.computeFreshness({ ...base, programs: [base.programs[0], base.programs[0]] }, today, null).odds === null);
+}
+section("Catalyst windows: one parser for runway, overdue and the floor");
+{
+  const W = api.parseCatalystWindow;
+  const ymd = d => d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+  const span = s => { const w = W(s); return w ? ymd(w.start) + ".." + ymd(w.end) + " " + w.precision : null; };
+  ok("H1 2027 is 1 Jan to 30 Jun 2027", span("H1 2027") === "2027-01-01..2027-06-30 half");
+  ok("H2 2027, 2027-H2 and 2H 2027 are 1 Jul to 31 Dec", span("H2 2027") === "2027-07-01..2027-12-31 half" && span("2027-H2") === span("H2 2027") && span("2H 2027") === span("H2 2027"));
+  ok("2027 is the whole year", span("2027") === "2027-01-01..2027-12-31 year");
+  ok("2027-Q2 is 1 Apr to 30 Jun; Q2 2027 and 2027 Q2 the same", span("2027-Q2") === "2027-04-01..2027-06-30 quarter" && span("Q2 2027") === span("2027-Q2") && span("2027 Q2") === span("2027-Q2"));
+  ok("2027-02 is the whole of February (28 days in 2027)", span("2027-02") === "2027-02-01..2027-02-28 month");
+  ok("2027-11-14 is that one day", span("2027-11-14") === "2027-11-14..2027-11-14 day");
+  ok("prose stays undated: 'sometime next year', 'after the FDA meeting', '2027-13'", W("sometime next year") === null && W("after the FDA meeting") === null && W("2027-13") === null);
+  // The forms accepted before October 2026 give the same single date as
+  // they always did (the last day), so no existing entry moves.
+  ok("parseCatalystDate unchanged for day / month / quarter", ymd(api.parseCatalystDate("2026-11-14")) === "2026-11-14" && ymd(api.parseCatalystDate("2026-11")) === "2026-11-30" && ymd(api.parseCatalystDate("2027-Q3")) === "2027-09-30");
+  ok("... and now reads H1 2027 as its end, 30 June", ymd(api.parseCatalystDate("H1 2027")) === "2027-06-30");
+
+  // Overdue only once the window has ended. pendingCalibrationEntries reads
+  // the real clock, so the windows are placed around today.
+  const now = new Date(); const y = now.getFullYear();
+  const caseWith = dates => ({ programs: [{ name: "P", calibrationLog: dates.map((d, i) => ({ id: "c" + i, catalystLabel: "C" + i, catalystDate: d, outcome: "pending" })) }] });
+  const pend = api.pendingCalibrationEntries(caseWith([String(y), String(y - 1), "sometime next year"]));
+  ok("this year's window is not overdue; last year's is; prose is open, never overdue", pend.overdue.length === 1 && pend.overdue[0].catalystDate === String(y - 1) && pend.open.length === 2);
+
+  // Runway: a window is never collapsed to a day. Runway 20 months against a
+  // window 18-24 months out: cash runs out INSIDE it. Against 25-31: before
+  // it opens (gap). Against 10-14, 6-month cushion: 20-14 = 6, funded.
+  const c = (label, s, e) => ({ label, monthsToStart: s, monthsAway: e });
+  const rw = api.classifyCatalystFunding(20, [c("inside", 18, 24), c("before", 25, 31), c("funded", 10, 14), c("tight", 12, 16)], 6);
+  const st = Object.fromEntries(rw.rows.map(r => [r.label, r.status]));
+  ok("runway 20 mo vs a window 18-24 mo out: runs out inside it", st.inside === "inside");
+  ok("... vs 25-31: runs out before it opens (gap)", st.before === "gap");
+  ok("... vs 10-14 with a 6-month cushion: funded (20 - 14 = 6)", st.funded === "funded");
+  ok("... vs 12-16: reaches the end with 4 months left, tight", st.tight === "tight");
+  ok("counts: 1 gap, 1 inside, 1 tight, 1 funded", rw.gapCount === 1 && rw.insideCount === 1 && rw.tightCount === 1 && rw.fundedCount === 1);
+  ok("the binding problem is the earliest not-funded one (tight at 12-16)", rw.firstProblem && rw.firstProblem.label === "tight");
+  ok("an exact date (no start) can never be 'inside'", api.classifyCatalystFunding(20, [{ label: "x", monthsAway: 22 }], 6).rows[0].status === "gap");
+
+  // computeRunwayVsCatalysts carries the window through: H1 of next year.
+  const rv = api.computeRunwayVsCatalysts(caseWith(["H1 " + (y + 1)]), { runwayMonthsOverride: 600, now: new Date(y, 0, 1) });
+  near("H1 next year from 1 Jan: the window opens 12 months out", rv.rows[0].monthsToStart, api.monthsUntil(new Date(y, 0, 1), new Date(y + 1, 0, 1)), 1e-9);
+  near("... and ends at 30 June", rv.rows[0].monthsAway, api.monthsUntil(new Date(y, 0, 1), new Date(y + 1, 5, 30)), 1e-9);
+
+  // The next catalyst: a pin wins over an earlier unpinned date; among pins
+  // (or among unpinned) the earliest; ended windows and scored entries drop.
+  const t0 = new Date(2026, 9, 4);
+  const cs = { programs: [{ name: "P", calibrationLog: [
+    { catalystLabel: "early unpinned", catalystDate: "2026-11", outcome: "pending" },
+    { catalystLabel: "pinned later", catalystDate: "H1 2027", outcome: "pending", pin: { type: "topline", source: "guidance", at: "2026-10-04" } },
+    { catalystLabel: "pinned past", catalystDate: "2026-Q2", outcome: "pending", pin: { type: "pdufa", source: "x", at: "2026-01-01" } },
+    { catalystLabel: "scored", catalystDate: "2026-12", outcome: "success", pin: { type: "other", source: "x", at: "2026-01-01" } } ] }] };
+  const nc = api.nextCaseCatalyst(cs, t0);
+  ok("a pinned H1 2027 wins over an unpinned November 2026", nc && nc.entry.catalystLabel === "pinned later" && nc.pinned);
+  ok("with no pin the earliest dated still-to-come entry", api.nextCaseCatalyst({ programs: [{ calibrationLog: [cs.programs[0].calibrationLog[0], { catalystLabel: "Dec", catalystDate: "2026-12", outcome: "pending" }] }] }, t0).entry.catalystLabel === "early unpinned");
+  ok("nothing left to come: null", api.nextCaseCatalyst({ programs: [{ calibrationLog: [cs.programs[0].calibrationLog[2]] }] }, t0) === null);
+
+  // The floor's burn plan burns to the END of the pinned window: from cash
+  // dated 2026-06-30 to 30 Jun 2027 at $10M a month = 12 months, $120M.
+  const fcase = { valuationDate: "2026-10-04", failureFloor: { method: "burn" }, capitalStructure: { monthlyBurn: "10000000", cashAsOf: "2026-06-30" }, programs: [{ calibrationLog: cs.programs[0].calibrationLog }] };
+  const bp = api.failureFloorBurnPlan(fcase, 3, 0);
+  near("floor burns to the end of the pinned H1 2027: 12 months from 30 Jun 2026", bp.monthsToReadout, 12, 0.05);
+  ok("... and says it is the pinned catalyst, to the end of that window", /pinned catalyst \(H1 2027, to the end of that window\)/.test(bp.readoutSource));
+}
 section("Runway vs. catalyst funding classification");
 {
   const cat = (label, monthsAway) => ({ label, monthsAway });
@@ -1265,7 +1358,9 @@ section("Runway vs. catalyst funding classification");
   ok("2027-02 resolves to the last day of February 2027", m.getFullYear() === 2027 && m.getMonth() === 1 && m.getDate() === 28);
   const d = api.parseCatalystDate("2027-06-15");
   ok("full ISO date parses to that exact day", d.getFullYear() === 2027 && d.getMonth() === 5 && d.getDate() === 15);
-  ok("free text is left undated rather than guessed", api.parseCatalystDate("H1 2027") === null);
+  // Until October 2026 "H1 2027" was left undated on purpose; it is a window
+  // now (see "Catalyst windows" below). Prose is still never guessed.
+  ok("free text is left undated rather than guessed", api.parseCatalystDate("sometime in 2027") === null && api.parseCatalystDate("after the EOP2 meeting") === null);
   ok("empty input is undated", api.parseCatalystDate("") === null);
 
   // monthsUntil sign and scale.
@@ -1654,7 +1749,14 @@ section("Runway vs. catalyst: the composing function");
   ok("5.79 months of cash left is under the 6-month cushion -> tight", r.rows[0].status === "tight" && r.firstProblem && r.firstProblem.label === "Ph3 readout");
   near("the undated pending entry is counted, not dropped silently", r.undatedCount, 1, 0);
   const r2 = api.computeRunwayVsCatalysts(theCase, { now: new Date(2026, 8, 23), runwayMonthsOverride: 5 });
-  ok("a 5-month runway runs out before a 6.2-month readout -> gap", r2.rows[0].status === "gap" && r2.gapCount === 1);
+  // 2027-Q1 is a window now: it opens 1 Jan 2027, 100 days = 3.2854 months
+  // out, and ends 31 Mar, 6.2094 out. Five months of cash runs out INSIDE it;
+  // three runs out before it opens.
+  // (local dates: the November clock change adds an hour, hence the tolerance)
+  near("2027-Q1 opens 100 / 30.4375 = 3.28542 months out", r2.rows[0].monthsToStart, 3.28542, 2e-3);
+  ok("a 5-month runway runs out inside the Q1 2027 window -> inside", r2.rows[0].status === "inside" && r2.insideCount === 1);
+  const r3 = api.computeRunwayVsCatalysts(theCase, { now: new Date(2026, 8, 23), runwayMonthsOverride: 3 });
+  ok("a 3-month runway runs out before the window opens -> gap", r3.rows[0].status === "gap" && r3.gapCount === 1);
 }
 section("Local date stamp");
 {
@@ -4765,7 +4867,7 @@ section("Rough failure floor from the monthly burn (opt-in)");
   near("burn to the readout: $5.7M x 5.0267", f.burnToReadout, 5.7e6 * months, 1);
   near("equity: $117.238M - burn - $26M wind-down", f.equity, 117.238e6 - 5.7e6 * months - 26e6, 1);
   near("per share over 70,360,627 shares", f.perShare, (117.238e6 - 5.7e6 * months - 26e6) / 70360627, 1e-9);
-  ok("says where the readout date came from", /Calibration Log \(2026-11\)/.test(f.readoutSource));
+  ok("says where the readout date came from, to the end of that month", /Calibration Log \(2026-11, to the end of that window\)/.test(f.readoutSource));
   // No dated catalyst: the model's own timeline (Phase 2 ends 1.72 years
   // after the valuation date of Sept 30, 2026, so 3 months + 1.72 years of burn).
   const noLog = JSON.parse(JSON.stringify(on)); noLog.programs[0].calibrationLog = [];
@@ -4820,6 +4922,11 @@ section("Raise priced as a discount to today, the Napkin-vs-build flag, the mode
     snap.thesis.includes("Base fair value ~$" + v("base")) && snap.thesis.includes("Bear ~$" + v("bear")) && snap.thesis.includes("Bull ~$" + v("bull")));
   ok("snapshot: the price-implied odds against the case's 65%", /The price implies ~55% odds of launch against this case's 65%/.test(snap.thesis));
   ok("snapshot: the failure floor by the case's method", /if the next readout fails, ~\$1\.30 is left \(the filing's cash/.test(snap.thesis));
+  // ... and what it rested on (the fixture has the price date and cash date,
+  // no pinned catalyst: its Calibration Log is not in the fixture).
+  ok("snapshot: an inputs line with the price and cash dates (" + (snap.thesis.match(/Inputs: [^.]*\./) || [""])[0] + ")", /Inputs: price entered 2026-09-25, cash as of 2026-06-30/.test(snap.thesis));
+  const stPinned = { ...st, programs: [{ ...st.programs[0], calibrationLog: [{ catalystLabel: "EMPEROR", catalystDate: "2099-Q3", outcome: "pending", pin: { type: "topline", source: "guidance", at: "2026-09-28" } }] }] };
+  ok("snapshot: names the pinned catalyst and its source", /next catalyst 2099-Q3 \(pinned: guidance\)/.test(api.buildModelSnapshot(stPinned, "2026-09-28").thesis));
 }
 report();
 

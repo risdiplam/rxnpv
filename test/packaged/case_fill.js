@@ -24,7 +24,7 @@
 //   { "expectNow": "programs.0.x", "value": … }  check a stored value mid-plan
 //   { "clickLabel": "Delete this milestone" }   (a button by its aria-label)
 //   { "evidence": { label, classification, confidence, source, date, thesis } }
-//   { "calibration": { catalystLabel, catalystDate, yourPoS, marketImpliedPoS, outcome, notes } }
+//   { "calibration": { catalystLabel, catalystDate, yourPoS, marketImpliedPoS, outcome, notes, pin: { type, source } | false } }
 //   { "editEvidence": "<label of an existing entry>", "evidence": { …fields to set } }  (its Edit button)
 //   { "editCalibration": "<catalyst label of an existing entry>", "calibration": { … } }
 //
@@ -176,11 +176,23 @@ app.whenReady().then(async () => {
           put(byPh("The actual reasoning — what the source supports, and the main uncertainty if this isn't a plain Fact."), e.thesis);` : `
           const put = (el, v) => { if (v != null && el) __f.setValue(el, String(v)); };
           put(byPh("e.g. Phase 2 readout"), e.catalystLabel);
-          put(byPh("e.g. 2026-Q4"), e.catalystDate);
+          put(document.querySelector('input[aria-label="Catalyst date"]'), e.catalystDate);
           put(document.querySelector('select[aria-label="Outcome"]'), e.outcome || (${!!editing} ? null : "pending"));
           put(byPh("e.g. 40"), e.yourPoS);
           put(byPh("from Implied PoS above"), e.marketImpliedPoS);
-          put(byPh("Anything worth remembering about this call."), e.notes);`}
+          put(byPh("Anything worth remembering about this call."), e.notes);
+          // Pinning: { pin: { type, source } } ticks the box and fills both;
+          // { pin: false } unticks it.
+          if (e.pin !== undefined) {
+            const box = [...document.querySelectorAll("label")].filter(l => __f.visible(l)).find(l => /Pin this as the catalyst's date/.test(l.textContent));
+            const cb = box && box.querySelector("input[type=checkbox]");
+            if (!cb) return "no pin checkbox";
+            if (cb.checked !== !!e.pin) { cb.click(); await wait(250); }
+            if (e.pin) {
+              put(document.querySelector('select[aria-label="Pinned catalyst type"]'), e.pin.type);
+              put(document.querySelector('input[aria-label="Pinned catalyst source"]'), e.pin.source);
+            }
+          }`}
           await wait(200);
           const save = [...document.querySelectorAll("button")].filter(b => b.offsetParent !== null).reverse().find(b => /^(Save|Add|Save entry|Add entry|Save prediction)$/.test(b.textContent.trim()));
           if (!save) return "no save button"; save.click(); await wait(300); return true;

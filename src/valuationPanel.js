@@ -223,6 +223,7 @@ function useValuationSections({ theCase, onChange, goToTab }) {
               impliedSolved.impliedAbsolutePct.toFixed(0) + "%"),
             h("div", { className: "pvm-move" }, impliedSolved.multiplierPct.toFixed(0) + "% of your odds"))
         ),
+        h(FreshnessStrip, { theCase }),
         (() => { const by = k => (scenarioResults.find(s => s.key === k) || { result: { equity: {} } }).result.equity.perShare;
           const r = readPriceVsScenarios(price, by("bear"), by("base"), by("bull"));
           return r && h(Explain, Object.assign({ onTint: true }, r)); })(),
@@ -1081,4 +1082,51 @@ function CashAsOfFields({ cap, setCap, theCase, update }) {
         : cap.carryCashForward
           ? "On, but it needs the cash date and the monthly burn."
           : "Off: the valuation uses the cash the filing reported. The date and burn are remembered for Cash Runway and the rough “if it fails” estimate; the EDGAR pull fills both."));
+}
+
+// ── How fresh the inputs are (October 2026) ────────────────────────────────
+// One line under the headline numbers: the price and the date it was
+// entered, the cash and its filing date (with a real check for a newer
+// 10-Q/10-K on the desktop), the catalyst the case is pointed at, and where
+// the odds came from. Amber only for a price over a week old or a newer
+// filing — information, never a gate.
+function useNewerFiling(theCase) {
+  const [res, setRes] = React.useState(null);
+  const ticker = theCase.ticker, asOf = (theCase.capitalStructure || {}).cashAsOf;
+  React.useEffect(() => {
+    let live = true;
+    setRes(null);
+    // The EDGAR bridge itself, not just "desktop": without it there is
+    // nothing to ask, and the check would only log a failed lookup.
+    const bridge = typeof window !== "undefined" && window.electronAPI && window.electronAPI.edgarFetch;
+    if (!bridge || !ticker || !asOf) return undefined;
+    checkNewerFiling(ticker, asOf).then(r => { if (live) setRes(r); });
+    return () => { live = false; };
+  }, [ticker, asOf]);
+  return res;
+}
+function freshnessAgo(days) {
+  if (days == null) return "";
+  if (days <= 0) return "today";
+  return days === 1 ? "1 day ago" : days + " days ago";
+}
+function FreshnessStrip({ theCase }) {
+  const h = React.createElement;
+  const filing = useNewerFiling(theCase);
+  const f = computeFreshness(theCase, new Date(), filing && filing.status === "newer" ? filing.filing : null);
+  const amber = { color: "var(--warn)", fontWeight: 600 };
+  const parts = [];
+  if (f.price) parts.push(h("span", { key: "p", style: f.price.stale ? amber : null },
+    "Price " + fmtShare(f.price.value) + (f.price.asOf ? " entered " + f.price.asOf + " (" + freshnessAgo(f.price.days) + ")" : ", date not recorded") + (f.price.stale ? " — re-check it before acting on the gap" : "")));
+  else parts.push(h("span", { key: "p" }, "No price entered"));
+  if (f.cash) parts.push(h("span", { key: "c", title: filing && filing.status === "unavailable" ? "Could not check SEC for a newer filing: " + filing.reason : undefined },
+    "Cash " + fmtMoney(f.cash.value) + (f.cash.asOf ? " as of " + f.cash.asOf + " (" + freshnessAgo(f.cash.days) + ")" : ", date not recorded") + (f.cash.rolled ? ", rolled forward" : "")));
+  if (f.cash && f.cash.newer) parts.push(h("span", { key: "n", style: amber },
+    "a newer " + f.cash.newer.form + " (period to " + f.cash.newer.period + ") was filed " + f.cash.newer.filed + " — refresh cash, burn and shares"));
+  if (f.catalyst) parts.push(h("span", { key: "k" },
+    "Next: " + f.catalyst.label.split(/[,(]/)[0].trim() + ", " + f.catalyst.date + (f.catalyst.pinned ? " (pinned" + (f.catalyst.source ? ": " + f.catalyst.source : "") + ")" : " (Calibration Log, not pinned)")));
+  if (f.odds) parts.push(h("span", { key: "o" },
+    "Odds " + Math.round(f.odds.pct) + "%, " + (f.odds.source === "simulator" ? "from the simulator" + (f.odds.at ? " (" + f.odds.at + ")" : "") : f.odds.source === "typed" ? "your figure" : "the benchmark")));
+  return h("div", { className: "freshness", role: "note", "aria-label": "How fresh these inputs are", style: { ...UI.caption, marginTop: 10, lineHeight: 1.6 } },
+    parts.reduce((acc, el, i) => i ? acc.concat([h("span", { key: "s" + i, "aria-hidden": "true", style: { color: "var(--ink-3)" } }, " · "), el]) : [el], []));
 }

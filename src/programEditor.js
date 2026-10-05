@@ -827,6 +827,7 @@ function ProgramEditor({ program, onChange, onDelete, discountRatePct, terminalV
                     h("div", { style: { display: "flex", gap: 8, flexWrap: "wrap", fontSize: 10, fontFamily: "var(--mono)", marginBottom: 4 } },
                       h("span", { style: { color: outcomeColor[entry.outcome] || "var(--ink-2)", fontWeight: 700 } }, outcomeLabel[entry.outcome] || entry.outcome),
                       entry.catalystDate && h("span", { style: { color: "var(--ink-3)" } }, "· " + entry.catalystDate),
+                      entry.pin && h("span", { title: "Pinned " + (entry.pin.at || "") + (entry.pin.source ? " — source: " + entry.pin.source : ""), style: { color: "var(--teal)", fontWeight: 700 } }, "· Pinned · " + catalystPinLabel(entry.pin) + (entry.pin.source ? " · " + entry.pin.source : "")),
                       entry.yourPoS != null && h("span", { style: { color: "var(--ink-3)" } }, "· your PoS " + entry.yourPoS + "%"),
                       entry.marketImpliedPoS != null && h("span", { style: { color: "var(--ink-3)" } }, "· market " + entry.marketImpliedPoS + "%")
                     ),

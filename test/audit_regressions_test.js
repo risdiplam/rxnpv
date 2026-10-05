@@ -310,8 +310,17 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
   {
     click([...d.querySelectorAll("button")].find(b => b.textContent.trim() === "Load sample case")); await wait(200);
     click([...d.querySelectorAll("button")].find(b => b.textContent.trim() === "Stoke — Dravet, Phase 3")); await wait(500);
+    // A pinned catalyst shows as pinned, with its type and source.
+    click(d.getElementById("casetab-calibration")); await wait(300);
+    const calPanel = d.getElementById("casepanel-calibration");
+    ok(!!calPanel && /Pinned · Topline data · Company guidance, Q2 2026 10-Q/.test(calPanel.textContent), "Calibration Log: the Stoke sample's EMPEROR entry shows as pinned with its source");
     click(d.getElementById("casetab-overview")); await wait(300);
     const panel = d.getElementById("casepanel-overview");
+    // The freshness line under the headline numbers.
+    const fr = panel && panel.querySelector('.freshness[role="note"]');
+    ok(!!fr && /Price \$24\.80 entered 2026-09-25/.test(fr.textContent) && /Cash \$420\.0M as of 2026-06-30/.test(fr.textContent)
+      && /Next: EMPEROR Phase 3 topline, 2027-Q3 \(pinned: Company guidance/.test(fr.textContent) && /Odds 65%, your figure/.test(fr.textContent),
+      "Overview: the freshness line gives price date, cash date, the pinned catalyst and the odds' source (" + (fr && fr.textContent) + ")");
     const table = panel && panel.querySelector(".proj-table");
     ok(!!table && table.querySelectorAll("tbody tr").length === 16, "Projections: the table shows the first 16 years");
     ok(!!table && /Enterprise value \$1\.62B/.test(table.querySelector("tfoot").textContent), "Projections: the table ends at the Base enterprise value");
@@ -429,7 +438,7 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
     if (burnBox) { click(burnBox.querySelector("input")); await wait(400); }
     const rngOn = [...panel.querySelectorAll("[data-export-section]")].find(e => e.getAttribute("data-export-section") === "The whole range, on one line");
     const rtOn = rngOn ? [...rngOn.querySelectorAll("svg text")].map(t => t.textContent) : [];
-    ok(rtOn.includes("≈$0.46") && rtOn.includes("$28.76") && /15\.0 months to the readout/.test(rngOn.textContent) && /Calibration Log \(2027-Q3\)/.test(rngOn.textContent), "Floor: switched on, the floor is the burn estimate and Base is unchanged (" + rtOn.join(" | ") + ")");
+    ok(rtOn.includes("≈$0.46") && rtOn.includes("$28.76") && /15\.0 months to the readout/.test(rngOn.textContent) && /pinned catalyst \(2027-Q3, to the end of that window\)/.test(rngOn.textContent), "Floor: switched on, the floor is the burn estimate and Base is unchanged (" + rtOn.join(" | ") + ")");
     const offBox = rngOn && [...rngOn.querySelectorAll("label")].find(l => /Rough estimate from the monthly burn/.test(l.textContent));
     if (offBox) { click(offBox.querySelector("input")); await wait(400); }
 

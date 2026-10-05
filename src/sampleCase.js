@@ -148,6 +148,7 @@ function sampleCaseStoke() {
     calibrationLog: [
       { id: newId("cal"), catalystLabel: "EMPEROR Phase 3 topline, through to approval (PoS to launch)", catalystDate: "2027-Q3",
         yourPoS: 65, marketImpliedPoS: 55, outcome: "pending",
+        pin: { type: "topline", source: "Company guidance, Q2 2026 10-Q (readout Q3 2027)", at: SAMPLE_CASE_AS_OF },
         notes: "Both figures are the probability of reaching launch. Market-implied is this case's own reverse-solve at $24.80 on 2026-09-28 (Overview → What the price implies). Score it as success on approval, failure on a failed readout or a rejection." }
     ]
   });
@@ -250,6 +251,7 @@ function sampleCaseStoke() {
     ticker: "STOK",
     valuationDate: SAMPLE_CASE_AS_OF,
     currentPrice: "24.80",
+    priceAsOf: "2026-09-25", // the close it came from (Evidence Log: Share price)
     discountRatePct: "12",
     valuationMethod: "dcf",
     corporateGA: { preCommercialAnnualM: "95", gaShareOfMatureSgaPct: "50", windDownYears: "1" },
@@ -401,7 +403,11 @@ function sampleCasePepGen() {
     calibrationLog: [
       { id: newId("cal"), catalystLabel: "FREEDOM2 10 mg/kg data, through to approval (PoS to launch)", catalystDate: "2026-11",
         yourPoS: 15, marketImpliedPoS: 23, outcome: "pending",
-        notes: "Both figures are the probability of reaching launch. Market-implied is this case's own reverse-solve at $2.34 on 2026-09-30. The November data are the first multi-dose look at 10 mg/kg; a positive read should move both figures up." }
+        pin: { type: "topline", source: "Company guidance, Q2 2026 results release (data in November 2026)", at: SAMPLE_PEPGEN_AS_OF },
+        notes: "Both figures are the probability of reaching launch. Market-implied is this case's own reverse-solve at $2.34 on 2026-09-30. The November data are the first multi-dose look at 10 mg/kg; a positive read should move both figures up." },
+      { id: newId("cal"), catalystLabel: "FREEDOM2 12.5 mg/kg results", catalystDate: "H1 2027",
+        yourPoS: null, marketImpliedPoS: null, outcome: "pending",
+        notes: "Guided only as \"1H 2027\" (Q2 2026 results release), so it is entered as that window rather than a guessed date: Runway vs. Catalyst treats it as January to June 2027. No odds are recorded yet — the November 10 mg/kg data come first, and the call is worth making after them." }
     ]
   });
 
@@ -474,6 +480,7 @@ function sampleCasePepGen() {
     ticker: "PEPG",
     valuationDate: "2026-09-30",
     currentPrice: "2.34",
+    priceAsOf: "2026-09-29", // the close it came from (Evidence Log: Share price)
     discountRatePct: "14",
     valuationMethod: "dcf",
     corporateGA: { preCommercialAnnualM: "26", gaShareOfMatureSgaPct: "50", windDownYears: "1" },

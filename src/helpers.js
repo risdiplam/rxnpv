@@ -1162,6 +1162,9 @@ function CalibrationEntryForm({ onSave, onCancel, initialValues, saveLabel }) {
   const [marketImpliedPoS, setMarketImpliedPoS] = React.useState(iv.marketImpliedPoS != null ? String(iv.marketImpliedPoS) : "");
   const [outcome, setOutcome] = React.useState(iv.outcome || "pending");
   const [notes, setNotes] = React.useState(iv.notes || "");
+  const [pinned, setPinned] = React.useState(!!iv.pin);
+  const [pinType, setPinType] = React.useState((iv.pin && iv.pin.type) || "topline");
+  const [pinSource, setPinSource] = React.useState((iv.pin && iv.pin.source) || "");
   const inputStyle = { width: "100%", padding: "5px 8px", borderRadius: 5, border: "1px solid var(--rule)", background: "var(--surface)", color: "var(--ink-1)", fontFamily: "var(--mono)", fontSize: 11 };
   const fieldLabelStyle = { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginBottom: 3 };
   const canSave = catalystLabel.trim().length > 0;
@@ -1171,7 +1174,8 @@ function CalibrationEntryForm({ onSave, onCancel, initialValues, saveLabel }) {
       h("div", null, h("div", { style: fieldLabelStyle }, "Catalyst *"),
         h("input", { type: "text", value: catalystLabel, placeholder: "e.g. Phase 2 readout", onChange: e => setCatalystLabel(e.target.value), style: inputStyle })),
       h("div", null, h("div", { style: fieldLabelStyle }, "Date"),
-        h("input", { type: "text", value: catalystDate, placeholder: "e.g. 2026-Q4", onChange: e => setCatalystDate(e.target.value), style: inputStyle })),
+        h("input", { type: "text", value: catalystDate, placeholder: "e.g. 2026-Q4 or H1 2027", "aria-label": "Catalyst date", onChange: e => setCatalystDate(e.target.value), style: inputStyle }),
+        catalystDate.trim() && !parseCatalystWindow(catalystDate) && h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginTop: 3 } }, "Not a date the checks can read — it stays undated. Try 2027-03-15, 2027-03, 2027-Q1, H1 2027 or 2027.")),
       h("div", null, h("div", { style: fieldLabelStyle }, "Outcome"),
         h("select", { "aria-label": "Outcome", value: outcome, onChange: e => setOutcome(e.target.value), style: inputStyle },
           h("option", { value: "pending" }, "Pending"),
@@ -1182,13 +1186,33 @@ function CalibrationEntryForm({ onSave, onCancel, initialValues, saveLabel }) {
       h("div", null, h("div", { style: fieldLabelStyle }, "Market-implied PoS (%)"),
         h("input", { type: "number", value: marketImpliedPoS, placeholder: "from Implied PoS above", onChange: e => setMarketImpliedPoS(e.target.value), style: inputStyle })),
     ),
+    // Pinning: this entry's date is THE date for the event, read first by
+    // Runway vs Catalyst, the failure floor and the Overview.
+    h("div", { style: { marginBottom: 10 } },
+      h("label", { style: { display: "flex", alignItems: "center", gap: 6, fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-2)", cursor: "pointer" } },
+        h("input", { type: "checkbox", checked: pinned, onChange: e => setPinned(e.target.checked) }),
+        "Pin this as the catalyst's date"),
+      pinned && h("div", { style: { display: "grid", gridTemplateColumns: "minmax(140px, 1fr) 2fr", gap: 10, marginTop: 8 } },
+        h("div", null, h("div", { style: fieldLabelStyle }, "Type"),
+          h("select", { "aria-label": "Pinned catalyst type", value: pinType, onChange: e => setPinType(e.target.value), style: inputStyle },
+            CATALYST_PIN_TYPES.map(([v, l]) => h("option", { key: v, value: v }, l)))),
+        h("div", null, h("div", { style: fieldLabelStyle }, "Source"),
+          h("input", { type: "text", value: pinSource, "aria-label": "Pinned catalyst source", placeholder: "e.g. company guidance, Q2 2026 call", onChange: e => setPinSource(e.target.value), style: inputStyle }))),
+      pinned && h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginTop: 5, lineHeight: 1.5 } },
+        "Used ahead of any other date for this case. A registry completion date is when the trial stops collecting data, not when results are announced.")),
     h("div", { style: { marginBottom: 10 } },
       h("div", { style: fieldLabelStyle }, "Notes"),
       h("textarea", { value: notes, placeholder: "Anything worth remembering about this call.", onChange: e => setNotes(e.target.value), rows: 2, style: { ...inputStyle, resize: "vertical", fontFamily: "var(--sans)" } })
     ),
     h("div", { style: { display: "flex", gap: 8 } },
       h("button", {
-        onClick: () => { if (!canSave) return; onSave({ catalystLabel: catalystLabel.trim(), catalystDate: catalystDate.trim(), yourPoS: yourPoS === "" ? null : Number(yourPoS), marketImpliedPoS: marketImpliedPoS === "" ? null : Number(marketImpliedPoS), outcome, notes: notes.trim() }); },
+        onClick: () => {
+          if (!canSave) return;
+          // A pin keeps the date it was first made unless its type or source changes.
+          const prev = iv.pin;
+          const pin = pinned ? (prev && prev.type === pinType && (prev.source || "") === pinSource.trim() ? prev : { type: pinType, source: pinSource.trim(), at: localDateStamp() }) : null;
+          onSave({ catalystLabel: catalystLabel.trim(), catalystDate: catalystDate.trim(), yourPoS: yourPoS === "" ? null : Number(yourPoS), marketImpliedPoS: marketImpliedPoS === "" ? null : Number(marketImpliedPoS), outcome, notes: notes.trim(), pin });
+        },
         style: { padding: "6px 16px", borderRadius: 6, border: "none", background: canSave ? "var(--teal-fill)" : "var(--rule)", color: "var(--on-teal)", fontFamily: "var(--mono)", fontSize: 11, fontWeight: 700, cursor: "pointer" }
       }, saveLabel || "Add"),
       h("button", { onClick: onCancel, style: { padding: "6px 14px", borderRadius: 6, border: "1px solid var(--rule)", background: "transparent", color: "var(--ink-2)", fontFamily: "var(--mono)", fontSize: 11, cursor: "pointer" } }, "Cancel")
@@ -1434,18 +1458,70 @@ function CompetitorScanBox({ indication, drugName, currentNumDrugs, onApplyNumDr
 // ── Calibration catalyst dates ──────────────────────────────────────────────
 // The catalyst date is a free-text field on purpose (real catalysts get
 // described as "2026-Q4" or "H1 2027" as often as a real date), so parse the
-// formats that ARE unambiguous and treat everything else as simply undated
-// rather than guessing. An unparseable date is never reported as overdue.
-function parseCatalystDate(raw) {
+// formats that ARE unambiguous, each as the window it names, and treat
+// everything else ("sometime next year") as undated rather than guessing.
+//   2027-11-14 (a day) · 2027-11 (a month) · 2027-Q2 / Q2 2027 (a quarter)
+//   H1 2027 / 2027-H1 / 1H 2027 (a half) · 2027 (a year)
+// Until October 2026 halves and years were dropped on purpose, which made
+// the commonest way companies guide a readout invisible to every check.
+// Returns { start, end, precision, raw } or null; start and end are local
+// dates (first and last day).
+function parseCatalystWindow(raw) {
   if (!raw || typeof raw !== "string") return null;
   const s = raw.trim();
+  const win = (start, end, precision) => ({ start, end, precision, raw: s });
   let m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  if (m) return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
-  m = s.match(/^(\d{4})[-\s]?Q([1-4])$/i);
-  if (m) return new Date(Number(m[1]), Number(m[2]) * 3, 0); // last day of that quarter
+  if (m) { const d = new Date(+m[1], +m[2] - 1, +m[3]); return +m[2] >= 1 && +m[2] <= 12 ? win(d, d, "day") : null; }
   m = s.match(/^(\d{4})-(\d{2})$/);
-  if (m) return new Date(Number(m[1]), Number(m[2]), 0); // last day of that month
+  if (m) return +m[2] >= 1 && +m[2] <= 12 ? win(new Date(+m[1], +m[2] - 1, 1), new Date(+m[1], +m[2], 0), "month") : null;
+  m = s.match(/^(\d{4})[-\s]?Q([1-4])$/i);
+  if (!m) { const r = s.match(/^Q([1-4])[-\s]?(\d{4})$/i); if (r) m = [r[0], r[2], r[1]]; }
+  if (m) { const y = +m[1], q = +m[2]; return win(new Date(y, (q - 1) * 3, 1), new Date(y, q * 3, 0), "quarter"); }
+  m = s.match(/^H([12])[-\s]?(\d{4})$/i) || s.match(/^([12])H[-\s]?(\d{4})$/i);
+  if (m) { const y = +m[2], hf = +m[1]; return win(new Date(y, (hf - 1) * 6, 1), new Date(y, hf * 6, 0), "half"); }
+  m = s.match(/^(\d{4})[-\s]?H([12])$/i);
+  if (m) { const y = +m[1], hf = +m[2]; return win(new Date(y, (hf - 1) * 6, 1), new Date(y, hf * 6, 0), "half"); }
+  m = s.match(/^(\d{4})$/);
+  if (m) return win(new Date(+m[1], 0, 1), new Date(+m[1], 11, 31), "year");
   return null;
+}
+// The last day of the window: what "overdue" and the failure floor's burn
+// date read. A window is overdue only once it has ended, and the floor burns
+// to its end (burning to the start would overstate the cash left). Identical
+// to the old single-date reading for the day, month and quarter forms.
+function parseCatalystDate(raw) {
+  const w = parseCatalystWindow(raw);
+  return w ? w.end : null;
+}
+
+// A pinned catalyst is a Calibration Log entry the user has marked as THE
+// date for that event (entry.pin = { type, source, at }): company guidance or
+// an FDA action date, in preference to a registry completion date, which is
+// not a readout. One object, so a pin and a prediction can never disagree.
+const CATALYST_PIN_TYPES = [["topline", "Topline data"], ["pdufa", "PDUFA date"], ["adcom", "AdCom"], ["other", "Other"]];
+function catalystPinLabel(pin) {
+  if (!pin) return "";
+  const t = CATALYST_PIN_TYPES.find(x => x[0] === pin.type);
+  return t ? t[1] : (pin.type || "Pinned");
+}
+
+// The case's next catalyst: the earliest pending pinned entry whose window
+// has not ended, else the earliest pending dated one. Returns
+// { program, entry, window, pinned } or null. `today` is a local Date.
+function nextCaseCatalyst(theCase, today, programsOnly) {
+  const now = today || new Date();
+  const day = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  let best = null;
+  ((programsOnly || (theCase && theCase.programs)) || []).forEach(p => {
+    (p.calibrationLog || []).forEach(entry => {
+      if (entry.outcome && entry.outcome !== "pending") return;
+      const w = parseCatalystWindow(entry.catalystDate);
+      if (!w || w.end < day) return;
+      const pinned = !!entry.pin;
+      if (!best || (pinned && !best.pinned) || (pinned === best.pinned && w.start < best.window.start)) best = { program: p, entry, window: w, pinned };
+    });
+  });
+  return best;
 }
 
 // Pending calibration predictions across a whole case, split into ones whose
@@ -1499,23 +1575,29 @@ function classifyCatalystFunding(runwayMonths, catalysts, cushionMonths) {
   const rows = (catalysts || [])
     .filter(c => c && isFinite(c.monthsAway))
     .map(c => {
-      const cushionAtCatalyst = runwayMonths - c.monthsAway;   // months of cash left when it reads out
+      // monthsAway is the END of the catalyst's window (the day itself for an
+      // exact date); monthsToStart its start. A window is never collapsed to
+      // one day: cash that runs out between the two is its own answer.
+      const start = c.monthsToStart != null && isFinite(c.monthsToStart) ? Math.min(c.monthsToStart, c.monthsAway) : c.monthsAway;
+      const cushionAtCatalyst = runwayMonths - c.monthsAway;   // months of cash left at the window's end
       let status;
-      if (cushionAtCatalyst < 0) status = "gap";               // runs out BEFORE the readout
+      if (runwayMonths < start) status = "gap";                // runs out BEFORE the window opens
+      else if (cushionAtCatalyst < 0) status = "inside";       // runs out inside the window
       else if (cushionAtCatalyst < cushion) status = "tight";  // reaches it, but on fumes
       else status = "funded";
-      return { ...c, cushionAtCatalyst, status };
+      return { ...c, monthsToStart: start, cushionAtCatalyst, status };
     })
     .sort((a, b) => a.monthsAway - b.monthsAway);
 
   const gaps = rows.filter(r => r.status === "gap");
+  const insides = rows.filter(r => r.status === "inside");
   const tights = rows.filter(r => r.status === "tight");
   // The binding constraint is the EARLIEST catalyst that isn't comfortably
   // funded — that's the one that forces a raise, regardless of what follows.
   const firstProblem = rows.find(r => r.status !== "funded") || null;
   return {
     ok: true, runwayMonths, beyondHorizon, cushionMonths: cushion, rows,
-    gapCount: gaps.length, tightCount: tights.length, fundedCount: rows.length - gaps.length - tights.length,
+    gapCount: gaps.length, insideCount: insides.length, tightCount: tights.length, fundedCount: rows.length - gaps.length - insides.length - tights.length,
     firstProblem
   };
 }
@@ -1547,13 +1629,16 @@ function computeRunwayVsCatalysts(theCase, opts) {
   (theCase && theCase.programs ? theCase.programs : []).forEach(p => {
     (p.calibrationLog || []).forEach(entry => {
       if (entry.outcome && entry.outcome !== "pending") return; // already read out
-      const d = parseCatalystDate(entry.catalystDate);
-      if (!d) return;                                            // undated stays out, never guessed
+      const w = parseCatalystWindow(entry.catalystDate);
+      if (!w) return;                                            // undated stays out, never guessed
       catalysts.push({
         programName: p.drugName || p.name || "Program",
         label: entry.catalystLabel || "Catalyst",
         dateText: entry.catalystDate,
-        monthsAway: monthsUntil(now, d)
+        precision: w.precision,
+        pin: entry.pin || null,
+        monthsToStart: monthsUntil(now, w.start),
+        monthsAway: monthsUntil(now, w.end)
       });
     });
   });

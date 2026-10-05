@@ -420,8 +420,33 @@ function CatalystCalendarTool({ cases, updateCase, activeCase }) {
       error && h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--red)", marginTop: 10 } }, error)
     ]),
 
+    // The user's own pinned dates first: they need no lookup, and they are
+    // the dates the rest of the app uses.
+    (() => {
+      const pins = [];
+      cases.filter(c => selectedIds.has(c.id)).forEach(c => (c.programs || []).forEach(p => (p.calibrationLog || []).forEach(e => {
+        if (!e.pin || (e.outcome && e.outcome !== "pending")) return;
+        pins.push({ c, p, e, w: parseCatalystWindow(e.catalystDate) });
+      })));
+      if (!pins.length) return null;
+      pins.sort((a, b) => (a.w ? a.w.start.getTime() : Infinity) - (b.w ? b.w.start.getTime() : Infinity));
+      return toolCard(h, [
+        toolLabel(h, "Your pinned catalysts (" + pins.length + ")"),
+        h("div", { style: { ...UI.caption, marginBottom: 10 } }, "Dates you pinned in a case's Calibration Log, with their source. Runway vs. Catalyst and the failure floor use these ahead of the registry estimates below."),
+        h("div", { style: { display: "flex", flexDirection: "column", gap: 6 } },
+          pins.map((x, i) => h("div", { key: i, style: { padding: "8px 12px", borderRadius: 6, background: "var(--surface-2)", fontSize: 11, fontFamily: "var(--mono)" } },
+            h("div", { style: { display: "flex", justifyContent: "space-between", gap: 10 } },
+              h("span", { style: { color: "var(--teal)", fontWeight: 700 } }, (x.e.catalystDate || "undated") + " · " + catalystPinLabel(x.e.pin)),
+              h("span", { style: { color: "var(--ink-3)" } }, caseDisplayName(x.c) + " · " + (x.p.drugName || x.p.name || "Program"))),
+            h("div", { style: { color: "var(--ink-1)", marginTop: 2 } }, x.e.catalystLabel),
+            h("div", { style: { color: "var(--ink-3)", marginTop: 2 } }, "Source: " + (x.e.pin.source || "not given") + (x.e.pin.at ? " · pinned " + x.e.pin.at : ""))))
+        )
+      ]);
+    })(),
+
     upcomingEvents && toolCard(h, [
       toolLabel(h, "Upcoming — estimated trial completions (" + upcomingEvents.length + ")"),
+      h("div", { style: { ...UI.caption, marginBottom: 10 } }, "A registry completion date is when a trial expects to stop collecting data for its primary endpoint. Results usually follow months later, so it is not a readout date."),
       upcomingEvents.length === 0 && h("div", { style: { fontSize: 12, fontFamily: "var(--mono)", color: "var(--ink-3)" } }, "No future-dated trial completion estimates found for these programs."),
       h("div", { style: { display: "flex", flexDirection: "column", gap: 6, maxHeight: 400, overflowY: "auto" } },
         upcomingEvents.map((e, i) => h("div", { key: i, style: { padding: "8px 12px", borderRadius: 6, background: "var(--surface-2)", fontSize: 11, fontFamily: "var(--mono)" } },
@@ -624,6 +649,7 @@ function RunwayVsCatalystTool({ cases, activeCase }) {
   const STATUS = {
     funded: { color: "var(--teal)", word: "Funded through it" },
     tight:  { color: "var(--warn)", word: "Reaches it, but on fumes" },
+    inside: { color: "var(--red)", word: "Runs out inside the window" },
     gap:    { color: "var(--red)", word: "Runs out first" }
   };
   const fmtMonths = m => (m >= 0 ? "" : "−") + Math.abs(m).toFixed(1) + " mo";
@@ -644,7 +670,7 @@ function RunwayVsCatalystTool({ cases, activeCase }) {
     ]),
 
     !theCase && toolCard(h, [h("div", { style: { fontFamily: "var(--mono)", fontSize: 12, color: "var(--ink-3)" } },
-      "Pick a case. It needs starting cash and a cost model (for runway), plus at least one calibration-log entry with a date like 2027-Q2 (for the catalyst).")]),
+      "Pick a case. It needs starting cash and a cost model (for runway), plus at least one calibration-log entry with a date like 2027-03-15, 2027-Q2 or H1 2027 (for the catalyst).")]),
 
     theCase && res && !res.ok && toolCard(h, [
       h("div", { style: { fontFamily: "var(--mono)", fontSize: 12, color: "var(--warn)" } }, res.error)
@@ -671,7 +697,7 @@ function RunwayVsCatalystTool({ cases, activeCase }) {
       // from the chart.
       res.rows.length === 0
         ? h("div", { style: { padding: "12px 14px", borderRadius: 8, background: "var(--surface-2)", fontFamily: "var(--sans)", fontSize: 12, color: "var(--ink-2)", lineHeight: 1.6 } },
-            "No dated catalysts on this case yet. Add one in a program's calibration log with a date like \"2027-Q2\" — free-text dates such as \"H1 2027\" are deliberately left undated rather than guessed at."
+            "No dated catalysts on this case yet. Add one in a program's calibration log with a date like \"2027-03-15\", \"2027-Q2\", \"H1 2027\" or \"2027\" — prose such as \"sometime next year\" is left undated rather than guessed at."
             + (res.undatedCount ? " (" + res.undatedCount + " undated prediction" + (res.undatedCount > 1 ? "s" : "") + " skipped.)" : ""))
         : h("div", { style: {
             padding: "12px 14px", borderRadius: 8, lineHeight: 1.65, fontFamily: "var(--sans)", fontSize: 12,
@@ -682,12 +708,19 @@ function RunwayVsCatalystTool({ cases, activeCase }) {
             res.firstProblem
               ? h("span", null,
                   h("b", { style: { color: STATUS[res.firstProblem.status].color } },
-                    res.firstProblem.status === "gap" ? "Financing needed before the readout. " : "Reaches the readout with very little left. "),
+                    res.firstProblem.status === "gap" ? "Financing needed before the readout. "
+                      : res.firstProblem.status === "inside" ? "The cash runs out inside the readout's window. "
+                      : "Reaches the readout with very little left. "),
                   "\"", res.firstProblem.label, "\" (", res.firstProblem.programName, ") is ",
-                  res.firstProblem.monthsAway.toFixed(1), " months out, against ", res.runwayMonths.toFixed(1), " months of runway — ",
+                  res.firstProblem.status === "inside" || (res.firstProblem.monthsToStart < res.firstProblem.monthsAway - 0.5)
+                    ? "expected " + Math.max(0, res.firstProblem.monthsToStart).toFixed(1) + "–" + res.firstProblem.monthsAway.toFixed(1) + " months out (" + res.firstProblem.dateText + ")"
+                    : res.firstProblem.monthsAway.toFixed(1) + " months out",
+                  ", against ", res.runwayMonths.toFixed(1), " months of runway — ",
                   res.firstProblem.status === "gap"
-                    ? "about " + Math.abs(res.firstProblem.cushionAtCatalyst).toFixed(1) + " months short. Expect a raise before the catalyst, and size the dilution into your entry rather than after it."
-                    : "roughly " + res.firstProblem.cushionAtCatalyst.toFixed(1) + " months of cash left when it reads out, below the " + res.cushionMonths + "-month cushion. A company this close to the line usually finances ahead of the event anyway.")
+                    ? "about " + Math.abs(res.runwayMonths - res.firstProblem.monthsToStart).toFixed(1) + " months short of the window even opening. Expect a raise before the catalyst, and size the dilution into your entry rather than after it."
+                    : res.firstProblem.status === "inside"
+                      ? "if it comes early in the window the cash just reaches it; if late, a raise comes first. Either way there is no cushion."
+                      : "roughly " + res.firstProblem.cushionAtCatalyst.toFixed(1) + " months of cash left at the end of it, below the " + res.cushionMonths + "-month cushion. A company this close to the line usually finances ahead of the event anyway.")
               : h("span", null,
                   h("b", { style: { color: "var(--teal)" } }, "Funded through every dated catalyst. "),
                   res.beyondHorizon
@@ -709,6 +742,10 @@ function RunwayVsCatalystTool({ cases, activeCase }) {
           ),
           h("div", { style: { position: "relative", height: 8 + res.rows.length * 26 } },
             res.rows.map((r, i) => h("div", { key: i, style: { position: "absolute", top: i * 26, left: 0, right: 0, height: 22 } },
+              // A window ("H1 2027") is drawn as its span, under the marker
+              // at its end, clear of the label beside the marker.
+              r.monthsToStart < r.monthsAway - 0.5 && h("div", { "aria-hidden": "true", title: r.dateText + ": " + Math.max(0, r.monthsToStart).toFixed(1) + "–" + r.monthsAway.toFixed(1) + " months out",
+                style: { position: "absolute", left: pct(Math.max(0, r.monthsToStart)) + "%", width: Math.max(0.5, pct(r.monthsAway) - pct(Math.max(0, r.monthsToStart))) + "%", top: 19, height: 3, borderRadius: 2, background: STATUS[r.status].color, opacity: 0.45 } }),
               h("div", { title: r.label + " — " + r.dateText, style: { position: "absolute", left: pct(r.monthsAway) + "%", top: 0, transform: "translateX(-50%)", display: "flex", flexDirection: "column", alignItems: "center" } },
                 h("div", { style: { width: 2, height: 8, background: STATUS[r.status].color } }),
                 h("div", { style: { width: 9, height: 9, borderRadius: "50%", background: STATUS[r.status].color, marginTop: -1 } })),
@@ -731,11 +768,14 @@ function RunwayVsCatalystTool({ cases, activeCase }) {
           h("div", null,
             h("div", { style: { fontFamily: "var(--mono)", fontSize: 12, fontWeight: 700, color: "var(--ink-1)" } }, r.label),
             h("div", { style: { fontFamily: "var(--mono)", fontSize: 10, color: "var(--ink-3)", marginTop: 2 } },
-              r.programName, " · ", r.dateText, " · ", r.monthsAway.toFixed(1), " mo out")),
+              r.programName, " · ", r.dateText, " · ",
+              r.monthsToStart < r.monthsAway - 0.5 ? Math.max(0, r.monthsToStart).toFixed(1) + "–" + r.monthsAway.toFixed(1) + " mo out" : r.monthsAway.toFixed(1) + " mo out"),
+            r.pin && h("div", { style: { fontFamily: "var(--mono)", fontSize: 10, color: "var(--teal)", marginTop: 2 } },
+              "Pinned · " + catalystPinLabel(r.pin) + (r.pin.source ? " · " + r.pin.source : ""))),
           h("div", { style: { textAlign: "right", flexShrink: 0 } },
             h("div", { style: { fontFamily: "var(--mono)", fontSize: 12, fontWeight: 700, color: STATUS[r.status].color } }, STATUS[r.status].word),
             h("div", { style: { fontFamily: "var(--mono)", fontSize: 10, color: "var(--ink-3)", marginTop: 2 } },
-              res.beyondHorizon ? "never runs out" : fmtMonths(r.cushionAtCatalyst) + " of cash at readout"))
+              res.beyondHorizon ? "never runs out" : fmtMonths(r.cushionAtCatalyst) + " of cash " + (r.monthsToStart < r.monthsAway - 0.5 ? "at the window's end" : "at readout")))
         ))
       ),
 

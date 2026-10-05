@@ -560,20 +560,16 @@ function failureFloorBurnPlan(theCase, modelYears, laterYears) {
   const now = new Date();
   const today = parseIsoDay(theCase.valuationDate) != null ? parseIsoDay(theCase.valuationDate) : Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
   const cashDate = parseIsoDay(cap.cashAsOf) != null ? parseIsoDay(cap.cashAsOf) : today;
-  // The next readout: the earliest pending, dated, still-future Calibration
-  // Log entry (parseCatalystDate reads "2026-11" as the end of November).
-  let logged = null;
-  (theCase.programs[0].calibrationLog || []).forEach(e => {
-    if (e.outcome && e.outcome !== "pending") return;
-    const d = parseCatalystDate(e.catalystDate);
-    if (!d) return;
-    const t = Date.UTC(d.getFullYear(), d.getMonth(), d.getDate());
-    if (t >= today && (!logged || t < logged.t)) logged = { t, label: e.catalystLabel || "the logged catalyst", date: e.catalystDate };
-  });
+  // The next readout: the pinned catalyst if there is one, else the earliest
+  // pending dated Calibration Log entry still to come — burned to the END of
+  // its window ("2026-11" is the end of November, "H1 2027" 30 June 2027).
+  const todayDate = new Date(new Date(today).getUTCFullYear(), new Date(today).getUTCMonth(), new Date(today).getUTCDate());
+  const nc = nextCaseCatalyst(theCase, todayDate, [theCase.programs[0]]);
+  const logged = nc ? { t: Date.UTC(nc.window.end.getFullYear(), nc.window.end.getMonth(), nc.window.end.getDate()), label: nc.entry.catalystLabel || "the logged catalyst", date: nc.entry.catalystDate, pinned: nc.pinned } : null;
   const readout = logged ? logged.t + laterYears * 12 * MONTH : today + modelYears * 12 * MONTH;
   const months = Math.max(0, (readout - cashDate) / MONTH);
   return { burnToReadout: burn * months, monthsToReadout: months, monthlyBurn: burn,
-    readoutSource: logged ? (laterYears > 0 ? "the Calibration Log's " + logged.date + " plus the model's later stages" : "the Calibration Log (" + logged.date + ")") : "the model's timeline" };
+    readoutSource: logged ? (laterYears > 0 ? (logged.pinned ? "the pinned " : "the Calibration Log's ") + logged.date + " plus the model's later stages" : (logged.pinned ? "the pinned catalyst (" : "the Calibration Log (") + logged.date + (/^\d{4}-\d{2}-\d{2}$/.test(logged.date) ? ")" : ", to the end of that window)")) : "the model's timeline" };
 }
 
 // ── Outcome tree: how the remaining catalysts play out ─────────────────────
@@ -1262,6 +1258,45 @@ function computeDilutionPath(theCase, scenario, discountRateBasePct, opts) {
 // current reading, not a history (versioned snapshots are deliberately not
 // built). today: "YYYY-MM-DD" (defaults to the case's valuationDate or today).
 const MODEL_SNAPSHOT_LABEL = "What the model says (snapshot)";
+// How old the inputs behind the headline are (October 2026). The fair value,
+// the odds the price implies and the failure floor are all arithmetic on a
+// typed price and a filed cash balance; acting on a two-week-old price or a
+// two-quarter-old balance is the commonest way a careful case is wrong, and
+// nothing said so. Pure: `today` is a local Date, `newerFiling` the result of
+// the EDGAR check (newerFinancialFiling) when the caller has one.
+// Amber states, and only two: a price entered more than 7 days ago, and a
+// newer 10-Q/10-K than the cash on the case.
+const FRESHNESS_PRICE_STALE_DAYS = 7;
+function computeFreshness(theCase, today, newerFiling) {
+  const now = today || new Date();
+  const t = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
+  const age = iso => { const p = parseIsoDay(iso); return p == null ? null : Math.round((t - p) / 86400000); };
+  const cap = (theCase && theCase.capitalStructure) || {};
+  const priceNum = numOr(theCase && theCase.currentPrice, NaN);
+  const priceDays = age(theCase && theCase.priceAsOf);
+  const price = isFinite(priceNum) && priceNum > 0
+    ? { value: priceNum, asOf: (theCase.priceAsOf || null), days: priceDays, stale: priceDays != null && priceDays > FRESHNESS_PRICE_STALE_DAYS }
+    : null;
+  const cashNum = numOr(cap.cash, NaN);
+  const cash = isFinite(cashNum) && cap.cash !== ""
+    ? { value: cashNum, asOf: cap.cashAsOf || null, days: age(cap.cashAsOf), rolled: !!cap.carryCashForward, newer: newerFiling || null }
+    : null;
+  const nc = nextCaseCatalyst(theCase, now);
+  const catalyst = nc ? { label: nc.entry.catalystLabel || "Catalyst", date: nc.entry.catalystDate, pinned: nc.pinned,
+    type: nc.pinned ? catalystPinLabel(nc.entry.pin) : null, source: nc.pinned ? (nc.entry.pin.source || "") : "", pinnedAt: nc.pinned ? (nc.entry.pin.at || null) : null } : null;
+  let odds = null;
+  const progs = (theCase && theCase.programs) || [];
+  if (progs.length === 1) {
+    const p = progs[0];
+    const typed = p.posOverridePct !== "" && p.posOverridePct != null;
+    let pct = null;
+    try { pct = typed ? Number(p.posOverridePct) : computePoSWeighting(p).posToLaunch * 100; } catch (e) { pct = null; }
+    const from = p.posSource && typed ? p.posSource : null;   // set by "Use as this case's odds" (simulator)
+    odds = pct != null && isFinite(pct) ? { pct, source: from ? "simulator" : typed ? "typed" : "benchmark", at: from ? from.at || null : null } : null;
+  }
+  return { price, cash, catalyst, odds, amber: !!((price && price.stale) || (cash && cash.newer)) };
+}
+
 function buildModelSnapshot(theCase, today) {
   if (!theCase || !theCase.programs || !theCase.programs.length) return null;
   const date = today || theCase.valuationDate || localDateStamp();
@@ -1309,6 +1344,17 @@ function buildModelSnapshot(theCase, today) {
       if (rows.length) parts.push("What moves it most: " + andList(rows.map(r => r.name.replace(/ \(.*\)$/, "").replace(/ \/ revenue$/, "").replace(/^[A-Z](?![A-Z])/, c => c.toLowerCase()) + " (" + sh(Math.min(r.lo, r.hi)) + " to " + sh(Math.max(r.lo, r.hi)) + ")")) + ".");
     } catch (e) { /* skip */ }
   }
+  // How fresh the inputs were when this was written, so a snapshot read
+  // months later says what it rested on.
+  try {
+    const fr = computeFreshness(theCase, new Date());
+    const bits = [];
+    if (fr.price && fr.price.asOf) bits.push("price entered " + fr.price.asOf);
+    if (fr.cash && fr.cash.asOf) bits.push("cash as of " + fr.cash.asOf);
+    if (fr.catalyst) bits.push("next catalyst " + fr.catalyst.date + (fr.catalyst.pinned ? " (pinned" + (fr.catalyst.source ? ": " + fr.catalyst.source : "") + ")" : ""));
+    if (fr.odds) bits.push("odds " + (fr.odds.source === "simulator" ? "from the simulator" + (fr.odds.at ? " (" + fr.odds.at + ")" : "") : fr.odds.source === "typed" ? "typed" : "the benchmark"));
+    if (bits.length) parts.push("Inputs: " + andList(bits) + ".");
+  } catch (e) { /* the snapshot stands without it */ }
   return { label: MODEL_SNAPSHOT_LABEL, classification: "inference", confidence: "moderate", source: "Generated from this case's model on " + date, date, thesis: parts.join(" ") };
 }
 

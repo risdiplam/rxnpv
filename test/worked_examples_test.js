@@ -100,7 +100,7 @@ const SKIP = new Set(["fdmc"]);
   const pg = caseNamed(/^PepGen.*sample case/);
   const pgEx = ((pg && pg.pinnedResults) || []).filter(p => p.kind === "example");
   ok(!!pg && pgEx.length >= 20 && pgEx.every(p => p.included === false && p.note && p.note.length > 80 && p.reopen), "the PepGen sample loads with its worked examples (" + pgEx.length + ")");
-  ok(!!pg && pg.programs[0].evidenceLog.length >= 25 && pg.programs[0].calibrationLog.length === 1, "and its evidence log and calibration entry");
+  ok(!!pg && pg.programs[0].evidenceLog.length >= 25 && pg.programs[0].calibrationLog.length === 2 && !!pg.programs[0].calibrationLog[0].pin, "and its evidence log and two calibration entries, the first pinned (the second is the H1 2027 window)");
   await openAll(pgEx);
 
   console.log("\nErrors:", errors.length);

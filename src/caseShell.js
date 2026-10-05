@@ -11,6 +11,7 @@ function newCase() {
     updatedAt: Date.now(),
     programs: [newProgram()],
     currentPrice: "", // manually entered, lives at the top near company name — drives upside/downside and treasury-method dilution
+    priceAsOf: "", // the date of that price (set when it is typed); the Overview says how old it is
     corporateGA: { preCommercialAnnualM: "", gaShareOfMatureSgaPct: "50", windDownYears: "" },
     discountRatePct: "",
     terminalValue: { enabled: false, method: "exitMultiple", growthPct: "0", exitMultiple: "" },
@@ -346,8 +347,13 @@ function CaseView({ theCase, onChange, onDelete, onNavigateToTools, onReopenSave
       h("div", { style: { display: "flex", alignItems: "center", gap: 6 } },
         h("span", { style: UI.captionMd }, "Current price"),
         h("span", { style: { fontSize: 13, fontFamily: "var(--mono)", color: "var(--ink-3)" } }, "$"),
-        h("input", { type: "number", value: theCase.currentPrice, onChange: e => update({ currentPrice: e.target.value }), placeholder: "0.00", "aria-label": "Current share price in dollars",
-          style: { width: 80, fontFamily: "var(--mono)", fontSize: 14, color: "var(--ink-1)", background: "var(--surface)", border: "1px solid var(--rule)", borderRadius: 6, padding: "6px 10px" } })
+        // Typing a price stamps it with today's date (theCase.priceAsOf) so
+        // the Overview can say how old it is; the date can be set to the
+        // close the price came from.
+        h("input", { type: "number", value: theCase.currentPrice, onChange: e => update({ currentPrice: e.target.value, priceAsOf: localDateStamp() }), placeholder: "0.00", "aria-label": "Current share price in dollars",
+          style: { width: 80, fontFamily: "var(--mono)", fontSize: 14, color: "var(--ink-1)", background: "var(--surface)", border: "1px solid var(--rule)", borderRadius: 6, padding: "6px 10px" } }),
+        theCase.currentPrice !== "" && theCase.currentPrice != null && h("input", { type: "date", value: theCase.priceAsOf || "", onChange: e => update({ priceAsOf: e.target.value }), "aria-label": "Price as of", title: "The date of this price",
+          style: { fontFamily: "var(--mono)", fontSize: 12, color: "var(--ink-2)", background: "var(--surface)", border: "1px solid var(--rule)", borderRadius: 6, padding: "5px 6px", minHeight: 28 } })
       ),
       h("button", { onClick: () => setConfirmingDelete(true), style: { padding: "6px 14px", borderRadius: 6, border: "1px solid var(--red)", background: "transparent", color: "var(--red)", fontFamily: "var(--mono)", fontSize: 11, cursor: "pointer" } }, "Delete case")
     ),

@@ -183,8 +183,10 @@ function ReadoutScenariosSection({ theCase, discountRatePct, tv, baseValue, onCh
   const price = theCase.currentPrice !== "" && theCase.currentPrice != null && Number(theCase.currentPrice) > 0 ? Number(theCase.currentPrice) : null;
   const s = theCase.readoutScenarios || {};
   const setS = patch => onChange({ ...theCase, readoutScenarios: { ...s, ...patch }, updatedAt: Date.now() });
-  // The catalyst's own name when the Calibration Log has one pending.
-  const pending = ((theCase.programs[0] || {}).calibrationLog || []).find(e => !e.outcome || e.outcome === "pending");
+  // The catalyst's own name: the pinned one, else the next dated, else the
+  // first pending entry in the Calibration Log.
+  const nc = nextCaseCatalyst(theCase);
+  const pending = nc ? nc.entry : ((theCase.programs[0] || {}).calibrationLog || []).find(e => !e.outcome || e.outcome === "pending");
   const name = pending && pending.catalystLabel ? pending.catalystLabel.split(/[,(]/)[0].trim() : r.gate.label;
   const pct1 = v => Math.round(v * 10) / 10;
   const input = (key, placeholder, label) => h("input", { type: "number", min: 0, max: key.endsWith("SharePct") ? undefined : 100, step: 1, className: "rs-input",

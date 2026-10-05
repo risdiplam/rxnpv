@@ -384,6 +384,34 @@ function extractDebt(ug) {
   return found ? total : null;
 }
 
+// The most recent 10-Q or 10-K whose period ends after the case's cash date —
+// a filing the case has not caught up with. Reads the submissions index
+// (reverse-chronological; reportDate is the period end). Null when the case
+// is current or there is nothing to compare.
+function newerFinancialFiling(submissions, cashAsOf) {
+  if (!submissions || !submissions.filings || !submissions.filings.recent || !cashAsOf) return null;
+  const r = submissions.filings.recent;
+  for (let i = 0; i < (r.form || []).length; i++) {
+    if (r.form[i] !== "10-Q" && r.form[i] !== "10-K") continue;
+    const period = (r.reportDate || [])[i];
+    if (period && period > cashAsOf) return { form: r.form[i], filed: r.filingDate[i], period };
+  }
+  return null;
+}
+// For the Overview's freshness line. Desktop only (EDGAR goes through the
+// main process); the submissions index is cached for six hours.
+async function checkNewerFiling(ticker, cashAsOf) {
+  if (!ticker || !cashAsOf) return { status: "unchecked" };
+  try {
+    const info = await findCIK(ticker);
+    if (!info || !info.cik) return { status: "unavailable", reason: "no SEC filer found for " + ticker };
+    const subs = await fetchSubmissions(info.cik);
+    if (!subs) return { status: "unavailable", reason: "SEC EDGAR could not be reached" };
+    const f = newerFinancialFiling(subs, cashAsOf);
+    return f ? { status: "newer", filing: f } : { status: "current" };
+  } catch (e) { return { status: "unavailable", reason: "SEC EDGAR could not be reached" }; }
+}
+
 function recentFilingsByType(submissions, types, limit) {
   limit = limit || 5;
   if (!submissions || !submissions.filings?.recent) return [];
