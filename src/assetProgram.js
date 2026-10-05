@@ -167,6 +167,46 @@ function summarizeAssetProgram(studies, drugName) {
 // Each line is a statement of fact with its own denominator attached. Nothing
 // here is weighted, combined or ranked, and there is deliberately no overall
 // verdict: the reader is the one holding the thesis.
+// Merging condition strings that name the same disease (October 2026): the
+// registry has no normalised vocabulary, so "Myotonic Dystrophy Type 1",
+// "DM1" and "Steinert Disease" count as three indications. groups:
+// [{ name, members: [raw strings] }], chosen by the user. A trial naming two
+// members of one group counts once for it; the evidence checklist's count is
+// the merged one. Raw strings are kept on each row (mergedFrom).
+function applyConditionMerges(summary, groups) {
+  if (!summary || !summary.phases || !groups || !groups.length) return summary;
+  const map = {};
+  groups.forEach(g => (g.members || []).forEach(m => { map[String(m).trim().toLowerCase()] = g.name; }));
+  const counts = {}, from = {};
+  summary.phases.forEach(p => p.trials.forEach(s => {
+    const seen = {};
+    (s.conditions || []).forEach(c => {
+      const raw = String(c).trim();
+      if (!raw) return;
+      const k = map[raw.toLowerCase()] || raw;
+      if (map[raw.toLowerCase()]) (from[k] = from[k] || {})[raw] = true;
+      if (seen[k]) return;
+      seen[k] = true;
+      counts[k] = (counts[k] || 0) + 1;
+    });
+  }));
+  const indications = Object.keys(counts).map(k => ({ condition: k, trials: counts[k], mergedFrom: from[k] ? Object.keys(from[k]) : null })).sort((a, b) => b.trials - a.trials);
+  return { ...summary, indications, evidence: { ...summary.evidence, indicationCount: indications.length }, mergedGroups: groups.length };
+}
+const CONDITION_MERGES_KEY = "rxnpv_condition_merges";
+function conditionMergeKey(drugName) { return String(drugName || "").trim().toLowerCase(); }
+function loadConditionMerges(drugName) {
+  try { const all = JSON.parse(localStorage.getItem(CONDITION_MERGES_KEY) || "{}"); return all[conditionMergeKey(drugName)] || []; } catch (e) { return []; }
+}
+function saveConditionMerges(drugName, groups) {
+  try {
+    const all = JSON.parse(localStorage.getItem(CONDITION_MERGES_KEY) || "{}");
+    if (groups && groups.length) all[conditionMergeKey(drugName)] = groups; else delete all[conditionMergeKey(drugName)];
+    localStorage.setItem(CONDITION_MERGES_KEY, JSON.stringify(all));
+    return true;
+  } catch (e) { return false; }
+}
+
 function describeEvidenceBase(summary) {
   if (!summary || !summary.evidence || !summary.evidence.trials) return [];
   const e = summary.evidence;

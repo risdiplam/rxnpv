@@ -145,7 +145,17 @@ function AssetProgramTool({ activeCase, onDecodeTrial, onWatchTrial }) {
   const [drug, setDrug] = React.useState("");
   const drugFromCase = useCasePrefill(activeCase, caseToolDefaults(activeCase).drugName, drug, setDrug);
   const [loading, setLoading] = React.useState(false);
-  const [summary, setSummary] = React.useState(null);
+  const [rawSummary, setSummary] = React.useState(null);
+  // Condition merges are the user's, per drug search (stored, so they survive
+  // a registry refresh and need no case); the summary shown — and its
+  // evidence checklist — is re-counted under them.
+  const [merges, setMerges] = React.useState([]);
+  const [picked, setPicked] = React.useState([]);
+  const [mergeName, setMergeName] = React.useState("");
+  const [showRaw, setShowRaw] = React.useState(false);
+  React.useEffect(() => { setMerges(rawSummary ? loadConditionMerges(rawSummary.drugName) : []); setPicked([]); }, [rawSummary && rawSummary.drugName]);
+  const summary = rawSummary ? applyConditionMerges(rawSummary, merges) : null;
+  const saveMerges = next => { setMerges(next); saveConditionMerges(rawSummary.drugName, next); setPicked([]); setMergeName(""); };
   const [error, setError] = React.useState(null);
   const [openPhase, setOpenPhase] = React.useState(null);
   const seq = React.useRef(0);
@@ -253,16 +263,36 @@ function AssetProgramTool({ activeCase, onDecodeTrial, onWatchTrial }) {
           )))
       ]),
 
-      summary.indications.length > 1 && toolCard(h, [
-        toolLabel(h, "Where it is being tried (" + summary.indications.length + " registered conditions)"),
+      (summary.indications.length > 1 || merges.length > 0) && toolCard(h, [
+        toolLabel(h, "Where it is being tried (" + summary.indications.length + " registered condition" + (summary.indications.length === 1 ? "" : "s") + (merges.length ? ", after merges" : "") + ")"),
         h("div", { style: { display: "flex", flexWrap: "wrap", gap: 6 } },
-          summary.indications.slice(0, 30).map((ind, i) => h("span", { key: i,
-            style: { fontSize: 10.5, fontFamily: "var(--mono)", color: "var(--ink-2)", background: "var(--surface-2)", borderRadius: 5, padding: "3px 8px" } },
-            ind.condition + " · " + ind.trials))),
+          summary.indications.slice(0, 30).map((ind, i) => {
+            const on = picked.indexOf(ind.condition) !== -1;
+            return h("span", { key: ind.condition, style: { display: "inline-flex", gap: 4, alignItems: "center" } },
+              h("button", { type: "button", "aria-pressed": on, title: ind.mergedFrom ? "Merged from: " + ind.mergedFrom.join(" · ") : "Select to merge with other names for the same disease",
+                onClick: () => setPicked(on ? picked.filter(x => x !== ind.condition) : picked.concat([ind.condition])),
+                style: { fontSize: 10.5, fontFamily: "var(--mono)", color: on ? "var(--teal)" : "var(--ink-2)", background: on ? "var(--teal-bg)" : "var(--surface-2)", border: "1px solid " + (on ? "var(--teal)" : "transparent"), borderRadius: 5, padding: "3px 8px", minHeight: 26, cursor: "pointer" } },
+                ind.condition + " · " + ind.trials + (ind.mergedFrom ? " · " + ind.mergedFrom.length + " merged" : "")),
+              ind.mergedFrom && h("button", { type: "button", className: "link-btn", "data-no-export": "", style: { fontSize: 10 }, onClick: () => saveMerges(merges.filter(g => g.name !== ind.condition)) }, "unmerge"));
+          })),
+        picked.length >= 2 && h("div", { "data-no-export": "", style: { display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginTop: 8 } },
+          h("input", { type: "text", value: mergeName, "aria-label": "Name for the merged condition", placeholder: picked[0], onChange: e => setMergeName(e.target.value),
+            style: { padding: "5px 8px", minHeight: 28, borderRadius: 6, border: "1.5px solid var(--rule)", background: "var(--surface)", color: "var(--ink-1)", fontFamily: "var(--mono)", fontSize: 11 } }),
+          h("button", { type: "button", onClick: () => {
+              const name = mergeName.trim() || picked[0];
+              // A picked row may itself be a merge: its members join the new group.
+              const members = [].concat(...picked.map(c => { const g = merges.find(x => x.name === c); return g ? g.members : [c]; }));
+              saveMerges(merges.filter(g => picked.indexOf(g.name) === -1).concat([{ name, members }]));
+            }, style: { padding: "5px 12px", minHeight: 28, borderRadius: 6, border: "1px solid var(--teal)", background: "var(--teal-bg)", color: "var(--teal)", fontFamily: "var(--mono)", fontSize: 11, fontWeight: 700, cursor: "pointer" } }, "Merge " + picked.length + " as one condition"),
+          h("button", { type: "button", className: "link-btn", onClick: () => setPicked([]) }, "clear")),
+        merges.length > 0 && h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginTop: 6 } },
+          merges.length + " merge" + (merges.length === 1 ? "" : "s") + " applied (saved for “" + rawSummary.drugName + "”; the counts above and the evidence checklist use them). ",
+          h("button", { type: "button", className: "link-btn", style: { fontSize: 10 }, onClick: () => setShowRaw(!showRaw) }, showRaw ? "hide the registry strings" : "show the registry strings"),
+          showRaw && h("div", { style: { marginTop: 4 } }, merges.map(g => h("div", { key: g.name }, g.name + " ← " + g.members.join(" · "))))),
         summary.indications.length > 30 && h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginTop: 6 } },
           "…and " + (summary.indications.length - 30) + " more."),
         h("div", { className: "prose", style: { fontSize: 10, fontFamily: "var(--sans)", color: "var(--ink-3)", lineHeight: 1.6, marginTop: 8 } },
-          "These are the sponsor's own registered condition strings, not a normalized vocabulary — the same disease often appears two or three ways, which inflates the count. Read the spread, not the number.")
+          "These are the sponsor's own registered condition strings, not a normalized vocabulary — the same disease often appears two or three ways, which inflates the count. Select the names that are the same disease and merge them.")
       ])
     )
   );

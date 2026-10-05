@@ -851,6 +851,25 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
     ok(![...d.querySelectorAll("button")].some(b => /^Close out “FREEDOM2/.test(b.textContent)), "Close-out: the prompt is gone once closed out");
   }
 
+  // The IRA clock: off, then ticked with no cut (nothing changes), then a cut.
+  {
+    const pgCase = () => JSON.parse(w.localStorage.getItem("rxnpv_cases_v1")).filter(c => /^PepGen/.test(c.name)).pop();
+    click(btn("Workspace")); await wait(300);
+    click(d.getElementById("casetab-assumptions")); await wait(400);
+    const asm = d.getElementById("casepanel-assumptions");
+    const iraNote = [...asm.querySelectorAll("button, summary, [role=button]")].find(b => /^Medicare price negotiation \(IRA\), optional/.test(b.textContent.trim()));
+    ok(!!iraNote, "IRA: the optional clock sits in the Exclusivity card");
+    if (iraNote) { click(iraNote); await wait(300); }
+    const box = [...asm.querySelectorAll("label")].find(l => /Step US revenue down when a negotiated Medicare price/.test(l.textContent));
+    if (box) { click(box.querySelector("input")); await wait(300); }
+    ok(pgCase().programs[0].ira && pgCase().programs[0].ira.enabled === true && pgCase().programs[0].ira.effectiveYears === "9", "IRA: ticking it stores the clock with the suggested 9 years (small molecule)");
+    ok(/On, but with no cut entered it changes nothing/.test(asm.textContent) && /drugs approved only for rare diseases are largely excluded/.test(asm.textContent), "IRA: with no cut it says so, and a rare-disease program gets the exclusion note");
+    const cut = [...asm.querySelectorAll("input")].find(i => i.getAttribute("aria-label") === "Cut to US revenue (%)");
+    if (cut) { setVal(cut, "30"); await wait(300); }
+    ok(pgCase().programs[0].ira.reductionPct === "30", "IRA: the cut is the user's own figure");
+    if (box) { click(box.querySelector("input")); await wait(300); }
+  }
+
   if (errors.length) { console.log(errors.slice(0, 40).join("\n")); console.log("\n" + errors.length + " FAILURE(S) across " + checks + " checks"); process.exit(1); }
   console.log("ALL AUDIT REGRESSION CHECKS PASSED — " + checks + " checks");
   process.exit(0);

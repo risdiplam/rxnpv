@@ -259,6 +259,32 @@ function cmsSeriesFreshness(series, now) {
 
 // Re-indexes a series to "periods since the drug first appears", so two
 // launches from different years can be read on the same axis.
+// The closest published launch curve to an analog's Medicare uptake (October
+// 2026): its full years, as a share of the highest, against the median /
+// slow / fast curves for its years to peak (Robey & David, the curves the
+// revenue build already uses). A shape, not a level — dollars never move.
+// Null with a reason when the analog was selling before the data begins, or
+// has fewer than three full years; stillRising when its last year is its
+// highest (years to peak is then a lower bound).
+function matchLaunchShape(points) {
+  const pts = (points || []).filter(p => p && p.spending > 0);
+  if (!pts.length) return { ok: false, reason: "no spending to read" };
+  if (pts[0].launchPredatesData) return { ok: false, reason: "already selling before the data starts, so its early years are not a launch" };
+  const vals = pts.filter(p => p.isFullYear !== false).sort((a, b) => a.periodsSinceFirst - b.periodsSinceFirst).map(p => p.spending);
+  if (vals.length < 3) return { ok: false, reason: "fewer than three full years of spending" };
+  let peakIdx = 0; vals.forEach((v, i) => { if (v > vals[peakIdx]) peakIdx = i; });
+  const stillRising = peakIdx === vals.length - 1;
+  const yearsToPeak = Math.max(1, peakIdx + 1);
+  const pct = vals.slice(0, yearsToPeak).map(v => v / vals[peakIdx] * 100);
+  let best = null;
+  [["median", "median"], ["p25", "slow (25th percentile)"], ["p75", "fast (75th percentile)"]].forEach(([profile, label]) => {
+    const curve = launchCurveForYears(yearsToPeak, profile);
+    const sse = pct.reduce((a, v, i) => a + Math.pow(v - curve[i], 2), 0);
+    if (!best || sse < best.sse) best = { profile, label, sse, curve };
+  });
+  return { ok: true, yearsToPeak, profile: best.profile, profileLabel: best.label, rmse: Math.sqrt(best.sse / pct.length), pct, stillRising, fullYears: vals.length };
+}
+
 function indexToLaunch(series, dataStartYear) {
   const nonEmpty = (series || []).filter(p => p.spending > 0);
   if (!nonEmpty.length) return [];
@@ -326,6 +352,5 @@ if (typeof module !== "undefined" && module.exports) {
   module.exports = {
     fetchDrugSpending, parseCmsPeriodLabel, parseCmsAnnualRow, parseCmsQuarterlyRow,
     pickOverallRows, cmsNormalizeName, cmsDisplayName, cmsFetchByBrand, mergeDrugSpendSeries, addComparablePeriodGrowth, impliedAnnualRunRate,
-    cmsSeriesFreshness, indexToLaunch, cmsNum, CMS_DATASETS, CMS_STALENESS_MONTHS
-  };
+    cmsSeriesFreshness, indexToLaunch, cmsNum, CMS_DATASETS, CMS_STALENESS_MONTHS, matchLaunchShape };
 }

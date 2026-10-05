@@ -25,12 +25,12 @@ function CommercialTool({ cases, updateCase, activeCase }) {
     h("div", { style: { display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" } },
       subTab("launch", "Launch tracker"),
       subTab("actual", "Actual vs modeled")),
-    sub === "launch" ? h(LaunchTrackerTool, { activeCase }) : h(ActualVsModelTool, { cases, updateCase, activeCase })
+    sub === "launch" ? h(LaunchTrackerTool, { activeCase, updateCase }) : h(ActualVsModelTool, { cases, updateCase, activeCase })
   );
 }
 
 // ── Launch tracker: Medicare spending as an uptake proxy ───────────────────
-function LaunchTrackerTool({ activeCase }) {
+function LaunchTrackerTool({ activeCase, updateCase }) {
   const h = React.createElement;
   const [brand, setBrand] = React.useState("");
   const brandFromCase = useCasePrefill(activeCase, caseToolDefaults(activeCase).marketedDrug, brand, setBrand);
@@ -142,6 +142,7 @@ function LaunchTrackerTool({ activeCase }) {
           );
         })(),
         rows.length > 1 && h("div", { className: "prose", style: { fontSize: 10, fontFamily: "var(--sans)", color: "var(--ink-3)", lineHeight: 1.6, marginTop: 6 } },
+          h(LaunchShapeRows, { rows, activeCase, updateCase }),
           "Indexed to each drug's first year of Medicare spending, so launches from different years sit on the same axis. Year 1 is almost never a full commercial year — a drug approved in March shows nine months of it — so the first point understates every curve by a different amount depending on approval date. A mature analog's later years are its plateau, not its ramp."),
         rows.some(r => r.found && r.series.some(p => !p.isFullYear)) && h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--warn)", marginTop: 4 } },
           "One or more points is a partial period plotted at its reported value, not annualized — the line dips there for a reporting reason, not a commercial one.")
@@ -376,4 +377,29 @@ function ExclusivityTool({ cases, updateCase, activeCase }) {
             "A generic can challenge a patent before it expires (Paragraph IV), settle for an earlier agreed entry date, or design around a formulation patent entirely. Separately, regulatory exclusivities — new chemical entity, orphan — can run past a patent. This is the published patent landscape: a sourced starting point, not the verdict.")))
     ]))
   );
+}
+
+// Copy an analog's launch SHAPE into the open case (October 2026): the
+// closest published curve and years to peak, never its dollars; offered for a
+// Full revenue build, on confirmation, with the source kept on the curve.
+function LaunchShapeRows({ rows, activeCase, updateCase }) {
+  const h = React.createElement;
+  const [confirm, setConfirm] = React.useState(null);
+  const shapes = (rows || []).filter(r => r.found && r.series && r.series.length).map(r => ({ r, m: matchLaunchShape(indexToLaunch(r.series, r.dataStartYear)) }));
+  if (!shapes.length) return null;
+  const prog = activeCase && activeCase.programs && activeCase.programs.length === 1 ? activeCase.programs[0] : null;
+  const full = prog && (prog.revenueMode || "quick") === "full";
+  const rb = prog ? getRevenueBuild(prog) : null;
+  return h("div", { className: "launch-shapes", style: { margin: "6px 0 10px", fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-2)", lineHeight: 1.6 } },
+    shapes.map(({ r, m }, i) => h("div", { key: i, style: { marginBottom: 4 } },
+      h("b", null, r.brand + ": "),
+      m.ok ? "closest launch shape is the " + m.profileLabel + " curve, " + m.yearsToPeak + " year" + (m.yearsToPeak === 1 ? "" : "s") + " to peak" + (m.stillRising ? " — still rising in its last full year, so that is a lower bound" : "") + " (" + m.fullYears + " full years of Medicare spending)." : "no shape to copy — " + m.reason + ".",
+      m.ok && prog && updateCase && (full
+        ? (confirm === i
+            ? h("span", { "data-no-export": "" }, " Set " + (prog.drugName || prog.name) + "'s launch curve to " + m.profileLabel + ", " + m.yearsToPeak + " years (now " + (rb.launchCurve.profile || "median") + ", " + rb.launchCurve.yearsToPeak + ")? Timing moves the value. ",
+                h("button", { type: "button", className: "link-btn", onClick: () => { updateCase({ ...activeCase, programs: [{ ...prog, revenueBuild: { ...rb, launchCurve: { ...rb.launchCurve, yearsToPeak: String(Math.min(10, Math.max(3, m.yearsToPeak))), profile: m.profile, source: "shape of " + r.brand + ", CMS Medicare spending, " + localDateStamp() } } }], updatedAt: Date.now() }); setConfirm(null); } }, "Confirm"), " ",
+                h("button", { type: "button", className: "link-btn", onClick: () => setConfirm(null) }, "Cancel"))
+            : h("button", { type: "button", className: "link-btn", "data-no-export": "", style: { marginLeft: 6 }, onClick: () => setConfirm(i) }, "Use this shape for " + (prog.drugName || prog.name)))
+        : h("span", { style: { color: "var(--ink-3)" } }, " (a Quick revenue build has no launch curve to receive it)")))),
+    h("div", { style: { color: "var(--ink-3)", fontSize: 10 } }, "A shape, not a level: copying it changes the launch curve and years to peak only, never price or patients. Medicare spending is gross of rebates and about a quarter behind, and a children's drug barely appears in it."));
 }

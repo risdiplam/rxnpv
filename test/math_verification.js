@@ -75,7 +75,7 @@ const EXPORTS = [
   "runPeakSalesSimulation", "driverSensitivity", "percentSpecToFraction", "percentSpecError", "renderIconArray",
   "niceTicks", "formatTick", "formatRegisteredP", "parseCatalystHit", "sponsorNameFromEntity", "renderLineChart", "renderHistogram", "renderForestPlot",
   "treasuryMethodShares", "ifConvertedShares", "computeEquityValue", "applyFutureRaise",
-  "classifyCatalystFunding", "computeRunwayVsCatalysts", "monthsUntil", "parseCatalystDate", "parseCatalystWindow", "nextCaseCatalyst", "computeFreshness", "newerFinancialFiling", "catalystPinLabel", "computeFailureFloorPair", "floorZeroReason", "impliedHeldFixed", "summarizeObservedEffects", "analogPriorPresets", "findInsiderBuyCluster", "extractLimitationsOfUse", "labelDate", "biologicExclusivityFloor", "optionsImpliedMove", "modelImpliedMove", "readImpliedMove", "orderByCompletion", "computePortfolioCatalysts", "addModelSnapshot", "isModelSnapshot", "modelSnapshotLabel", "buildDecisionMemo", "computeCaseValuation", "getEffectiveScenarioPreset", "caseFacilities", "computeForwardRunway", "computeFinancingBridge", "forwardBalanceAt", "edgarCashSource", "baseCaseFairValue", "assuranceToCaseOdds", "applyAssuranceToProgram", "posFromSimulator", "describePosSource", "pendingCalibrationEntries", "failureFloorBurnPlan", "RUNWAY_CUSHION_MONTHS_DEFAULT",
+  "classifyCatalystFunding", "computeRunwayVsCatalysts", "monthsUntil", "parseCatalystDate", "parseCatalystWindow", "nextCaseCatalyst", "computeFreshness", "newerFinancialFiling", "catalystPinLabel", "computeFailureFloorPair", "floorZeroReason", "impliedHeldFixed", "summarizeObservedEffects", "analogPriorPresets", "applyIraClock", "suggestedIraYears", "matchLaunchShape", "applyConditionMerges", "summarizeAssetProgram", "findInsiderBuyCluster", "extractLimitationsOfUse", "labelDate", "biologicExclusivityFloor", "optionsImpliedMove", "modelImpliedMove", "readImpliedMove", "orderByCompletion", "computePortfolioCatalysts", "addModelSnapshot", "isModelSnapshot", "modelSnapshotLabel", "buildDecisionMemo", "computeCaseValuation", "getEffectiveScenarioPreset", "caseFacilities", "computeForwardRunway", "computeFinancingBridge", "forwardBalanceAt", "edgarCashSource", "baseCaseFairValue", "assuranceToCaseOdds", "applyAssuranceToProgram", "posFromSimulator", "describePosSource", "pendingCalibrationEntries", "failureFloorBurnPlan", "RUNWAY_CUSHION_MONTHS_DEFAULT",
   "summarizeOrangeBookPatents", "isPediatricExtension", "parseFdaYyyymmdd",
   "computeBinaryEventImpliedPoS", "selectPeakSalesCompWindow",
   "applyTaxToCalendar", "computeMoleculeTypePoSRatios", "POS_BY_MOLECULE",
@@ -1192,6 +1192,54 @@ report();
 // whole point of the tool, so it is tested directly rather than only through
 // the UI. Boundaries matter here: "reaches it with exactly zero cushion" and
 // "runs out one day early" are different answers to an investor.
+section("Asset Program: merging condition names for one disease");
+{
+  const st = (id, conds) => ({ nctId: id, phase: "PHASE2", conditions: conds, interventions: ["PGN-EDODM1"], interventionOtherNames: [] });
+  const raw = api.summarizeAssetProgram([st("N1", ["Myotonic Dystrophy Type 1"]), st("N2", ["DM1", "Myotonic Dystrophy Type 1"]), st("N3", ["Steinert Disease"]), st("N4", ["Healthy volunteers"])], "PGN-EDODM1");
+  ok("unmerged: four registry strings, four indications", raw.indications.length === 4 && raw.evidence.indicationCount === 4);
+  const m = api.applyConditionMerges(raw, [{ name: "DM1", members: ["Myotonic Dystrophy Type 1", "dm1", "Steinert Disease"] }]);
+  const dm1 = m.indications.find(x => x.condition === "DM1");
+  ok("merged: three strings become one, so two indications (the evidence checklist count too)", m.indications.length === 2 && m.evidence.indicationCount === 2);
+  ok("a trial naming two members counts once: DM1 in 3 trials, not 4", dm1 && dm1.trials === 3);
+  ok("the raw strings are kept on the row (case-insensitive match)", dm1.mergedFrom.length === 3 && dm1.mergedFrom.includes("DM1"));
+  ok("no merges: the summary is returned as it was", api.applyConditionMerges(raw, []) === raw);
+}
+section("An analog's launch shape against the published curves");
+{
+  // Spending that follows the 5-year median curve (15, 42, 68, 86, 100% of
+  // peak) then plateaus: median, 5 years. Scaled to $40M at peak.
+  const pt = (i, v, extra) => Object.assign({ spending: v, periodsSinceFirst: i, isFullYear: true }, extra || {});
+  const med = [15, 42, 68, 86, 100, 98, 97].map((v, i) => pt(i, v * 0.4e6));
+  const m = api.matchLaunchShape(med);
+  ok("the 5-year median curve is matched as median, 5 years to peak", m.ok && m.profile === "median" && m.yearsToPeak === 5 && !m.stillRising);
+  near("... with no error", m.rmse, 0, 1e-9);
+  const fast = [25, 53, 78, 94, 100, 99].map((v, i) => pt(i, v));
+  ok("the 5-year fast curve (25, 53, 78, 94, 100) is matched as fast", api.matchLaunchShape(fast).profile === "p75");
+  const rising = [10, 30, 55, 75].map((v, i) => pt(i, v));
+  ok("still rising in the last full year: flagged, years to peak a lower bound", api.matchLaunchShape(rising).stillRising === true && api.matchLaunchShape(rising).yearsToPeak === 4);
+  ok("selling before the data starts: refused, with the reason", !api.matchLaunchShape(med.map((p, i) => i === 0 ? { ...p, launchPredatesData: true } : p)).ok);
+  ok("fewer than three full years: refused", !api.matchLaunchShape([pt(0, 10), pt(1, 30)]).ok);
+  ok("a partial year is left out of the fit", api.matchLaunchShape(med.concat([pt(7, 10, { isFullYear: false })])).profile === "median");
+}
+section("The IRA clock: opt-in, no default cut, US revenue only");
+{
+  const st = JSON.parse(fs.readFileSync(path.join(__dirname, "fixtures", "stoke_sample_case.json"), "utf8"));
+  const p = st.programs[0];
+  const base = api.getProgramRevenueResult(p, 25);
+  const on = api.getProgramRevenueResult({ ...p, ira: { enabled: true, reductionPct: "40", effectiveYears: "9" } }, 25);
+  ok("years 1-9 unchanged; from year 10 US revenue is 60%, ex-US untouched",
+    on.years.slice(0, 9).every((r, i) => r.usRevenue === base.years[i].usRevenue) &&
+    on.years.slice(9).every((r, i) => Math.abs(r.usRevenue - Math.round(base.years[i + 9].usRevenue * 0.6)) <= 1 && r.exUSRevenue === base.years[i + 9].exUSRevenue && r.totalRevenue === r.usRevenue + r.exUSRevenue));
+  const blank = api.getProgramRevenueResult({ ...p, ira: { enabled: true, reductionPct: "", effectiveYears: "9" } }, 25);
+  ok("ticked with no cut: identical to off", JSON.stringify(blank.years) === JSON.stringify(base.years));
+  const quick = { ...p, revenueMode: "quick", quickRevenue: { peakRevenue: "1000000000", yearsToPeak: "5", profile: "median" }, partnership: { enabled: false } };
+  const qb = api.getProgramRevenueResult(quick, 25), qo = api.getProgramRevenueResult({ ...quick, ira: { enabled: true, reductionPct: "50", effectiveYears: "9" } }, 25);
+  ok("Quick mode (no US/ex-US split): all revenue from year 10 is halved", qo.years.slice(9).every((r, i) => Math.abs(r.totalRevenue - Math.round(qb.years[i + 9].totalRevenue * 0.5)) <= 1));
+  ok("suggested effective year: 9 for a small molecule, 13 for a biologic", api.suggestedIraYears({ modality: "smallMolecule" }) === 9 && api.suggestedIraYears({ modality: "biologic" }) === 13);
+  const v = c => api.computeCaseValuation(c, api.getEffectiveScenarioPreset(c, "base"), "base", Number(st.discountRatePct), st.terminalValue).equity.perShare;
+  const withIra = { ...st, programs: [{ ...p, ira: { enabled: true, reductionPct: "40", effectiveYears: "9" } }] };
+  ok("on, it lowers Base (" + v(st).toFixed(2) + " → " + v(withIra).toFixed(2) + "); off, the sample is untouched", v(withIra) < v(st) && Math.abs(v({ ...st, programs: [{ ...p, ira: { enabled: false, reductionPct: "40", effectiveYears: "9" } }] }) - v(st)) < 1e-9);
+}
 section("Smaller items: insider clusters, label limitations, the biologic floor");
 {
   const tx = (owner, date, code, usd) => ({ ownerName: owner, date, code, valueUsd: usd, shares: 1000 });

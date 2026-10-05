@@ -50,6 +50,8 @@ function stub(obj) {
   const good = w.parseImportFile(JSON.stringify(b));
   ok(good.ok && good.kind === "backup" && good.summary.cases === 1 && good.summary.customComps === 1 && good.summary.watchedTrials === 1, "a backup parses and summarises (1 case, 1 comp, 1 watched trial)");
   ok(!w.parseImportFile("not json").ok, "junk is refused");
+  // October 2026: the Asset Program's condition merges are the user's own work.
+  ok(w.backupKeyKind("rxnpv_condition_merges") === "data", "condition merges are backed up and restored as user data");
   ok(!w.parseImportFile(JSON.stringify({ format: "something-else" })).ok, "a foreign JSON file is refused");
   ok(/newer version/.test(w.parseImportFile(JSON.stringify({ format: "rxnpv-backup", version: 99, data: {} })).error), "a backup from a newer version is refused with a reason");
   const tampered = JSON.parse(JSON.stringify(b)); tampered.data.evil_key = "\"x\""; tampered.data.rxnpv_edgar_cache = "{}";

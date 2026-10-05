@@ -416,6 +416,31 @@ function getRevenueBuild(program) {
   };
 }
 
+// The IRA price-negotiation clock (October 2026). Opt-in (program.ira), and
+// the reduction has NO default: the negotiated outcome varies by drug and by
+// competition, so the app supplies no number — blank changes nothing. From
+// the effective year after approval (the model takes approval as launch,
+// year 1): about 9 years for a small molecule and 13 for a biologic (selection
+// at ~7 / ~11 years, the price two years later), editable. US revenue only;
+// Quick mode has no US/ex-US split, so it applies to all of it.
+function suggestedIraYears(program) {
+  const m = (program && (program.modality || (getRevenueBuild(program).exclusivity || {}).modality)) || "smallMolecule";
+  return /biologic|gene|cell/i.test(m) ? 13 : 9;
+}
+function applyIraClock(result, ira, mode) {
+  if (!ira || !ira.enabled || !result || !result.years) return result;
+  const cut = Number(ira.reductionPct), eff = Number(ira.effectiveYears);
+  if (!(cut > 0) || !(eff > 0)) return result;
+  const f = 1 - Math.min(100, cut) / 100;
+  const years = result.years.map(r => {
+    if (r.year <= eff) return r;
+    const us = mode === "quick" ? r.totalRevenue : r.usRevenue;
+    const usNew = Math.round(us * f);
+    return mode === "quick" ? { ...r, usRevenue: usNew, totalRevenue: usNew } : { ...r, usRevenue: usNew, totalRevenue: usNew + r.exUSRevenue };
+  });
+  return { ...result, years, iraApplied: { fromYear: eff + 1, reductionPct: cut } };
+}
+
 function getProgramRevenueResult(program, projectionYears) {
   const mode = program.revenueMode || "quick";
   const revenueBuild = getRevenueBuild(program);
@@ -426,5 +451,5 @@ function getProgramRevenueResult(program, projectionYears) {
   } else {
     result = computeProgramRevenue(revenueBuild, projectionYears);
   }
-  return applyPartnershipToRevenue(result, program.partnership, mode);
+  return applyPartnershipToRevenue(applyIraClock(result, program.ira, mode), program.partnership, mode);
 }

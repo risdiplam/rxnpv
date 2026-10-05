@@ -441,7 +441,8 @@ function ProgramEditor({ program, onChange, onDelete, discountRatePct, terminalV
         bench: getExclusivityBenchText(program.modality).volRetained }),
       h(BenchField, { label: "Price decline after LOE", value: rb.exclusivity.priceDeclinePct, onChange: v => set("revenueBuild.exclusivity.priceDeclinePct", v), suffix: "%",
         placeholder: "blank = " + getErosionDefaults(rb.exclusivity.modality || "smallMolecule").priceDeclinePct + " (benchmark)",
-        bench: getExclusivityBenchText(program.modality).priceDecline })
+        bench: getExclusivityBenchText(program.modality).priceDecline }),
+      h(IraClockFields, { program, set })
     )),
 
     // ── 7. Cost Structure ──
@@ -858,4 +859,29 @@ function ProgramEditor({ program, onChange, onDelete, discountRatePct, terminalV
       );
     })()),
   );
+}
+
+// The IRA negotiation clock (October 2026): folded away, off, and with no
+// default reduction — a checkbox that does nothing until the user supplies
+// their own assumption (applyIraClock in engine.js).
+function IraClockFields({ program, set }) {
+  const h = React.createElement;
+  const ira = program.ira || {};
+  const sugg = suggestedIraYears(program);
+  const rare = program.posDiseaseType === "rare";
+  const live = ira.enabled && Number(ira.reductionPct) > 0;
+  return h("div", { style: { flex: "1 1 100%" } },
+    h(Note, { summary: "Medicare price negotiation (IRA), optional" + (live ? " · on: −" + ira.reductionPct + "% of US revenue from year " + (Number(ira.effectiveYears || sugg) + 1) : ""), open: !!ira.enabled },
+      h("div", null,
+        h("label", { style: { display: "flex", alignItems: "center", gap: 8, cursor: "pointer", marginBottom: 8 } },
+          h("input", { type: "checkbox", checked: !!ira.enabled, onChange: e => set("ira", { ...ira, enabled: e.target.checked, effectiveYears: ira.effectiveYears || String(sugg) }) }),
+          "Step US revenue down when a negotiated Medicare price would take effect"),
+        ira.enabled && h("div", { style: { display: "flex", gap: 16, flexWrap: "wrap" } },
+          h(BenchField, { label: "Cut to US revenue", value: ira.reductionPct || "", onChange: v => set("ira", { ...ira, reductionPct: v }), suffix: "%", placeholder: "your assumption",
+            help: "No default: the negotiated price varies by drug, and Medicare's share of a drug's US revenue varies more (a children's drug has almost none). Blank changes nothing." }),
+          h(BenchField, { label: "Years after approval it takes effect", value: ira.effectiveYears || "", onChange: v => set("ira", { ...ira, effectiveYears: v }), suffix: "yrs", placeholder: String(sugg),
+            help: "About 9 years for a small molecule and 13 for a biologic: selection at ~7 / ~11 years, the negotiated price two years after. The model takes approval as launch." })),
+        ira.enabled && !(Number(ira.reductionPct) > 0) && h("div", { style: { ...UI.caption, marginTop: 4 } }, "On, but with no cut entered it changes nothing."),
+        h("div", { style: { ...UI.caption, marginTop: 6, lineHeight: 1.6 } },
+          "A clock, not a prediction of the negotiation. Single-source status, exclusions and renegotiation can all change it." + (rare ? " This program is marked rare disease: since 2025, drugs approved only for rare diseases are largely excluded from negotiation — check before using this." : "")))));
 }
