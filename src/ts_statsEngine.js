@@ -639,9 +639,12 @@ const BINARY_SHRINKAGE_FACTOR = 1.20;
 // mean shift across the sample, not something every program experiences.
 const HR_SHRINKAGE_FACTOR = 1.09;
 
-function shrinkBinaryResponseRate(observedP2Pct) {
-  const projected = observedP2Pct / BINARY_SHRINKAGE_FACTOR;
-  return { projectedP3Pct: Math.max(0, Math.min(100, projected)), factor: BINARY_SHRINKAGE_FACTOR };
+// factor: the user's own discount when they have a reason for one (the
+// Translator's field, October 2026); the literature average otherwise.
+function shrinkBinaryResponseRate(observedP2Pct, factor) {
+  const f = factor > 0 ? factor : BINARY_SHRINKAGE_FACTOR;
+  const projected = observedP2Pct / f;
+  return { projectedP3Pct: Math.max(0, Math.min(100, projected)), factor: f };
 }
 
 // Moves the hazard ratio toward 1.0 (the null) by the shrinkage factor. If
@@ -649,9 +652,10 @@ function shrinkBinaryResponseRate(observedP2Pct) {
 // 3 value can cross 1.0 entirely — flagged via crossesNull rather than
 // silently clamped, since that crossing IS the honest, useful finding: a
 // marginal Phase 2 result may not survive Phase 3 at all on average.
-function shrinkHazardRatio(assumedHR) {
-  const projected = assumedHR * HR_SHRINKAGE_FACTOR;
-  return { projectedP3HR: Math.max(0.001, projected), factor: HR_SHRINKAGE_FACTOR, crossesNull: projected >= 1 };
+function shrinkHazardRatio(assumedHR, factor) {
+  const f = factor > 0 ? factor : HR_SHRINKAGE_FACTOR;
+  const projected = assumedHR * f;
+  return { projectedP3HR: Math.max(0.001, projected), factor: f, crossesNull: projected >= 1 };
 }
 
 

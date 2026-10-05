@@ -75,7 +75,7 @@ const EXPORTS = [
   "runPeakSalesSimulation", "driverSensitivity", "percentSpecToFraction", "percentSpecError", "renderIconArray",
   "niceTicks", "formatTick", "formatRegisteredP", "parseCatalystHit", "sponsorNameFromEntity", "renderLineChart", "renderHistogram", "renderForestPlot",
   "treasuryMethodShares", "ifConvertedShares", "computeEquityValue", "applyFutureRaise",
-  "classifyCatalystFunding", "computeRunwayVsCatalysts", "monthsUntil", "parseCatalystDate", "parseCatalystWindow", "nextCaseCatalyst", "computeFreshness", "newerFinancialFiling", "catalystPinLabel", "computeFailureFloorPair", "floorZeroReason", "impliedHeldFixed", "caseFacilities", "computeForwardRunway", "computeFinancingBridge", "forwardBalanceAt", "edgarCashSource", "baseCaseFairValue", "assuranceToCaseOdds", "applyAssuranceToProgram", "posFromSimulator", "describePosSource", "pendingCalibrationEntries", "failureFloorBurnPlan", "RUNWAY_CUSHION_MONTHS_DEFAULT",
+  "classifyCatalystFunding", "computeRunwayVsCatalysts", "monthsUntil", "parseCatalystDate", "parseCatalystWindow", "nextCaseCatalyst", "computeFreshness", "newerFinancialFiling", "catalystPinLabel", "computeFailureFloorPair", "floorZeroReason", "impliedHeldFixed", "summarizeObservedEffects", "analogPriorPresets", "caseFacilities", "computeForwardRunway", "computeFinancingBridge", "forwardBalanceAt", "edgarCashSource", "baseCaseFairValue", "assuranceToCaseOdds", "applyAssuranceToProgram", "posFromSimulator", "describePosSource", "pendingCalibrationEntries", "failureFloorBurnPlan", "RUNWAY_CUSHION_MONTHS_DEFAULT",
   "summarizeOrangeBookPatents", "isPediatricExtension", "parseFdaYyyymmdd",
   "computeBinaryEventImpliedPoS", "selectPeakSalesCompWindow",
   "applyTaxToCalendar", "computeMoleculeTypePoSRatios", "POS_BY_MOLECULE",
@@ -1192,6 +1192,80 @@ report();
 // whole point of the tool, so it is tested directly rather than only through
 // the UI. Boundaries matter here: "reaches it with exactly zero cushion" and
 // "runs out one day early" are different answers to an investor.
+section("Simulator: delayed separation, readout timing, the editable discount, analog priors");
+{
+  // Delayed separation, checked against the closed form. Control median 12
+  // (λc = ln2/12), HR 0.5 (λt = λc/2), effect from month 6: S(t) = e^(−λc t)
+  // to 6, then e^(−6λc − λt (t − 6)). S(6) = 2^(−0.5) = 0.7071 > 0.5, so the
+  // treated median is past 6: 6λc + λt(m − 6) = ln2 → m − 6 = (ln2 − ln2/2)/(λc/2)
+  // = 12 → median 18 months (24 with the effect from day one).
+  const lc = Math.log(2) / 12;
+  const S = (t) => t <= 6 ? Math.exp(-lc * t) : Math.exp(-lc * 6 - (lc / 2) * (t - 6));
+  near("closed form: the treated median is 18 months", Math.log(2) - (6 * lc + (lc / 2) * 12), 0, 1e-12);
+  // A late effect costs power on a fixed design. (Kept ahead of the 6,000-
+  // patient replicates below: placed after them, the first two assurance runs
+  // in this harness returned the same hit rate, a state effect of this
+  // harness — where the stats module is globalThis — that a standalone load
+  // of the same files and the packaged app do not show. Noted, October 2026.)
+  const d = { nControl: 150, nTreat: 150, medianControl: 12, accrualPeriod: 12, followupPeriod: 12 };
+  const now0 = api.runAssuranceSimulation({ endpointType: "timeToEvent", design: { ...d }, prior: { type: "point", value: 0.65 }, alpha: 0.05, sided: "two", iterations: 3000 });
+  const late = api.runAssuranceSimulation({ endpointType: "timeToEvent", design: { ...d, delayMonths: 9 }, prior: { type: "point", value: 0.65 }, alpha: 0.05, sided: "two", iterations: 3000 });
+  ok("effect from month 9 lowers assurance (" + now0.pos.toFixed(3) + " → " + late.pos.toFixed(3) + ")", late.pos < now0.pos - 0.1);
+  const zero = api.runAssuranceSimulation({ endpointType: "timeToEvent", design: { ...d, delayMonths: 0 }, prior: { type: "point", value: 0.65 }, alpha: 0.05, sided: "two", iterations: 3000 });
+  near("a delay of 0 is the proportional-hazards model (same assurance within Monte Carlo error)", zero.pos, now0.pos, 0.04);
+
+  // Simulate many treated patients through the replicate's own sampler: no
+  // censoring (long follow-up), one arm only (nControl 0 is not allowed, so a
+  // huge treatment arm and read its events).
+  const big = { nControl: 1, nTreat: 6000, medianControl: 12, accrualPeriod: 0.0001, followupPeriod: 1000, delayMonths: 6, targetEvents: 3001 };
+  const r = api.simulateTimeToEventReplicate(big, 0.5);
+  near("the 3001st event of 6001 patients (the median) lands near 18 months", r.timeToTarget, 18, 0.9);
+  const r0 = api.simulateTimeToEventReplicate({ ...big, delayMonths: 0 }, 0.5);
+  near("... and near 24 with the effect from day one", r0.timeToTarget, 24, 1.2);
+  ok("S(t) used above is a proper survival curve (S(0)=1, falls)", S(0) === 1 && S(30) < S(10));
+
+  // Readout timing against the expected event count. HR 1 (no effect), 400
+  // patients accrued evenly over 12 months, control median 12. Expected
+  // events by calendar month T ≥ 12: 400 × (1/12)∫0^12 (1 − e^(−λ(T−u))) du
+  // = 400 × [1 − (e^(−λ(T−12)) − e^(−λT)) / (12λ)]. The T where that is 200.
+  const lam = Math.log(2) / 12;
+  const expected = T => 400 * (1 - (Math.exp(-lam * (T - 12)) - Math.exp(-lam * T)) / (12 * lam));
+  let lo = 12, hi = 60; for (let i = 0; i < 60; i++) { const m = (lo + hi) / 2; if (expected(m) < 200) lo = m; else hi = m; }
+  const tStar = (lo + hi) / 2;
+  const rt = api.runAssuranceSimulation({ endpointType: "timeToEvent", design: { nControl: 200, nTreat: 200, medianControl: 12, accrualPeriod: 12, followupPeriod: 12, targetEvents: 200 }, prior: { type: "point", value: 1 }, alpha: 0.05, sided: "two", iterations: 1500 }).readoutTiming;
+  near("200 of 400 events: the median timing matches the expected-events solution (" + tStar.toFixed(2) + " months)", rt.median, tStar, 0.5);
+  ok("10th ≤ median ≤ 90th percentile", rt.p10 <= rt.median && rt.median <= rt.p90);
+  ok("the planned 24 months (12 + 12) is past the median, so few runs miss it (" + (rt.neverShare * 100).toFixed(1) + "%)", rt.planEnd === 24 && rt.neverShare < 0.2);
+  const impossible = api.runAssuranceSimulation({ endpointType: "timeToEvent", design: { nControl: 50, nTreat: 50, medianControl: 12, accrualPeriod: 12, followupPeriod: 12, targetEvents: 150 }, prior: { type: "point", value: 0.8 }, alpha: 0.05, sided: "two", iterations: 200 }).readoutTiming;
+  ok("a target above the number of patients is never reached", impossible.neverShare === 1);
+  ok("no target: no timing", api.runAssuranceSimulation({ endpointType: "timeToEvent", design: { ...d }, prior: { type: "point", value: 0.7 }, alpha: 0.05, sided: "two", iterations: 200 }).readoutTiming === null);
+
+  // The summary line's numbers.
+  const sm = api.summarizeObservedEffects([0.6, 0.8, 0.95, 1.05, NaN, 0.7], "timeToEvent");
+  ok("summary: median of the five finite values is 0.8; 2 of 5 worse than 0.90, 1 of 5 worse than 1", sm.median === 0.8 && sm.worseThan090 === 0.4 && sm.worseThan100 === 0.2 && sm.n === 5);
+  ok("summary for a difference: just the median (even count: mean of the middle two)", api.summarizeObservedEffects([0.1, 0.3, 0.2, 0.4], "binary").median === 0.25);
+
+  // The Phase 2→3 discount, now a parameter.
+  near("HR 0.66 × the default 1.09", api.shrinkHazardRatio(0.66).projectedP3HR, 0.7194, 1e-9);
+  near("HR 0.66 × a typed 1.20 = 0.792", api.shrinkHazardRatio(0.66, 1.2).projectedP3HR, 0.792, 1e-9);
+  near("45% ÷ a typed 1.5 = 30%", api.shrinkBinaryResponseRate(45, 1.5).projectedP3Pct, 30, 1e-9);
+  ok("a blank or zero factor falls back to the literature average", api.shrinkHazardRatio(0.66, 0).factor === 1.09 && api.shrinkBinaryResponseRate(45, NaN).factor === 1.2);
+
+  // Analog-board priors: hazard ratios only; the cautious quartile is the
+  // less favourable end (nearer 1).
+  const rows = [0.5, 0.6, 0.7, 0.8, 0.9].map(v => ({ scale: "ratio", paramLabel: "Hazard ratio", value: v })).concat([{ scale: "ratio", paramLabel: "Odds ratio", value: 0.2 }, { scale: "difference", paramLabel: "Mean difference", value: 3 }]);
+  const pre = api.analogPriorPresets(rows);
+  ok("presets: 5 hazard ratios (the odds ratio and the difference left out)", pre.n === 5);
+  near("median 0.70", pre.median, 0.7, 1e-12);
+  near("after the 1.09 discount: 0.763", pre.medianDiscounted, 0.763, 1e-9);
+  ok("cautious quartile: the 75th-percentile HR, 0.80 (nearest rank: the 4th of 5)", pre.cautious === 0.8);
+  ok("nothing parsed: nothing offered", api.analogPriorPresets([{ scale: "ratio", paramLabel: "Odds ratio", value: 0.5 }]) === null && api.analogPriorPresets([]) === null);
+
+  // A month range pins a simulated window without inventing a day.
+  const w = api.parseCatalystWindow("2027-03 to 2027-09");
+  ok("'2027-03 to 2027-09' is 1 Mar to 30 Sep 2027", w && w.precision === "range" && w.start.getMonth() === 2 && w.start.getDate() === 1 && w.end.getMonth() === 8 && w.end.getDate() === 30);
+  ok("a backwards range is not a date", api.parseCatalystWindow("2027-09 to 2027-03") === null);
+}
 section("Cash to reach the catalyst: facilities and the financing bridge");
 {
   const fac = api.caseFacilities({ capitalStructure: { atmUndrawn: "60000000", debtUndrawn: "25000000", milestoneExpected: "15000000", shelfRemaining: "150000000", facilitiesNote: "Q2 10-Q" } });

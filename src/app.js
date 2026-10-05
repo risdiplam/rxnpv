@@ -207,7 +207,7 @@ function App() {
     view === "report" ? h(ErrorBoundary, { key: "report" }, h(ReportView, { theCase: activeCase, onBack: () => setView("workspace"), updateCase })) :
     view === "bundle" ? h(ErrorBoundary, { key: "bundle" }, h(BundleView, { onBack: () => setView("workspace") })) :
     view === "reference" ? h(ErrorBoundary, { key: "reference" }, h(ReferenceSheet, { activeCase })) :
-    view === "tools" ? h(ErrorBoundary, { key: "tools" }, h(ToolsView, { cases, updateCase, activeCase, navRequest: toolsNavRequest, onSelectCase: setActiveCaseId, onOpenWorkspace: () => setView("workspace") })) :
+    view === "tools" ? h(ErrorBoundary, { key: "tools" }, h(ToolsView, { cases, updateCase, activeCase, navRequest: toolsNavRequest, onSelectCase: setActiveCaseId, onOpenWorkspace: () => setView("workspace"), onReopen: reopenSaved })) :
     view === "simulation" ? h(ErrorBoundary, { key: "simulation" }, h(SimulationView, { cases, updateCase, activeCase, onSelectCase: setActiveCaseId, onOpenWorkspace: () => setView("workspace") })) :
     view === "portfolio" ? h(ErrorBoundary, { key: "portfolio" }, h(PortfolioView, { cases })) :
     // minHeight, not height. A fixed height here capped this row at 100vh,

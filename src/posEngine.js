@@ -227,7 +227,7 @@ function applyAssuranceToProgram(program, conv, run, today) {
     kind: "simulator", at: today, writtenPct, beforePct: Math.round(conv.beforePct * 10) / 10, beforeSource: conv.beforeSource,
     trialStage: conv.trialStage, laterOdds: conv.laterOdds, looseFit: conv.looseFit,
     trialWin: run.posDirectional != null ? run.posDirectional : run.pos, assurance: run.pos, mcSE: run.posStdErr,
-    endpointType: run.endpointType, design: run.design, prior: run.prior, alpha: run.alpha, sided: run.sided, iterations: run.iterations } };
+    endpointType: run.endpointType, design: run.design, prior: run.prior, priorSource: run.priorSource || "", alpha: run.alpha, sided: run.sided, iterations: run.iterations } };
 }
 // True while the program's odds are still the ones the simulator wrote
 // (editing the field by hand makes them the user's own again).
@@ -241,8 +241,9 @@ function describePosSource(s) {
   const prior = s.prior ? (s.prior.type === "point" ? "a fixed " + s.prior.value : "a normal prior, mean " + s.prior.mean + " (SD " + s.prior.sd + ")") : "";
   const d = s.design || {};
   const n = d.nTreat != null ? d.nTreat + " vs " + d.nControl + " patients" : "";
+  const delay = d.delayMonths > 0 ? "effect from month " + d.delayMonths : "";
   return "From the trial simulator on " + s.at + ": " + (s.trialWin * 100).toFixed(1) + "% chance this " + (s.trialStage || "trial") + " reads out significant in the expected direction (" +
-    [s.endpointType === "timeToEvent" ? "time-to-event" : s.endpointType, prior, n, "α " + s.alpha + " " + (s.sided === "one" ? "one-sided" : "two-sided"), (s.iterations || 0).toLocaleString() + " runs, ±" + ((s.mcSE || 0) * 100).toFixed(2) + "pp"].filter(Boolean).join("; ") +
+    [s.endpointType === "timeToEvent" ? "time-to-event" : s.endpointType, prior, s.priorSource ? "prior from " + s.priorSource : "", n, delay, "α " + s.alpha + " " + (s.sided === "one" ? "one-sided" : "two-sided"), (s.iterations || 0).toLocaleString() + " runs, ±" + ((s.mcSE || 0) * 100).toFixed(2) + "pp"].filter(Boolean).join("; ") +
     ") × " + (s.laterOdds * 100).toFixed(0) + "% benchmark odds of the steps after it = " + s.writtenPct + "% (it was " + s.beforePct + "%, " + (s.beforeSource === "typed" ? "your figure" : "the benchmark") + ")." +
     (s.looseFit ? " A Phase 2 result is a looser fit: drugs often advance to Phase 3 without hitting their Phase 2 primary." : "");
 }

@@ -268,7 +268,7 @@ function AssetProgramTool({ activeCase, onDecodeTrial, onWatchTrial }) {
 // actually reported. Deliberately rendered below the design cards, in that
 // order, because the whole point is to read the architecture first and the
 // outcome second. Engine in trialResults.js; this file only lays it out.
-function TrialResultsPanels({ results, study }) {
+function TrialResultsPanels({ results, study, onReopen }) {
   const h = React.createElement;
   const [openSecondary, setOpenSecondary] = React.useState(false);
   const [openPeriods, setOpenPeriods] = React.useState(false);
@@ -295,7 +295,31 @@ function TrialResultsPanels({ results, study }) {
     return s;
   };
 
-  const analysisLine = (a, groupsById) => {
+  // A posted hazard ratio can seed the trial simulator (October 2026). Only
+  // what the record holds: the ratio, its interval (as a normal prior's SD,
+  // from the log-scale standard error), and the compared arms' sizes in the
+  // order registered. The control arm's median is never seeded — the record
+  // does not say which arm is the drug — so the simulator asks for it.
+  const nct = study && study.protocolSection && study.protocolSection.identificationModule ? study.protocolSection.identificationModule.nctId : "";
+  const seedButton = (a, nByGroup) => {
+    const spec = typeof tsClassifyEffectParam === "function" ? tsClassifyEffectParam(a.paramType) : null;
+    const hr = Number(a.value);
+    if (!onReopen || !spec || spec.label !== "Hazard ratio" || !(hr > 0)) return null;
+    const lo = Number(a.lower), hi = Number(a.upper);
+    const z = { "90": 1.645, "95": 1.96, "99": 2.576 }[String(a.ciPct || "95")] || 1.96;
+    const sd = lo > 0 && hi > lo ? hr * (Math.log(hi) - Math.log(lo)) / (2 * z) : null;
+    const ns = (a.groupIds || []).map(g => nByGroup[g]).filter(v => v > 0);
+    const inputs = [{ id: "endpointType", value: "timeToEvent" }, { id: "priorType", value: sd ? "normal" : "point" }, { id: "priorMean", value: hr.toFixed(3) }];
+    if (sd) inputs.push({ id: "priorSd", value: sd.toFixed(3) });
+    if (ns.length === 2) { inputs.push({ id: "nTreat", value: String(ns[0]) }, { id: "nControl", value: String(ns[1]) }); }
+    inputs.push({ id: "medianControl", value: "" });
+    inputs.push({ id: "priorSource", value: nct + "'s posted primary result (hazard ratio " + hr + (sd ? ", " + (a.ciPct || "95") + "% CI " + a.lower + "–" + a.upper : "") + "), read " + localDateStamp() + (ns.length === 2 ? "; arm sizes " + ns.join(" and ") + " in registered order" : "") });
+    return h("button", { type: "button", "data-no-export": "", onClick: () => onReopen({ view: "simulation", simTab: "trialOutcome", inputs }),
+      title: "Opens Trial Outcome / PoS with this hazard ratio as the prior; you enter the control arm's median",
+      style: { marginTop: 6, padding: "4px 10px", borderRadius: 6, border: "1px solid var(--teal)", background: "transparent", color: "var(--teal)", fontFamily: "var(--mono)", fontSize: 10.5, cursor: "pointer" } }, "Use as a simulator starting point →");
+  };
+
+  const analysisLine = (a, groupsById, nByGroup) => {
     const bits = [];
     bits.push((a.paramType || "Estimate") + " " + (a.value != null ? a.value : "—"));
     if (a.lower != null && a.upper != null) bits.push("(" + (a.ciPct || "95") + "% CI " + a.lower + " – " + a.upper + ")");
@@ -321,7 +345,8 @@ function TrialResultsPanels({ results, study }) {
         "This interval spans " + a.nullValue + ", the value meaning no difference — the data are consistent with no effect."),
       a.crossesNull === false && h("div", { style: { fontSize: 10.5, fontFamily: "var(--sans)", color: "var(--ink-3)", marginTop: 4, lineHeight: 1.5 } },
         "The interval excludes " + a.nullValue + " (no difference). That is a statement about this endpoint only."),
-      a.comment && h("div", { style: { fontSize: 10, fontFamily: "var(--sans)", color: "var(--ink-3)", marginTop: 4, lineHeight: 1.5 } }, a.comment)
+      a.comment && h("div", { style: { fontSize: 10, fontFamily: "var(--sans)", color: "var(--ink-3)", marginTop: 4, lineHeight: 1.5 } }, a.comment),
+      seedButton(a, nByGroup || {})
     );
   };
 
@@ -362,7 +387,7 @@ function TrialResultsPanels({ results, study }) {
         : h("div", { style: { fontSize: 11.5, fontFamily: "var(--sans)", color: "var(--ink-3)", marginTop: 8 } }, "No measurements registered."),
 
       o.categoryRows && o.categoryRows.length > 12 && caveat("Showing the first 12 of " + o.categoryRows.length + " categories."),
-      (o.analyses || []).map((a, i) => h("div", { key: i }, analysisLine(a, groupsById))),
+      (o.analyses || []).map((a, i) => h("div", { key: i }, analysisLine(a, groupsById, Object.fromEntries((o.arms || []).filter(x => x.n > 0).map(x => [x.groupId, x.n]))))),
       o.posted && o.analyses.length === 0 && o.layout !== "stratified" && caveat("No between-group comparison was registered for this endpoint — the arms above are reported, the difference between them is not.")
     );
   };
@@ -522,7 +547,7 @@ function TrialResultsPanels({ results, study }) {
 // Everything shown is derived from registered CT.gov fields only — see
 // trialDecoder.js. Nothing here predicts success, and nothing is inferred
 // from the sponsor or the drug.
-function TrialDecoderTool({ activeCase, initialNctId, onConsumedInitialNctId }) {
+function TrialDecoderTool({ activeCase, initialNctId, onConsumedInitialNctId, onReopen }) {
   const h = React.createElement;
   const [nctInput, setNctInput] = React.useState("");
   const nctFromCase = useCasePrefill(activeCase, initialNctId ? "" : caseToolDefaults(activeCase).leadNct, nctInput, setNctInput);
@@ -656,7 +681,7 @@ function TrialDecoderTool({ activeCase, initialNctId, onConsumedInitialNctId }) 
               )))
       ]),
 
-      results && h(TrialResultsPanels, { results: results, study: raw }),
+      results && h(TrialResultsPanels, { results: results, study: raw, onReopen }),
 
       !results && decoded.hasResults && toolCard(h, [
         h("div", { style: { fontSize: 11.5, fontFamily: "var(--sans)", color: "var(--warn)", lineHeight: 1.6 } },
@@ -714,7 +739,7 @@ function h0(n) { return String(n); }
 // several relevant trials and forcing a one-trial-per-program data model
 // would be the wrong shape for that. First check on any NCT ID saves the
 // baseline with nothing to compare yet — that's expected, not an error.
-function TrialWatchTool({ activeCase, initialNctId, onConsumedInitialNctId }) {
+function TrialWatchTool({ activeCase, initialNctId, onConsumedInitialNctId, onReopen }) {
   const h = React.createElement;
   const [ctCondition, setCtCondition] = React.useState("non-small cell lung cancer");
   const [ctPhase, setCtPhase] = React.useState("PHASE2");
@@ -875,6 +900,23 @@ function TrialWatchTool({ activeCase, initialNctId, onConsumedInitialNctId }) {
                     h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-2)", marginBottom: 6 } },
                       "median " + sum.median.toFixed(2) + " \u00B7 range " + sum.min.toFixed(2) + " to " + sum.max.toFixed(2) +
                       " \u00B7 " + sum.intervalExcludesNull + " of " + sum.intervalReported + " with a CI excluding no-effect"),
+                    // Starting points for the trial simulator's prior: hazard
+                    // ratios only, offered, never filled on their own.
+                    scale === "ratio" && onReopen && (() => {
+                      const pre = analogPriorPresets(rows);
+                      if (!pre) return null;
+                      const cond = (effects.query && effects.query.condition) || ctCondition || "this search";
+                      const open = (value, what) => onReopen({ view: "simulation", simTab: "trialOutcome", inputs: [
+                        { id: "endpointType", value: "timeToEvent" }, { id: "priorType", value: "point" }, { id: "priorMean", value: value.toFixed(2) },
+                        { id: "priorSource", value: "the analog board for \u201c" + cond + "\u201d (" + localDateStamp() + "): " + what + " of " + pre.n + " posted hazard ratio" + (pre.n === 1 ? "" : "s") + " — a percentile of what parsed, not of every trial" }] });
+                      const b = (label, value, what, title) => h("button", { type: "button", title, onClick: () => open(value, what),
+                        style: { padding: "3px 9px", borderRadius: 6, border: "1px solid var(--rule)", background: "transparent", color: "var(--ink-2)", fontFamily: "var(--mono)", fontSize: 10, cursor: "pointer" } }, label);
+                      return h("div", { className: "analog-presets", style: { display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", marginBottom: 8, fontSize: 10.5, fontFamily: "var(--mono)", color: "var(--ink-3)" } },
+                        "Simulator prior from the " + pre.n + " hazard ratio" + (pre.n === 1 ? "" : "s") + ":",
+                        b("median " + pre.median.toFixed(2), pre.median, "the class median", "Open Trial Outcome / PoS with the class median as a fixed prior"),
+                        b("after Phase 2→3 discount " + pre.medianDiscounted.toFixed(2), pre.medianDiscounted, "the class median × " + pre.discountFactor + " (Phase 2→3 discount)", "The median moved toward no effect by the literature's average Phase 2→3 attenuation"),
+                        b("cautious " + pre.cautious.toFixed(2), pre.cautious, "the cautious quartile (75th-percentile hazard ratio, the less favourable end)", "The 75th-percentile hazard ratio: closer to 1, so a deliberately cautious read of the same board"));
+                    })(),
                     h("div", { style: { display: "flex", flexDirection: "column", gap: 3, maxHeight: 260, overflowY: "auto" } },
                       rows.map((r, i) => h("div", { key: i, style: { display: "flex", justifyContent: "space-between", gap: 8, fontSize: 10.5, fontFamily: "var(--mono)", color: "var(--ink-2)", padding: "4px 0", borderBottom: "1px solid var(--rule)" } },
                         h("span", { style: { flex: "1 1 auto", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } },

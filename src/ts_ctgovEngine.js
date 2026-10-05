@@ -132,7 +132,7 @@ function median(arr) {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { fetchHistoricalComps, parseHistoricalStudy, summarizeStudiesResponse, monthsBetween, median, TS_CTGOV_BASE, extractAnalogEffects, fetchAnalogEffects, tsClassifyEffectParam, positionInAnalogs };
+  module.exports = { fetchHistoricalComps, parseHistoricalStudy, summarizeStudiesResponse, monthsBetween, median, TS_CTGOV_BASE, extractAnalogEffects, fetchAnalogEffects, tsClassifyEffectParam, positionInAnalogs, analogPriorPresets };
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -292,6 +292,22 @@ function extractAnalogEffects(data, queryMeta) {
 //
 // Deliberately NOT a verdict. It reports rank and denominator and leaves the
 // judgement where it belongs.
+// Starting points for the trial simulator's prior from the posted hazard
+// ratios on this board (October 2026). Hazard ratios only: the simulator's
+// time-to-event prior is a hazard ratio, and an odds or risk ratio is not the
+// same quantity. Three fills: the class median; the median after the Phase
+// 2→3 discount (it moves an effect toward no effect); and the cautious
+// quartile — the 75th-percentile hazard ratio, i.e. the less favourable end,
+// nearer 1. Null when nothing parsed; never invented.
+function analogPriorPresets(rows, discountFactor) {
+  const hrs = (rows || []).filter(r => r && r.scale === "ratio" && r.paramLabel === "Hazard ratio" && isFinite(r.value) && r.value > 0).map(r => r.value).sort((a, b) => a - b);
+  if (!hrs.length) return null;
+  const f = discountFactor > 0 ? discountFactor : 1.09;
+  const med = median(hrs);
+  const q75 = hrs[Math.max(0, Math.ceil(0.75 * hrs.length) - 1)];
+  return { n: hrs.length, median: med, medianDiscounted: Math.min(med * f, 1.5), cautious: q75, discountFactor: f };
+}
+
 function positionInAnalogs(rows, value) {
   const vals = (rows || []).map(r => (r && typeof r.value === "number") ? r : null).filter(Boolean);
   if (!vals.length || typeof value !== "number" || !isFinite(value)) return null;

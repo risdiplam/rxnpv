@@ -59,14 +59,26 @@ function simulateTimeToEventReplicate(design, trueEffect) {
   const hazardRatio = Math.max(1e-6, trueEffect);
   const rateControl = Math.log(2) / design.medianControl;
   const rateTreat = rateControl * hazardRatio;
+  // Delayed separation (October 2026): for the first delayMonths after
+  // randomisation the treatment arm has the control hazard; after that,
+  // control × HR. The exponential is memoryless, so a treated patient still
+  // event-free at the delay draws the rest of their time at the new rate.
+  // 0 (or blank) is the proportional-hazards model from day one.
+  const delay = Math.max(0, Number(design.delayMonths) || 0);
+  const drawTreat = () => {
+    if (!(delay > 0)) return STATS.randExponential(rateTreat);
+    const t0 = STATS.randExponential(rateControl);
+    return t0 <= delay ? t0 : delay + STATS.randExponential(rateTreat);
+  };
 
   const subjects = [];
+  const eventClock = []; // calendar time of every event if follow-up went on (readout timing)
   const totalN = design.nControl + design.nTreat;
   for (let i = 0; i < totalN; i++) {
     const arm = i < design.nTreat ? 1 : 0; // 1 = treatment, 0 = control
     const entryTime = STATS.randUniform(0, design.accrualPeriod);
-    const rate = arm === 1 ? rateTreat : rateControl;
-    const survivalTime = STATS.randExponential(rate);
+    const survivalTime = arm === 1 ? drawTreat() : STATS.randExponential(rateControl);
+    if (design.targetEvents > 0) eventClock.push(entryTime + survivalTime);
     const studyEnd = design.accrualPeriod + design.followupPeriod;
     const observedTime = Math.min(survivalTime, Math.max(0, studyEnd - entryTime));
     const event = survivalTime <= (studyEnd - entryTime) ? 1 : 0;
@@ -81,7 +93,15 @@ function simulateTimeToEventReplicate(design, trueEffect) {
   const D = subjects.filter(s => s.event === 1).length;
   const O2 = D - O1, E2 = D - E1;
   const observedHR = (O1 > 0 && E1 > 0 && O2 > 0 && E2 > 0) ? (O1 / E1) / (O2 / E2) : NaN;
-  return { pValue, observedEffect: observedHR, totalEvents: D };
+  // Readout timing: months from the first patient in to the target'th event,
+  // had the trial kept following everyone (Infinity if there are fewer
+  // patients than the target).
+  let timeToTarget = null;
+  if (design.targetEvents > 0) {
+    eventClock.sort((a, b) => a - b);
+    timeToTarget = design.targetEvents <= eventClock.length ? eventClock[design.targetEvents - 1] : Infinity;
+  }
+  return { pValue, observedEffect: observedHR, totalEvents: D, timeToTarget };
 }
 
 const REPLICATORS = {
@@ -89,6 +109,20 @@ const REPLICATORS = {
   continuous: simulateContinuousReplicate,
   timeToEvent: simulateTimeToEventReplicate
 };
+
+// One quotable line under the assurance histogram (October 2026): the
+// median simulated effect, and for a hazard ratio how often a run came out
+// worse than 0.90 and than 1.00 — so two priors with the same hit rate but
+// different effects read differently. Pure; the caller writes the words.
+function summarizeObservedEffects(effects, endpointType) {
+  const xs = (effects || []).filter(v => isFinite(v)).sort((a, b) => a - b);
+  if (!xs.length) return null;
+  const median = xs.length % 2 ? xs[(xs.length - 1) / 2] : (xs[xs.length / 2 - 1] + xs[xs.length / 2]) / 2;
+  const share = f => xs.filter(f).length / xs.length;
+  return endpointType === 'timeToEvent'
+    ? { median, worseThan090: share(v => v > 0.9), worseThan100: share(v => v > 1), n: xs.length }
+    : { median, n: xs.length };
+}
 
 // ── The Monte Carlo loop itself ─────────────────────────────────────────────
 
@@ -109,9 +143,11 @@ function runAssuranceSimulation(config) {
   const towardBenefit = v => (endpointType === 'timeToEvent' ? 1 - v : v);
   let hits = 0, directionalHits = 0;
   const observedEffects = [];
+  const targetTimes = [];
   for (let i = 0; i < iterations; i++) {
     const trueEffect = samplePrior(prior);
-    const { pValue, observedEffect } = replicate(design, trueEffect);
+    const { pValue, observedEffect, timeToTarget } = replicate(design, trueEffect);
+    if (timeToTarget != null) targetTimes.push(timeToTarget);
     const isHit = alpha ? (pValue < alpha) : false;
     if (isHit) {
       hits++;
@@ -132,10 +168,23 @@ function runAssuranceSimulation(config) {
     conditional[q] = priorQuantile(prior, q);
   }
 
+  // When the target event count lands: median and 10th/90th percentiles of
+  // the months from first patient in, and the share of runs that do not get
+  // there inside the planned accrual + follow-up.
+  let readoutTiming = null;
+  if (targetTimes.length) {
+    const sorted = targetTimes.slice().sort((a, b) => a - b);
+    const q = p => sorted[Math.min(sorted.length - 1, Math.floor(p * sorted.length))];
+    const planEnd = design.accrualPeriod + design.followupPeriod;
+    readoutTiming = { targetEvents: design.targetEvents, median: q(0.5), p10: q(0.1), p90: q(0.9),
+      neverShare: sorted.filter(t => !(t <= planEnd)).length / sorted.length, planEnd };
+  }
+
   return {
     pos,
     posStdErr,
     posDirectional,
+    readoutTiming,
     iterations,
     conditionalEffectQuantiles: conditional,
     observedEffects // caller bins this into a histogram for display
@@ -146,6 +195,6 @@ if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     samplePrior, priorQuantile,
     simulateBinaryReplicate, simulateContinuousReplicate, simulateTimeToEventReplicate,
-    runAssuranceSimulation
+    runAssuranceSimulation, summarizeObservedEffects
   };
 }

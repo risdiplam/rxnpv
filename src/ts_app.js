@@ -361,12 +361,28 @@ function renderTrialOutcomeTab(content) {
     ]),
     note('Fixed value vs. Normal — which should I pick?', '"Fixed value" treats your prior mean as certain — every simulated replicate draws its true effect from that exact number, so the only randomness left is sampling noise from running a trial of that size. Use this when you want to isolate "given this effect size is real, what’s my chance of a significant readout purely from sample size" — a cleaner question, but one that ignores that you might just be wrong about the effect size itself. "Normal (mean + SD)" additionally draws a different true effect for each replicate from around your prior mean, so the result also reflects your own uncertainty about whether the effect is really there at all — usually the more honest choice for a drug that hasn’t read out yet, since "the drug works exactly this well" is rarely something you actually know for certain.'),
     el('div', { id: 'priorFields' }),
+    // Where the prior came from, when a tool filled it (the analog board, a
+    // posted result in the Trial Decoder). Cleared the moment the prior is
+    // typed over, so it never vouches for a number someone else chose.
+    el('input', { type: 'hidden', id: 'priorSource', value: '' }),
+    el('p', { id: 'priorSourceNote', class: 'subtle', style: 'display:none' }),
     el('button', { class: 'runbtn', onclick: runTrialOutcome }, 'Run simulation'),
     el('div', { id: 'trialOutcomeResults', class: 'results' }),
     note('Before setting your prior, check the placebo floor', 'For placebo-controlled indications (depression, chronic/neuropathic pain, IBS, migraine, dermatology are the best-documented) a meaningful share of the placebo arm’s own improvement is baked in regardless of drug effect — see Reference Sheet → Probability of Success → Placebo response benchmarks. A prior set without accounting for that floor overstates the achievable treatment effect (active minus placebo), not just the trial’s raw response rate.')
   ]);
   content.appendChild(form);
   document.getElementById('endpointType').addEventListener('change', renderEndpointFields);
+  const showPriorSource = () => {
+    const v = val('priorSource'), n = document.getElementById('priorSourceNote');
+    if (n) { n.style.display = v ? '' : 'none'; n.textContent = v ? 'Prior from ' + v + '.' : ''; }
+  };
+  const onPriorEdit = e => {
+    const id = e.target && e.target.id;
+    if (id === 'priorMean' || id === 'priorSd' || id === 'priorType' || id === 'endpointType') { const ps = document.getElementById('priorSource'); if (ps) ps.value = ''; }
+    showPriorSource();
+  };
+  form.addEventListener('input', onPriorEdit);
+  form.addEventListener('change', onPriorEdit);
   renderEndpointFields();
 }
 
@@ -405,10 +421,14 @@ function renderP2P3Fields() {
   container.className = 'fieldgrid';
   if (type === 'binary') {
     container.appendChild(field('Observed Phase 2 response rate (%)', numberInput('p2p3ObservedRate', 45, { step: '0.1', min: 0, max: 100 })));
-    container.appendChild(el('p', { class: 'subtle field-wide' }, 'A 2026 concordance analysis matching Phase 3 solid-tumor oncology trials (2014–2020) to their supporting Phase 1b/2 trials found early-phase objective response rates overstated the eventual Phase 3 rate by about one-fifth, on average.'));
+    // Editable, per run (October 2026): the literature average, shown rather
+    // than hidden in a constant; a run with a reason can use another.
+    container.appendChild(field('Discount factor (divide by)', numberInput('p2p3Factor', BINARY_SHRINKAGE_FACTOR, { step: '0.01', min: 1 })));
+    container.appendChild(el('p', { class: 'subtle field-wide' }, 'A 2026 concordance analysis matching Phase 3 solid-tumor oncology trials (2014–2020) to their supporting Phase 1b/2 trials found early-phase objective response rates overstated the eventual Phase 3 rate by about one-fifth, on average — the 1.20 above. It is an average across a sample of oncology trials, not a law: about half came in better than that. Change it for this run if you have a reason; it resets to 1.20 next time.'));
   } else {
     container.appendChild(field('Assumed hazard ratio (from Phase 2 / design assumption)', numberInput('p2p3ObservedHR', 0.66, { step: '0.01', min: 0.01 })));
-    container.appendChild(el('p', { class: 'subtle field-wide' }, 'A JNCI analysis of 111 Phase 3 oncology trials (2023) found the hazard ratio assumed at design time — typically informed by Phase 2 — averaged 0.66, while the ratio actually observed in the completed Phase 3 trial averaged 0.72: about 9% weaker, on average. Only 57% of trials came in weaker than expected, so this is a mean shift across the sample, not a universal one.'));
+    container.appendChild(field('Discount factor (multiply by)', numberInput('p2p3Factor', HR_SHRINKAGE_FACTOR, { step: '0.01', min: 1 })));
+    container.appendChild(el('p', { class: 'subtle field-wide' }, 'A JNCI analysis of 111 Phase 3 oncology trials (2023) found the hazard ratio assumed at design time — typically informed by Phase 2 — averaged 0.66, while the ratio actually observed in the completed Phase 3 trial averaged 0.72: about 9% weaker, on average — the 1.09 above. Only 57% of trials came in weaker than expected, so this is a mean shift across the sample, not a universal one. Change it for this run if you have a reason; it resets to 1.09 next time.'));
   }
 }
 
@@ -424,10 +444,12 @@ function runP2P3() {
       resultsDiv.appendChild(el('p', { class: 'error' }, 'Response rate must be between 0 and 100%.'));
       return;
     }
-    const r = shrinkBinaryResponseRate(observed);
+    const fac = numVal('p2p3Factor');
+    if (!(fac >= 1)) { resultsDiv.appendChild(el('p', { class: 'error' }, 'The discount factor must be 1 or more (1 = no discount).')); return; }
+    const r = shrinkBinaryResponseRate(observed, fac);
     resultsDiv.appendChild(el('div', { class: 'headline' }, [
       el('span', { class: 'bignum' }, r.projectedP3Pct.toFixed(1) + '%'),
-      el('span', { class: 'sublabel' }, `shrinkage-adjusted Phase 3 planning assumption (observed ${observed.toFixed(1)}% ÷ ${r.factor.toFixed(2)})`)
+      el('span', { class: 'sublabel' }, `shrinkage-adjusted Phase 3 planning assumption (observed ${observed.toFixed(1)}% ÷ ${r.factor.toFixed(2)}${r.factor !== BINARY_SHRINKAGE_FACTOR ? ', your factor; the literature average is ' + BINARY_SHRINKAGE_FACTOR.toFixed(2) : ''})`)
     ]));
     resultsDiv.appendChild(el('p', { class: 'subtle' }, `Your raw ${observed.toFixed(1)}% Phase 2 result, unadjusted, is the optimistic case — useful as an upper bound, not the planning default.`));
     const compareSvg = renderForestPlot([
@@ -441,10 +463,12 @@ function runP2P3() {
       resultsDiv.appendChild(el('p', { class: 'error' }, 'Hazard ratio must be a positive number.'));
       return;
     }
-    const r = shrinkHazardRatio(hr);
+    const fac = numVal('p2p3Factor');
+    if (!(fac >= 1)) { resultsDiv.appendChild(el('p', { class: 'error' }, 'The discount factor must be 1 or more (1 = no discount).')); return; }
+    const r = shrinkHazardRatio(hr, fac);
     resultsDiv.appendChild(el('div', { class: 'headline' }, [
       el('span', { class: 'bignum' }, r.projectedP3HR.toFixed(3)),
-      el('span', { class: 'sublabel' }, `shrinkage-adjusted Phase 3 planning assumption (${hr.toFixed(3)} × ${r.factor.toFixed(2)})`)
+      el('span', { class: 'sublabel' }, `shrinkage-adjusted Phase 3 planning assumption (${hr.toFixed(3)} × ${r.factor.toFixed(2)}${r.factor !== HR_SHRINKAGE_FACTOR ? ', your factor; the literature average is ' + HR_SHRINKAGE_FACTOR.toFixed(2) : ''})`)
     ]));
     if (r.crossesNull) {
       resultsDiv.appendChild(el('p', { class: 'error' }, `This shrinks past HR = 1.0 — on average, a Phase 2 result this close to the null doesn't survive Phase 3 as a statistically meaningful effect. Worth treating as a real caution, not just an unlucky roundoff.`));
@@ -1108,7 +1132,7 @@ function renderSsEndpointFields() {
       container.appendChild(field('Assumed common SD', numberInput('ssSd', 10)));
     } else {
       container.appendChild(field('Assumed hazard ratio', numberInput('ssHazardRatio', 0.7, { step: '0.01' })));
-      container.appendChild(el('p', { class: 'subtle field-wide' }, 'Solves for total events required (Schoenfeld), not enrolled patients — converting events to enrollment needs accrual/follow-up assumptions this calculator doesn’t ask for.'));
+      container.appendChild(el('p', { class: 'subtle field-wide' }, 'Solves for total events required (Schoenfeld), not enrolled patients — converting events to enrollment needs accrual/follow-up assumptions this calculator doesn’t ask for. It assumes the hazard ratio holds from day one (proportional hazards); for an effect that starts late, Trial Outcome / PoS has an “effect starts at month” field that shows what the delay costs.'));
     }
   } else {
     // Minimum Detectable Effect mode — N is the given, fixed quantity (already
@@ -1122,7 +1146,7 @@ function renderSsEndpointFields() {
       container.appendChild(field('N per arm (already fixed)', numberInput('mdeN', 85, { step: '1' })));
     } else {
       container.appendChild(field('Total events (already fixed)', numberInput('mdeEvents', 200, { step: '1' })));
-      container.appendChild(el('p', { class: 'subtle field-wide' }, 'Solves for the smallest hazard ratio your event count could actually detect — the same Schoenfeld approximation as the sample-size direction, just inverted.'));
+      container.appendChild(el('p', { class: 'subtle field-wide' }, 'Solves for the smallest hazard ratio your event count could actually detect — the same Schoenfeld approximation as the sample-size direction, just inverted, and the same assumption that the effect holds from day one.'));
     }
   }
 }
@@ -1516,7 +1540,11 @@ function renderEndpointFields() {
     container.appendChild(field('Control median survival (months)', numberInput('medianControl', 12)));
     container.appendChild(field('Accrual period (months)', numberInput('accrualPeriod', 18)));
     container.appendChild(field('Follow-up after last enrollment (months)', numberInput('followupPeriod', 12)));
-    container.appendChild(el('p', { class: 'subtle field-wide' }, 'Prior mean/SD below describe the assumed true hazard ratio (treatment vs. control).'));
+    // October 2026: when the effect starts, and when the event target lands.
+    container.appendChild(field('Effect starts at month (0 = from day one)', numberInput('delayMonths', 0, { step: '1', min: 0 })));
+    container.appendChild(field('Target event count (optional)', numberInput('targetEvents', '', { step: '1', min: 1, placeholder: 'e.g. 300' })));
+    container.appendChild(field('Trial start, for pinning a date (optional)', el('input', { type: 'text', id: 'trialStart', placeholder: 'YYYY-MM' })));
+    container.appendChild(el('p', { class: 'subtle field-wide' }, 'Prior mean/SD below describe the assumed true hazard ratio (treatment vs. control). An effect that starts late — the immuno-oncology pattern, and any therapy whose benefit builds after a biological lag (gene expression, disease modification) — makes the usual power figure, which assumes proportional hazards from day one, too hopeful; the delay field shows by how much.'));
   }
 
   const priorContainer = document.getElementById('priorFields');
@@ -1551,12 +1579,25 @@ function runTrialOutcome() {
   } else if (endpointType === 'continuous') {
     design = { nControl: numVal('nControl'), nTreat: numVal('nTreat'), controlMean: numVal('controlMean'), sd: numVal('sd') };
   } else {
-    design = { nControl: numVal('nControl'), nTreat: numVal('nTreat'), medianControl: numVal('medianControl'), accrualPeriod: numVal('accrualPeriod'), followupPeriod: numVal('followupPeriod') };
+    const delayMonths = numVal('delayMonths'), targetEvents = numVal('targetEvents');
+    design = { nControl: numVal('nControl'), nTreat: numVal('nTreat'), medianControl: numVal('medianControl'), accrualPeriod: numVal('accrualPeriod'), followupPeriod: numVal('followupPeriod'),
+      delayMonths: delayMonths > 0 ? delayMonths : 0, targetEvents: targetEvents >= 1 ? Math.round(targetEvents) : 0 };
+  }
+  const resultsDiv = document.getElementById('trialOutcomeResults');
+  if (!resultsDiv) return;  // tab changed before this ran — nothing to write into
+  // A design seeded from a posted result (Trial Decoder) carries the effect
+  // but not the control arm: say what is missing rather than simulate NaN.
+  if (endpointType === 'timeToEvent' && !(design.medianControl > 0)) {
+    resultsDiv.innerHTML = '';
+    resultsDiv.appendChild(el('p', { class: 'error' }, 'Enter the control arm\u2019s median (months) to run: it is in the results table or the paper. A registered result rarely carries it in a form that can be read automatically.'));
+    return;
   }
 
   const result = runAssuranceSimulation({ endpointType, design, prior, alpha, sided, iterations });
-  const resultsDiv = document.getElementById('trialOutcomeResults');
-  if (!resultsDiv) return;  // tab changed before this ran — nothing to write into
+  // With a delayed effect, the same design with the effect from day one — so
+  // the cost of the delay is a number, not only a caveat.
+  const pfdResult = endpointType === 'timeToEvent' && design.delayMonths > 0
+    ? runAssuranceSimulation({ endpointType, design: { ...design, delayMonths: 0, targetEvents: 0 }, prior, alpha, sided, iterations }) : null;
   resultsDiv.innerHTML = '';
   resultsDiv.appendChild(el('div', { class: 'headline' }, [
     el('span', { class: 'bignum' }, (result.pos * 100).toFixed(1) + '%'),
@@ -1564,6 +1605,10 @@ function runTrialOutcome() {
   ]));
   const asRead = explainNode(readAssurance(result.pos * 100, sided));
   if (asRead) resultsDiv.appendChild(asRead);
+  if (pfdResult) resultsDiv.appendChild(el('p', { class: 'delay-compare' }, [
+    el('b', {}, 'With the effect starting at month ' + design.delayMonths + ': ' + (result.pos * 100).toFixed(1) + '% significant. '),
+    'From day one on the same design (proportional hazards — what the usual power formula assumes): ' + (pfdResult.pos * 100).toFixed(1) + '%. The ' + Math.max(0, (pfdResult.pos - result.pos) * 100).toFixed(1) + '-point gap is what a late-separating effect costs this trial.']));
+  if (result.readoutTiming) renderReadoutTiming(resultsDiv, result.readoutTiming);
   // A binary prior is on the treated response rate, but each replicate's
   // observed effect is the difference (treatment − control), so the marker
   // sits at the difference the prior implies — at the prior mean itself it
@@ -1576,6 +1621,11 @@ function runTrialOutcome() {
     markerLabel: isBinary ? 'difference the prior implies' : endpointType === 'timeToEvent' ? 'prior mean hazard ratio' : 'prior mean'
   });
   appendChartWithExport(resultsDiv, chartHtml, 'trial-outcome-assurance');
+  // One quotable line under the chart.
+  const sum = summarizeObservedEffects(result.observedEffects, endpointType);
+  if (sum) resultsDiv.appendChild(el('p', { class: 'subtle effect-summary' }, endpointType === 'timeToEvent'
+    ? 'Median simulated hazard ratio ' + sum.median.toFixed(2) + ' · ' + Math.round(sum.worseThan090 * 100) + '% of runs worse than 0.90 · ' + Math.round(sum.worseThan100 * 100) + '% worse than 1.00 (no benefit) · ' + (result.pos * 100).toFixed(1) + '% significant' + (result.posDirectional != null && result.posDirectional < result.pos - 0.0005 ? ' (' + (result.posDirectional * 100).toFixed(1) + '% the right way)' : '') + '.'
+    : 'Median observed ' + (isBinary ? 'difference in response rate ' + (sum.median >= 0 ? '+' : '−') + Math.abs(sum.median * 100).toFixed(1) + ' points' : 'mean difference ' + (sum.median >= 0 ? '+' : '−') + Math.abs(sum.median).toFixed(2)) + ' (0 = no difference) · ' + (result.pos * 100).toFixed(1) + '% significant' + (result.posDirectional != null && result.posDirectional < result.pos - 0.0005 ? ' (' + (result.posDirectional * 100).toFixed(1) + '% the right way)' : '') + '.'));
 
   // Time-to-event only: the assumed survival curves the hazard ratio actually
   // implies. The single most standard visual in oncology trial reporting, and
@@ -1611,7 +1661,51 @@ function runTrialOutcome() {
         `At HR ${hr.toFixed(3)}, median survival goes from ${medianControl.toFixed(1)} months (control) to ${medianTreat.toFixed(1)} months (treatment) — a gain of ${(medianTreat - medianControl).toFixed(1)} months. Exponential (constant-hazard) survival, the same model the replicate simulation uses; real curves with a changing hazard over time will differ in shape while landing on the same overall hazard ratio.`));
     }
   }
-  renderUseAsCaseOdds(resultsDiv, result, { endpointType, design, prior, alpha, sided, iterations, pos: result.pos, posDirectional: result.posDirectional, posStdErr: result.posStdErr });
+  renderUseAsCaseOdds(resultsDiv, result, { endpointType, design, prior, alpha, sided, iterations, pos: result.pos, posDirectional: result.posDirectional, posStdErr: result.posStdErr, priorSource: val('priorSource') });
+}
+
+// When an event-driven trial reaches its target (October 2026): the months
+// from first patient in, as a range, and how often it never gets there on the
+// planned follow-up. With a trial start it can be pinned as a catalyst WINDOW
+// (the 10th–90th percentile, never a single day) on the open case.
+function renderReadoutTiming(resultsDiv, t) {
+  const mo = v => isFinite(v) ? v.toFixed(0) : '—';
+  const box = el('div', { class: 'readout-timing', style: 'margin:12px 0;padding:10px 12px;border-radius:8px;background:var(--surface-2)' });
+  resultsDiv.appendChild(box);
+  box.appendChild(el('div', {}, [el('b', {}, 'Target of ' + t.targetEvents.toLocaleString() + ' events: '),
+    'reached a median ' + mo(t.median) + ' months from the first patient in (10th–90th percentile ' + mo(t.p10) + '–' + mo(t.p90) + ' months).']));
+  if (t.neverShare > 0) box.appendChild(el('div', { style: t.neverShare >= 0.2 ? 'color:var(--warn);font-weight:600' : '' },
+    'In ' + Math.round(t.neverShare * 100) + '% of runs the trial does not reach it inside the planned ' + t.planEnd.toFixed(0) + ' months of accrual and follow-up' + (t.neverShare >= 0.2 ? ' — a reason to question a guided date that assumes it will.' : '.')));
+  const start = /^(\d{4})-(\d{2})$/.exec((val('trialStart') || '').trim());
+  const bridge = window.rxnpvSimBridge, theCase = bridge && bridge.activeCase;
+  if (!start) { box.appendChild(el('div', { class: 'subtle' }, 'Add the trial\u2019s start (YYYY-MM) above to turn this into dates and pin it as a catalyst window.')); return; }
+  if (!isFinite(t.p10) || !isFinite(t.p90)) return;
+  const at = m => { const d = new Date(+start[1], +start[2] - 1 + Math.floor(m), 1); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); };
+  const windowText = at(t.p10) + ' to ' + at(t.p90);
+  box.appendChild(el('div', {}, 'From a start in ' + start[0] + ': most likely between ' + at(t.p10) + ' and ' + at(t.p90) + ' (median ' + at(t.median) + ').'));
+  if (!theCase || !theCase.programs || !theCase.programs.length) return;
+  const row = el('div', { 'data-no-export': '', style: 'display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap' });
+  box.appendChild(row);
+  const pinBtn = el('button', { type: 'button', class: 'runbtn' }, 'Pin ' + windowText + ' as a catalyst window');
+  pinBtn.addEventListener('click', () => {
+    row.innerHTML = '';
+    const prog = theCase.programs[0];
+    row.appendChild(el('span', {}, 'Add a pinned Calibration Log entry for ' + (prog.drugName || prog.name || 'the program') + ' dated ' + windowText + '? It becomes the next catalyst if it comes before any other pin.'));
+    const yes = el('button', { type: 'button', class: 'runbtn' }, 'Confirm');
+    const no = el('button', { type: 'button', style: 'padding:6px 12px;border-radius:6px;border:1px solid var(--rule);background:transparent;color:var(--ink-2);cursor:pointer' }, 'Cancel');
+    yes.addEventListener('click', () => {
+      const live = window.rxnpvSimBridge, c = live && live.activeCase && live.activeCase.id === theCase.id ? live.activeCase : theCase;
+      const entry = { id: newId('cal'), catalystLabel: 'Event target reached: ' + t.targetEvents + ' events (simulated)', catalystDate: windowText, yourPoS: null, marketImpliedPoS: null, outcome: 'pending',
+        pin: { type: 'topline', source: 'Trial simulator: ' + t.targetEvents + ' events, trial start ' + start[0] + ', 10th–90th percentile', at: localDateStamp() },
+        notes: 'Median ' + at(t.median) + '. ' + (t.neverShare > 0 ? Math.round(t.neverShare * 100) + '% of runs did not reach the target on the planned follow-up.' : '') };
+      live.updateCase({ ...c, programs: c.programs.map((p, i) => i === 0 ? { ...p, calibrationLog: [...(p.calibrationLog || []), entry] } : p), updatedAt: Date.now() });
+      row.innerHTML = '';
+      row.appendChild(el('span', { style: 'color:var(--teal);font-weight:700' }, 'Pinned ' + windowText + ' on the case\u2019s Calibration Log.'));
+    });
+    no.addEventListener('click', () => { row.innerHTML = ''; row.appendChild(pinBtn); });
+    row.appendChild(yes); row.appendChild(no);
+  });
+  row.appendChild(pinBtn);
 }
 
 // "Use as this case's odds" (October 2026). The run above is ONE trial; the

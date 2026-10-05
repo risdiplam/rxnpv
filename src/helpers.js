@@ -1462,6 +1462,7 @@ function CompetitorScanBox({ indication, drugName, currentNumDrugs, onApplyNumDr
 // everything else ("sometime next year") as undated rather than guessing.
 //   2027-11-14 (a day) · 2027-11 (a month) · 2027-Q2 / Q2 2027 (a quarter)
 //   H1 2027 / 2027-H1 / 1H 2027 (a half) · 2027 (a year)
+//   2027-03 to 2027-09 (a range of months)
 // Until October 2026 halves and years were dropped on purpose, which made
 // the commonest way companies guide a readout invisible to every check.
 // Returns { start, end, precision, raw } or null; start and end are local
@@ -1470,7 +1471,15 @@ function parseCatalystWindow(raw) {
   if (!raw || typeof raw !== "string") return null;
   const s = raw.trim();
   const win = (start, end, precision) => ({ start, end, precision, raw: s });
-  let m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  // A month range, "2027-03 to 2027-09" — what the trial simulator pins as a
+  // readout window (its 10th–90th percentile), and how "mid-2027" guidance
+  // can be written without inventing a day.
+  let m = s.match(/^(\d{4})-(\d{2})\s*(?:to|–|—|\.\.)\s*(\d{4})-(\d{2})$/i);
+  if (m) {
+    const a = new Date(+m[1], +m[2] - 1, 1), b = new Date(+m[3], +m[4], 0);
+    return +m[2] >= 1 && +m[2] <= 12 && +m[4] >= 1 && +m[4] <= 12 && a <= b ? win(a, b, "range") : null;
+  }
+  m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (m) { const d = new Date(+m[1], +m[2] - 1, +m[3]); return +m[2] >= 1 && +m[2] <= 12 ? win(d, d, "day") : null; }
   m = s.match(/^(\d{4})-(\d{2})$/);
   if (m) return +m[2] >= 1 && +m[2] <= 12 ? win(new Date(+m[1], +m[2] - 1, 1), new Date(+m[1], +m[2], 0), "month") : null;

@@ -750,6 +750,38 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
     ok(pg().futureRaise.enabled === true && Math.abs(Number(pg().futureRaise.amountM) - 19e6) < 1e6 && pg().futureRaise.priceMode === "discount" && pg().futureRaise.discountPct === "15", "Model this raise: Confirm writes the raise into the case (" + pg().futureRaise.amountM + ")");
   }
 
+  // Simulator: delayed separation, readout timing pinned as a window, the
+  // summary line, and the Translator's editable discount (PepGen is open).
+  {
+    click(btn("Simulation")); await wait(700);
+    click(btn("Trial Outcome / PoS")); await wait(400);
+    const sel = d.getElementById("endpointType"); sel.value = "timeToEvent"; sel.dispatchEvent(new w.Event("change", { bubbles: true })); await wait(300);
+    const setNum = (id, v) => { const e = d.getElementById(id); if (e) e.value = v; };
+    setNum("nControl", "150"); setNum("nTreat", "150"); setNum("medianControl", "12"); setNum("accrualPeriod", "12"); setNum("followupPeriod", "12");
+    setNum("delayMonths", "6"); setNum("targetEvents", "200"); setNum("iterations", "1000");
+    const ts = d.getElementById("trialStart"); if (ts) ts.value = "2026-01";
+    const pt = d.getElementById("priorType"); if (pt) { pt.value = "point"; pt.dispatchEvent(new w.Event("change", { bubbles: true })); }
+    setNum("priorMean", "0.7");
+    click(btn("Run simulation")); await wait(1200);
+    const res = d.getElementById("trialOutcomeResults");
+    ok(/With the effect starting at month 6: [\d.]+% significant\. From day one on the same design \(proportional hazards/.test(res.textContent), "Simulator: a delayed effect shows its cost against proportional hazards");
+    ok(/Median simulated hazard ratio 0\.\d\d · \d+% of runs worse than 0\.90 · \d+% worse than 1\.00/.test(res.textContent), "Simulator: the one-line summary under the chart");
+    const rt = res.querySelector(".readout-timing");
+    ok(!!rt && /Target of 200 events: reached a median \d+ months from the first patient in \(10th–90th percentile \d+–\d+ months\)/.test(rt.textContent) && /From a start in 2026-01: most likely between \d{4}-\d\d and \d{4}-\d\d/.test(rt.textContent), "Simulator: readout timing as months and dates (" + (rt && rt.textContent.slice(0, 200)) + ")");
+    const before = JSON.parse(w.localStorage.getItem("rxnpv_cases_v1")).filter(c => /^PepGen/.test(c.name)).pop().programs[0].calibrationLog.length;
+    click([...rt.querySelectorAll("button")].find(b => /as a catalyst window$/.test(b.textContent))); await wait(200);
+    click([...rt.querySelectorAll("button")].find(b => b.textContent === "Confirm")); await wait(400);
+    const log = JSON.parse(w.localStorage.getItem("rxnpv_cases_v1")).filter(c => /^PepGen/.test(c.name)).pop().programs[0].calibrationLog;
+    const added = log[log.length - 1];
+    ok(log.length === before + 1 && /^\d{4}-\d\d to \d{4}-\d\d$/.test(added.catalystDate) && added.pin && /Trial simulator: 200 events, trial start 2026-01/.test(added.pin.source), "Simulator: the window is pinned on the case as a month range (" + added.catalystDate + ")");
+    // The Translator's discount factor, per run.
+    click(btn("Phase 2→3 Translator")); await wait(400);
+    setNum("p2p3ObservedRate", "45"); setNum("p2p3Factor", "1.5");
+    click(btn("Translate to Phase 3")); await wait(300);
+    ok(/30\.0%/.test(d.getElementById("p2p3Results").textContent) && /your factor; the literature average is 1\.20/.test(d.getElementById("p2p3Results").textContent), "Translator: a typed 1.5 gives 45% ÷ 1.5 = 30.0%, and says it is not the default");
+    click(btn("Workspace")); await wait(300);
+  }
+
   if (errors.length) { console.log(errors.slice(0, 40).join("\n")); console.log("\n" + errors.length + " FAILURE(S) across " + checks + " checks"); process.exit(1); }
   console.log("ALL AUDIT REGRESSION CHECKS PASSED — " + checks + " checks");
   process.exit(0);

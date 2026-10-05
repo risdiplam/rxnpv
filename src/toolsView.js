@@ -61,7 +61,7 @@ function workbenchForTool(toolId) {
   return TOOL_WORKBENCHES.find(w => w.tools.some(t => t[0] === toolId)) || TOOL_WORKBENCHES[0];
 }
 
-function ToolsView({ cases, updateCase, activeCase, navRequest, onSelectCase, onOpenWorkspace }) {
+function ToolsView({ cases, updateCase, activeCase, navRequest, onSelectCase, onOpenWorkspace, onReopen }) {
   const h = React.createElement;
   const [tab, setTab] = React.useState("decoder");
   // Set by Company Lookup's "Watch this trial" link and consumed once by
@@ -132,13 +132,13 @@ function ToolsView({ cases, updateCase, activeCase, navRequest, onSelectCase, on
     tab === "peaksales" ? h(PeakSalesCompsTool, { cases, updateCase, activeCase }) :
     tab === "licensing" ? h(LicensingCompsTool, { cases, updateCase, activeCase }) :
     tab === "calendar" ? h(CatalystCalendarTool, { cases, updateCase, activeCase }) :
-    tab === "decoder" ? h(TrialDecoderTool, { activeCase, initialNctId: pendingNctId, onConsumedInitialNctId: () => setPendingNctId(null) }) :
+    tab === "decoder" ? h(TrialDecoderTool, { activeCase, initialNctId: pendingNctId, onConsumedInitialNctId: () => setPendingNctId(null), onReopen }) :
     tab === "compare" ? h(TrialCompareTool, { activeCase }) :
     tab === "target" ? h(TargetDossierTool, { activeCase }) :
     tab === "literature" ? h(LiteratureTool, { activeCase }) :
     tab === "asset" ? h(AssetProgramTool, { activeCase, onDecodeTrial: goToTrialDecoder, onWatchTrial: goToTrialWatch }) :
     tab === "commercial" ? h(CommercialTool, { cases, updateCase, activeCase }) :
-    tab === "trialwatch" ? h(TrialWatchTool, { activeCase, initialNctId: pendingNctId, onConsumedInitialNctId: () => setPendingNctId(null) }) :
+    tab === "trialwatch" ? h(TrialWatchTool, { activeCase, initialNctId: pendingNctId, onConsumedInitialNctId: () => setPendingNctId(null), onReopen }) :
     tab === "fdaLookup" ? h(FdaLookupTool, { activeCase }) :
     tab === "exclusivity" ? h(ExclusivityTool, { cases, updateCase, activeCase }) :
     h(SensitivityTool, { cases, updateCase, activeCase })
