@@ -687,7 +687,7 @@ function ReferenceSheet({ activeCase }) {
     h("div", { style: { fontFamily: "var(--display)", fontSize: 24, fontWeight: 700, color: "var(--ink-1)", marginBottom: 4 } }, "Reference Sheet"),
     h("div", { style: { fontFamily: "var(--mono)", fontSize: 12, color: "var(--ink-3)", marginBottom: 20 } }, "Every benchmark the engine uses (and a few it will use next), sourced. This is what stands in for napkin math."),
     h("div", { style: { display: "flex", gap: 6, marginBottom: 20, flexWrap: "wrap" } },
-      tabs.map(([id,lbl]) => h("button", { key: id, onClick: () => setTab(id),
+      tabs.map(([id,lbl]) => h("button", { key: id, onClick: () => setTab(id), "aria-current": tab === id ? "page" : undefined,
         style: { padding: "6px 14px", borderRadius: 7, border: "1px solid var(--rule)", cursor: "pointer", fontFamily: "var(--mono)", fontSize: 12,
           background: tab === id ? "var(--teal-bg)" : "transparent", color: tab === id ? "var(--teal)" : "var(--ink-2)", fontWeight: tab === id ? 700 : 400 }
       }, lbl))),

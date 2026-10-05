@@ -381,6 +381,9 @@
   input::placeholder, textarea::placeholder { color: var(--ink-3); opacity: 1; }
   button { cursor: pointer; font-family: inherit; transition: opacity 0.12s ease, background 0.12s ease, border-color 0.12s ease, transform 0.06s ease; }
   button:hover { opacity: 0.9; }
+  /* The selected tab is already marked: fading it on hover took its accent
+     text below 4.5:1 on the light theme (ui_audit, October 2026). */
+  button[aria-current]:hover { opacity: 1; }
   button:active { transform: translateY(0.5px); }
   ::-webkit-scrollbar { width: 10px; height: 10px; }
   ::-webkit-scrollbar-thumb { background: var(--rule); border-radius: 6px; }
