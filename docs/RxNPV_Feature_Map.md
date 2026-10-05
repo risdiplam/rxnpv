@@ -60,8 +60,8 @@ Grok's case: the assurance simulator's time-to-event model (exponential survival
 |---|---|---|
 | Distribution of the observed effect | **BUILT · bug fixed** | Already there (the assurance histogram); Grok said the loop "collapses to a hit rate", which is wrong. But for time-to-event its "observed HR" was O1/E1, biased toward 1 (~0.84 for a true 0.70), so the histogram sat right of its own marker. Now the log-rank estimate (O1/E1)/(O2/E2); 2026-10-04. |
 | Weibull / piecewise baseline hazard | **DECIDED — no** | Under proportional hazards, log-rank power depends on the number of events and the HR, not on the baseline curve's shape (Schoenfeld). A different shape changes only *when* events arrive, which a user can already vary through the control median and follow-up. It would not change the PoS the way the review claims. |
-| Delayed separation (non-proportional hazards) | **OPEN** | The one item that really can make the PoS optimistic: when curves separate late (typical of immuno-oncology), log-rank loses power and Schoenfeld overstates it. Worth building — one "effect starts at month X" field and a caveat on the Schoenfeld figure — the first time the user models an oncology or IO readout. Neither current case (Stoke, PepGen) has a time-to-event primary. |
-| Calendar time to the target event count | **OPEN** | When an event-driven trial reads out is itself a catalyst date. Cheap to add to the simulator; build it alongside delayed separation if an event-driven case comes up. |
+| Delayed separation (non-proportional hazards) | **DECIDED — build** (October product pass, Batch 4; the user: "if we are likely to come across these situations, we should just build now") | The one item that really can make the PoS optimistic: when curves separate late (typical of immuno-oncology), log-rank loses power and Schoenfeld overstates it. Worth building — one "effect starts at month X" field and a caveat on the Schoenfeld figure — the first time the user models an oncology or IO readout. Neither current case (Stoke, PepGen) has a time-to-event primary. |
+| Calendar time to the target event count | **DECIDED — build** (October product pass, Batch 4) | When an event-driven trial reads out is itself a catalyst date. Cheap to add to the simulator; build it alongside delayed separation if an event-driven case comes up. |
 | Dropout as its own clock | **DECIDED — no** | Random dropout only reduces events, which the dropout stress panel already covers. Dropout that differs between arms is a bias question, not a power one; the Trial Decoder's results reader looks at it once results exist. |
 | Group sequential / alpha spending, MaxCombo, RMST, weighted log-rank, correlated PFS/OS, cure models, stratification, digitised Kaplan–Meier control arms | **DECIDED — no** | Trial-design-team tools. Group sequential was already declined (section 8). Fails the scope line. |
 
@@ -154,6 +154,12 @@ Each of these has been considered and declined on the merits. Recording them her
 - **Code signing / notarisation** — $99/yr buys nothing for local use
 - **Real bundler** — legitimate future improvement, but a deliberate isolated architecture change, never bundled into feature work
 - **Channel/inventory stocking analysis** — not reliably observable from public data
+- **Position sizing of any kind** (October 2026 product pass: Grok's edge-scaled size, Spark's loss-to-floor size, a "loss if it fails" calculator) — the user: "its on the side of investment advice and theres no clear criterion." Grok's formula had no basis (not Kelly, and the odds gap is not an edge — fair value against price already is), and the failure floor already says what is left on a miss.
+- **A second dilution path after a failure** (Grok D1) — a raise priced near the post-failure value adds cash and shares in proportion and barely moves the per-share floor; the wind-down case already exists (Corporate G&A wind-down years); and the floor is deliberately hand-checkable arithmetic.
+- **A pipeline-disagreement table** (Grok T6) — an Evidence Log entry already holds "the company says X, the registry says Y" with its source and date.
+- **A backup reminder banner** (Grok B1) — the sidebar's permanent backup status line is the surface; a dismissible banner on top trains dismissing both.
+- **An "accelerated approval" or "confirmatory trial outstanding" flag inferred from label text** (Grok F1) — a regulatory-history fact, not a label fact; keyword matching gives confident wrong answers. Label text may be quoted, labelled as a quotation.
+- **A separate reverse-solve screen** (Grok V3) — the existing solvers already answer it; the decision memo shows implied odds and the implied revenue variable together.
 
 ---
 
@@ -174,3 +180,33 @@ Each of these has been considered and declined on the merits. Recording them her
 4. ~~**Commercial workbench** — launch trajectory, actual vs modelled~~ — **done**, Phase 24
 5. ~~**Tab consolidation**~~ — **done**, Phase 25. Six workbenches (Trial / Science / Company / Commercial / Valuation / Benchmarks), 18 tools.
 6. ~~**Electron upgrade**~~ — **done** 2026-09-22: Electron 33.4.11 → **44.4.4** (Phase 27). Every item on this list is now done.
+
+---
+
+## 11. October 2026 product pass (Grok + Spark review, decided with the user)
+
+An external pass by Grok, audited by Spark, reviewed against the code on 2026-10-04 and decided with the user. Built in batches, each verified in the packaged app before the next; the two sample cases are filled with each new field as it lands so every feature is exercised on a real case. New fields start blank and change nothing, so existing cases value as before. Status lines below move to **BUILT** only when an item meets its done test.
+
+**Where new information goes.** The user: new lines that show something the app does not already show are not clutter "if it can be implemented cleanly"; the Overview and the one-page decision memo carry the information, and the interactive screens (Assumptions, Scenarios, Tools) gain controls only where one is needed, folded away by default.
+
+| Batch | Item | Status |
+|---|---|---|
+| 1 | One window-aware catalyst date parser (`2027-11-14`, `2027-11`, `2027-Q2`, `H1 2027`, `2027`) for Runway vs Catalyst, overdue prompts and the failure floor; a window is overdue only at its end and the floor burns to its end (Grok C1) | DECIDED — build |
+| 1 | Pinned catalysts as a flag on a Calibration Log entry (type, window, source, date pinned), read first everywhere; registry completion stays, labelled completion (Grok C2, as Spark amended: one object, not two) | DECIDED — build |
+| 1 | A one-line freshness strip on the Overview: price with its entered date (new), cash with its date plus a real EDGAR check for a newer 10-Q/10-K (stronger than Spark's 100-day rule), the pinned catalyst and where the odds came from (Spark SP-1) | DECIDED — build |
+| 2 | Simulator → case odds: overall odds = the chance of a significant result *in the right direction* × the benchmark odds of every remaining step after that trial, into the existing override, with before/after shown and the run's provenance kept; a Phase 2 caveat (advancing ≠ hitting the primary) (Grok V1; Spark's stage-not-launch correction, built without a per-stage field the app does not have) | DECIDED — build |
+| 2 | Both failure floors on the Overview, the active one marked, a $0 floor saying why (Grok V4) | DECIDED — build |
+| 2 | The odds gap in percentage points beside "your odds / price implies", inputs held fixed listed on demand (Grok V2) | DECIDED — build |
+| 3 | Undrawn ATM, undrawn debt, expected milestone cash and remaining shelf (one as-of/source note), runway with and without them, the cash tag shown, a warning when the same ATM is entered twice (Grok C3/C4) | DECIDED — build |
+| 3 | "Dollars needed" on Runway vs Catalyst (to the pin plus the cushion, against the shelf) with "Model this raise" pre-filling the existing raise fields (Spark SP-2, reduced: the dilution path already models the raise itself) | DECIDED — build |
+| 4 | Delayed separation and readout timing as one simulator change (see the survival table, section 2) | DECIDED — build |
+| 4 | A one-line summary under the assurance histogram (Grok S3, as downgraded) | DECIDED — build |
+| 4 | Editable Phase 2→3 discount, per run (Grok S4) | DECIDED — build |
+| 4 | Analog-board prior presets: median, median after the discount, a cautious quartile (Grok S5 + Spark) | DECIDED — build |
+| 4 | Trial Decoder → simulator: a posted effect seeds the design, the control arm stays the user's (Grok T1, as amended) | DECIDED — build |
+| 5 | One-page decision memo (report preset) including "What would change my mind" (Grok R1 + Spark) | DECIDED — build |
+| 5 | Options-implied move against the model's win/miss values, typed in (no feed) — Claude's addition | DECIDED — build |
+| 5 | Cross-case catalyst list in Portfolio from pins, each with its funding state, competitor completions that read first (Grok P1/T3 + Spark SP-4) | DECIDED — build |
+| 5 | Close-out prompt for a passed pin, and snapshots kept dated rather than replaced (Spark SP-5; Claude's snapshot history, which SP-5's before/after needs) | DECIDED — build — a narrow reversal of "versioned snapshots": model snapshots only, as dated Evidence Log entries |
+| 6 | Insider clusters by distinct insiders (D3); FDA limitations of use quoted (F1, cut down); biologic 12-year floor from first licensure (M1); analog launch shape into a Full build (M3); basis suggested by channel (M4); denominator in the analog headline (T2); condition merge on Asset Program (T4); drug status on the Target Dossier (T5); the IRA clock, opt-in, blank factor, effective ~9 / ~13 years, with the 2025 orphan exclusion noted (M2 — Spark's +11/+15 years double-counted the two-year lag) | DECIDED — build |
+
