@@ -478,7 +478,7 @@ function ReportView({ theCase, onBack, updateCase }) {
           return h("div", { style: cardStyle },
             h("div", { style: { fontSize: 13, fontWeight: 700, marginBottom: 10, color: rpt.ink2 } }, "Forward-Looking Cash Runway"),
             h("div", { style: { fontSize: 11, marginBottom: 10, color: rpt.ink2 } },
-              "Starting cash " + fmtMoney(fr.startingCash) + " — modeled runway " + (fr.runwayMonths != null ? fr.runwayMonths.toFixed(0) + " months" : "25yr+")),
+              "Starting cash " + fmtMoney(fr.startingCash) + (fr.cashAsOf ? " (" + fr.cashAsOf + ")" : "") + " — modeled runway " + (fr.runwayMonths != null ? fr.runwayMonths.toFixed(0) + " months from today" : "25yr+")),
             h(RevenueChart, { series: [{ name: "Projected cash balance", color: rpt.teal, points: fr.path.map(p => ({ v: p.balanceEnd, label: p.year })) }], height: 160, label: "Projected cash balance by year" })
           );
         })(),

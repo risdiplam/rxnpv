@@ -390,14 +390,17 @@ function LaunchShapeRows({ rows, activeCase, updateCase }) {
   const prog = activeCase && activeCase.programs && activeCase.programs.length === 1 ? activeCase.programs[0] : null;
   const full = prog && (prog.revenueMode || "quick") === "full";
   const rb = prog ? getRevenueBuild(prog) : null;
+  // The launch curves run 3 to 10 years to peak; the confirmation names the
+  // figure that will actually be written.
+  const ytp = m => Math.min(10, Math.max(3, m.yearsToPeak));
   return h("div", { className: "launch-shapes", style: { margin: "6px 0 10px", fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-2)", lineHeight: 1.6 } },
     shapes.map(({ r, m }, i) => h("div", { key: i, style: { marginBottom: 4 } },
       h("b", null, r.brand + ": "),
       m.ok ? "closest launch shape is the " + m.profileLabel + " curve, " + m.yearsToPeak + " year" + (m.yearsToPeak === 1 ? "" : "s") + " to peak" + (m.stillRising ? " — still rising in its last full year, so that is a lower bound" : "") + " (" + m.fullYears + " full years of Medicare spending)." : "no shape to copy — " + m.reason + ".",
       m.ok && prog && updateCase && (full
         ? (confirm === i
-            ? h("span", { "data-no-export": "" }, " Set " + (prog.drugName || prog.name) + "'s launch curve to " + m.profileLabel + ", " + m.yearsToPeak + " years (now " + (rb.launchCurve.profile || "median") + ", " + rb.launchCurve.yearsToPeak + ")? Timing moves the value. ",
-                h("button", { type: "button", className: "link-btn", onClick: () => { updateCase({ ...activeCase, programs: [{ ...prog, revenueBuild: { ...rb, launchCurve: { ...rb.launchCurve, yearsToPeak: String(Math.min(10, Math.max(3, m.yearsToPeak))), profile: m.profile, source: "shape of " + r.brand + ", CMS Medicare spending, " + localDateStamp() } } }], updatedAt: Date.now() }); setConfirm(null); } }, "Confirm"), " ",
+            ? h("span", { "data-no-export": "" }, " Set " + (prog.drugName || prog.name) + "'s launch curve to " + m.profileLabel + ", " + ytp(m) + " years" + (ytp(m) !== m.yearsToPeak ? " (the curves' " + (m.yearsToPeak < 3 ? "shortest" : "longest") + ")" : "") + " (now " + (rb.launchCurve.profile || "median") + ", " + rb.launchCurve.yearsToPeak + ")? Timing moves the value. ",
+                h("button", { type: "button", className: "link-btn", onClick: () => { updateCase({ ...activeCase, programs: [{ ...prog, revenueBuild: { ...rb, launchCurve: { ...rb.launchCurve, yearsToPeak: String(ytp(m)), profile: m.profile, source: "shape of " + r.brand + ", CMS Medicare spending, " + localDateStamp() } } }], updatedAt: Date.now() }); setConfirm(null); } }, "Confirm"), " ",
                 h("button", { type: "button", className: "link-btn", onClick: () => setConfirm(null) }, "Cancel"))
             : h("button", { type: "button", className: "link-btn", "data-no-export": "", style: { marginLeft: 6 }, onClick: () => setConfirm(i) }, "Use this shape for " + (prog.drugName || prog.name)))
         : h("span", { style: { color: "var(--ink-3)" } }, " (a Quick revenue build has no launch curve to receive it)")))),

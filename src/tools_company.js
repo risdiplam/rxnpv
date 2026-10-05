@@ -433,8 +433,11 @@ function CatalystCalendarTool({ cases, updateCase, activeCase }) {
     (() => {
       const pins = [];
       cases.filter(c => selectedIds.has(c.id)).forEach(c => (c.programs || []).forEach(p => (p.calibrationLog || []).forEach(e => {
-        if (!e.pin || (e.outcome && e.outcome !== "pending")) return;
-        pins.push({ c, p, e, w: parseCatalystWindow(e.catalystDate) });
+        if (!e.pin || (e.outcome && e.outcome !== "pending") || e.closeOut) return;
+        const w = parseCatalystWindow(e.catalystDate);
+        const today = new Date(); today.setHours(0, 0, 0, 0);
+        if (w && w.end < today) return;   // behind it: the Calibration banner asks for the result
+        pins.push({ c, p, e, w });
       })));
       if (!pins.length) return null;
       pins.sort((a, b) => (a.w ? a.w.start.getTime() : Infinity) - (b.w ? b.w.start.getTime() : Infinity));
@@ -612,7 +615,7 @@ function RunwayTool({ cases, updateCase, activeCase }) {
         frError && h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--red)", marginTop: 10 } }, "Calculation error: " + frError),
         fr && !frError && h("div", { style: { marginTop: 14 } },
           h("div", { style: { display: "flex", gap: 24, flexWrap: "wrap", marginBottom: 14 } },
-            h("div", null, h("div", { style: UI.caption }, "Starting cash"),
+            h("div", null, h("div", { style: UI.caption }, "Starting cash" + (fr.cashAsOf ? " (" + fr.cashAsOf + ")" : "")),
               h("div", { style: UI.stat }, fmtMoney(fr.startingCash))),
             h("div", null, h("div", { style: UI.caption }, "Modeled runway"),
               h("div", { style: { fontSize: 22, fontFamily: "var(--mono)", fontWeight: 800, color: fr.runwayMonths != null && fr.runwayMonths < 12 ? "var(--red)" : "var(--green)" } },
@@ -632,7 +635,8 @@ function RunwayTool({ cases, updateCase, activeCase }) {
               series: [{ name: "Projected cash balance", color: "var(--teal)", points: fr.path.map(p => ({ v: p.balanceEnd, label: p.year })) }],
               height: 160, showLegend: false
             })),
-          h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginTop: 4 } }, "Below the zero line is the cumulative cash the plan would need raised — the model never raises money on its own, so where the line crosses zero is when a raise becomes necessary."),
+          h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginTop: 4 } }, "Below the zero line is the cumulative cash the plan would need raised — the model never raises money on its own, so where the line crosses zero is when a raise becomes necessary." +
+            (fr.monthsSinceCash >= 0.5 ? " The balance is the " + fr.cashAsOf + " filing's, so the runway is counted from today: the " + fr.monthsSinceCash.toFixed(1) + " months since then are taken off." : "")),
           h(Explain, readForwardRunway(fr.runwayMonths, fr.path))
         )
       ]);
@@ -710,7 +714,9 @@ function RunwayVsCatalystTool({ cases, updateCase, activeCase }) {
           h("div", { style: { fontSize: 26, fontFamily: "var(--mono)", fontWeight: 800, color: (!res.beyondHorizon && res.runwayMonths < 12) ? "var(--red)" : "var(--green)" } },
             res.beyondHorizon ? "No end" : res.runwayMonths.toFixed(0) + " mo"),
           res.beyondHorizon && h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", maxWidth: 150, lineHeight: 1.4 } },
-            "modeled cash flow turns positive before cash runs out")),
+            "modeled cash flow turns positive before cash runs out"),
+          !res.beyondHorizon && res.monthsSinceCash >= 0.5 && h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", maxWidth: 150, lineHeight: 1.4 } },
+            "from today, on the " + res.cashAsOf + " cash")),
         h("div", null,
           h("div", { style: UI.caption }, "Dated catalysts"),
           h("div", { style: { fontSize: 26, fontFamily: "var(--mono)", fontWeight: 800, color: "var(--ink-1)" } }, String(res.rows.length))),
@@ -839,6 +845,8 @@ function RunwayVsCatalystTool({ cases, updateCase, activeCase }) {
 
       res.undatedCount > 0 && res.rows.length > 0 && h("div", { style: { marginTop: 12, fontFamily: "var(--mono)", fontSize: 10, color: "var(--ink-3)" } },
         res.undatedCount, " further prediction" + (res.undatedCount > 1 ? "s" : "") + " had no parseable date and " + (res.undatedCount > 1 ? "were" : "was") + " left out rather than guessed at."),
+      res.pastCount > 0 && h("div", { style: { marginTop: 8, fontFamily: "var(--mono)", fontSize: 10, color: "var(--ink-3)" } },
+        res.pastCount + " pending prediction" + (res.pastCount > 1 ? "s are" : " is") + " dated in the past and left out — score " + (res.pastCount > 1 ? "them" : "it") + " on the Calibration tab."),
 
       h("div", { style: { marginTop: 14 } },
         h(Note, { summary: "What this runway figure doesn't know about" },

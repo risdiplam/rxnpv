@@ -1176,6 +1176,19 @@ function computeForwardRunway(theCase, opts) {
   const capStruct = effectiveCapitalStructure(theCase);
   // extraCash: the facilities above, for the "with facilities" runway only.
   const startingCash = numOr(capStruct.cash, 0) + ((opts && opts.extraCash) || 0);
+  // The balance is the filing's, so the path starts on the cash date; a
+  // runway is read from today (October 2026 audit: it ran long by every month
+  // since the filing, while catalyst dates were counted from today). Rolling
+  // the cash forward already brings the balance to today, so nothing is taken
+  // off then. now: a local Date (Runway vs. Catalyst passes its own); else the
+  // case's valuation date, else today — the same day the roll-forward uses.
+  const cap0 = (theCase && theCase.capitalStructure) || {};
+  const cashAt = parseIsoDay(cap0.cashAsOf);
+  const nowD = opts && opts.now;
+  const at = nowD ? Date.UTC(nowD.getFullYear(), nowD.getMonth(), nowD.getDate())
+    : parseIsoDay(theCase.valuationDate) != null ? parseIsoDay(theCase.valuationDate) : Date.UTC(new Date().getFullYear(), new Date().getMonth(), new Date().getDate());
+  const rolled = !!cap0.carryCashForward && numOr(cap0.monthlyBurn, 0) > 0;
+  const monthsSinceCash = !rolled && cashAt != null && at > cashAt ? (at - cashAt) / (86400000 * 30.4375) : 0;
 
   let balance = startingCash;
   const path = [];
@@ -1191,8 +1204,11 @@ function computeForwardRunway(theCase, opts) {
     }
   }
   if (runwayYears == null && startingCash <= 0) runwayYears = 0;
+  const fromCash = runwayYears != null ? runwayYears * 12 : null;
+  const runwayMonths = fromCash != null ? Math.max(0, fromCash - monthsSinceCash) : null;
 
-  return { startingCash, path, runwayYears, runwayMonths: runwayYears != null ? runwayYears * 12 : null };
+  return { startingCash, path, cashAsOf: cashAt != null ? cap0.cashAsOf : null, monthsSinceCash, runwayMonthsFromCash: fromCash,
+    runwayYears: runwayMonths != null ? runwayMonths / 12 : null, runwayMonths };
 }
 
 // The modelled cash balance after `months`, read along the forward runway's
@@ -1221,10 +1237,11 @@ function computeFinancingBridge(theCase, opts) {
   const rv = computeRunwayVsCatalysts(theCase, { cushionMonths: cushion, now: o.now });
   if (!rv.ok || !rv.firstProblem) return null;
   let fr;
-  try { fr = computeForwardRunway(theCase); } catch (e) { return null; }
+  try { fr = computeForwardRunway(theCase, { now: o.now || new Date() }); } catch (e) { return null; }
   const target = rv.firstProblem;
   const months = Math.max(0, target.monthsAway) + cushion;
-  const needed = Math.max(0, -forwardBalanceAt(fr, months));
+  // The path starts on the cash date, so read it that many months further on.
+  const needed = Math.max(0, -forwardBalanceAt(fr, months + fr.monthsSinceCash));
   if (!(needed > 0)) return null;
   const fac = caseFacilities(theCase);
   const afterFacilities = Math.max(0, needed - fac.total);

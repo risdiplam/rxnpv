@@ -1355,25 +1355,40 @@ section("Simulator: delayed separation, readout timing, the editable discount, a
   const lc = Math.log(2) / 12;
   const S = (t) => t <= 6 ? Math.exp(-lc * t) : Math.exp(-lc * 6 - (lc / 2) * (t - 6));
   near("closed form: the treated median is 18 months", Math.log(2) - (6 * lc + (lc / 2) * 12), 0, 1e-12);
-  // A late effect costs power on a fixed design. (Kept ahead of the 6,000-
-  // patient replicates below: placed after them, the first two assurance runs
-  // in this harness returned the same hit rate, a state effect of this
-  // harness — where the stats module is globalThis — that a standalone load
-  // of the same files and the packaged app do not show. Noted, October 2026.)
+  // A late effect costs power on a fixed design. Every run here draws from a
+  // fixed seed (mulberry32 in place of Math.random, restored after), so the
+  // checks are exact rather than lucky: an omitted delay and a delay of 0 must
+  // give the IDENTICAL hit rate from the same seed. (Before October 2026 these
+  // ran on live randomness; twice in a long session the first run read as if
+  // delayed — never reproduced in 25 further runs. The seed removes chance
+  // from the question either way.)
+  const realRandom = Math.random;
+  const seeded = seed => { let a = seed >>> 0; return () => { a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; };
+  const runSeeded = (seed, design) => { Math.random = seeded(seed); try { return api.runAssuranceSimulation({ endpointType: "timeToEvent", design, prior: { type: "point", value: 0.65 }, alpha: 0.05, sided: "two", iterations: 3000 }); } finally { Math.random = realRandom; } };
   const d = { nControl: 150, nTreat: 150, medianControl: 12, accrualPeriod: 12, followupPeriod: 12 };
-  const now0 = api.runAssuranceSimulation({ endpointType: "timeToEvent", design: { ...d }, prior: { type: "point", value: 0.65 }, alpha: 0.05, sided: "two", iterations: 3000 });
-  const late = api.runAssuranceSimulation({ endpointType: "timeToEvent", design: { ...d, delayMonths: 9 }, prior: { type: "point", value: 0.65 }, alpha: 0.05, sided: "two", iterations: 3000 });
+  const now0 = runSeeded(1, { ...d });
+  const zero = runSeeded(1, { ...d, delayMonths: 0 });
+  const late = runSeeded(1, { ...d, delayMonths: 9 });
   ok("effect from month 9 lowers assurance (" + now0.pos.toFixed(3) + " → " + late.pos.toFixed(3) + ")", late.pos < now0.pos - 0.1);
-  const zero = api.runAssuranceSimulation({ endpointType: "timeToEvent", design: { ...d, delayMonths: 0 }, prior: { type: "point", value: 0.65 }, alpha: 0.05, sided: "two", iterations: 3000 });
-  near("a delay of 0 is the proportional-hazards model (same assurance within Monte Carlo error)", zero.pos, now0.pos, 0.04);
+  ok("a delay of 0 is the proportional-hazards model: the same hit rate as no delay field, from the same seed (" + zero.pos.toFixed(4) + ")", zero.pos === now0.pos);
+  // And unseeded, a 3,000-run hit rate sits within Monte Carlo error of the
+  // seeded one (two independent rates near 0.8: SE of the difference ≈
+  // √(2 × 0.8 × 0.2 / 3000) = 0.0103; 0.05 is ~5 SEs).
+  near("live randomness agrees with the seeded run within Monte Carlo error", api.runAssuranceSimulation({ endpointType: "timeToEvent", design: { ...d }, prior: { type: "point", value: 0.65 }, alpha: 0.05, sided: "two", iterations: 3000 }).pos, now0.pos, 0.05);
+  ok("Math.random is restored after the seeded runs", Math.random === realRandom);
 
   // Simulate many treated patients through the replicate's own sampler: no
   // censoring (long follow-up), one arm only (nControl 0 is not allowed, so a
   // huge treatment arm and read its events).
   const big = { nControl: 1, nTreat: 6000, medianControl: 12, accrualPeriod: 0.0001, followupPeriod: 1000, delayMonths: 6, targetEvents: 3001 };
-  const r = api.simulateTimeToEventReplicate(big, 0.5);
-  near("the 3001st event of 6001 patients (the median) lands near 18 months", r.timeToTarget, 18, 0.9);
-  const r0 = api.simulateTimeToEventReplicate({ ...big, delayMonths: 0 }, 0.5);
+  const replSeeded = (seed, design) => { Math.random = seeded(seed); try { return api.simulateTimeToEventReplicate(design, 0.5); } finally { Math.random = realRandom; } };
+  const r = replSeeded(7, big);
+  // Tolerance: the sample median of n = 6000 has SE ≈ 1 / (2 f(m) √n), with
+  // f(18) = λt × S(18) = (ln2/24) × 0.5 = 0.01444, so SE ≈ 1 / (2 × 0.01444 ×
+  // 77.46) = 0.447 months. 0.9 was two SEs and failed about one run in twenty
+  // (October 2026 audit); 1.8 is four SEs and still far from 12 or 24.
+  near("the 3001st event of 6001 patients (the median) lands near 18 months", r.timeToTarget, 18, 1.8);
+  const r0 = replSeeded(8, { ...big, delayMonths: 0 });
   near("... and near 24 with the effect from day one", r0.timeToTarget, 24, 1.2);
   ok("S(t) used above is a proper survival curve (S(0)=1, falls)", S(0) === 1 && S(30) < S(10));
 
@@ -1440,6 +1455,24 @@ section("Cash to reach the catalyst: facilities and the financing bridge");
   const fr = api.computeForwardRunway(thin);
   const frX = api.computeForwardRunway(thin, { extraCash: 100e6 });
   ok("extra cash lengthens the runway (" + fr.runwayMonths.toFixed(1) + " → " + frX.runwayMonths.toFixed(1) + " mo) and the yearly flows are the same", frX.runwayMonths > fr.runwayMonths && frX.path[0].flow === fr.path[0].flow);
+  // The runway is read from today, not from the filing (October 2026 audit).
+  // The fixture's cash is dated 2026-06-30; 92 days later (2026-09-30) is
+  // 92 / 30.4375 = 3.0226 months, which come off the path's own runway.
+  const dated = { ...thin, valuationDate: "2026-09-30", capitalStructure: { ...thin.capitalStructure, cashAsOf: "2026-06-30" } };
+  const frD = api.computeForwardRunway(dated);
+  near("the months since the filing: 92 days = 3.0226 months", frD.monthsSinceCash, 92 / 30.4375, 1e-9);
+  near("runway from today = the path's runway − the months since the filing", frD.runwayMonths, frD.runwayMonthsFromCash - 92 / 30.4375, 1e-9);
+  ok("the path itself is unchanged (it starts on the cash date)", frD.path[0].balanceEnd === fr.path[0].balanceEnd && frD.runwayMonthsFromCash === fr.runwayMonthsFromCash);
+  const rolledCase = { ...dated, capitalStructure: { ...dated.capitalStructure, carryCashForward: true, monthlyBurn: "5000000" } };
+  ok("rolling the cash forward already brings it to today: nothing more comes off", api.computeForwardRunway(rolledCase).monthsSinceCash === 0);
+  const late = { ...dated, valuationDate: "2030-01-01" };
+  ok("a runway that ended before today reads 0, never negative", api.computeForwardRunway(late).runwayMonths === 0);
+  ok("an explicit now overrides the valuation date", Math.abs(api.computeForwardRunway(dated, { now: new Date(2026, 7, 30) }).monthsSinceCash - 61 / 30.4375) < 1e-9);
+  ok("a cash date after today takes nothing off", api.computeForwardRunway({ ...dated, valuationDate: "2026-01-01" }).monthsSinceCash === 0);
+  const rvD = api.computeRunwayVsCatalysts(dated, { now: new Date(2026, 8, 30), cushionMonths: 6 });
+  near("Runway vs. Catalyst reads the same runway from the same day", rvD.runwayMonths, frD.runwayMonths, 1e-9);
+  ok("and says which filing it rests on", rvD.cashAsOf === "2026-06-30" && Math.abs(rvD.monthsSinceCash - 92 / 30.4375) < 1e-9);
+
   const now = new Date(y, 0, 15);
   const b = api.computeFinancingBridge(thin, { cushionMonths: 6, now, discountPct: 20 });
   // Independent: the balance after T months, read linearly along the yearly path.
@@ -1588,6 +1621,8 @@ section("Catalyst windows: one parser for runway, overdue and the floor");
   ok("2027-Q2 is 1 Apr to 30 Jun; Q2 2027 and 2027 Q2 the same", span("2027-Q2") === "2027-04-01..2027-06-30 quarter" && span("Q2 2027") === span("2027-Q2") && span("2027 Q2") === span("2027-Q2"));
   ok("2027-02 is the whole of February (28 days in 2027)", span("2027-02") === "2027-02-01..2027-02-28 month");
   ok("2027-11-14 is that one day", span("2027-11-14") === "2027-11-14..2027-11-14 day");
+  // A day that does not exist is refused, not rolled into the next month.
+  ok("2027-02-31, 2027-02-29 and 2027-04-31 are not dates; 2028-02-29 is (a leap year)", W("2027-02-31") === null && W("2027-02-29") === null && W("2027-04-31") === null && span("2028-02-29") === "2028-02-29..2028-02-29 day");
   ok("prose stays undated: 'sometime next year', 'after the FDA meeting', '2027-13'", W("sometime next year") === null && W("after the FDA meeting") === null && W("2027-13") === null);
   // The forms accepted before October 2026 give the same single date as
   // they always did (the last day), so no existing entry moves.
@@ -1596,6 +1631,19 @@ section("Catalyst windows: one parser for runway, overdue and the floor");
 
   // Overdue only once the window has ended. pendingCalibrationEntries reads
   // the real clock, so the windows are placed around today.
+  // Runway vs. Catalyst leaves out a window that has already ended (counted)
+  // and a closed-out entry (it happened). Case with a fixed 30-month runway.
+  {
+    const at = new Date(2026, 9, 5);
+    const c = { programs: [{ name: "P", calibrationLog: [
+      { catalystLabel: "Past", catalystDate: "2026-Q2", outcome: "pending" },
+      { catalystLabel: "Closed", catalystDate: "2027-Q1", outcome: "pending", closeOut: { at: "2026-10-01" } },
+      { catalystLabel: "Next", catalystDate: "2027-Q3", outcome: "pending" }] }] };
+    const rv = api.computeRunwayVsCatalysts(c, { now: at, runwayMonthsOverride: 30, cushionMonths: 6 });
+    ok("Runway vs. Catalyst: only the future, open catalyst is listed", rv.rows.length === 1 && rv.rows[0].label === "Next");
+    ok("... and the past one is counted, not lost", rv.pastCount === 1);
+  }
+
   const now = new Date(); const y = now.getFullYear();
   const caseWith = dates => ({ programs: [{ name: "P", calibrationLog: dates.map((d, i) => ({ id: "c" + i, catalystLabel: "C" + i, catalystDate: d, outcome: "pending" })) }] });
   const pend = api.pendingCalibrationEntries(caseWith([String(y), String(y - 1), "sometime next year"]));
@@ -5374,7 +5422,10 @@ section("Portfolio runway: unknown, runs out, or never runs out");
   const noCash = JSON.parse(JSON.stringify(pepgen)); noCash.capitalStructure.cash = "";
   const [st, pg, nc] = api.computePortfolioSummary([stoke, pepgen, noCash]);
   ok("Stoke: cash never runs out in the projection", st.runwayOutlasts === true && st.runwayYears == null);
-  ok("PepGen: runs out after ~1.5 years (1.72-year Phase 2 at $43.5M a year plus $26M G&A, then Phase 3)", pg.runwayOutlasts === false && Math.abs(pg.runwayYears - 1.664) < 0.01);
+  // 1.664 years from the June 30 filing (1.72-year Phase 2 at $43.5M a year
+  // plus $26M G&A, then Phase 3), less the 92 days to the case's valuation
+  // date (3.0226 months = 0.2519 years): 1.412 years from today.
+  ok("PepGen: runs out ~1.4 years from today (1.664 from the June 30 filing, less the 92 days since)", pg.runwayOutlasts === false && Math.abs(pg.runwayYears - (1.664 - 92 / 30.4375 / 12)) < 0.01);
   ok("no cash entered: unknown, not zero", nc.runwayYears == null && nc.runwayOutlasts === false);
 }
 report();

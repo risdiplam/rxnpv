@@ -1483,7 +1483,8 @@ function parseCatalystWindow(raw) {
     return +m[2] >= 1 && +m[2] <= 12 && +m[4] >= 1 && +m[4] <= 12 && a <= b ? win(a, b, "range") : null;
   }
   m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  if (m) { const d = new Date(+m[1], +m[2] - 1, +m[3]); return +m[2] >= 1 && +m[2] <= 12 ? win(d, d, "day") : null; }
+  // A day that does not exist ("2027-02-31") is refused, not rolled into March.
+  if (m) { const d = new Date(+m[1], +m[2] - 1, +m[3]); return d.getMonth() === +m[2] - 1 && d.getDate() === +m[3] ? win(d, d, "day") : null; }
   m = s.match(/^(\d{4})-(\d{2})$/);
   if (m) return +m[2] >= 1 && +m[2] <= 12 ? win(new Date(+m[1], +m[2] - 1, 1), new Date(+m[1], +m[2], 0), "month") : null;
   m = s.match(/^(\d{4})[-\s]?Q([1-4])$/i);
@@ -1698,26 +1699,34 @@ function monthsUntil(from, to) {
 function computeRunwayVsCatalysts(theCase, opts) {
   const o = opts || {};
   const now = o.now || new Date();
-  let runwayMonths = o.runwayMonthsOverride;
+  let runwayMonths = o.runwayMonthsOverride, cashAsOf = null, monthsSinceCash = 0;
   if (runwayMonths == null) {
     try {
       // withFacilities: the runway if the undrawn ATM, debt and expected
       // milestones the user entered come in (never the default).
-      const fr = computeForwardRunway(theCase, o.withFacilities ? { extraCash: caseFacilities(theCase).total } : undefined);
+      const fr = computeForwardRunway(theCase, { now, extraCash: o.withFacilities ? caseFacilities(theCase).total : 0 });
       // null from computeForwardRunway is ambiguous — it means "balance never
       // crossed zero in the 25-year window", which is either "no cash modelled
       // at all" or "turns cash-flow positive and never runs out". Starting cash
       // is what separates them.
       runwayMonths = fr.runwayMonths != null ? fr.runwayMonths
         : (fr.startingCash > 0 ? Infinity : null);
+      cashAsOf = fr.cashAsOf; monthsSinceCash = fr.monthsSinceCash;
     } catch (e) { runwayMonths = null; }
   }
   const catalysts = [];
+  const day = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  let pastCount = 0;
   (theCase && theCase.programs ? theCase.programs : []).forEach(p => {
     (p.calibrationLog || []).forEach(entry => {
       if (entry.outcome && entry.outcome !== "pending") return; // already read out
+      if (entry.closeOut) return;                                // closed out: it happened
       const w = parseCatalystWindow(entry.catalystDate);
       if (!w) return;                                            // undated stays out, never guessed
+      // A window that has already ended is behind the company, funded or not
+      // (October 2026 audit: it was listed as "funded", a negative number of
+      // months out). Counted, so the Calibration Log's overdue entries are named.
+      if (w.end < day) { pastCount++; return; }
       catalysts.push({
         programName: p.drugName || p.name || "Program",
         label: entry.catalystLabel || "Catalyst",
@@ -1733,7 +1742,7 @@ function computeRunwayVsCatalysts(theCase, opts) {
     n + (p.calibrationLog || []).filter(e => (!e.outcome || e.outcome === "pending") && !parseCatalystDate(e.catalystDate)).length, 0);
 
   const result = classifyCatalystFunding(runwayMonths, catalysts, o.cushionMonths);
-  return { ...result, undatedCount };
+  return { ...result, undatedCount, pastCount, cashAsOf, monthsSinceCash };
 }
 
 // ── Binary-event implied probability ───────────────────────────────────────

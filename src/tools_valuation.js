@@ -128,7 +128,7 @@ function BinaryEventTool({ cases, activeCase, updateCase }) {
 
   const res = computeBinaryEventImpliedPoS({ currentValue: current, successValue: success, failValue: fail, yourPoSPct: yourPoS });
   const showing = current !== "" && success !== "" && fail !== "";
-  const sym = unit === "perShare" ? "$" : "$";
+  const sym = "$";
   const suffix = unit === "marketCap" ? "M" : "";
   const fmt = v => sym + (Math.abs(v) >= 1000 ? v.toFixed(0) : v.toFixed(2)) + suffix;
 
@@ -202,7 +202,7 @@ function BinaryEventTool({ cases, activeCase, updateCase }) {
             h("span", null, "0% — fails ", fmt(res.fail)),
             h("span", null, "100% — works ", fmt(res.success))),
           res.yourPoSPct != null && h("div", { style: { fontFamily: "var(--mono)", fontSize: 10, color: "var(--amber)", marginTop: 3 } },
-            "amber line = your ", res.yourPoSPct, "% estimate")
+            "marker = your ", res.yourPoSPct, "% estimate")
         );
       })(),
 
@@ -228,7 +228,12 @@ function BinaryEventTool({ cases, activeCase, updateCase }) {
             "This treats the readout as the only thing that matters — exactly true for a single-asset company, progressively less true otherwise. A pipeline, a partner, or a cash-rich balance sheet all put a floor under failure and blur the binary. And the implied probability is only as good as the two values you anchored it with: it is arithmetic on your assumptions, not an independent read on the market.")))
     ])),
 
-    h(OptionsMoveCard, { activeCase, updateCase, price: current, success, fail, yourPoS, impliedPoS: showing && res.ok ? res.impliedPoS : null })
+    // The options card works in dollars a share: the tool's own figures only
+    // when they are per share (a market cap in $M against a straddle price
+    // read as a ±0.4% move — October 2026 audit), else the case's price.
+    h(OptionsMoveCard, perShare
+      ? { activeCase, updateCase, price: current, success, fail, yourPoS, impliedPoS: showing && res.ok ? res.impliedPoS : null }
+      : { activeCase, updateCase, price: "", success: "", fail: "", yourPoS, impliedPoS: null })
   );
 }
 

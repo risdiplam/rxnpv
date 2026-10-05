@@ -2,6 +2,7 @@
 // that none of them crashes a view or logs an error.
 //
 //   $E test/packaged/button_sweep.js --app=/Applications/RxNPV.app [--sample=pepgen|stoke] [--only=Tools] [--parallel=4] [--timeout=20] [--max-minutes=30]
+//   $E test/packaged/button_sweep.js --userdata=<profile dir> --case="<case name>"   (a copy of an existing profile)
 //
 // The export sweep already presses every export-menu button and the worked
 // examples test opens every tool with real inputs; this covers everything
@@ -74,7 +75,13 @@ if (!SHARD && PARALLEL > 1) {
 app.commandLine.appendSwitch("disable-renderer-backgrounding");
 app.commandLine.appendSwitch("disable-background-timer-throttling");
 app.commandLine.appendSwitch("disable-backgrounding-occluded-windows");
-app.setPath("userData", fs.mkdtempSync(path.join(os.tmpdir(), "rx-buttons-")));
+// --userdata=<dir> --case="<name>": sweep an existing profile's case (a copy
+// of the user's real data — cases saved before newer fields existed) instead
+// of a freshly loaded sample. Each copy of the app works on its own copy of
+// the profile, so the original is never written to.
+const PROFILE = fs.mkdtempSync(path.join(os.tmpdir(), "rx-buttons-"));
+if (args.userdata) fs.cpSync(path.resolve(String(args.userdata)), PROFILE, { recursive: true });
+app.setPath("userData", PROFILE);
 dialog.showSaveDialog = async () => ({ canceled: true });
 dialog.showOpenDialog = async () => ({ canceled: true, filePaths: [] });
 dialog.showMessageBox = async () => ({ response: 0 });
@@ -129,9 +136,11 @@ app.whenReady().then(async () => {
     const click = async (t, ms) => { const r = await js(`__b.click(${JSON.stringify(t)})`); await sleep(ms || 500); return r; };
 
     // A finished sample case, so every section has content.
-    await click("Load sample case", 300);
-    await click(args.sample === "stoke" ? "Stoke — Dravet, Phase 3" : "PepGen — DM1, Phase 2", 1500);
-    const caseName = args.sample === "stoke" ? "Stoke Therapeutics — sample case" : "PepGen — sample case";
+    if (!args.case) {
+      await click("Load sample case", 300);
+      await click(args.sample === "stoke" ? "Stoke — Dravet, Phase 3" : "PepGen — DM1, Phase 2", 1500);
+    }
+    const caseName = args.case ? String(args.case) : args.sample === "stoke" ? "Stoke Therapeutics — sample case" : "PepGen — sample case";
     const openCase = `(() => { const b = [...document.querySelectorAll("button, [role=button]")].find(x => x.textContent.includes(${JSON.stringify(caseName)})); if (b) b.click(); return !!b; })()`;
 
     const stops = [];

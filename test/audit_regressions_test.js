@@ -729,27 +729,32 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
     const card = [...d.querySelectorAll("[data-export-section]")].find(e => /does the cash reach/.test(e.textContent));
     ok(!!card && /With facilities/.test(card.textContent) && /\+ \$97\.0M undrawn ATM/.test(card.textContent), "Runway vs. Catalyst: the runway with facilities beside the modelled one");
     const fb = card && card.querySelector(".financing-bridge");
-    ok(!!fb && /About \$19\.0M to get past the end of "FREEDOM2 10 mg\/kg data" \(2026-11\) with the 6-month cushion/.test(fb.textContent) && /The \$97\.0M of undrawn ATM entered would cover it/.test(fb.textContent), "Runway vs. Catalyst: the financing bridge, covered by the ATM (" + (fb && fb.textContent.slice(0, 300)) + ")");
-    // Without the ATM, the $19M is a raise: shares, Base with and without.
+    // Read from the June 30 cash: 153 days to the end of November (5.03 months)
+    // plus the 6-month cushion is 11.03 months of the model's ~$59.7M-a-year
+    // burn: $20M − $54.9M = −$34.8M. Counted from the cash date, it does not
+    // drift with today's date (before the October 2026 audit it read $19.0M,
+    // counted from today with the June cash, and moved every day).
+    ok(!!fb && /About \$34\.8M to get past the end of "FREEDOM2 10 mg\/kg data" \(2026-11\) with the 6-month cushion/.test(fb.textContent) && /The \$97\.0M of undrawn ATM entered would cover it/.test(fb.textContent), "Runway vs. Catalyst: the financing bridge, covered by the ATM (" + (fb && fb.textContent.slice(0, 300)) + ")");
+    // Without the ATM, the $34.8M is a raise: shares, Base with and without.
     click(btn("Workspace")); await wait(300); click(d.getElementById("casetab-assumptions")); await wait(300);
     const atmIn = [...d.getElementById("casepanel-assumptions").querySelectorAll("input")].find(i => i.getAttribute("aria-label") === "Undrawn ATM ($M)");
     atmIn.focus(); setVal(atmIn, ""); await wait(300); atmIn.blur(); await wait(200);
     click(btn("Tools")); await wait(500); click(btn("Company")); await wait(400); click(btn("Runway vs. Catalyst")); await wait(700);
     const fb2 = [...d.querySelectorAll(".financing-bridge")].pop();
     ok(!!fb2 && /This case already models a raise of \$100\.0M, which would cover it/.test(fb2.textContent) && !/Model this raise/.test(fb2.textContent), "Runway vs. Catalyst: without the ATM, the case's own modelled $100M raise covers it (" + (fb2 && fb2.textContent.slice(0, 300)) + ")");
-    // Switch the modelled raise off: now the $19M is a raise to model.
+    // Switch the modelled raise off: now the $34.8M is a raise to model.
     click(btn("Workspace")); await wait(300); click(d.getElementById("casetab-assumptions")); await wait(300);
     const frBox = [...d.getElementById("casepanel-assumptions").querySelectorAll("label")].find(l => /Model a future capital raise/.test(l.textContent) && l.querySelector("input[type=checkbox]") && l.querySelector("input[type=checkbox]").checked);
     if (frBox) { click(frBox.querySelector("input[type=checkbox]")); await wait(300); }
     click(btn("Tools")); await wait(500); click(btn("Company")); await wait(400); click(btn("Runway vs. Catalyst")); await wait(700);
     const fb3 = [...d.querySelectorAll(".financing-bridge")].pop();
-    ok(!!frBox && !!fb3 && /Raised at 15% below today's price \(\$1\.99\), that is about 9\.[56]M new shares; Base fair value would be \$[\d.]+ with it, against \$[\d.]+ now — the shares would be sold above this case's own value per share/.test(fb3.textContent), "Runway vs. Catalyst: with no modelled raise, the $19M as shares and Base with it (" + (fb3 && fb3.textContent.slice(0, 360)) + ")");
+    ok(!!frBox && !!fb3 && /Raised at 15% below today's price \(\$1\.99\), that is about 17\.[45]M new shares; Base fair value would be \$[\d.]+ with it, against \$[\d.]+ now — the shares would be sold above this case's own value per share/.test(fb3.textContent), "Runway vs. Catalyst: with no modelled raise, the $34.8M as shares and Base with it (" + (fb3 && fb3.textContent.slice(0, 360)) + ")");
     const pg = () => JSON.parse(w.localStorage.getItem("rxnpv_cases_v1")).filter(c => /^PepGen/.test(c.name)).pop();
     const fbNow = () => [...d.querySelectorAll(".financing-bridge")].pop();
     click([...fbNow().querySelectorAll("button")].find(b => b.textContent === "Model this raise")); await wait(200);
-    ok(pg().futureRaise.enabled === false && /^Add \$19\.\dM at 15% below today's price\? This changes the valuation\./.test([...fbNow().querySelectorAll("span")].map(x => x.textContent).find(t => /^Add/.test(t)) || ""), "Model this raise: asks first, changes nothing yet");
+    ok(pg().futureRaise.enabled === false && /^Add \$34\.\dM at 15% below today's price\? This changes the valuation\./.test([...fbNow().querySelectorAll("span")].map(x => x.textContent).find(t => /^Add/.test(t)) || ""), "Model this raise: asks first, changes nothing yet");
     click([...fbNow().querySelectorAll("button")].find(b => b.textContent === "Confirm")); await wait(400);
-    ok(pg().futureRaise.enabled === true && Math.abs(Number(pg().futureRaise.amountM) - 19e6) < 1e6 && pg().futureRaise.priceMode === "discount" && pg().futureRaise.discountPct === "15", "Model this raise: Confirm writes the raise into the case (" + pg().futureRaise.amountM + ")");
+    ok(pg().futureRaise.enabled === true && Math.abs(Number(pg().futureRaise.amountM) - 34.8e6) < 1e6 && pg().futureRaise.priceMode === "discount" && pg().futureRaise.discountPct === "15", "Model this raise: Confirm writes the raise into the case (" + pg().futureRaise.amountM + ")");
   }
 
   // Simulator: delayed separation, readout timing pinned as a window, the
@@ -805,6 +810,18 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
     const om = d.querySelector(".options-move");
     ok(!!om && /±30%/.test(om.textContent), "Binary Event: a $0.70 straddle at $2.34 prices about ±30% (" + (om && om.textContent.slice(0, 120)) + ")");
     ok(pgCase().optionsMove && pgCase().optionsMove.straddle === "0.70" && /^\d{4}-\d\d-\d\d$/.test(pgCase().optionsMove.asOf), "Binary Event: the straddle is saved on the case, dated");
+    // Switched to market cap ($M), the tool's own figures are not dollars a
+    // share: the options card must keep reading the case's $2.34, not divide
+    // the straddle by a market value (October 2026 audit: it read ±0%).
+    const unitSel = [...d.querySelectorAll("select")].find(x => x.getAttribute("aria-label") === "Value units");
+    if (unitSel) { unitSel.value = "marketCap"; unitSel.dispatchEvent(new w.Event("change", { bubbles: true })); await wait(400); }
+    const todayIn = [...d.querySelectorAll("input")].find(i => i.getAttribute("aria-label") === "Today");
+    const todayWas = todayIn ? todayIn.value : "";
+    if (todayIn) { setVal(todayIn, "150"); await wait(400); }   // a $150M market cap
+    const om2 = d.querySelector(".options-move");
+    ok(!!unitSel && !!todayIn && !!om2 && /±30%/.test(om2.textContent), "Binary Event in market cap: the options move still reads the case's price (" + (om2 && om2.textContent.slice(0, 120)) + ")");
+    if (todayIn) { setVal(todayIn, todayWas); await wait(200); }
+    if (unitSel) { unitSel.value = "perShare"; unitSel.dispatchEvent(new w.Event("change", { bubbles: true })); await wait(300); }
 
     // The report's Decision memo preset.
     click(btn("Workspace")); await wait(300);

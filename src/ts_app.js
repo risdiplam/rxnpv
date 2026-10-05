@@ -1761,10 +1761,13 @@ function renderUseAsCaseOdds(resultsDiv, result, run) {
       yes.addEventListener('click', () => {
         // Re-read the case at click time: the one this panel drew may be stale.
         const live = window.rxnpvSimBridge, c = live && live.activeCase && live.activeCase.id === theCase.id ? live.activeCase : theCase;
-        const progs = c.programs.map((p, i) => i === progIdx ? applyAssuranceToProgram(p, assuranceToCaseOdds(p, win), run, localDateStamp()) : p);
-        live.updateCase({ ...c, programs: progs, updatedAt: Date.now() });
+        const target = c.programs[progIdx];
+        const convNow = target ? assuranceToCaseOdds(target, win) : { ok: false, reason: 'That program is no longer on the case.' };
         row.innerHTML = '';
-        row.appendChild(el('span', { style: 'color:var(--teal);font-weight:700' }, 'Done: the case\u2019s odds are now ' + pct(conv.oddsPct) + '. The run is recorded beside the odds on the Assumptions tab.'));
+        if (!convNow.ok) { row.appendChild(el('span', { class: 'error' }, 'Not applied: ' + convNow.reason)); return; }
+        const progs = c.programs.map((p, i) => i === progIdx ? applyAssuranceToProgram(p, convNow, run, localDateStamp()) : p);
+        live.updateCase({ ...c, programs: progs, updatedAt: Date.now() });
+        row.appendChild(el('span', { style: 'color:var(--teal);font-weight:700' }, 'Done: the case\u2019s odds are now ' + pct(convNow.oddsPct) + '. The run is recorded beside the odds on the Assumptions tab.'));
       });
       no.addEventListener('click', draw);
       row.appendChild(yes); row.appendChild(no);
