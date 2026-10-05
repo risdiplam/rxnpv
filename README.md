@@ -99,11 +99,16 @@ Suggested real-world inputs, most of them the cases used against the live servic
 | **What each outcome is worth** | The range strip (if it fails · today · if it works, with Bear/Base/Bull), the outcome tree (each remaining catalyst with the case's own odds, endings valued by the model, optional resubmission branch) and, on Scenarios, what each readout result would do to the value. *If it fails* is the filing's cash less the current stage still to pay, G&A to the readout and a wind-down — it assumes the whole current stage is unpaid; a rough estimate from the monthly burn is an opt-in alternative. | Open the floor's note and tick *Rough estimate from the monthly burn*. The strip's floor moves; Bear/Base/Bull do not. |
 | **Year by year** | The odds-weighted cash flows and running present value, with an *If it works* view of the same years. | Toggle *× odds* / *If it works*. The table drops the × odds column and ends at the success-case enterprise value. |
 | **Red flags you have considered** | *Mark considered* collapses a flag to a dated line and takes it off the badge; it reopens by itself if the input behind it changes. | Mark a flag considered, then change the input it names. It comes back. |
-| **Snapshot from the model** | Writes the Evidence Log's "What the model says" entry from the live numbers, dated, replacing the previous one. | Change the price, press *Snapshot from the model*, read the entry. |
+| **Snapshot from the model** | Writes a dated "What the model says" entry to the Evidence Log from the live numbers. Earlier dates are kept, so the history shows how the case moved; a second snapshot on the same day replaces that day's. | Change the price, press *Snapshot from the model*, read the entry. |
+| **Freshness strip** | Top of the Overview: the date of the price, the cash figure's filing (and whether EDGAR has a newer one), the next catalyst and where the odds came from. Amber only when the price is over a week old or a newer filing exists. | Type a new price; its date resets to today. |
+| **Pinned catalysts** | A Calibration Log entry can be pinned as the case's catalyst, with a window (day, month, quarter, half, year or month range). Runway vs. Catalyst, the Catalyst Calendar, the failure floor and the Portfolio catalyst list read it; cash running out inside a window is shown as its own state. Close it out after the readout to score the call. | Pin "Q3 2027" on a case and open Runway vs. Catalyst. |
+| **Facilities** | ATM capacity, undrawn debt, expected milestones and the shelf, kept beside the cash. They change the runway readings and the financing bridge, never the fair value. | Enter an ATM amount; *With facilities* appears on Runway vs. Catalyst, and the fair value does not move. |
+| **Decision memo** | One printable page: the call, the numbers, the catalyst, the runway, the evidence and "what would change my mind", all from the same functions as the Overview. | Generate Report → *Decision memo* preset. |
+| **IRA clock** | Optional Medicare price negotiation cut, starting the year the law allows for the molecule type. No default cut. | Turn it on for a program; revenue drops from the negotiation year. |
 | **Saved tab and worked examples** | Results saved from Tools and Simulation with their inputs; the sample cases carry one worked example per tool, each reopening its tool with sourced inputs. | Open the Stoke sample's Saved tab and open any example. |
 | **Sum-of-the-parts, risk waterfalls** | Per-program value contribution (needs 2+ programs); unrisked → risked NPV. | Add a second program. The SOTP and pipeline waterfall appear. |
 
-**Automated:** `final_regression_pass.js` covers the core valuation paths. `math_verification.js` (1,396 checks at the last update; it prints the current count) covers every formula against hand-derived values.
+**Automated:** `final_regression_pass.js` covers the core valuation paths. `math_verification.js` (1,572 checks at the last update; it prints the current count) covers every formula against hand-derived values.
 
 ### Tools: six workbenches, 19 tools, grouped by the question being asked
 
@@ -122,7 +127,7 @@ Suggested real-world inputs, most of them the cases used against the live servic
 
 | Tab | What it does |
 |---|---|
-| **Trial Outcome / PoS** | Bayesian assurance: thousands of simulated trials under an uncertain true effect. Binary, continuous or time-to-event, with drawn survival curves. |
+| **Trial Outcome / PoS** | Bayesian assurance: thousands of simulated trials under an uncertain true effect. Binary, continuous or time-to-event, with drawn survival curves, delayed separation, an event target with the readout date it implies, and analog priors from posted hazard ratios. *Use as this case's odds* turns the result into launch odds (a win in the expected direction × the benchmark odds of every later step) and records where they came from. |
 | **Phase 2→3 Translator** | Shrinks a Phase 2 effect to a Phase 3 planning assumption using published concordance factors. |
 | **Trial Statistics** (7 sub-tools) | Fragility Index · Sample Size / Power (with an assumption-stress panel) · P-value ↔ CI · Single-Arm CI · 2×2 Outcome Analysis · Non-Inferiority · Multiplicity Adjustment |
 | **Meta-Analysis** | Pooled effect across trials. |
@@ -186,7 +191,7 @@ A cross-case summary: fair value against price, runway, modelled against implied
 
 | Suite | Covers |
 |---|---|
-| `math_verification.js` | 1,396 checks (at the last update; the suite prints the current count) of engine math against values derived by hand, from closed forms or from published constants. Never against the app's own output. Needs no DOM. |
+| `math_verification.js` | 1,572 checks (at the last update; the suite prints the current count) of engine math against values derived by hand, from closed forms or from published constants. Never against the app's own output. Needs no DOM. |
 | `net_test.js` | `resilientFetch`, the one fetch every integration uses: what is retried (dropped connections, timeouts, 408/425/429/5xx), what is not (400/403/404), and the waits. |
 | `backup_test.js` | Backup and restore (ADD vs REPLACE, unknown keys dropped, caches excluded) and both sample cases, pinned to the independent rebuilds. |
 | `worked_examples_test.js` | Every worked example in the sample cases opens its tool, fills it and runs; none reach the report. |

@@ -191,22 +191,30 @@ An external pass by Grok, audited by Spark, reviewed against the code on 2026-10
 
 | Batch | Item | Status |
 |---|---|---|
-| 1 | One window-aware catalyst date parser (`2027-11-14`, `2027-11`, `2027-Q2`, `H1 2027`, `2027`) for Runway vs Catalyst, overdue prompts and the failure floor; a window is overdue only at its end and the floor burns to its end (Grok C1) | DECIDED — build |
-| 1 | Pinned catalysts as a flag on a Calibration Log entry (type, window, source, date pinned), read first everywhere; registry completion stays, labelled completion (Grok C2, as Spark amended: one object, not two) | DECIDED — build |
-| 1 | A one-line freshness strip on the Overview: price with its entered date (new), cash with its date plus a real EDGAR check for a newer 10-Q/10-K (stronger than Spark's 100-day rule), the pinned catalyst and where the odds came from (Spark SP-1) | DECIDED — build |
-| 2 | Simulator → case odds: overall odds = the chance of a significant result *in the right direction* × the benchmark odds of every remaining step after that trial, into the existing override, with before/after shown and the run's provenance kept; a Phase 2 caveat (advancing ≠ hitting the primary) (Grok V1; Spark's stage-not-launch correction, built without a per-stage field the app does not have) | DECIDED — build |
-| 2 | Both failure floors on the Overview, the active one marked, a $0 floor saying why (Grok V4) | DECIDED — build |
-| 2 | The odds gap in percentage points beside "your odds / price implies", inputs held fixed listed on demand (Grok V2) | DECIDED — build |
-| 3 | Undrawn ATM, undrawn debt, expected milestone cash and remaining shelf (one as-of/source note), runway with and without them, the cash tag shown, a warning when the same ATM is entered twice (Grok C3/C4) | DECIDED — build |
-| 3 | "Dollars needed" on Runway vs Catalyst (to the pin plus the cushion, against the shelf) with "Model this raise" pre-filling the existing raise fields (Spark SP-2, reduced: the dilution path already models the raise itself) | DECIDED — build |
-| 4 | Delayed separation and readout timing as one simulator change (see the survival table, section 2) | DECIDED — build |
-| 4 | A one-line summary under the assurance histogram (Grok S3, as downgraded) | DECIDED — build |
-| 4 | Editable Phase 2→3 discount, per run (Grok S4) | DECIDED — build |
-| 4 | Analog-board prior presets: median, median after the discount, a cautious quartile (Grok S5 + Spark) | DECIDED — build |
-| 4 | Trial Decoder → simulator: a posted effect seeds the design, the control arm stays the user's (Grok T1, as amended) | DECIDED — build |
-| 5 | One-page decision memo (report preset) including "What would change my mind" (Grok R1 + Spark) | DECIDED — build |
-| 5 | Options-implied move against the model's win/miss values, typed in (no feed) — Claude's addition | DECIDED — build |
-| 5 | Cross-case catalyst list in Portfolio from pins, each with its funding state, competitor completions that read first (Grok P1/T3 + Spark SP-4) | DECIDED — build |
-| 5 | Close-out prompt for a passed pin, and snapshots kept dated rather than replaced (Spark SP-5; Claude's snapshot history, which SP-5's before/after needs) | DECIDED — build — a narrow reversal of "versioned snapshots": model snapshots only, as dated Evidence Log entries |
-| 6 | Insider clusters by distinct insiders (D3); FDA limitations of use quoted (F1, cut down); biologic 12-year floor from first licensure (M1); analog launch shape into a Full build (M3); basis suggested by channel (M4); denominator in the analog headline (T2); condition merge on Asset Program (T4); drug status on the Target Dossier (T5); the IRA clock, opt-in, blank factor, effective ~9 / ~13 years, with the 2025 orphan exclusion noted (M2 — Spark's +11/+15 years double-counted the two-year lag) | DECIDED — build |
+| 1 | One window-aware catalyst date parser (`2027-11-14`, `2027-11`, `2027-Q2`, `H1 2027`, `2027`) for Runway vs Catalyst, overdue prompts and the failure floor; a window is overdue only at its end and the floor burns to its end (Grok C1) | **BUILT** |
+| 1 | Pinned catalysts as a flag on a Calibration Log entry (type, window, source, date pinned), read first everywhere; registry completion stays, labelled completion (Grok C2, as Spark amended: one object, not two) | **BUILT** |
+| 1 | A one-line freshness strip on the Overview: price with its entered date (new), cash with its date plus a real EDGAR check for a newer 10-Q/10-K (stronger than Spark's 100-day rule), the pinned catalyst and where the odds came from (Spark SP-1) | **BUILT** |
+| 2 | Simulator → case odds: overall odds = the chance of a significant result *in the right direction* × the benchmark odds of every remaining step after that trial, into the existing override, with before/after shown and the run's provenance kept; a Phase 2 caveat (advancing ≠ hitting the primary) (Grok V1; Spark's stage-not-launch correction, built without a per-stage field the app does not have) | **BUILT** |
+| 2 | Both failure floors on the Overview, the active one marked, a $0 floor saying why (Grok V4) | **BUILT** |
+| 2 | The odds gap in percentage points beside "your odds / price implies", inputs held fixed listed on demand (Grok V2) | **BUILT** |
+| 3 | Undrawn ATM, undrawn debt, expected milestone cash and remaining shelf (one as-of/source note), runway with and without them, the cash tag shown, a warning when the same ATM is entered twice (Grok C3/C4) | **BUILT** |
+| 3 | "Dollars needed" on Runway vs Catalyst (to the pin plus the cushion, against the shelf) with "Model this raise" pre-filling the existing raise fields (Spark SP-2, reduced: the dilution path already models the raise itself) | **BUILT** |
+| 4 | Delayed separation and readout timing as one simulator change (see the survival table, section 2) | **BUILT** |
+| 4 | A one-line summary under the assurance histogram (Grok S3, as downgraded) | **BUILT** |
+| 4 | Editable Phase 2→3 discount, per run (Grok S4) | **BUILT** |
+| 4 | Analog-board prior presets: median, median after the discount, a cautious quartile (Grok S5 + Spark) | **BUILT** |
+| 4 | Trial Decoder → simulator: a posted effect seeds the design, the control arm stays the user's (Grok T1, as amended) | **BUILT** |
+| 5 | One-page decision memo (report preset) including "What would change my mind" (Grok R1 + Spark) | **BUILT** |
+| 5 | Options-implied move against the model's win/miss values, typed in (no feed) — Claude's addition | **BUILT** |
+| 5 | Cross-case catalyst list in Portfolio from pins, each with its funding state, competitor completions that read first (Grok P1/T3 + Spark SP-4) | **BUILT** |
+| 5 | Close-out prompt for a passed pin, and snapshots kept dated rather than replaced (Spark SP-5; Claude's snapshot history, which SP-5's before/after needs) | **BUILT** — a narrow reversal of "versioned snapshots": model snapshots only, as dated Evidence Log entries |
+| 6 | Insider clusters by distinct insiders (D3); FDA limitations of use quoted (F1, cut down); biologic 12-year floor from first licensure (M1); analog launch shape into a Full build (M3); basis suggested by channel (M4); denominator in the analog headline (T2); condition merge on Asset Program (T4); drug status on the Target Dossier (T5); the IRA clock, opt-in, blank factor, effective ~9 / ~13 years, with the 2025 orphan exclusion noted (M2 — Spark's +11/+15 years double-counted the two-year lag) | **BUILT** |
+
+**How it was built, where it differs from the plan above (October 5, 2026).** Every item met its done test and was checked in the packaged app, live services included.
+- **Analog launch shape (M3)** fits the analog's Medicare years to the closest published curve (median / slow / fast) and years to peak, the two settings the revenue build already has, rather than adding a free-form curve to the engine. Verified live: Mounjaro reads as the slow curve, 4 years, still rising; analogs selling before CMS's data begins (Fintepla, Epidiolex, Nurtec, Trulicity) are refused.
+- **Condition merges (T4)** are stored per drug search (backed up), not per case, so they work with no case open.
+- **Target Dossier status (T5)** found a real bug: Open Targets now returns `APPROVAL`, which scored every approved drug as stage 0 and left them out of "reached Phase 3+" (TTR read far too few; now 13 of 13). Status is approved / withdrawn (from Open Targets' warnings) / furthest stage; Open Targets does not record a program stopping, so nothing is called stopped.
+- **The financing bridge (SP-2)** counts a raise the case already models: when it covers the need, the bridge says so and offers nothing.
+- **"Who reads out first" (T3)** leaves out the case's own registered trials (its program's trial IDs) — the first live check listed Stoke's own Phase 3 as a competitor.
+- **Samples** carry every new field that has a real source: pinned catalysts, price dates, cash sources, ATM and shelf figures from their filings, a window-dated PepGen entry, "What would change my mind". Not filled: options prices (no real chain), competitor lists and condition merges (user actions), the IRA clock (rare-disease drugs, largely excluded). Neither sample has a time-to-event primary, so the delayed-separation and readout-timing features are exercised by test designs. Bear/Base/Bull unchanged throughout.
 
