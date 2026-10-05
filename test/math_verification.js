@@ -1473,10 +1473,13 @@ section("Cash to reach the catalyst: facilities and the financing bridge");
   near("Runway vs. Catalyst reads the same runway from the same day", rvD.runwayMonths, frD.runwayMonths, 1e-9);
   ok("and says which filing it rests on", rvD.cashAsOf === "2026-06-30" && Math.abs(rvD.monthsSinceCash - 92 / 30.4375) < 1e-9);
 
-  const now = new Date(y, 0, 15);
+  const now = new Date(y, 9, 5);
   const b = api.computeFinancingBridge(thin, { cushionMonths: 6, now, discountPct: 20 });
-  // Independent: the balance after T months, read linearly along the yearly path.
-  const T = api.monthsUntil(now, new Date(y + 1, 11, 31)) + 6;
+  // Independent: the balance after T months, read linearly along the yearly
+  // path — which starts on the fixture's cash date (2026-06-30), so T is the
+  // whole days from then to the window's end (31 Dec of next year) over
+  // 30.4375, plus the 6-month cushion. Today does not enter it.
+  const T = (Date.UTC(y + 1, 11, 31) - Date.UTC(2026, 5, 30)) / 86400000 / 30.4375 + 6;
   const yr = Math.floor(T / 12), within = T / 12 - yr;
   const startY = yr === 0 ? fr.startingCash : fr.path[yr - 1].balanceEnd;
   const balT = startY + (fr.path[yr].balanceEnd - startY) * within;

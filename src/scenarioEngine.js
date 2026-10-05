@@ -1240,8 +1240,15 @@ function computeFinancingBridge(theCase, opts) {
   try { fr = computeForwardRunway(theCase, { now: o.now || new Date() }); } catch (e) { return null; }
   const target = rv.firstProblem;
   const months = Math.max(0, target.monthsAway) + cushion;
-  // The path starts on the cash date, so read it that many months further on.
-  const needed = Math.max(0, -forwardBalanceAt(fr, months + fr.monthsSinceCash));
+  // The path starts on the cash date, so read it at the window's end counted
+  // FROM the cash date — whole days, so the figure does not move with the
+  // time of day (today never enters it once the cash is dated).
+  const w = parseCatalystWindow(target.dateText);
+  const cashAt = fr.cashAsOf ? parseIsoDay(fr.cashAsOf) : null;
+  const alongPath = w && cashAt != null
+    ? Math.max(0, (Date.UTC(w.end.getFullYear(), w.end.getMonth(), w.end.getDate()) - cashAt) / (86400000 * 30.4375)) + cushion
+    : months + fr.monthsSinceCash;
+  const needed = Math.max(0, -forwardBalanceAt(fr, alongPath));
   if (!(needed > 0)) return null;
   const fac = caseFacilities(theCase);
   const afterFacilities = Math.max(0, needed - fac.total);
