@@ -105,11 +105,15 @@ function FdaLookupTool({ activeCase }) {
 
     hasLabel && toolCard(h, [
       toolLabel(h, "Label summary"),
+      h("div", { style: { ...UI.caption, marginBottom: 8 } }, (label.labelDate ? "Label dated " + label.labelDate + " · " : "") + "Boxed warning: " + (label.boxedWarning ? "yes" : "none on this label")),
       label.boxedWarning && h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--red)", padding: "8px 10px", borderRadius: 6, background: "var(--red-bg)", marginBottom: 10, lineHeight: 1.6 } }, truncatedSpan(h, label.boxedWarning, 3000)),
       label.indicationsAndUsage && h("div", { style: { marginBottom: 10 } },
         h("div", { style: { ...UI.caption, marginBottom: 4 } }, "Indications and usage"),
         h("div", { style: { fontSize: 11, fontFamily: "var(--sans)", color: "var(--ink-2)", lineHeight: 1.6 } }, truncatedSpan(h, label.indicationsAndUsage, 3000))
       ),
+      label.limitationsOfUse && h("div", { className: "limitations-of-use", style: { marginBottom: 10 } },
+        h("div", { style: { ...UI.caption, marginBottom: 4 } }, "Limitations of use (quoted from the label" + (label.labelDate ? ", " + label.labelDate : "") + ")"),
+        h("blockquote", { style: { margin: 0, paddingLeft: 10, borderLeft: "2px solid var(--rule)", fontSize: 11, fontFamily: "var(--sans)", color: "var(--ink-2)", lineHeight: 1.6 } }, "\u201c" + label.limitationsOfUse + "\u201d")),
       label.warningsAndPrecautions && h("div", { style: { marginBottom: 10 } },
         h("div", { style: { ...UI.caption, marginBottom: 4 } }, "Warnings and precautions"),
         h("div", { style: { fontSize: 11, fontFamily: "var(--sans)", color: "var(--ink-2)", lineHeight: 1.6 } }, truncatedSpan(h, label.warningsAndPrecautions, 3000))
@@ -958,7 +962,8 @@ function TrialWatchTool({ activeCase, updateCase, initialNctId, onConsumedInitia
                       h("div", { style: { fontSize: 11.5, fontFamily: "var(--mono)", color: "var(--ink-1)" } },
                         v + " is more favorable than " + pos.beats + " of " + pos.n + " posted "
                           + (scale === "ratio" ? "ratio-scale" : "difference-scale") + " results (" + pct + "th percentile)"
-                          + (pos.ties ? ", and ties " + pos.ties : "")),
+                          + (pos.ties ? ", and ties " + pos.ties : "")
+                          + " — " + effects.withExtractableEffect + " of " + effects.sampleSize + " trials in this search posted a primary result that could be read"),
                       h("div", { style: { fontSize: 10.5, fontFamily: "var(--mono)", color: "var(--ink-3)", marginTop: 2 } },
                         "median here is " + pos.median.toFixed(2) + ", range " + pos.min.toFixed(2) + " to " + pos.max.toFixed(2)
                           + (pos.favoursTreatment ? "" : " \u2014 and this number is on the wrong side of " + pos.nullValue + " altogether")),
@@ -994,7 +999,8 @@ function TrialWatchTool({ activeCase, updateCase, initialNctId, onConsumedInitia
         ctSummary.studies.length > 0 && (() => {
           const nc = activeCase ? nextCaseCatalyst(activeCase) : null;
           const pin = nc && nc.pinned ? nc : null;
-          const ord = orderByCompletion(ctSummary.studies, { pinWindow: pin ? pin.window : null });
+          const ownNcts = activeCase ? [].concat(...(activeCase.programs || []).map(p => String(p.trialIds || "").toUpperCase().match(/NCT\d{8}/g) || [])) : [];
+          const ord = orderByCompletion(ctSummary.studies, { pinWindow: pin ? pin.window : null, excludeNcts: ownNcts });
           if (!ord.rows.length) return null;
           return h("div", { className: "reads-first", style: { marginTop: 12, paddingTop: 10, borderTop: "1px dashed var(--rule)" } },
             h("div", { style: { ...UI.caption, marginBottom: 4 } }, "Who reads out first (" + ord.rows.length + (ord.total > ord.rows.length ? " of " + ord.total : "") + ", by completion date)"),
@@ -1005,7 +1011,7 @@ function TrialWatchTool({ activeCase, updateCase, initialNctId, onConsumedInitia
                 h("span", { style: { color: "var(--ink-1)", minWidth: 92 } }, r.date),
                 h("span", null, r.nctId + " · " + (r.sponsor || "—") + " · " + (r.phase || "—") + " · " + r.which),
                 r.readsFirst && h("span", { style: { color: "var(--warn)", fontWeight: 700 } }, "reads first")))),
-            ord.undated > 0 && h("div", { style: { ...UI.caption, marginTop: 4 } }, ord.undated + " with no completion date left out."),
+            (ord.undated > 0 || ord.ownExcluded > 0) && h("div", { style: { ...UI.caption, marginTop: 4 } }, [ord.undated > 0 ? ord.undated + " with no completion date left out" : null, ord.ownExcluded > 0 ? ord.ownExcluded + " of the case's own trials left out (its program's trial IDs)" : null].filter(Boolean).join("; ") + "."),
             activeCase && updateCase && h("button", { type: "button", "data-no-export": "",
               onClick: () => updateCase({ ...activeCase, competitorReads: { condition: ctCondition, phase: ctPhase, at: localDateStamp(), rows: ord.rows.slice(0, 10).map(r => ({ nctId: r.nctId, sponsor: r.sponsor, phase: r.phase, date: r.date, which: r.which })) }, updatedAt: Date.now() }),
               style: { marginTop: 8, padding: "4px 10px", minHeight: 28, borderRadius: 6, border: "1px solid var(--rule)", background: "transparent", color: "var(--ink-2)", fontFamily: "var(--mono)", fontSize: 10.5, cursor: "pointer" } },

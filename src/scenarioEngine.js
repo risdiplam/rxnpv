@@ -565,7 +565,7 @@ function impliedHeldFixed(theCase) {
   const fr = theCase.futureRaise || {};
   if (fr.enabled) items.push("the modelled raise");
   if ((theCase.dilutionPath || {}).enabled) items.push("the dilution path");
-  items.push("terminal value " + ((theCase.terminalValue || {}).enabled ? "on" : "off"));
+  items.push((theCase.terminalValue || {}).enabled ? "a terminal value" : "no terminal value");
   return items;
 }
 

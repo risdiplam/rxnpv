@@ -115,12 +115,14 @@ function TargetDossierTool({ activeCase }) {
       dossier.drugs.length > 0 && toolCard(h, [
         toolLabel(h, "Drugs already aimed at this target (" + dossier.drugs.length + " shown)"),
         h("div", { style: { fontSize: 10.5, fontFamily: "var(--sans)", color: "var(--ink-3)", marginBottom: 10, lineHeight: 1.6 } },
-          "What has been tried and how far it got. A target with approved drugs is validated but crowded; one where several programs stalled in Phase 2 is a different kind of warning than one nobody has attempted."),
+          "What has been tried and how far it got. A target with approved drugs is validated but crowded; one where several programs stalled in Phase 2 is a different kind of warning than one nobody has attempted. Development status as Open Targets reports it: approved, withdrawn, or the furthest stage reached — it does not record whether an unapproved program is still going or has stopped."),
         h("div", { style: { display: "flex", flexDirection: "column", gap: 4, maxHeight: 340, overflowY: "auto" } },
           dossier.drugs.map((d, i) => h("div", { key: i, style: { padding: "6px 0", borderBottom: "1px solid var(--rule)" } },
             h("div", { style: { display: "flex", justifyContent: "space-between", gap: 10, fontSize: 11, fontFamily: "var(--mono)" } },
               h("span", { style: { color: "var(--ink-1)" } }, d.name),
-              h("span", { style: { color: d.maxPhase >= 4 ? "var(--teal)" : "var(--ink-2)", whiteSpace: "nowrap" } }, phaseLabel(d))),
+              h("span", { style: { color: d.withdrawn && d.withdrawn.length ? "var(--red)" : d.maxPhase >= 4 ? "var(--teal)" : "var(--ink-2)", whiteSpace: "nowrap" } },
+                d.withdrawn && d.withdrawn.length ? "Withdrawn" + (d.withdrawn[0] ? " (" + d.withdrawn.join("; ") + ")" : "") : phaseLabel(d) + (d.maxPhase > 0 && d.maxPhase < 4 ? " (furthest reached)" : ""))),
+            d.boxedWarning && h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--warn)", marginTop: 2 } }, "Boxed warning on its label"),
             d.mechanism && h("div", { style: { fontSize: 10, fontFamily: "var(--sans)", color: "var(--ink-3)", marginTop: 2 } }, d.mechanism),
             d.indications.length > 0 && h("div", { style: { fontSize: 10, fontFamily: "var(--sans)", color: "var(--ink-3)", marginTop: 2 } },
               truncatedSpan(h, d.indications.slice(0, 4).join(", ") + (d.indications.length > 4 ? " +" + (d.indications.length - 4) + " more" : ""), 150)))))

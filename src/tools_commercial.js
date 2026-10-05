@@ -333,7 +333,10 @@ function ExclusivityTool({ cases, updateCase, activeCase }) {
     ]),
 
     res && !res.ok && toolCard(h, [
-      h("div", { style: { fontFamily: "var(--sans)", fontSize: 12, lineHeight: 1.6, color: res.isBiologic ? "var(--ink-1)" : "var(--warn)" } }, res.error)
+      h("div", { style: { fontFamily: "var(--sans)", fontSize: 12, lineHeight: 1.6, color: res.isBiologic ? "var(--ink-1)" : "var(--warn)" } }, res.error),
+      res.biologicFloor && h("div", { className: "biologic-floor", style: { marginTop: 10, padding: "10px 12px", borderRadius: 7, background: "var(--surface-2)", fontFamily: "var(--sans)", fontSize: 12, lineHeight: 1.6 } },
+        h("div", null, h("b", null, "Statutory exclusivity floor: " + res.biologicFloor.floor), " — 12 years from first licensure on " + res.biologicFloor.firstLicensure + " (Drugs@FDA's earliest BLA approval)."),
+        h("div", { style: UI.caption }, "A floor, not a patent expiry: biosimilar patent litigation can move the real date in either direction. If you have a better-sourced date, it goes in the program's Exclusivity & LOE years."))
     ]),
 
     s && h("div", { ref: exRef }, toolCard(h, [

@@ -85,7 +85,7 @@ const OT_TARGET_QUERY = `
         rows {
           id
           maxClinicalStage
-          drug { id name mechanismsOfAction { rows { mechanismOfAction } } }
+          drug { id name mechanismsOfAction { rows { mechanismOfAction } } drugWarnings { warningType country year } }
           diseases { disease { name } }
         }
       }
@@ -127,7 +127,10 @@ function summarizeDossier(target) {
   // check roman numerals longest-first so "PHASE II" can't match "PHASE III".
   const stageToNumber = (stage) => {
     const t = String(stage || "").toUpperCase().replace(/[_\s]+/g, " ").trim();
-    if (/APPROVED|PHASE 4|PHASE IV\b/.test(t)) return 4;
+    // The live API says "APPROVAL" (checked October 2026); matching only
+    // "APPROVED" scored every approved drug as stage 0, so the dossier's
+    // "reached Phase 3+" count left out exactly the approved ones.
+    if (/APPROV|PHASE 4|PHASE IV\b/.test(t)) return 4;
     if (/PHASE 3|PHASE III\b/.test(t)) return 3;
     if (/PHASE 2|PHASE II\b/.test(t)) return 2;
     if (/PHASE 1|PHASE I\b/.test(t)) return 1;
@@ -137,6 +140,7 @@ function summarizeDossier(target) {
   const prettyStage = (stage) => {
     const t = String(stage || "").replace(/[_\s]+/g, " ").trim().toLowerCase();
     if (!t) return "";
+    if (/^approv/.test(t)) return "Approved";
     return t.charAt(0).toUpperCase() + t.slice(1);
   };
   const drugs = drugRows.map(d => ({
@@ -147,7 +151,12 @@ function summarizeDossier(target) {
       ? d.drug.mechanismsOfAction.rows[0].mechanismOfAction : "",
     // A clinical-candidate row's `diseases` are ClinicalDiseaseListItem, which
     // wraps the disease rather than carrying a name directly.
-    indications: (d.diseases || []).map(x => x && x.disease && x.disease.name).filter(Boolean)
+    indications: (d.diseases || []).map(x => x && x.disease && x.disease.name).filter(Boolean),
+    // Status only as Open Targets reports it (October 2026): a "Withdrawn"
+    // warning, and a boxed warning. It does not record a program stopping in
+    // development, so nothing is ever called stopped or failed.
+    withdrawn: ((d.drug && d.drug.drugWarnings) || []).filter(w => /withdrawn/i.test(w.warningType || "")).map(w => [w.country, w.year].filter(Boolean).join(" ")),
+    boxedWarning: ((d.drug && d.drug.drugWarnings) || []).some(w => /black box|boxed/i.test(w.warningType || ""))
   })).sort((a, b) => b.maxPhase - a.maxPhase);
 
   return {

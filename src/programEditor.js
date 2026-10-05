@@ -388,7 +388,10 @@ function ProgramEditor({ program, onChange, onDelete, discountRatePct, terminalV
         h("div", { style: UI.fieldLabel }, "That price is on a…"),
         h("select", { "aria-label": "Price basis", value: rb.pricing.priceBasis || "ASP", onChange: e => set("revenueBuild.pricing.priceBasis", e.target.value),
           style: UI.input },
-          PRICE_BASIS_OPTIONS.map(o => h("option", { key: o.value, value: o.value }, o.label)))),
+          PRICE_BASIS_OPTIONS.map(o => h("option", { key: o.value, value: o.value }, o.label))),
+        // By channel (October 2026): a hint only — the basis conversion is
+        // the one adjustment, never a second gross-to-net haircut on top.
+        h("div", { style: { ...UI.caption, marginTop: 4, lineHeight: 1.5 } }, "Usually: a drug given in a clinic or by injection (Medicare Part B, buy-and-bill) is quoted as ASP; a pharmacy drug (Part D, retail) as WAC.")),
       h(BenchField, { label: "Net price realization", value: rb.pricing.netPriceRealizationPct, onChange: v => set("revenueBuild.pricing.netPriceRealizationPct", v), suffix: "%",
         placeholder: String(aspPctOfBasis(rb.pricing.priceBasis || "ASP")),
         help: "What share of the entered price the manufacturer actually keeps — the other side of gross-to-net (45% gross-to-net = 55% realization). Leave blank to use Table 4-1's average for the basis above. Override it if you have a real figure: that table averages across all drugs and understates gross-to-net badly for a modern specialty brand, where 40-50% deductions are ordinary." }),

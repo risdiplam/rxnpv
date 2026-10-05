@@ -75,7 +75,7 @@ const EXPORTS = [
   "runPeakSalesSimulation", "driverSensitivity", "percentSpecToFraction", "percentSpecError", "renderIconArray",
   "niceTicks", "formatTick", "formatRegisteredP", "parseCatalystHit", "sponsorNameFromEntity", "renderLineChart", "renderHistogram", "renderForestPlot",
   "treasuryMethodShares", "ifConvertedShares", "computeEquityValue", "applyFutureRaise",
-  "classifyCatalystFunding", "computeRunwayVsCatalysts", "monthsUntil", "parseCatalystDate", "parseCatalystWindow", "nextCaseCatalyst", "computeFreshness", "newerFinancialFiling", "catalystPinLabel", "computeFailureFloorPair", "floorZeroReason", "impliedHeldFixed", "summarizeObservedEffects", "analogPriorPresets", "optionsImpliedMove", "modelImpliedMove", "readImpliedMove", "orderByCompletion", "computePortfolioCatalysts", "addModelSnapshot", "isModelSnapshot", "modelSnapshotLabel", "buildDecisionMemo", "computeCaseValuation", "getEffectiveScenarioPreset", "caseFacilities", "computeForwardRunway", "computeFinancingBridge", "forwardBalanceAt", "edgarCashSource", "baseCaseFairValue", "assuranceToCaseOdds", "applyAssuranceToProgram", "posFromSimulator", "describePosSource", "pendingCalibrationEntries", "failureFloorBurnPlan", "RUNWAY_CUSHION_MONTHS_DEFAULT",
+  "classifyCatalystFunding", "computeRunwayVsCatalysts", "monthsUntil", "parseCatalystDate", "parseCatalystWindow", "nextCaseCatalyst", "computeFreshness", "newerFinancialFiling", "catalystPinLabel", "computeFailureFloorPair", "floorZeroReason", "impliedHeldFixed", "summarizeObservedEffects", "analogPriorPresets", "findInsiderBuyCluster", "extractLimitationsOfUse", "labelDate", "biologicExclusivityFloor", "optionsImpliedMove", "modelImpliedMove", "readImpliedMove", "orderByCompletion", "computePortfolioCatalysts", "addModelSnapshot", "isModelSnapshot", "modelSnapshotLabel", "buildDecisionMemo", "computeCaseValuation", "getEffectiveScenarioPreset", "caseFacilities", "computeForwardRunway", "computeFinancingBridge", "forwardBalanceAt", "edgarCashSource", "baseCaseFairValue", "assuranceToCaseOdds", "applyAssuranceToProgram", "posFromSimulator", "describePosSource", "pendingCalibrationEntries", "failureFloorBurnPlan", "RUNWAY_CUSHION_MONTHS_DEFAULT",
   "summarizeOrangeBookPatents", "isPediatricExtension", "parseFdaYyyymmdd",
   "computeBinaryEventImpliedPoS", "selectPeakSalesCompWindow",
   "applyTaxToCalendar", "computeMoleculeTypePoSRatios", "POS_BY_MOLECULE",
@@ -1192,6 +1192,29 @@ report();
 // whole point of the tool, so it is tested directly rather than only through
 // the UI. Boundaries matter here: "reaches it with exactly zero cushion" and
 // "runs out one day early" are different answers to an investor.
+section("Smaller items: insider clusters, label limitations, the biologic floor");
+{
+  const tx = (owner, date, code, usd) => ({ ownerName: owner, date, code, valueUsd: usd, shares: 1000 });
+  const cl = api.findInsiderBuyCluster([tx("CEO", "2026-03-01", "P", 100e3), tx("CFO", "2026-03-10", "P", 50e3), tx("Director", "2026-03-25", "P", 25e3), tx("CEO", "2026-05-01", "P", 10e3), tx("COO", "2026-03-12", "A", 0), tx("COO", "2026-03-13", "M", 0)]);
+  ok("three insiders buying inside 30 days is a cluster (the award and the exercise do not count)", cl && cl.kind === "cluster" && cl.insiders === 3 && cl.count === 3 && cl.start === "2026-03-01" && cl.end === "2026-03-25");
+  near("... $175K total", cl.totalUsd, 175e3, 1e-9);
+  const one = api.findInsiderBuyCluster([tx("CEO", "2026-03-01", "P", 1), tx("CEO", "2026-03-05", "P", 1), tx("CEO", "2026-03-20", "P", 1)]);
+  ok("one insider, three buys: reported as one insider, not a cluster", one && one.kind === "single" && one.names[0] === "CEO");
+  ok("awards only: nothing", api.findInsiderBuyCluster([tx("A", "2026-03-01", "A", 0), tx("B", "2026-03-02", "A", 0), tx("C", "2026-03-03", "A", 0)]) === null);
+  ok("three insiders spread over 60 days: no cluster", api.findInsiderBuyCluster([tx("A", "2026-01-01", "P", 1), tx("B", "2026-02-15", "P", 1), tx("C", "2026-03-01", "P", 1)]) === null);
+
+  const ind = "1 INDICATIONS AND USAGE DRUGX is indicated for the treatment of Duchenne muscular dystrophy in patients with a confirmed mutation. This indication is approved under accelerated approval based on an increase in dystrophin. Limitations of Use: DRUGX has not been studied in patients over 18 years. 2 DOSAGE AND ADMINISTRATION 2.1 Dosing";
+  ok("limitations of use: the sentence after the heading, up to the next numbered section", api.extractLimitationsOfUse(ind) === "DRUGX has not been studied in patients over 18 years.");
+  // The shape of Wegovy's live label (2024-04-23): the limitation, then
+  // openFDA's field repeats the highlights, starting "WEGOVY is a …".
+  ok("stops where the label's highlights repeat (Wegovy's shape)", api.extractLimitationsOfUse("with obesity. Limitations of Use • WEGOVY contains semaglutide. Coadministration with other GLP-1 receptor agonists is not recommended. WEGOVY is a glucagon-like peptide-1 (GLP-1) receptor agonist indicated in combination with diet") === "• WEGOVY contains semaglutide. Coadministration with other GLP-1 receptor agonists is not recommended.");
+  ok("no such heading: null (nothing about accelerated approval is extracted)", api.extractLimitationsOfUse("1 INDICATIONS AND USAGE DRUGX is indicated for X.") === null);
+  ok("label date from openFDA's effective_time", api.labelDate("20240315") === "2024-03-15" && api.labelDate("") === null);
+
+  const fl = api.biologicExclusivityFloor([{ applicationType: "BLA", firstApprovalDate: "20140904" }, { applicationType: "BLA", firstApprovalDate: "20170101" }, { applicationType: "NDA", firstApprovalDate: "20100101" }]);
+  ok("biologic floor: 12 years from the earliest BLA licensure (2014-09-04 → 2026-09-04); NDAs ignored", fl && fl.firstLicensure === "2014-09-04" && fl.floor === "2026-09-04");
+  ok("no BLA: no floor", api.biologicExclusivityFloor([{ applicationType: "NDA", firstApprovalDate: "20100101" }]) === null);
+}
 section("Decision output: options move, completion order, the catalyst list, snapshots, the memo");
 {
   // Options-implied move. A $6.50 straddle at $26: 6.5 / 26 = 25%. From
@@ -1220,6 +1243,8 @@ section("Decision output: options move, completion order, the catalyst list, sna
   ok("ordered by date, the long-past one dropped: C, A, B", ord.rows.map(r => r.nctId).join("") === "CAB");
   ok("reads first: C and A complete before H2 2027 opens; B does not", ord.rows.filter(r => r.readsFirst).map(r => r.nctId).join("") === "CA" && ord.readsFirstCount === 2);
   ok("primary completion is preferred and labelled; the undated one is counted", ord.rows[0].which === "completion" && ord.rows[1].which === "primary completion" && ord.undated === 1);
+  const own = api.orderByCompletion(studies, { now, pinWindow: api.parseCatalystWindow("H2 2027"), excludeNcts: ["a"] });
+  ok("the case's own trial is left out (case-insensitive) and counted", own.rows.map(r => r.nctId).join("") === "CB" && own.ownExcluded === 1);
 
   // The catalyst list. PepGen with a pinned Q1 next-year readout, a
   // competitor completing before it, a closed-out pin; a second case with no pin.
@@ -1237,6 +1262,9 @@ section("Decision output: options move, completion order, the catalyst list, sna
   ok("grouped by the quarter the window opens: " + (y + 1) + " Q1", pc.groups.length === 1 && pc.groups[0].quarter === (y + 1) + " Q1");
   ok("each with its funding state from Runway vs. Catalyst", pc.groups[0].items.every(it => ["funded", "tight", "inside", "gap"].includes(it.funding)));
   ok("only the competitor completing before the pin is listed under it", pc.groups[0].items[0].competitors.map(c => c.nctId).join() === "X1");
+  const ownSaved = { ...withPin, programs: [{ ...withPin.programs[0], trialIds: "NCTX1" }], competitorReads: { ...withPin.competitorReads, rows: [{ ...withPin.competitorReads.rows[0], nctId: "NCT12345678" }] } };
+  ownSaved.programs[0].trialIds = "NCT12345678";
+  ok("a saved row that is the case's own trial is never listed as a competitor", api.computePortfolioCatalysts([ownSaved], now).groups[0].items[0].competitors.length === 0);
   ok("the explicit shared tag on both pins is reported", pc.sharedTags.join() === "DM1 read");
   ok("the closed-out pin is listed as resolved, not upcoming", pc.resolved.length === 2 && pc.resolved[0].closeOut.happened === "hit");
 
@@ -1400,7 +1428,7 @@ section("What 'the price implies' holds fixed");
   const held = api.impliedHeldFixed(st);
   const peak = api.getProgramRevenueResult(st.programs[0], 25).peakTotalRevenue;
   ok("Stoke: the Base peak from the full build, to the nearest $10M ($" + (peak / 1e9).toFixed(2) + "B)", held[0] === "Base peak revenue $" + (peak / 1e9).toFixed(2) + "B (the full build)");
-  ok("... launch year, discount rate, net cash, shares, raise and terminal value", held.includes("launch in year " + st.programs[0].launchYearOffset) && held.includes(st.discountRatePct + "% discount rate") && held.some(x => /^net cash \$/.test(x)) && held.some(x => /M diluted shares$/.test(x)) && held.includes("terminal value off"));
+  ok("... launch year, discount rate, net cash, shares, raise and terminal value", held.includes("launch in year " + st.programs[0].launchYearOffset) && held.includes(st.discountRatePct + "% discount rate") && held.some(x => /^net cash \$/.test(x)) && held.some(x => /M diluted shares$/.test(x)) && held.includes("no terminal value"));
   ok("... the modelled raise is listed because it is on", held.includes("the modelled raise") === !!(st.futureRaise && st.futureRaise.enabled));
   ok("two programs: nothing (no single implied figure)", api.impliedHeldFixed({ ...st, programs: [st.programs[0], st.programs[0]] }) === null);
 }
@@ -2533,6 +2561,14 @@ section("Open Targets dossier — stage parsing and evidence split");
   near("PHASE_2 does not get mistaken for 3", api.summarizeDossier(mk("PHASE_2")).drugs[0].maxPhase, 2, 0);
   near("Phase II is not matched by the Phase III rule", api.summarizeDossier(mk("Phase II")).drugs[0].maxPhase, 2, 0);
   near("APPROVED counts as 4", api.summarizeDossier(mk("APPROVED")).drugs[0].maxPhase, 4, 0);
+  // The live API says APPROVAL (October 2026); it scored 0 before the fix.
+  near("APPROVAL (what the live API returns) counts as 4", api.summarizeDossier(mk("APPROVAL")).drugs[0].maxPhase, 4, 0);
+  ok("... is labelled Approved and counted in Phase 3+", api.summarizeDossier(mk("APPROVAL")).drugs[0].stageLabel === "Approved" && api.summarizeDossier(mk("APPROVAL")).approvedOrLateStage === 1);
+  const mkW = warnings => { const t = mk("PHASE_4"); t.drugAndClinicalCandidates.rows[0].drug.drugWarnings = warnings; return t; };
+  const wd = api.summarizeDossier(mkW([{ warningType: "Withdrawn", country: "United States", year: 2019 }, { warningType: "Black Box Warning", country: "United States", year: null }])).drugs[0];
+  ok("a Withdrawn warning reads as withdrawn, with where and when; a black box warning is flagged", wd.withdrawn.join() === "United States 2019" && wd.boxedWarning === true);
+  const none = api.summarizeDossier(mk("PHASE_3")).drugs[0];
+  ok("no warnings: not withdrawn, no boxed warning — and nothing is ever called stopped", none.withdrawn.length === 0 && none.boxedWarning === false && !("stopped" in none));
   near("an unknown stage is 0, not guessed", api.summarizeDossier(mk("")).drugs[0].maxPhase, 0, 0);
   near("phase 3+ count reflects the parse", api.summarizeDossier(mk("PHASE_3")).approvedOrLateStage, 1, 0);
 

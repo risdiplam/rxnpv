@@ -418,7 +418,7 @@ function OptionsMoveCard({ activeCase, updateCase, price, success, fail, yourPoS
         h("div", { style: UI.caption }, om.basis === "straddle" ? "straddle ÷ price" : "σ√t × √(2/π)")),
       model && h("div", null, h("div", { style: UI.caption }, "Your model"),
         h("div", { style: { fontSize: 26, fontFamily: "var(--mono)", fontWeight: 800, color: "var(--ink-1)" } }, "±" + model.pct.toFixed(0) + "%"),
-        h("div", { style: UI.caption }, (model.upPct != null ? "+" + model.upPct.toFixed(0) + "% (" + Math.round(model.upProb * 100) + "%)" : "") + (model.upPct != null && model.downPct != null ? " · " : "") + (model.downPct != null ? model.downPct.toFixed(0) + "% (" + Math.round(model.downProb * 100) + "%)" : "")))),
+        h("div", { style: UI.caption }, (model.upPct != null ? "+" + model.upPct.toFixed(0) + "% (" + Math.round(model.upProb * 100) + "%)" : "") + (model.upPct != null && model.downPct != null ? " · " : "") + (model.downPct != null ? "−" + Math.abs(model.downPct).toFixed(0) + "% (" + Math.round(model.downProb * 100) + "%)" : "")))),
     om && model && h("div", { style: { ...UI.caption, marginTop: 6 } }, "Your side is from " + modelNote + ". The options price the move to expiry, which includes ordinary trading as well as the event."),
     read && h(Explain, read),
     activeCase && om && h("div", { style: { ...UI.caption, marginTop: 6 } }, "Saved to " + caseDisplayName(activeCase) + " for its decision memo.")

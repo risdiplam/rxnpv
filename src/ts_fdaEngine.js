@@ -78,6 +78,27 @@ function parseApprovalResponse(data, drugName) {
   return { query: drugName, matches: results.length, results };
 }
 
+// "Limitations of Use" is a subsection inside the label's indications text,
+// not a field of its own: the sentence(s) after the heading, up to the next
+// numbered section or the end. Quoted as written; null when the label has
+// none. (October 2026; deliberately no accelerated-approval flag — that is a
+// regulatory-history fact, not a label fact.)
+function extractLimitationsOfUse(indicationsText) {
+  if (!indicationsText) return null;
+  // A section break is a number then a heading in capitals ("2 DOSAGE AND
+  // ADMINISTRATION"), so "18 years" in the text never ends the quote; and
+  // openFDA's field often repeats the label's highlights right after the
+  // limitations, starting "WEGOVY is a …" — that ends it too.
+  const m = String(indicationsText).match(/[Ll]imitations?\s+[Oo]f\s+[Uu]se\s*[:.\-–]?\s*([\s\S]*?)(?=\s+\d{1,2}(?:\.\d+)?\s+[A-Z]{2,}|\s+[A-Z][A-Z0-9\u00ae-]{2,}\s+is\s+(?:a|an|indicated)\b|\s*$)/);
+  if (!m) return null;
+  const t = m[1].replace(/\s+/g, " ").trim();
+  return t ? (t.length > 700 ? t.slice(0, 700).replace(/\s\S*$/, "") + " …" : t) : null;
+}
+function labelDate(effectiveTime) {
+  const m = /^(\d{4})(\d{2})(\d{2})/.exec(String(effectiveTime || ""));
+  return m ? m[1] + "-" + m[2] + "-" + m[3] : null;
+}
+
 // ── Drug label: indications, boxed warnings, adverse reactions from the ────
 // approved label text (useful context when sourcing a mechanism/indication)
 async function fetchDrugLabel(drugName) {
@@ -91,6 +112,8 @@ async function fetchDrugLabel(drugName) {
     query: drugName,
     found: true,
     indicationsAndUsage: firstOrNull(r.indications_and_usage),
+    limitationsOfUse: extractLimitationsOfUse(firstOrNull(r.indications_and_usage)),
+    labelDate: labelDate(r.effective_time),
     boxedWarning: firstOrNull(r.boxed_warning),
     adverseReactionsSummary: firstOrNull(r.adverse_reactions),
     // openFDA names this section warnings_and_cautions on current-format
@@ -123,5 +146,5 @@ function firstOrNull(arr) {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { fetchApprovalHistory, fetchDrugLabel, fetchAdverseEventSummary, parseApprovalResponse, FDA_API_ROOT };
+  module.exports = { fetchApprovalHistory, fetchDrugLabel, fetchAdverseEventSummary, parseApprovalResponse, FDA_API_ROOT, extractLimitationsOfUse, labelDate };
 }

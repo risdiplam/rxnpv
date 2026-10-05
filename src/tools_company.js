@@ -174,6 +174,7 @@ function CompanyLookupTool({ cases, updateCase, activeCase, onWatchTrial }) {
             .concat(insiderResult.derivativeTransactions || [])
             .sort((a, b) => (b.date || "").localeCompare(a.date || ""));
           const sum = insiderResult.openMarketSummary || {};
+          const cl = insiderResult.buyCluster || findInsiderBuyCluster(insiderResult.transactions || []);
           const rows = insiderView === "market" ? market : grants;
           const tab = (key, label, n) => h("button", { key: key, onClick: () => setInsiderView(key),
             style: { padding: "4px 12px", borderRadius: 6, fontSize: 10, fontFamily: "var(--mono)", cursor: "pointer",
@@ -187,6 +188,11 @@ function CompanyLookupTool({ cases, updateCase, activeCase, onWatchTrial }) {
             // The headline is open-market activity only. A net figure that
             // folded in grants and tax withholding would be the standard way
             // this number stops meaning anything.
+            cl && h("div", { className: "insider-cluster", style: { fontSize: 11, fontFamily: "var(--mono)", color: cl.kind === "cluster" ? "var(--teal)" : "var(--ink-2)", marginBottom: 6, lineHeight: 1.6 } },
+              cl.kind === "cluster"
+                ? cl.insiders + " insiders bought within 30 days (" + cl.start + " to " + cl.end + ") · " + cl.count + " purchases" + (cl.totalUsd ? " · " + fmtMoney(cl.totalUsd) + " total" : "") + "."
+                : "One insider (" + cl.names[0] + "), " + cl.count + " purchases within 30 days (" + cl.start + " to " + cl.end + ")" + (cl.totalUsd ? " · " + fmtMoney(cl.totalUsd) : "") + " — usually one decision in tranches, not a cluster.",
+              h("div", { style: { color: "var(--ink-3)", fontSize: 10 } }, "Open-market purchases as filed. Purchases under a pre-arranged 10b5-1 plan are not distinguished (that is in the filing's footnotes, which are not read).")),
             sum.any
               ? h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-1)", lineHeight: 1.7, marginBottom: 8 } },
                   h("div", null,

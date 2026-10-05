@@ -642,13 +642,13 @@ function DecisionMemoSection({ theCase, rpt, cardStyle }) {
   try { m = buildDecisionMemo(theCase); } catch (e) { m = null; }
   if (!m) return null;
   const row = (label, ...vals) => h("tr", null,
-    h("td", { style: { padding: "5px 10px 5px 0", color: rpt.ink3, fontFamily: "var(--mono)", fontSize: 11, verticalAlign: "top", whiteSpace: "nowrap" } }, label),
+    h("td", { style: { padding: "5px 10px 5px 0", width: 150, minWidth: 150, color: rpt.ink3, fontFamily: "var(--mono)", fontSize: 11, verticalAlign: "top" } }, label),
     h("td", { style: { padding: "5px 0", fontSize: 12, lineHeight: 1.5, color: rpt.ink1 } }, ...vals));
   const sh = v => v == null || !isFinite(v) ? "—" : fmtShare(v);
   const vs = v => m.price && v != null && isFinite(v) ? " (" + (v >= m.price ? "+" : "−") + Math.abs(Math.round((v / m.price - 1) * 100)) + "%)" : "";
   const f = m.freshness;
   const ago = d => d == null ? "" : d <= 0 ? "today" : d + " day" + (d === 1 ? "" : "s") + " ago";
-  const months = v => v == null ? "beyond the 25-year projection" : v.toFixed(0) + " months";
+  const months = v => v == null ? "the modelled cash never runs out (cash flow turns positive first)" : v.toFixed(0) + " months";
   const cm = CHANGE_MY_MIND_FIELDS.filter(([k]) => (m.changeMyMind[k] || "").trim());
   const head = t => h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: rpt.ink3, textTransform: "uppercase", letterSpacing: "0.06em", margin: "14px 0 4px" } }, t);
   return h("div", { className: "decision-memo", style: { ...cardStyle, padding: "18px 20px" } },
@@ -675,7 +675,7 @@ function DecisionMemoSection({ theCase, rpt, cardStyle }) {
         m.floors.burn ? row("Burn to readout" + (m.floors.active === "burn" ? " (in use)" : ""), sh(m.floors.burn.perShare) + " a share — date from " + m.floors.burn.source + (m.floors.burn.why ? "; $0 because " + m.floors.burn.why : "")) : row("Burn to readout", "no monthly burn on the case"))) : h("div", { style: { fontSize: 12, color: rpt.ink2 } }, "—"),
     head("Cash to the catalyst"),
     h("table", { style: { borderCollapse: "collapse", width: "100%" } }, h("tbody", null,
-      m.runway && row("Runway", months(m.runway.months) + " on the model's own burn" + (m.runway.facilities.total > 0 ? "; " + months(m.runway.withFacilitiesMonths) + " with " + fmtMoney(m.runway.facilities.total) + " of undrawn ATM, debt and expected milestones" + (m.runway.facilities.note ? " (" + m.runway.facilities.note + ")" : "") : "")))),
+      m.runway && row("Runway", (m.runway.months == null ? months(null) : months(m.runway.months) + " on the model's own burn") + (m.runway.facilities.total > 0 && m.runway.months != null ? "; " + months(m.runway.withFacilitiesMonths) + " with " + fmtMoney(m.runway.facilities.total) + " of undrawn ATM, debt and expected milestones" + (m.runway.facilities.note ? " (" + m.runway.facilities.note + ")" : "") : "")))),
     m.options && head("What the options price"),
     m.options && h("div", { style: { fontSize: 12, lineHeight: 1.6 } },
       "About ±" + m.options.pct.toFixed(0) + "% (" + (m.options.basis === "straddle" ? "from the straddle" : "from implied volatility") + (m.options.asOf ? ", entered " + m.options.asOf : "") + ")" + (m.options.model ? "; your readout outcomes average ±" + m.options.model.pct.toFixed(0) + "%." : "."),

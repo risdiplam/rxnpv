@@ -829,6 +829,28 @@ function summarizeOpenMarketActivity(transactions) {
   };
 }
 
+// An insider-buying cluster (October 2026): the 30-day window holding the
+// most DISTINCT insiders buying on the open market (code P only: awards,
+// option exercises and withholding never count). Three or more insiders is a
+// cluster; several purchases by one insider is reported differently, since it
+// is usually one decision executed in tranches. Null when neither applies.
+function findInsiderBuyCluster(transactions, windowDays) {
+  const days = windowDays || 30;
+  const buys = (transactions || []).filter(t => t.code === "P" && t.date && t.ownerName).map(t => ({ ...t, ms: Date.parse(t.date) })).filter(t => isFinite(t.ms)).sort((a, b) => a.ms - b.ms);
+  let best = null;
+  buys.forEach((b, i) => {
+    const inWin = buys.filter(x => x.ms >= b.ms && x.ms <= b.ms + days * 86400000);
+    const names = [...new Set(inWin.map(x => x.ownerName))];
+    if (!best || names.length > best.insiders || (names.length === best.insiders && inWin.length > best.count)) {
+      best = { insiders: names.length, names, count: inWin.length, totalUsd: inWin.reduce((a, x) => a + (x.valueUsd || 0), 0), start: inWin[0].date, end: inWin[inWin.length - 1].date };
+    }
+  });
+  if (!best) return null;
+  if (best.insiders >= 3) return { ...best, kind: "cluster" };
+  if (best.insiders === 1 && best.count >= 3) return { ...best, kind: "single" };
+  return null;
+}
+
 async function fetchInsiderTransactions(cik, limit) {
   limit = limit || 20;
   const cikPadded = String(cik).replace(/\D/g, "").padStart(10, "0");
@@ -901,6 +923,7 @@ async function fetchInsiderTransactions(cik, limit) {
     // The one summary worth stating up front: money actually spent, and money
     // actually taken out. Grants are deliberately absent from both.
     openMarketSummary: summarizeOpenMarketActivity(transactions),
+    buyCluster: findInsiderBuyCluster(transactions),
     filingsChecked: filingRefs.length, filingsParsed: parsed.filter(Boolean).length
   };
 }

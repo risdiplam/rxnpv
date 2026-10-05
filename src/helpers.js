@@ -1546,7 +1546,8 @@ function computePortfolioCatalysts(cases, today) {
       if (!w || w.end < day) return;
       pins++;
       const row = rv && rv.ok ? rv.rows.find(r => r.label === (e.catalystLabel || "Catalyst") && r.dateText === e.catalystDate) : null;
-      const comps = ((c.competitorReads && c.competitorReads.rows) || []).map(r => ({ ...r, window: r.date ? parseCatalystWindow(String(r.date)) : null }))
+      const ownNcts = new Set([].concat(...(c.programs || []).map(q => String(q.trialIds || "").toUpperCase().match(/NCT\d{8}/g) || [])));
+      const comps = ((c.competitorReads && c.competitorReads.rows) || []).filter(r => !ownNcts.has(String(r.nctId || "").toUpperCase())).map(r => ({ ...r, window: r.date ? parseCatalystWindow(String(r.date)) : null }))
         .filter(r => r.window && r.window.end < w.start && r.window.end >= day).sort((a, b) => a.window.start - b.window.start).slice(0, 3);
       items.push({ caseName: caseDisplayName(c), caseId: c.id, program: p.drugName || p.name || "Program", label: e.catalystLabel || "Catalyst", date: e.catalystDate, window: w,
         type: catalystPinLabel(e.pin), source: e.pin.source || "", sharedTag: (e.pin.sharedTag || "").trim(), funding: row ? row.status : null, beyondHorizon: rv && rv.ok ? rv.beyondHorizon : false, competitors: comps });
@@ -1573,7 +1574,9 @@ function orderByCompletion(studies, opts) {
   const now = o.now || new Date();
   const floor = new Date(now.getFullYear(), now.getMonth() - (o.pastMonths == null ? 3 : o.pastMonths), 1);
   const pinStart = o.pinWindow ? o.pinWindow.start : null;
-  const rows = (studies || []).map(s => {
+  // The case's own registered trials are not competitors.
+  const own = new Set((o.excludeNcts || []).map(x => String(x).toUpperCase()));
+  const rows = (studies || []).filter(s => !own.has(String(s.nctId || "").toUpperCase())).map(s => {
     const raw = s.primaryCompletionDate || s.completionDate || null;
     const w = raw ? parseCatalystWindow(String(raw)) : null;
     return { nctId: s.nctId, sponsor: s.sponsor || "", title: s.title || "", phase: s.phase || "", status: s.status || "",
@@ -1582,7 +1585,7 @@ function orderByCompletion(studies, opts) {
   });
   const dated = rows.filter(r => r.window && r.window.end >= floor).sort((a, b) => a.window.start - b.window.start);
   const undated = rows.filter(r => !r.window);
-  return { rows: dated.slice(0, o.cap || 12), undated: undated.length, readsFirstCount: dated.filter(r => r.readsFirst).length, total: dated.length };
+  return { rows: dated.slice(0, o.cap || 12), undated: undated.length, readsFirstCount: dated.filter(r => r.readsFirst).length, total: dated.length, ownExcluded: (studies || []).length - rows.length };
 }
 
 // The case's next catalyst: the earliest pending pinned entry whose window

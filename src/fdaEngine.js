@@ -76,6 +76,17 @@ async function searchDrugApproval(brandName) {
   }
 }
 
+// The statutory exclusivity floor for a biologic (October 2026): 12 years of
+// reference-product exclusivity from first licensure, from the earliest BLA
+// approval Drugs@FDA records. A floor, not a patent expiry: patent litigation
+// can move the real date either way, and the Purple Book has no public API.
+function biologicExclusivityFloor(approvalResults) {
+  const dates = (approvalResults || []).filter(r => r.applicationType === "BLA" && /^\d{8}$/.test(r.firstApprovalDate || "")).map(r => r.firstApprovalDate).sort();
+  if (!dates.length) return null;
+  const d = dates[0];
+  return { firstLicensure: d.slice(0, 4) + "-" + d.slice(4, 6) + "-" + d.slice(6, 8), floor: (Number(d.slice(0, 4)) + 12) + "-" + d.slice(4, 6) + "-" + d.slice(6, 8) };
+}
+
 // ── Orange Book: patent expiry / loss-of-exclusivity ───────────────────────
 const FDA_ORANGE_BOOK = "https://api.fda.gov/drug/orangebook.json";
 
@@ -180,7 +191,7 @@ async function fetchExclusivity(brandName) {
           const types = [...new Set(approval.results.map(r => r.applicationType).filter(Boolean))];
           if (types.includes("BLA")) {
             reason = "\"" + name + "\" is a biologic (BLA). The Orange Book covers small molecules only — biologic exclusivity lives in the Purple Book, which has no public API. Biologics instead get 12 years of BLA data exclusivity from first licensure.";
-            return { ok: false, isBiologic: true, error: reason, approvalTypes: types };
+            return { ok: false, isBiologic: true, error: reason, approvalTypes: types, biologicFloor: biologicExclusivityFloor(approval.results) };
           }
           reason += " Drugs@FDA does list it (" + types.join(", ") + "), so it may be approved without listed patents, or listed under a different brand name.";
         } else {
