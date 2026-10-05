@@ -742,7 +742,7 @@ function h0(n) { return String(n); }
 // several relevant trials and forcing a one-trial-per-program data model
 // would be the wrong shape for that. First check on any NCT ID saves the
 // baseline with nothing to compare yet — that's expected, not an error.
-function TrialWatchTool({ activeCase, initialNctId, onConsumedInitialNctId, onReopen }) {
+function TrialWatchTool({ activeCase, updateCase, initialNctId, onConsumedInitialNctId, onReopen }) {
   const h = React.createElement;
   const [ctCondition, setCtCondition] = React.useState("non-small cell lung cancer");
   const [ctPhase, setCtPhase] = React.useState("PHASE2");
@@ -988,7 +988,30 @@ function TrialWatchTool({ activeCase, initialNctId, onConsumedInitialNctId, onRe
               h("div", null, (s.title || "untitled") + (s.sponsor ? " — " + s.sponsor : "") + (s.enrollment ? " · n=" + s.enrollment : ""))
             ))
           )
-        )
+        ),
+        // Who reads out first: the same trials by completion date, tagged
+        // against the open case's pinned catalyst.
+        ctSummary.studies.length > 0 && (() => {
+          const nc = activeCase ? nextCaseCatalyst(activeCase) : null;
+          const pin = nc && nc.pinned ? nc : null;
+          const ord = orderByCompletion(ctSummary.studies, { pinWindow: pin ? pin.window : null });
+          if (!ord.rows.length) return null;
+          return h("div", { className: "reads-first", style: { marginTop: 12, paddingTop: 10, borderTop: "1px dashed var(--rule)" } },
+            h("div", { style: { ...UI.caption, marginBottom: 4 } }, "Who reads out first (" + ord.rows.length + (ord.total > ord.rows.length ? " of " + ord.total : "") + ", by completion date)"),
+            h("div", { className: "prose", style: { fontSize: 10.5, fontFamily: "var(--sans)", color: "var(--ink-3)", marginBottom: 8, lineHeight: 1.5 } },
+              "A completion date is when a trial expects to stop collecting data, not when results come out." + (pin ? " Tagged \u201creads first\u201d where it falls before " + caseDisplayName(activeCase) + "'s pinned " + pin.entry.catalystDate + "." : " Pin a catalyst on the open case to see which of these come before it.")),
+            h("div", { style: { display: "flex", flexDirection: "column", gap: 4 } },
+              ord.rows.map(r => h("div", { key: r.nctId, style: { display: "flex", gap: 8, alignItems: "baseline", flexWrap: "wrap", fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-2)" } },
+                h("span", { style: { color: "var(--ink-1)", minWidth: 92 } }, r.date),
+                h("span", null, r.nctId + " · " + (r.sponsor || "—") + " · " + (r.phase || "—") + " · " + r.which),
+                r.readsFirst && h("span", { style: { color: "var(--warn)", fontWeight: 700 } }, "reads first")))),
+            ord.undated > 0 && h("div", { style: { ...UI.caption, marginTop: 4 } }, ord.undated + " with no completion date left out."),
+            activeCase && updateCase && h("button", { type: "button", "data-no-export": "",
+              onClick: () => updateCase({ ...activeCase, competitorReads: { condition: ctCondition, phase: ctPhase, at: localDateStamp(), rows: ord.rows.slice(0, 10).map(r => ({ nctId: r.nctId, sponsor: r.sponsor, phase: r.phase, date: r.date, which: r.which })) }, updatedAt: Date.now() }),
+              style: { marginTop: 8, padding: "4px 10px", borderRadius: 6, border: "1px solid var(--rule)", background: "transparent", color: "var(--ink-2)", fontFamily: "var(--mono)", fontSize: 10.5, cursor: "pointer" } },
+              activeCase.competitorReads ? "Update the competitor list saved to " + caseDisplayName(activeCase) : "Save to " + caseDisplayName(activeCase) + " for the Portfolio catalyst list"),
+            activeCase && activeCase.competitorReads && h("div", { style: { ...UI.caption, marginTop: 4 } }, "Saved " + activeCase.competitorReads.at + " from \u201c" + activeCase.competitorReads.condition + "\u201d."));
+        })()
       )
     ]),
 

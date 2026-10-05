@@ -18,6 +18,9 @@
 // checkboxes and this picker are two views of the same stored state, not two
 // competing ones.
 const REPORT_SECTIONS = [
+  // The one-page decision memo (October 2026): off by default, so existing
+  // reports are unchanged; the "Decision memo" preset shows it alone.
+  { id: "memo",         label: "Decision memo",            defaultOn: false, group: "Core" },
   { id: "glance",       label: "At a glance",              defaultOn: true,  group: "Core" },
   { id: "summary",      label: "Valuation summary",        defaultOn: true,  group: "Core" },
   { id: "programs",     label: "Programs & assumptions",   defaultOn: true,  group: "Core" },
@@ -158,7 +161,8 @@ function ReportView({ theCase, onBack, updateCase }) {
         h("div", { style: { display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 12 } },
           h("span", { style: { fontSize: 11, fontFamily: "var(--mono)", color: rpt.ink3, } }, "Include in report"),
           h("div", { style: { flex: 1 } }),
-          [["Everything", () => setAll(true)],
+          [["Decision memo", () => setPreset(["memo"])],
+           ["Everything", () => setAll(true)],
            ["Summary only", () => setPreset(["summary", "priceVsValue"])],
            ["Charts only", () => setPreset(["revenueChart", "cashFlow", "sensitivity", "cashRunway", "peakSalesComps", "pinned"])],
            ["Clear", () => setAll(false)]
@@ -227,6 +231,7 @@ function ReportView({ theCase, onBack, updateCase }) {
       ),
 
       error ? h("div", { style: { color: rpt.red } }, "Could not compute valuation: " + error) : h("div", null,
+        inc("memo") && h(DecisionMemoSection, { theCase, rpt, cardStyle }),
         // The case at a glance, as the report's opening picture (caseGlance.js).
         inc("glance") && valMethod === "dcf" && theCase.programs.length === 1 && (() => {
           let g = null, drivers = [];
@@ -624,4 +629,58 @@ function usePrintBackground(color) {
     root.style.setProperty("--print-bg", color);
     return () => root.style.removeProperty("--print-bg");
   }, [color]);
+}
+
+// ── The decision memo (October 2026) ───────────────────────────────────────
+// One page: what the case says, what the price says, what is left if it
+// fails, whether the cash reaches the catalyst, how fresh every input is,
+// and what would change the user's mind. Every figure from buildDecisionMemo,
+// the same functions the Overview reads; no generated prose.
+function DecisionMemoSection({ theCase, rpt, cardStyle }) {
+  const h = React.createElement;
+  let m = null;
+  try { m = buildDecisionMemo(theCase); } catch (e) { m = null; }
+  if (!m) return null;
+  const row = (label, ...vals) => h("tr", null,
+    h("td", { style: { padding: "5px 10px 5px 0", color: rpt.ink3, fontFamily: "var(--mono)", fontSize: 11, verticalAlign: "top", whiteSpace: "nowrap" } }, label),
+    h("td", { style: { padding: "5px 0", fontSize: 12, lineHeight: 1.5, color: rpt.ink1 } }, ...vals));
+  const sh = v => v == null || !isFinite(v) ? "—" : fmtShare(v);
+  const vs = v => m.price && v != null && isFinite(v) ? " (" + (v >= m.price ? "+" : "−") + Math.abs(Math.round((v / m.price - 1) * 100)) + "%)" : "";
+  const f = m.freshness;
+  const ago = d => d == null ? "" : d <= 0 ? "today" : d + " day" + (d === 1 ? "" : "s") + " ago";
+  const months = v => v == null ? "beyond the 25-year projection" : v.toFixed(0) + " months";
+  const cm = CHANGE_MY_MIND_FIELDS.filter(([k]) => (m.changeMyMind[k] || "").trim());
+  const head = t => h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: rpt.ink3, textTransform: "uppercase", letterSpacing: "0.06em", margin: "14px 0 4px" } }, t);
+  return h("div", { className: "decision-memo", style: { ...cardStyle, padding: "18px 20px" } },
+    h("div", { style: { fontSize: 17, fontWeight: 700, fontFamily: "var(--sans)", marginBottom: 2 } }, "Decision memo"),
+    h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: rpt.ink3 } }, m.name + (m.ticker ? " (" + m.ticker + ")" : "") + " · " + m.date),
+    head("Inputs and how fresh they are"),
+    h("table", { style: { borderCollapse: "collapse", width: "100%" } }, h("tbody", null,
+      row("Price", m.price ? fmtShare(m.price) + (f.price && f.price.asOf ? ", entered " + f.price.asOf + " (" + ago(f.price.days) + ")" : ", date not recorded") : "not entered"),
+      row("Cash", f.cash ? fmtMoney(f.cash.value) + (f.cash.asOf ? " as of " + f.cash.asOf + " (" + ago(f.cash.days) + ")" : ", date not recorded") + (f.cash.rolled ? ", rolled forward" : "") + ((theCase.capitalStructure || {}).cashSource ? " — " + theCase.capitalStructure.cashSource : "") : "not entered"),
+      row("Next catalyst", m.catalyst ? m.catalyst.label + ", " + m.catalyst.date + (m.catalyst.pinned ? " — pinned" + (m.catalyst.type ? " (" + m.catalyst.type + ")" : "") + (m.catalyst.source ? "; source: " + m.catalyst.source : "") : " — from the Calibration Log, not pinned") : "none dated"),
+      row("Odds", m.oddsSource ? Math.round(m.oddsSource.pct) + "% to launch, " + (m.oddsSource.source === "simulator" ? "from the trial simulator" : m.oddsSource.source === "typed" ? "your figure" : "the benchmark") : "—", m.oddsSourceText ? h("div", { style: { fontSize: 11, color: rpt.ink2, marginTop: 2 } }, m.oddsSourceText) : null))),
+    head("What the case says, and what the price says"),
+    h("table", { style: { borderCollapse: "collapse", width: "100%" } }, h("tbody", null,
+      row("Fair value", "Bear " + sh(m.scenarios.bear) + vs(m.scenarios.bear) + " · Base " + sh(m.scenarios.base) + vs(m.scenarios.base) + " · Bull " + sh(m.scenarios.bull) + vs(m.scenarios.bull)),
+      m.ifWorks != null && row("If it works", sh(m.ifWorks) + vs(m.ifWorks) + " — Base with the drug approved"),
+      m.odds && row("Odds to launch", "yours " + Math.round(m.odds.yoursPct) + "% · the price implies " + Math.round(m.odds.impliedPct) + "% · gap " + (m.odds.gapPts > 0 ? "+" : m.odds.gapPts < 0 ? "−" : "") + Math.abs(m.odds.gapPts) + " pts"),
+      m.implied && row("Also implied", m.implied.label + " " + (m.implied.suffix === "$" ? fmtMoney(m.implied.impliedValue) : m.implied.impliedValue.toFixed(1) + m.implied.suffix) + " against your " + (m.implied.suffix === "$" ? fmtMoney(m.implied.currentValue) : m.implied.currentValue.toFixed(1) + m.implied.suffix) + (m.implied.degenerate ? " (at the edge of the range searched)" : "")),
+      m.heldFixed && (m.odds || m.implied) && row("Held fixed", andList(m.heldFixed)),
+      !m.price && row("Price-implied", "set a price on the case to see what it implies"))),
+    head("If it fails"),
+    m.multiProgram ? h("div", { style: { fontSize: 12, color: rpt.ink2 } }, "No single failure floor — more than one program, and one failure leaves the others standing.")
+      : m.floors ? h("table", { style: { borderCollapse: "collapse", width: "100%" } }, h("tbody", null,
+        row("Stage cost" + (m.floors.active === "stage" ? " (in use)" : ""), sh(m.floors.stage.perShare) + " a share — charging the rest of " + m.floors.stage.stageLabel + " at its benchmark cost" + (m.floors.stage.why ? "; $0 because " + m.floors.stage.why : "")),
+        m.floors.burn ? row("Burn to readout" + (m.floors.active === "burn" ? " (in use)" : ""), sh(m.floors.burn.perShare) + " a share — date from " + m.floors.burn.source + (m.floors.burn.why ? "; $0 because " + m.floors.burn.why : "")) : row("Burn to readout", "no monthly burn on the case"))) : h("div", { style: { fontSize: 12, color: rpt.ink2 } }, "—"),
+    head("Cash to the catalyst"),
+    h("table", { style: { borderCollapse: "collapse", width: "100%" } }, h("tbody", null,
+      m.runway && row("Runway", months(m.runway.months) + " on the model's own burn" + (m.runway.facilities.total > 0 ? "; " + months(m.runway.withFacilitiesMonths) + " with " + fmtMoney(m.runway.facilities.total) + " of undrawn ATM, debt and expected milestones" + (m.runway.facilities.note ? " (" + m.runway.facilities.note + ")" : "") : "")))),
+    m.options && head("What the options price"),
+    m.options && h("div", { style: { fontSize: 12, lineHeight: 1.6 } },
+      "About ±" + m.options.pct.toFixed(0) + "% (" + (m.options.basis === "straddle" ? "from the straddle" : "from implied volatility") + (m.options.asOf ? ", entered " + m.options.asOf : "") + ")" + (m.options.model ? "; your readout outcomes average ±" + m.options.model.pct.toFixed(0) + "%." : "."),
+      m.options.reading ? h("div", { style: { color: rpt.ink2 } }, m.options.reading.verdict + " " + m.options.reading.text) : null),
+    head("What would change my mind"),
+    cm.length ? h("table", { style: { borderCollapse: "collapse", width: "100%" } }, h("tbody", null, cm.map(([k, label]) => row(label, m.changeMyMind[k]))))
+      : h("div", { style: { fontSize: 12, color: rpt.ink3 } }, "Not written yet — the Evidence tab has four short fields for it."));
 }

@@ -391,22 +391,7 @@ function CaseView({ theCase, onChange, onDelete, onNavigateToTools, onReopenSave
     // unscored prediction is visible without hunting for it. Only counts a
     // catalyst as overdue when its date is unambiguously parseable — see
     // parseCatalystDate; a "H1 2027"-style entry stays simply open.
-    (() => {
-      // Only once a catalyst date has passed, when there is something to do:
-      // a prediction that is simply still open is already counted on the
-      // Calibration tab's badge, and a banner for it sat under every case
-      // header for months at a time.
-      const { overdue } = pendingCalibrationEntries(theCase);
-      if (overdue.length === 0) return null;
-      const detail = overdue.slice(0, 3).map(e => e.programName + " — " + (e.catalystLabel || "prediction") + (e.catalystDate ? " (" + e.catalystDate + ")" : "")).join(" · ");
-      return h("div", { style: { padding: "7px 14px", marginBottom: 16, background: "var(--surface)", borderLeft: "2px solid var(--teal)", borderRadius: 4, fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-2)", lineHeight: 1.6 } },
-        h("div", null,
-              h("span", { style: { color: "var(--teal)", fontWeight: 700 } }, overdue.length + " calibration prediction" + (overdue.length > 1 ? "s" : "") + " past its catalyst date"),
-              " — score " + (overdue.length > 1 ? "them" : "it") + " against what actually happened, in the program's Calibration Log. ",
-              tab !== "calibration" && h("button", { type: "button", className: "link-btn", onClick: () => setTab("calibration") }, "Open Calibration →"),
-              h("div", { style: { fontSize: 10, color: "var(--ink-3)", marginTop: 3 } }, detail + (overdue.length > 3 ? " · +" + (overdue.length - 3) + " more" : "")))
-      );
-    })(),
+    h(CalibrationNudge, { theCase, update, tab, setTab }),
 
     // ── Case sub-tabs (September 2026) ────────────────────────────────────
     // One long page became five tabs. Every tab stays mounted and the
@@ -517,6 +502,7 @@ function CaseView({ theCase, onChange, onDelete, onNavigateToTools, onReopenSave
 
     panel("evidence",
       vs.evidence,
+      theCase.programs.length > 0 && h(ChangeMyMindCard, { theCase, update }),
       theCase.programs.length > 0 && programPicker(false),
       editorFor("evidence")
     ),
@@ -527,4 +513,78 @@ function CaseView({ theCase, onChange, onDelete, onNavigateToTools, onReopenSave
     ),
     panel("saved", tab === "saved" && h(SavedPanel, { theCase, onChange: update, onReopen: onReopenSaved }))
   );
+}
+
+// What would change my mind (October 2026): four short, optional answers,
+// written before the catalyst and printed verbatim in the decision memo —
+// the part to re-read on readout morning. Case-level, stored as theCase.memo.
+const CHANGE_MY_MIND_FIELDS = [
+  ["efficacy", "Efficacy bar", "e.g. the readout needs at least a 40% cut in seizures against sham"],
+  ["safety", "Safety bar", "e.g. any CSF-protein signal that leads to a dosing change"],
+  ["cash", "Cash and dilution bar", "e.g. a raise above $150M before the readout"],
+  ["competitor", "Competitor bar", "e.g. Encoded's ETX101 showing a comparable effect first"]
+];
+function ChangeMyMindCard({ theCase, update }) {
+  const h = React.createElement;
+  const m = theCase.memo || {};
+  const filled = CHANGE_MY_MIND_FIELDS.filter(([k]) => (m[k] || "").trim()).length;
+  return h(SectionCard, { title: "What would change my mind", subtitle: "Written before the catalyst, printed in the decision memo" + (filled ? " · " + filled + " of 4 filled" : ""), defaultOpen: filled > 0 },
+    h("div", { className: "prose", style: { ...UI.caption, marginBottom: 10, lineHeight: 1.6 } }, "Short and specific: the result, event or number that would make you sell, size down or stop waiting. Each is optional and printed as you write it."),
+    h("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 12 } },
+      CHANGE_MY_MIND_FIELDS.map(([k, label, ph]) => h("label", { key: k, style: { display: "flex", flexDirection: "column", gap: 4, fontSize: 12, fontFamily: "var(--sans)", color: "var(--ink-2)" } },
+        label,
+        h("textarea", { value: m[k] || "", rows: 2, placeholder: ph, "aria-label": label, onChange: e => update({ memo: { ...m, [k]: e.target.value } }),
+          style: { padding: "7px 10px", borderRadius: 6, border: "1.5px solid var(--rule)", background: "var(--surface)", color: "var(--ink-1)", fontFamily: "var(--sans)", fontSize: 12, resize: "vertical" } })))));
+}
+
+// Calibration nudge, and closing out a pinned catalyst (October 2026). Once a
+// catalyst's date (a window's END) has passed, the banner says so; a pinned
+// one gets "Close out": what happened, the result where it was a scored
+// prediction, and what it changed — written to the same Calibration Log
+// entry — then the offer of a fresh, dated model snapshot, so the before
+// and after both exist. Only when the user means to keep it.
+function CalibrationNudge({ theCase, update, tab, setTab }) {
+  const h = React.createElement;
+  const [open, setOpen] = React.useState(null); // entryId being closed out
+  const [form, setForm] = React.useState({ happened: "", outcome: "pending", changed: "" });
+  const [after, setAfter] = React.useState(null); // { programId } once saved
+  const { overdue } = pendingCalibrationEntries(theCase);
+  const saveCloseOut = (row) => {
+    const programs = theCase.programs.map(p => p.id !== row.programId ? p : { ...p, calibrationLog: (p.calibrationLog || []).map(e => e.id !== row.entryId ? e : {
+      ...e, outcome: form.outcome === "pending" ? (e.outcome || "pending") : form.outcome,
+      closeOut: { at: localDateStamp(), happened: form.happened.trim(), changed: form.changed.trim() } }) });
+    update({ programs });
+    setOpen(null); setAfter({ programId: row.programId, label: row.catalystLabel });
+  };
+  const snapshot = () => {
+    const prog = theCase.programs.find(p => p.id === after.programId);
+    const entry = buildModelSnapshot(theCase);
+    if (prog && entry) update({ programs: theCase.programs.map(p => p.id !== prog.id ? p : { ...p, evidenceLog: addModelSnapshot(p.evidenceLog || [], entry, () => newId("ev")).log }) });
+    setAfter(null);
+  };
+  if (after) return h("div", { className: "closeout-done", style: { padding: "7px 14px", marginBottom: 16, background: "var(--surface)", borderLeft: "2px solid var(--teal)", borderRadius: 4, fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-2)", display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" } },
+    h("span", null, "Closed out \u201c" + (after.label || "the catalyst") + "\u201d. Take a fresh model snapshot, so the Evidence Log holds the before and the after?"),
+    h("button", { type: "button", className: "link-btn", onClick: snapshot }, "Take a snapshot"),
+    h("button", { type: "button", className: "link-btn", onClick: () => setAfter(null) }, "Not now"));
+  if (overdue.length === 0) return null;
+  const detail = overdue.slice(0, 3).map(e => e.programName + " — " + (e.catalystLabel || "prediction") + (e.catalystDate ? " (" + e.catalystDate + ")" : "")).join(" · ");
+  const pinnedDue = overdue.filter(e => e.pinned).slice(0, 3);
+  const inputStyle = { padding: "5px 8px", borderRadius: 5, border: "1px solid var(--rule)", background: "var(--surface)", color: "var(--ink-1)", fontFamily: "var(--mono)", fontSize: 11 };
+  return h("div", { style: { padding: "7px 14px", marginBottom: 16, background: "var(--surface)", borderLeft: "2px solid var(--teal)", borderRadius: 4, fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-2)" } },
+    h("div", null,
+      h("span", { style: { color: "var(--teal)", fontWeight: 700 } }, overdue.length + " calibration prediction" + (overdue.length > 1 ? "s" : "") + " past its catalyst date"),
+      " — score " + (overdue.length > 1 ? "them" : "it") + " against what actually happened, in the program's Calibration Log. ",
+      tab !== "calibration" && h("button", { type: "button", className: "link-btn", onClick: () => setTab("calibration") }, "Open Calibration →"),
+      h("div", { style: { fontSize: 10, color: "var(--ink-3)", marginTop: 3 } }, detail + (overdue.length > 3 ? " · +" + (overdue.length - 3) + " more" : ""))),
+    pinnedDue.map(row => h("div", { key: row.entryId, className: "closeout", style: { marginTop: 6 } },
+      open !== row.entryId
+        ? h("button", { type: "button", className: "link-btn", onClick: () => { setOpen(row.entryId); setForm({ happened: "", outcome: "pending", changed: "" }); } }, "Close out \u201c" + (row.catalystLabel || "the catalyst").split(/[,(]/)[0].trim() + "\u201d")
+        : h("div", { style: { display: "flex", flexDirection: "column", gap: 6, marginTop: 4, maxWidth: 640 } },
+            h("input", { type: "text", value: form.happened, "aria-label": "What happened", placeholder: "What happened (your words)", onChange: e => setForm({ ...form, happened: e.target.value }), style: inputStyle }),
+            h("select", { value: form.outcome, "aria-label": "Result", onChange: e => setForm({ ...form, outcome: e.target.value }), style: inputStyle },
+              h("option", { value: "pending" }, "Result: leave unscored"), h("option", { value: "success" }, "Success"), h("option", { value: "failure" }, "Failure")),
+            h("input", { type: "text", value: form.changed, "aria-label": "What this changed", placeholder: "What this changed in the thesis", onChange: e => setForm({ ...form, changed: e.target.value }), style: inputStyle }),
+            h("div", { style: { display: "flex", gap: 8 } },
+              h("button", { type: "button", onClick: () => saveCloseOut(row), style: { padding: "4px 12px", borderRadius: 5, border: "none", background: "var(--teal-fill)", color: "var(--on-teal)", fontFamily: "var(--mono)", fontSize: 11, fontWeight: 700, cursor: "pointer" } }, "Save close-out"),
+              h("button", { type: "button", onClick: () => setOpen(null), style: { padding: "4px 12px", borderRadius: 5, border: "1px solid var(--rule)", background: "transparent", color: "var(--ink-2)", fontFamily: "var(--mono)", fontSize: 11, cursor: "pointer" } }, "Cancel"))))));
 }

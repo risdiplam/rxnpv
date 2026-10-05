@@ -5115,7 +5115,7 @@ section("Raise priced as a discount to today, the Napkin-vs-build flag, the mode
   // The snapshot quotes the engine's own numbers.
   const snap = api.buildModelSnapshot(st, "2026-09-28");
   const v = k => api.computeCaseValuation(st, api.getEffectiveScenarioPreset(st, k), k, 12, st.terminalValue).equity.perShare.toFixed(2);
-  ok("snapshot: dated, labelled, and quotes Bear/Base/Bull as the engine computes them", snap.date === "2026-09-28" && snap.label === "What the model says (snapshot)" &&
+  ok("snapshot: dated, labelled, and quotes Bear/Base/Bull as the engine computes them", snap.date === "2026-09-28" && snap.label === "What the model says (snapshot, 2026-09-28)" &&
     snap.thesis.includes("Base fair value ~$" + v("base")) && snap.thesis.includes("Bear ~$" + v("bear")) && snap.thesis.includes("Bull ~$" + v("bull")));
   ok("snapshot: the price-implied odds against the case's 65%", /The price implies ~55% odds of launch against this case's 65%/.test(snap.thesis));
   ok("snapshot: the failure floor by the case's method", /if the next readout fails, ~\$1\.30 is left \(the filing's cash/.test(snap.thesis));

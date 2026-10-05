@@ -425,8 +425,10 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
     const snapCase = () => JSON.parse(w.localStorage.getItem("rxnpv_cases_v1")).find(c => c.name === "Stoke Therapeutics — sample case");
     const nBefore = snapCase().programs[0].evidenceLog.length;
     if (snapBtn) { click(snapBtn); await wait(400); }
-    const snapEntries = snapCase().programs[0].evidenceLog.filter(e => e.label === "What the model says (snapshot)");
-    ok(snapEntries.length === 1 && snapCase().programs[0].evidenceLog.length === nBefore && /^Generated from this case's model on /.test(snapEntries[0].source) && /Base fair value ~\$28\.76/.test(snapEntries[0].thesis),
+    // Snapshots are kept, dated (October 2026): a new dated entry is added
+    // beside the sample's undated one.
+    const snapEntries = snapCase().programs[0].evidenceLog.filter(e => /^What the model says \(snapshot, \d{4}-\d\d-\d\d\)$/.test(e.label));
+    ok(snapEntries.length === 1 && snapCase().programs[0].evidenceLog.length === nBefore + 1 && /^Generated from this case's model on /.test(snapEntries[0].source) && /Base fair value ~\$28\.76/.test(snapEntries[0].thesis),
       "Snapshot: replaces the one snapshot entry in place with the model's own figures (" + (snapEntries[0] && snapEntries[0].thesis.slice(0, 80)) + ")");
     click(d.getElementById("casetab-overview")); await wait(300);
 

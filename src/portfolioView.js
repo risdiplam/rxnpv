@@ -51,6 +51,8 @@ function PortfolioView({ cases }) {
       )
     ),
 
+    h(PortfolioCatalysts, { cases }),
+
     broken.length > 0 && h("div", { style: { padding: "10px 14px", borderRadius: 8, background: "var(--red-bg)", border: "1px solid var(--red)", marginBottom: 18, fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-2)" } },
       broken.map(s => h("div", { key: s.id }, h("b", { style: { color: "var(--red)" } }, s.name), ": " + s.error))
     ),
@@ -111,4 +113,43 @@ function PortfolioView({ cases }) {
       );
     })()
   );
+}
+
+// Upcoming catalysts across the book (October 2026): pins only, window first,
+// each with whether that case's cash reaches it. A registry completion date
+// never appears here as a catalyst; competitor completions saved from Trial
+// Explorer show beneath a case as "competitor completion — not your catalyst".
+const PORTFOLIO_FUNDING = {
+  funded: ["Funded through it", "var(--teal)"], tight: ["Reaches it on fumes", "var(--warn)"],
+  inside: ["Runs out inside the window", "var(--red)"], gap: ["Runs out first", "var(--red)"]
+};
+function PortfolioCatalysts({ cases }) {
+  const h = React.createElement;
+  const [showComp, setShowComp] = React.useState(() => { try { return localStorage.getItem("rxnpv_portfolio_competitors") !== "0"; } catch (e) { return true; } });
+  let pc = null;
+  try { pc = computePortfolioCatalysts(cases); } catch (e) { pc = null; }
+  if (!pc) return null;
+  const toggleComp = () => { const v = !showComp; setShowComp(v); try { localStorage.setItem("rxnpv_portfolio_competitors", v ? "1" : "0"); } catch (e) { /* per-viewer convenience only */ } };
+  return h(ExportSection, { title: "Upcoming catalysts", style: { background: "var(--surface)", border: "1px solid var(--rule)", borderRadius: 10, padding: "16px 18px", marginBottom: 18 } },
+    h("div", { style: { fontFamily: "var(--display)", fontSize: 16, fontWeight: 600, color: "var(--ink-1)", marginBottom: 4 } }, "Upcoming catalysts"),
+    h("div", { className: "prose", style: { ...UI.caption, marginBottom: 10, lineHeight: 1.6 } },
+      "Pinned catalysts across your cases, earliest first, with whether each company's modelled cash reaches it." +
+      (pc.noPin ? " " + pc.noPin + " case" + (pc.noPin === 1 ? " has" : "s have") + " no pinned catalyst and " + (pc.noPin === 1 ? "is" : "are") + " not listed." : "")),
+    pc.count === 0 && h("div", { style: UI.captionMd }, "No pinned catalysts yet — pin one in a case's Calibration Log."),
+    pc.sharedTags.length > 0 && h("div", { style: { ...UI.caption, marginBottom: 8 } }, "Shared readouts (the same tag on more than one case): " + pc.sharedTags.join(", ") + ". Two names reading out on the same event are one bet, not two."),
+    pc.groups.map(g => h("div", { key: g.quarter, style: { marginBottom: 10 } },
+      h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", letterSpacing: "0.05em", marginBottom: 4 } }, g.quarter),
+      g.items.map((it, i) => h("div", { key: it.caseId + i, className: "portfolio-catalyst", style: { padding: "7px 10px", borderRadius: 7, background: "var(--surface-2)", marginBottom: 5 } },
+        h("div", { style: { display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap", fontSize: 12, fontFamily: "var(--mono)" } },
+          h("span", { style: { color: "var(--ink-1)" } }, h("b", null, it.date), " · " + it.caseName + " · " + it.label.split(/[,(]/)[0].trim() + " (" + it.type + ")"),
+          it.funding ? h("span", { style: { color: PORTFOLIO_FUNDING[it.funding][1], fontWeight: 700 } }, it.beyondHorizon ? "Funded (cash never runs out in the model)" : PORTFOLIO_FUNDING[it.funding][0])
+            : h("span", { style: { color: "var(--ink-3)" } }, "no runway figure")),
+        h("div", { style: { fontSize: 10.5, fontFamily: "var(--mono)", color: "var(--ink-3)", marginTop: 2 } }, (it.source ? "Source: " + it.source : "no source given") + (it.sharedTag ? " · shared: " + it.sharedTag : "")),
+        showComp && it.competitors.map(cmp => h("div", { key: cmp.nctId, style: { fontSize: 10.5, fontFamily: "var(--mono)", color: "var(--ink-2)", marginTop: 2, paddingLeft: 12 } },
+          "↳ " + cmp.date + " · " + (cmp.sponsor || cmp.nctId) + " · " + (cmp.phase || "") + " — competitor " + (cmp.which || "completion") + ", not your catalyst · reads first")))))),
+    pc.groups.some(g => g.items.some(it => it.competitors.length)) && h("button", { type: "button", className: "link-btn", "data-no-export": "", onClick: toggleComp, style: { fontSize: 11 } }, showComp ? "Hide competitor completions" : "Show competitor completions"),
+    pc.resolved.length > 0 && h("div", { style: { marginTop: 10 } },
+      h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginBottom: 4 } }, "Resolved in the last 90 days"),
+      pc.resolved.map((r, i) => h("div", { key: i, style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-2)" } },
+        r.date + " · " + r.caseName + " · " + r.label.split(/[,(]/)[0].trim() + " — " + (r.outcome && r.outcome !== "pending" ? r.outcome : "closed out") + (r.closeOut.happened ? ": " + r.closeOut.happened : "")))));
 }

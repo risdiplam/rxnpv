@@ -1371,6 +1371,16 @@ function computeDilutionPath(theCase, scenario, discountRateBasePct, opts) {
 // current reading, not a history (versioned snapshots are deliberately not
 // built). today: "YYYY-MM-DD" (defaults to the case's valuationDate or today).
 const MODEL_SNAPSHOT_LABEL = "What the model says (snapshot)";
+// Snapshots are kept, dated (October 2026): each is labelled with its date,
+// so the Evidence Log holds what the model said before a readout beside what
+// it said after. A second snapshot on the same day replaces that day's.
+function modelSnapshotLabel(date) { return "What the model says (snapshot, " + date + ")"; }
+function isModelSnapshot(e) { return !!(e && typeof e.label === "string" && e.label.indexOf("What the model says (snapshot") === 0); }
+function addModelSnapshot(log, entry, makeId) {
+  const list = log || [];
+  const at = list.findIndex(e => e.label === entry.label);
+  return { log: at >= 0 ? list.map((e, i) => i === at ? { ...e, ...entry } : e) : [...list, { id: makeId ? makeId() : undefined, ...entry }], replaced: at >= 0 };
+}
 // How old the inputs behind the headline are (October 2026). The fair value,
 // the odds the price implies and the failure floor are all arithmetic on a
 // typed price and a filed cash balance; acting on a two-week-old price or a
@@ -1468,7 +1478,7 @@ function buildModelSnapshot(theCase, today) {
     if (fr.odds) bits.push("odds " + (fr.odds.source === "simulator" ? "from the simulator" + (fr.odds.at ? " (" + fr.odds.at + ")" : "") : fr.odds.source === "typed" ? "typed" : "the benchmark"));
     if (bits.length) parts.push("Inputs: " + andList(bits) + ".");
   } catch (e) { /* the snapshot stands without it */ }
-  return { label: MODEL_SNAPSHOT_LABEL, classification: "inference", confidence: "moderate", source: "Generated from this case's model on " + date, date, thesis: parts.join(" ") };
+  return { label: modelSnapshotLabel(date), classification: "inference", confidence: "moderate", source: "Generated from this case's model on " + date, date, thesis: parts.join(" ") };
 }
 
 // ── Red flags the user has marked "considered" ─────────────────────────────
@@ -1935,4 +1945,98 @@ function computeFullCaseMonteCarlo(theCase, discountRateBasePct, terminalValuePa
   ].sort((a, b) => Math.abs(b.correlation) - Math.abs(a.correlation));
 
   return { ok: true, iterations, validTrials: perShares.length, errors, mean, percentiles: pctiles, drivers, sortedValues: sorted };
+}
+
+// ── Options-implied move (October 2026) ────────────────────────────────────
+// Typed in, never fetched: an at-the-money straddle's price is close to the
+// expected absolute move to expiry, so straddle ÷ price; from implied
+// volatility, the expected absolute move is σ√t × √(2/π). o: { straddle,
+// iv (annual %), days (to expiry) }. Null without enough to compute it.
+function optionsImpliedMove(o, price) {
+  const P = numOr(price, 0);
+  const st = numOr(o && o.straddle, 0), iv = numOr(o && o.iv, 0), days = numOr(o && o.days, 0);
+  if (st > 0 && P > 0) return { pct: st / P * 100, basis: "straddle" };
+  if (iv > 0 && days > 0) return { pct: (iv / 100) * Math.sqrt(days / 365) * Math.sqrt(2 / Math.PI) * 100, basis: "iv" };
+  return null;
+}
+// The move the model expects across the readout: each outcome's value with
+// its probability, against today's price. outcomes: [{ prob, value }].
+function modelImpliedMove(price, outcomes) {
+  const P = numOr(price, 0);
+  if (!(P > 0) || !outcomes || !outcomes.length) return null;
+  let pct = 0, upP = 0, up = 0, downP = 0, down = 0;
+  outcomes.forEach(o => {
+    const m = (o.value - P) / P * 100;
+    pct += o.prob * Math.abs(m);
+    if (m >= 0) { upP += o.prob; up += o.prob * m; } else { downP += o.prob; down += o.prob * m; }
+  });
+  return { pct, upPct: upP > 0 ? up / upP : null, upProb: upP, downPct: downP > 0 ? down / downP : null, downProb: downP };
+}
+// One sentence: which prices the bigger swing. Never says which is right.
+function readImpliedMove(optionsPct, modelPct) {
+  if (!(optionsPct > 0) || !(modelPct > 0)) return null;
+  const r = optionsPct / modelPct;
+  if (r > 1.25) return { verdict: "Options price a bigger move than your model.", text: "The market expects a swing of about ±" + optionsPct.toFixed(0) + "%; your outcomes average ±" + modelPct.toFixed(0) + "%. Either your win and miss values are closer together than the market thinks, or the options are rich — buying them pays only if the move beats ±" + optionsPct.toFixed(0) + "%." };
+  if (r < 0.8) return { verdict: "Your model expects a bigger move than the options price.", text: "Your outcomes average a ±" + modelPct.toFixed(0) + "% move against about ±" + optionsPct.toFixed(0) + "% in the options. Either the market doubts the readout matters as much as your values say, or the options are cheap for the event." };
+  return { verdict: "Options and your model expect about the same move.", text: "About ±" + optionsPct.toFixed(0) + "% in the options against ±" + modelPct.toFixed(0) + "% from your outcomes — the size of the swing is not where you and the market differ." };
+}
+
+// ── The one-page decision memo (October 2026) ──────────────────────────────
+// Everything the memo prints, from the same functions the Overview uses, so
+// the memo and the screen cannot disagree. Pure apart from the clock.
+function buildDecisionMemo(theCase, today) {
+  if (!theCase || !theCase.programs || !theCase.programs.length) return null;
+  const now = today || new Date();
+  const dr = theCase.discountRatePct !== "" && theCase.discountRatePct != null ? Number(theCase.discountRatePct) : DISCOUNT_RATE_GUIDANCE.earlyBiotechSelfView[0];
+  const tv0 = theCase.terminalValue || { enabled: false };
+  const tv = { enabled: tv0.enabled, method: tv0.method, growthPct: tv0.growthPct, exitMultiple: tv0.exitMultiple };
+  const price = numOr(theCase.currentPrice, 0) > 0 ? Number(theCase.currentPrice) : null;
+  const one = theCase.programs.length === 1;
+  const val = k => { try { return computeCaseValuation(theCase, getEffectiveScenarioPreset(theCase, k), k, dr, tv).equity.perShare; } catch (e) { return null; } };
+  let ifWorks = null;
+  try { ifWorks = computeCaseValuation({ ...theCase, programs: theCase.programs.map(p => ({ ...p, posOverridePct: "100" })) }, SCENARIO_PRESETS.base, "base", dr, tv).equity.perShare; } catch (e) { ifWorks = null; }
+  let odds = null, implied = null;
+  if (one && price) {
+    try {
+      const im = solveImpliedPoSMultiplier(theCase, dr, tv);
+      if (im && im.ok && !im.degenerate && im.baseAbsolutePct != null) odds = { yoursPct: im.baseAbsolutePct, impliedPct: im.impliedAbsolutePct, gapPts: Math.round(im.impliedAbsolutePct) - Math.round(im.baseAbsolutePct) };
+    } catch (e) { odds = null; }
+    try {
+      const variable = (theCase.programs[0].revenueMode || "quick") === "full" ? "peakShare" : "peakRevenue";
+      const iv = solveImpliedVariable(theCase, dr, tv, variable);
+      if (iv && iv.ok) implied = { variable, label: iv.label, impliedValue: iv.impliedValue, currentValue: iv.currentValue, suffix: iv.suffix, degenerate: iv.degenerate || null };
+    } catch (e) { implied = null; }
+  }
+  const fresh = computeFreshness(theCase, now);
+  let floors = null;
+  try {
+    const fp = computeFailureFloorPair(theCase);
+    if (fp) floors = { active: fp.active, stage: { perShare: fp.stage.perShare, why: floorZeroReason(fp.stage), stageLabel: fp.stage.stageLabel }, burn: fp.burn ? { perShare: fp.burn.perShare, why: floorZeroReason(fp.burn), source: fp.burn.readoutSource } : null };
+  } catch (e) { floors = null; }
+  let runway = null;
+  try {
+    const fr = computeForwardRunway(theCase);
+    const fac = caseFacilities(theCase);
+    runway = { months: fr.runwayMonths, facilities: fac, withFacilitiesMonths: fac.total > 0 ? computeForwardRunway(theCase, { extraCash: fac.total }).runwayMonths : null };
+  } catch (e) { runway = null; }
+  let options = null;
+  const om = theCase.optionsMove;
+  if (om && price) {
+    const o = optionsImpliedMove(om, price);
+    let model = null;
+    try {
+      const rs = one ? computeReadoutScenarios(theCase, dr, tv) : null;
+      if (rs) model = modelImpliedMove(price, rs.rows.map(r => ({ prob: r.prob, value: r.value })));
+    } catch (e) { model = null; }
+    if (o) options = { pct: o.pct, basis: o.basis, asOf: om.asOf || null, model, reading: model ? readImpliedMove(o.pct, model.pct) : null };
+  }
+  const p0 = theCase.programs[0];
+  return {
+    name: theCase.name || "Case", ticker: theCase.ticker || "", date: localDateStamp(now),
+    price, scenarios: { bear: val("bear"), base: val("base"), bull: val("bull") }, ifWorks,
+    odds, oddsSource: fresh.odds, oddsSourceText: one && posFromSimulator(p0) ? describePosSource(p0.posSource) : "",
+    implied, heldFixed: one ? impliedHeldFixed(theCase) : null,
+    floors, multiProgram: !one, runway, catalyst: fresh.catalyst, freshness: fresh, options,
+    changeMyMind: theCase.memo || {}
+  };
 }

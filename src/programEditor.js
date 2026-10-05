@@ -723,14 +723,16 @@ function ProgramEditor({ program, onChange, onDelete, discountRatePct, terminalV
       const [editingIdx, setEditingIdx] = React.useState(null);
       const [snapMsg, setSnapMsg] = React.useState(null);
       const log = program.evidenceLog || [];
-      // The snapshot entry, written from the live model: replaces the one
-      // already in the log (same id, same place) or adds it at the end.
+      // The snapshot entry, written from the live model and dated: a new
+      // entry each day, kept, so the log shows what the model said before a
+      // readout beside what it says after (today's is replaced if re-taken).
       const writeSnapshot = () => {
         const entry = theCase ? buildModelSnapshot({ ...theCase, programs: (theCase.programs || []).map(p => p.id === program.id ? program : p) }) : null;
         if (!entry) { setSnapMsg("Nothing to snapshot yet — the case needs a value first."); return; }
-        const at = log.findIndex(e => e.label === MODEL_SNAPSHOT_LABEL);
-        set("evidenceLog", at >= 0 ? log.map((e, i) => i === at ? { ...e, ...entry } : e) : [...log, { id: newId("ev"), ...entry }]);
-        setSnapMsg((at >= 0 ? "Snapshot updated" : "Snapshot added") + " — " + entry.date + ".");
+        const r = addModelSnapshot(log, entry, () => newId("ev"));
+        set("evidenceLog", r.log);
+        const n = r.log.filter(isModelSnapshot).length;
+        setSnapMsg((r.replaced ? "Today's snapshot updated" : "Snapshot added") + " — " + entry.date + (n > 1 ? "; " + n + " kept, dated." : "."));
       };
 
       const addEntry = (entry) => {
@@ -776,7 +778,7 @@ function ProgramEditor({ program, onChange, onDelete, discountRatePct, terminalV
               )
         ),
         h("div", { style: { display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", margin: "4px 0 8px" } },
-          h("button", { type: "button", onClick: writeSnapshot, title: "Writes “" + MODEL_SNAPSHOT_LABEL + "” from the model as it stands — price, Bear/Base/Bull, the odds the price implies, the value if it works or fails, and what moves it most. Replaces the existing snapshot entry.",
+          h("button", { type: "button", onClick: writeSnapshot, title: "Writes a dated “" + MODEL_SNAPSHOT_LABEL + "” entry from the model as it stands — price, Bear/Base/Bull, the odds the price implies, the value if it works or fails, what moves it most, and how fresh the inputs are. Earlier snapshots are kept; one taken again today replaces today's.",
             style: { padding: "6px 14px", minHeight: 28, borderRadius: 6, border: "1px solid var(--teal)", background: "var(--teal-bg)", color: "var(--teal)", fontFamily: "var(--mono)", fontSize: 11, fontWeight: 700, cursor: "pointer" } }, "Snapshot from the model"),
           snapMsg && h("span", { role: "status", style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-3)" } }, snapMsg)),
         showForm

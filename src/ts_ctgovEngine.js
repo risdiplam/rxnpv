@@ -43,7 +43,9 @@ async function fetchHistoricalComps(condition, phase, opts = {}) {
   const params = {
     'query.cond': condition,
     'aggFilters': 'phase:' + (TS_PHASE_TO_AGGFILTER[phase] || phase),
-    'fields': 'NCTId,BriefTitle,OfficialTitle,Condition,Keyword,ConditionMeshTerm,OverallStatus,Phase,StartDate,CompletionDate,EnrollmentCount,LeadSponsorName,InterventionName,PrimaryOutcomeMeasure',
+    // PrimaryCompletionDate: "who reads out first" orders by it (October
+    // 2026). A filtered query drops any field it is not asked for.
+    'fields': 'NCTId,BriefTitle,OfficialTitle,Condition,Keyword,ConditionMeshTerm,OverallStatus,Phase,StartDate,PrimaryCompletionDate,CompletionDate,EnrollmentCount,LeadSponsorName,InterventionName,PrimaryOutcomeMeasure',
     'pageSize': String(opts.pageSize || 100),
     'format': 'json'
   };
@@ -70,6 +72,7 @@ function parseHistoricalStudy(s) {
     status: status.overallStatus,
     phase: (design.phases || []).join('/'),
     startDate: status.startDateStruct ? status.startDateStruct.date : null,
+    primaryCompletionDate: status.primaryCompletionDateStruct ? status.primaryCompletionDateStruct.date : null,
     completionDate: status.completionDateStruct ? status.completionDateStruct.date : null,
     enrollment: design.enrollmentInfo ? design.enrollmentInfo.count : null,
     sponsor: sponsor.leadSponsor ? sponsor.leadSponsor.name : null,

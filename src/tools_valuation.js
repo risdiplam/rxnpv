@@ -110,7 +110,7 @@ function SensitivityTool({ cases, updateCase, activeCase }) {
 // Lighter sibling of the full-case implied-PoS solver in Workspace/Portfolio,
 // which binary-searches a whole DCF against market cap. That one is more
 // complete and needs a built case; this is a three-number screen.
-function BinaryEventTool({ cases, activeCase }) {
+function BinaryEventTool({ cases, activeCase, updateCase }) {
   const h = React.createElement;
   const [current, setCurrent] = React.useState("");
   const [success, setSuccess] = React.useState("");
@@ -226,7 +226,9 @@ function BinaryEventTool({ cases, activeCase }) {
         h(Note, { summary: "When the binary frame stops holding" },
           h("div", { style: { lineHeight: 1.6 } },
             "This treats the readout as the only thing that matters — exactly true for a single-asset company, progressively less true otherwise. A pipeline, a partner, or a cash-rich balance sheet all put a floor under failure and blur the binary. And the implied probability is only as good as the two values you anchored it with: it is arithmetic on your assumptions, not an independent read on the market.")))
-    ]))
+    ])),
+
+    h(OptionsMoveCard, { activeCase, updateCase, price: current, success, fail, yourPoS, impliedPoS: showing && res.ok ? res.impliedPoS : null })
   );
 }
 
@@ -365,4 +367,60 @@ function FdmcTool({ cases, updateCase, activeCase }) {
       )
     ])
   );
+}
+
+// ── What the options price (October 2026) ──────────────────────────────────
+// Typed in from any options chain, never fetched: the straddle, or implied
+// volatility and days to expiry. Compared with the move the case's own
+// readout outcomes imply (clear win, modest win, miss), else with this tool's
+// win and fail values at your odds. Stored on the open case for the memo.
+function OptionsMoveCard({ activeCase, updateCase, price, success, fail, yourPoS, impliedPoS }) {
+  const h = React.createElement;
+  const saved = (activeCase && activeCase.optionsMove) || {};
+  const [o, setO] = React.useState({ straddle: saved.straddle || "", iv: saved.iv || "", days: saved.days || "" });
+  React.useEffect(() => { const sv = (activeCase && activeCase.optionsMove) || {}; setO({ straddle: sv.straddle || "", iv: sv.iv || "", days: sv.days || "" }); }, [activeCase && activeCase.id]);
+  const set = patch => {
+    const next = { ...o, ...patch };
+    setO(next);
+    if (activeCase && updateCase) updateCase({ ...activeCase, optionsMove: { ...next, asOf: localDateStamp() }, updatedAt: Date.now() });
+  };
+  const P = numOr(price, 0) > 0 ? Number(price) : (activeCase ? numOr(activeCase.currentPrice, 0) : 0);
+  const om = optionsImpliedMove(o, P);
+  let model = null, modelNote = "";
+  if (activeCase && activeCase.programs && activeCase.programs.length === 1) {
+    try {
+      const dr = activeCase.discountRatePct !== "" && activeCase.discountRatePct != null ? Number(activeCase.discountRatePct) : DISCOUNT_RATE_GUIDANCE.earlyBiotechSelfView[0];
+      const tv = activeCase.terminalValue || { enabled: false };
+      const rs = computeReadoutScenarios(activeCase, dr, { enabled: tv.enabled, method: tv.method, growthPct: tv.growthPct, exitMultiple: tv.exitMultiple });
+      if (rs) { model = modelImpliedMove(P, rs.rows.map(r => ({ prob: r.prob, value: r.value }))); modelNote = "the case's readout outcomes (Scenarios → Before the next readout)"; }
+    } catch (e) { model = null; }
+  }
+  if (!model && numOr(success, NaN) > 0 && isFinite(numOr(fail, NaN))) {
+    const p = numOr(yourPoS, NaN) >= 0 ? Number(yourPoS) / 100 : impliedPoS;
+    if (p != null && isFinite(p)) { model = modelImpliedMove(P, [{ prob: Math.max(0, Math.min(1, p)), value: Number(success) }, { prob: 1 - Math.max(0, Math.min(1, p)), value: Number(fail) }]); modelNote = "the win and fail values above at " + (numOr(yourPoS, NaN) >= 0 ? "your" : "the price-implied") + " odds"; }
+  }
+  const read = om && model ? readImpliedMove(om.pct, model.pct) : null;
+  const inp = (label, key, ph) => h("div", { style: { flex: "1 1 140px" } },
+    h("div", { style: { ...UI.caption, marginBottom: 4 } }, label),
+    h("input", { type: "number", "aria-label": label, value: o[key], placeholder: ph, onChange: e => set({ [key]: e.target.value }),
+      style: { width: "100%", padding: "8px 10px", borderRadius: 7, border: "1.5px solid var(--rule)", background: "var(--surface)", color: "var(--ink-1)", fontFamily: "var(--mono)", fontSize: 13 } }));
+  return toolCard(h, [
+    toolLabel(h, "What the options price"),
+    h("div", { style: UI.intro }, "From any options chain: the at-the-money straddle for the first expiry after the readout, or its implied volatility and the days to that expiry. The straddle's price is about the move the market expects either way."),
+    h("div", { style: { display: "flex", gap: 12, flexWrap: "wrap" } },
+      inp("Straddle price ($)", "straddle", "e.g. 6.50"),
+      inp("Implied volatility (%)", "iv", "e.g. 140"),
+      inp("Days to expiry", "days", "e.g. 45")),
+    !om && h("div", { style: { ...UI.caption, marginTop: 8 } }, "Enter the straddle, or the implied volatility and days to expiry. Nothing is fetched."),
+    om && h("div", { className: "options-move", style: { marginTop: 12, display: "flex", gap: 30, flexWrap: "wrap" } },
+      h("div", null, h("div", { style: UI.caption }, "Options price"),
+        h("div", { style: { fontSize: 26, fontFamily: "var(--mono)", fontWeight: 800, color: "var(--ink-1)" } }, "±" + om.pct.toFixed(0) + "%"),
+        h("div", { style: UI.caption }, om.basis === "straddle" ? "straddle ÷ price" : "σ√t × √(2/π)")),
+      model && h("div", null, h("div", { style: UI.caption }, "Your model"),
+        h("div", { style: { fontSize: 26, fontFamily: "var(--mono)", fontWeight: 800, color: "var(--ink-1)" } }, "±" + model.pct.toFixed(0) + "%"),
+        h("div", { style: UI.caption }, (model.upPct != null ? "+" + model.upPct.toFixed(0) + "% (" + Math.round(model.upProb * 100) + "%)" : "") + (model.upPct != null && model.downPct != null ? " · " : "") + (model.downPct != null ? model.downPct.toFixed(0) + "% (" + Math.round(model.downProb * 100) + "%)" : "")))),
+    om && model && h("div", { style: { ...UI.caption, marginTop: 6 } }, "Your side is from " + modelNote + ". The options price the move to expiry, which includes ordinary trading as well as the event."),
+    read && h(Explain, read),
+    activeCase && om && h("div", { style: { ...UI.caption, marginTop: 6 } }, "Saved to " + caseDisplayName(activeCase) + " for its decision memo.")
+  ]);
 }

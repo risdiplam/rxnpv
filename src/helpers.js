@@ -1165,6 +1165,7 @@ function CalibrationEntryForm({ onSave, onCancel, initialValues, saveLabel }) {
   const [pinned, setPinned] = React.useState(!!iv.pin);
   const [pinType, setPinType] = React.useState((iv.pin && iv.pin.type) || "topline");
   const [pinSource, setPinSource] = React.useState((iv.pin && iv.pin.source) || "");
+  const [pinTag, setPinTag] = React.useState((iv.pin && iv.pin.sharedTag) || "");
   const inputStyle = { width: "100%", padding: "5px 8px", borderRadius: 5, border: "1px solid var(--rule)", background: "var(--surface)", color: "var(--ink-1)", fontFamily: "var(--mono)", fontSize: 11 };
   const fieldLabelStyle = { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginBottom: 3 };
   const canSave = catalystLabel.trim().length > 0;
@@ -1197,7 +1198,9 @@ function CalibrationEntryForm({ onSave, onCancel, initialValues, saveLabel }) {
           h("select", { "aria-label": "Pinned catalyst type", value: pinType, onChange: e => setPinType(e.target.value), style: inputStyle },
             CATALYST_PIN_TYPES.map(([v, l]) => h("option", { key: v, value: v }, l)))),
         h("div", null, h("div", { style: fieldLabelStyle }, "Source"),
-          h("input", { type: "text", value: pinSource, "aria-label": "Pinned catalyst source", placeholder: "e.g. company guidance, Q2 2026 call", onChange: e => setPinSource(e.target.value), style: inputStyle }))),
+          h("input", { type: "text", value: pinSource, "aria-label": "Pinned catalyst source", placeholder: "e.g. company guidance, Q2 2026 call", onChange: e => setPinSource(e.target.value), style: inputStyle })),
+        h("div", { style: { gridColumn: "1 / -1" } }, h("div", { style: fieldLabelStyle }, "Shared readout tag (optional)"),
+          h("input", { type: "text", value: pinTag, "aria-label": "Shared readout tag", placeholder: "the same short tag on two cases' pins marks them as one event — e.g. ETX101 data", onChange: e => setPinTag(e.target.value), style: inputStyle }))),
       pinned && h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginTop: 5, lineHeight: 1.5 } },
         "Used ahead of any other date for this case. A registry completion date is when the trial stops collecting data, not when results are announced.")),
     h("div", { style: { marginBottom: 10 } },
@@ -1210,7 +1213,7 @@ function CalibrationEntryForm({ onSave, onCancel, initialValues, saveLabel }) {
           if (!canSave) return;
           // A pin keeps the date it was first made unless its type or source changes.
           const prev = iv.pin;
-          const pin = pinned ? (prev && prev.type === pinType && (prev.source || "") === pinSource.trim() ? prev : { type: pinType, source: pinSource.trim(), at: localDateStamp() }) : null;
+          const pin = pinned ? Object.assign({}, prev && prev.type === pinType && (prev.source || "") === pinSource.trim() ? prev : { type: pinType, source: pinSource.trim(), at: localDateStamp() }, { sharedTag: pinTag.trim() || undefined }) : null;
           onSave({ catalystLabel: catalystLabel.trim(), catalystDate: catalystDate.trim(), yourPoS: yourPoS === "" ? null : Number(yourPoS), marketImpliedPoS: marketImpliedPoS === "" ? null : Number(marketImpliedPoS), outcome, notes: notes.trim(), pin });
         },
         style: { padding: "6px 16px", borderRadius: 6, border: "none", background: canSave ? "var(--teal-fill)" : "var(--rule)", color: "var(--on-teal)", fontFamily: "var(--mono)", fontSize: 11, fontWeight: 700, cursor: "pointer" }
@@ -1514,6 +1517,74 @@ function catalystPinLabel(pin) {
   return t ? t[1] : (pin.type || "Pinned");
 }
 
+// The cross-case catalyst list (Portfolio, October 2026): every case's
+// pinned catalysts still to come, earliest window first, grouped by quarter,
+// each with the case's own Runway vs. Catalyst state for it and up to three
+// saved competitor completions that come before it (competitorReads, from
+// Trial Explorer). A pin can carry an explicit shared tag (pin.sharedTag) to
+// mark two cases' pins as the same readout — never matched from label text.
+// Closed-out pins from the last 90 days are listed as resolved. Cases with
+// no pin are counted, so the list never passes for the whole book.
+function computePortfolioCatalysts(cases, today) {
+  const now = today || new Date();
+  const day = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const items = [], resolved = [];
+  let noPin = 0;
+  (cases || []).forEach(c => {
+    let pins = 0;
+    let rv = null;
+    try { rv = computeRunwayVsCatalysts(c, { now }); } catch (e) { rv = null; }
+    (c.programs || []).forEach(p => (p.calibrationLog || []).forEach(e => {
+      if (!e.pin) return;
+      const w = parseCatalystWindow(e.catalystDate);
+      if (e.closeOut && e.closeOut.at) {
+        const at = parseIsoDay(e.closeOut.at);
+        if (at != null && (Date.UTC(day.getFullYear(), day.getMonth(), day.getDate()) - at) / 86400000 <= 90) resolved.push({ caseName: caseDisplayName(c), caseId: c.id, label: e.catalystLabel, date: e.catalystDate, outcome: e.outcome, closeOut: e.closeOut });
+        return;
+      }
+      if (e.outcome && e.outcome !== "pending") return;
+      if (!w || w.end < day) return;
+      pins++;
+      const row = rv && rv.ok ? rv.rows.find(r => r.label === (e.catalystLabel || "Catalyst") && r.dateText === e.catalystDate) : null;
+      const comps = ((c.competitorReads && c.competitorReads.rows) || []).map(r => ({ ...r, window: r.date ? parseCatalystWindow(String(r.date)) : null }))
+        .filter(r => r.window && r.window.end < w.start && r.window.end >= day).sort((a, b) => a.window.start - b.window.start).slice(0, 3);
+      items.push({ caseName: caseDisplayName(c), caseId: c.id, program: p.drugName || p.name || "Program", label: e.catalystLabel || "Catalyst", date: e.catalystDate, window: w,
+        type: catalystPinLabel(e.pin), source: e.pin.source || "", sharedTag: (e.pin.sharedTag || "").trim(), funding: row ? row.status : null, beyondHorizon: rv && rv.ok ? rv.beyondHorizon : false, competitors: comps });
+    }));
+    if (!pins) noPin++;
+  });
+  items.sort((a, b) => a.window.start - b.window.start);
+  const quarter = d => d.getFullYear() + " Q" + (Math.floor(d.getMonth() / 3) + 1);
+  const groups = [];
+  items.forEach(it => { const q = quarter(it.window.start); let g = groups.find(x => x.quarter === q); if (!g) { g = { quarter: q, items: [] }; groups.push(g); } g.items.push(it); });
+  const tags = {};
+  items.forEach(it => { if (it.sharedTag) tags[it.sharedTag] = (tags[it.sharedTag] || 0) + 1; });
+  return { groups, count: items.length, noPin, resolved, sharedTags: Object.keys(tags).filter(t => tags[t] > 1) };
+}
+
+// Who reads out first (October 2026): a landscape ordered by primary
+// completion (the final completion when that is all there is), still to
+// come or within the last `pastMonths`; undated trials last, labelled. With
+// the case's pinned catalyst, a trial whose completion falls before the pin's
+// window opens is "reads first" — a competitor that can reprice the name
+// before its own catalyst. Completion is never called a readout.
+function orderByCompletion(studies, opts) {
+  const o = opts || {};
+  const now = o.now || new Date();
+  const floor = new Date(now.getFullYear(), now.getMonth() - (o.pastMonths == null ? 3 : o.pastMonths), 1);
+  const pinStart = o.pinWindow ? o.pinWindow.start : null;
+  const rows = (studies || []).map(s => {
+    const raw = s.primaryCompletionDate || s.completionDate || null;
+    const w = raw ? parseCatalystWindow(String(raw)) : null;
+    return { nctId: s.nctId, sponsor: s.sponsor || "", title: s.title || "", phase: s.phase || "", status: s.status || "",
+      date: raw, which: s.primaryCompletionDate ? "primary completion" : (s.completionDate ? "completion" : null), window: w,
+      readsFirst: !!(w && pinStart && w.end < pinStart) };
+  });
+  const dated = rows.filter(r => r.window && r.window.end >= floor).sort((a, b) => a.window.start - b.window.start);
+  const undated = rows.filter(r => !r.window);
+  return { rows: dated.slice(0, o.cap || 12), undated: undated.length, readsFirstCount: dated.filter(r => r.readsFirst).length, total: dated.length };
+}
+
 // The case's next catalyst: the earliest pending pinned entry whose window
 // has not ended, else the earliest pending dated one. Returns
 // { program, entry, window, pinned } or null. `today` is a local Date.
@@ -1524,6 +1595,7 @@ function nextCaseCatalyst(theCase, today, programsOnly) {
   ((programsOnly || (theCase && theCase.programs)) || []).forEach(p => {
     (p.calibrationLog || []).forEach(entry => {
       if (entry.outcome && entry.outcome !== "pending") return;
+      if (entry.closeOut) return;
       const w = parseCatalystWindow(entry.catalystDate);
       if (!w || w.end < day) return;
       const pinned = !!entry.pin;
@@ -1543,8 +1615,9 @@ function pendingCalibrationEntries(theCase) {
   (theCase.programs || []).forEach(p => {
     (p.calibrationLog || []).forEach(entry => {
       if (entry.outcome && entry.outcome !== "pending") return;
+      if (entry.closeOut) return; // closed out: done, even if left unscored
       const d = parseCatalystDate(entry.catalystDate);
-      const row = { programName: p.drugName || p.name || "Program", catalystLabel: entry.catalystLabel, catalystDate: entry.catalystDate };
+      const row = { programName: p.drugName || p.name || "Program", catalystLabel: entry.catalystLabel, catalystDate: entry.catalystDate, programId: p.id, entryId: entry.id, pinned: !!entry.pin };
       if (d && d < now) overdue.push(row); else open.push(row);
     });
   });
