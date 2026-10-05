@@ -329,7 +329,7 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
     ok(!!gapEl && /everything else held: Base peak revenue \$1\.31B \(the full build\), launch in year 1/.test(gapEl.textContent), "Overview: 'held fixed' lists what the reverse-solve held still");
     // Both failure floors under the range strip.
     const fp = panel && panel.querySelector(".floor-pair");
-    ok(!!fp && /≈\$1\.30\s*charging the rest of Phase 3 at its benchmark cost\s*\(in use\)/.test(fp.textContent) && /≈\$0\.46\s*burning \$19\.5M a month to the readout/.test(fp.textContent), "Overview: both failure floors, the stage one in use (" + (fp && fp.textContent) + ")");
+    ok(!!fp && /≈\$1\.30\s*charging the rest of Phase 3 at its benchmark cost\s*\(in use\)/.test(fp.textContent) && /≈\$0\.46\s*burning \$19\.5M a month to the readout; date from the pinned catalyst/.test(fp.textContent), "Overview: both failure floors, the stage one in use (" + (fp && fp.textContent) + ")");
     const table = panel && panel.querySelector(".proj-table");
     ok(!!table && table.querySelectorAll("tbody tr").length === 16, "Projections: the table shows the first 16 years");
     ok(!!table && /Enterprise value \$1\.62B/.test(table.querySelector("tfoot").textContent), "Projections: the table ends at the Base enterprise value");

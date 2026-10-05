@@ -282,16 +282,18 @@ function useValuationSections({ theCase, onChange, goToTab }) {
           const setMethod = m => update({ failureFloor: { ...(theCase.failureFloor || {}), method: m } });
           const item = (f, key, desc) => {
             const active = pair.active === key, zero = floorZeroReason(f);
-            return h("div", { key, className: "floor-def" + (active ? " active" : ""), style: { display: "flex", gap: 8, alignItems: "baseline", flexWrap: "wrap" } },
-              h("b", { style: { fontFamily: "var(--mono)", color: active ? "var(--red)" : "var(--ink-2)" } }, "≈" + fmtShare(f.perShare)),
-              h("span", null, desc + (zero ? " — $0: " + zero : "")),
-              active ? h("span", { style: { color: "var(--ink-3)" } }, "(in use)")
-                : h("button", { type: "button", className: "link-btn", "data-no-export": "", onClick: () => setMethod(key), style: { fontSize: 11 } }, "Use this"));
+            return h("div", { key, className: "floor-def" + (active ? " active" : "") },
+              h("div", { style: { display: "flex", gap: 8, alignItems: "baseline", flexWrap: "wrap" } },
+                h("b", { style: { fontFamily: "var(--mono)", color: active ? "var(--red)" : "var(--ink-2)" } }, "≈" + fmtShare(f.perShare)),
+                h("span", null, desc),
+                active ? h("span", { style: { color: "var(--ink-3)" } }, "(in use)")
+                  : h("button", { type: "button", className: "link-btn", "data-no-export": "", onClick: () => setMethod(key), style: { fontSize: 11 } }, "Use this")),
+              zero && h("div", { style: { color: "var(--ink-3)", paddingLeft: 2 } }, "Why $0: " + zero + "."));
           };
           return h("div", { className: "floor-pair", role: "group", "aria-label": "If it fails: both definitions", style: { ...UI.caption, marginTop: 8, display: "flex", flexDirection: "column", gap: 4, lineHeight: 1.55 } },
             h("div", { style: { color: "var(--ink-2)", fontWeight: 600 } }, "If it fails, two ways of counting:"),
             item(pair.stage, "stage", "charging the rest of " + pair.stage.stageLabel + " at its benchmark cost"),
-            pair.burn ? item(pair.burn, "burn", "burning " + fmtMoney(pair.burn.monthlyBurn) + " a month to the readout (" + pair.burn.readoutSource + ")")
+            pair.burn ? item(pair.burn, "burn", "burning " + fmtMoney(pair.burn.monthlyBurn) + " a month to the readout; date from " + pair.burn.readoutSource)
               : h("div", { key: "nb", style: { color: "var(--ink-3)" } }, "Add a monthly burn (Assumptions → Capital structure) to see the burn-based figure beside it."));
         })(),
         floor && h(Explain, readOutcomeRange(floor.perShare, success, price, one ? impliedSolved.impliedAbsolutePct : null)),

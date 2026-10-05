@@ -586,8 +586,9 @@ function computeFailureFloorPair(theCase) {
 // than "this definition spends more than the cash". Null when it is above 0.
 function floorZeroReason(f) {
   if (!f || f.perShare > 0) return null;
-  if (f.method === "burn") return "burning " + fmtMoney(f.monthlyBurn) + " a month for " + f.monthsToReadout.toFixed(1) + " months to the readout (" + fmtMoney(f.burnToReadout) + ")" + (f.windDown > 0 ? " and " + f.windDownYears + " year" + (f.windDownYears === 1 ? "" : "s") + " of wind-down (" + fmtMoney(f.windDown) + ")" : "") + " uses up the " + fmtMoney(f.netCash) + " of net cash";
-  return "charging the " + f.stageLabel + " cost still to come (" + fmtMoney(f.trialCost) + "), G&A to the readout (" + fmtMoney(f.gaToReadout) + ")" + (f.windDown > 0 ? " and " + f.windDownYears + " year" + (f.windDownYears === 1 ? "" : "s") + " of wind-down (" + fmtMoney(f.windDown) + ")" : "") + " uses up the " + fmtMoney(f.netCash) + " of net cash";
+  const wind = f.windDown > 0 ? fmtMoney(f.windDown) + " of wind-down" : null;
+  if (f.method === "burn") return andList([fmtMoney(f.burnToReadout) + " of burn over " + f.monthsToReadout.toFixed(1) + " months to the readout", wind].filter(Boolean)) + " use up the " + fmtMoney(f.netCash) + " of net cash";
+  return andList([fmtMoney(f.trialCost) + " still to pay for " + f.stageLabel, fmtMoney(f.gaToReadout) + " of G&A to the readout", wind].filter(Boolean)) + " use up the " + fmtMoney(f.netCash) + " of net cash";
 }
 function failureFloorWantsBurn(theCase) {
   return !!(theCase && theCase.failureFloor && theCase.failureFloor.method === "burn");

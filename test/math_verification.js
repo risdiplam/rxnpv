@@ -1213,7 +1213,7 @@ section("Both failure floors, side by side");
   ok("PepGen: the stage floor is $0 and the burn floor is positive; the stage one is in use by default", pair.stage.perShare === 0 && pair.burn.perShare > 0.8 && pair.active === "stage");
   near("... the burn floor is the $0.8895 worked out longhand", pair.burn.perShare, (117.238e6 - 5.7e6 * (153 / (365.25 / 12)) - 26e6) / 70360627, 1e-9);
   const why = api.floorZeroReason(pair.stage);
-  ok("the $0 says what used the cash up (" + why + ")", /^charging the Phase 2 cost still to come \(\$[\d.]+M\), G&A to the readout \(\$[\d.]+M\) and 1 year of wind-down \(\$26\.0M\) uses up the \$[\d.]+M of net cash$/.test(why));
+  ok("the $0 says what used the cash up (" + why + ")", /^\$[\d.]+M still to pay for Phase 2, \$[\d.]+M of G&A to the readout and \$26\.0M of wind-down use up the \$[\d.]+M of net cash$/.test(why));
   ok("a positive floor has no $0 reason", api.floorZeroReason(pair.burn) === null);
   ok("switched to the burn method, it is the one in use", api.computeFailureFloorPair({ ...pg, failureFloor: { method: "burn" } }).active === "burn");
   const noBurn = { ...pg, capitalStructure: { ...pg.capitalStructure, monthlyBurn: "" } };
