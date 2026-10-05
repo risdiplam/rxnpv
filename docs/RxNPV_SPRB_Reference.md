@@ -54,6 +54,7 @@ Spruce is a single-asset company. Its asset is **tralesinidase alfa (TA-ERT)**, 
 ## What the app should show (expected results)
 
 - **Company Lookup → SPRB:** SPRUCE BIOSCIENCES, INC.; basic shares 2,874,013 (2026-08-10); cash $96.3M (2026-06-30); debt **$7.1M on the balance sheet ($16.6M face)**. An amber line says options and warrants are not tagged and that the filing excludes **409,850** potentially dilutive shares from EPS. That figure is the 233,147 warrants, 49,174 options and 127,084 RSUs, plus a few ESPP shares. Weighted-average diluted (EPS) is about 1.9M; this is not a fully diluted count.
+- **Company Lookup → Trial pipeline:** 8 Spruce-sponsored trials, including the tildacerfont studies (CAH, PCOS; most terminated) from before the pivot, the TrAnsform Phase 3 and the expanded-access record. The older TA-ERT trials are sponsored by Allievex, so they appear in Asset Program, not here.
 - **Load insider activity (Form 4):** about 15 recent filings, **no open-market buys or sells** (all awards, vesting and withholding), and no buying cluster.
 - **Cash Runway → Pull from EDGAR:** about $15.4M a quarter (cash used in operations, a 6-month span); a trailing runway of about 19 months from June 30.
 - **Asset Program → "tralesinidase alfa, TA-ERT, AX 250, BMN 250":** 5 trials. A testosterone study matched only by the text "TRT" is dropped and counted. The highest phase reads "Phase 4" because Allievex registered NCT05492799 that way; the drug is not approved.
