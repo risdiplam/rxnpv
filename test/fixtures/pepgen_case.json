@@ -261,6 +261,15 @@
     "upfrontM": "",
     "costSharingPct": "",
     "milestones": []
+   },
+   "licensor": {
+    "enabled": true,
+    "name": "Oxford University Innovation (OUI/MRC licence)",
+    "royaltyPct": "1",
+    "sublicensePct": "10",
+    "approvalMilestoneM": "",
+    "salesMilestones": [],
+    "note": "10-K FY2025: sub-single to low single-digit royalties on net sales above a £20–30M threshold; a mid-single to mid-teens % sublicense fee by licence year; £100K of commercial milestones"
    }
   }
  ],

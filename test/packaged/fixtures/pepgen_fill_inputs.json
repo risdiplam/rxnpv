@@ -829,6 +829,73 @@
    "value": false
   },
   {
+   "check": "In-licensed asset (royalties or milestones owed to a licensor)",
+   "value": true
+  },
+  {
+   "set": "Licensor",
+   "value": "Oxford University Innovation (OUI/MRC licence)"
+  },
+  {
+   "set": "Royalty owed",
+   "value": "1"
+  },
+  {
+   "set": "Share of partner income owed",
+   "value": "10"
+  },
+  {
+   "set": "Sales level ($M a year)",
+   "value": "500"
+  },
+  {
+   "set": "Milestone payment ($M)",
+   "value": "5"
+  },
+  {
+   "click": "+ Add sales milestone",
+   "after": 400
+  },
+  {
+   "expectNow": "programs.0.licensor.salesMilestones.0.paymentM",
+   "value": "5"
+  },
+  {
+   "expectNow": "programs.0.licensor.salesMilestones.0.thresholdM",
+   "value": "500"
+  },
+  {
+   "clickLabel": "Delete this sales milestone"
+  },
+  {
+   "clickLabel": "Confirm delete",
+   "after": 500
+  },
+  {
+   "set": "Licence terms source",
+   "value": "10-K FY2025: sub-single to low single-digit royalties on net sales above a £20–30M threshold; a mid-single to mid-teens % sublicense fee by licence year; £100K of commercial milestones"
+  },
+  {
+   "expect": "programs.0.licensor.enabled",
+   "value": true
+  },
+  {
+   "expect": "programs.0.licensor.royaltyPct",
+   "value": "1"
+  },
+  {
+   "expect": "programs.0.licensor.sublicensePct",
+   "value": "10"
+  },
+  {
+   "expect": "programs.0.licensor.salesMilestones",
+   "value": []
+  },
+  {
+   "expect": "programs.0.licensor.name",
+   "value": "Oxford University Innovation (OUI/MRC licence)"
+  },
+  {
    "tab": "scenarios"
   },
   {

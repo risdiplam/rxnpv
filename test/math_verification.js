@@ -86,7 +86,7 @@ const EXPORTS = [
   "computeTreatedPopulation", "launchCurveForYears", "erosionMultiplier", "computeProgramRevenue",
   "resolveNetPrice", "aspPctOfBasis", "PRICE_BASIS_OPTIONS", "getRevenueBuild", "PRICING_CONVERSION_MATRIX", "priceBasisArticle",
   "computeQuickProgramRevenue", "resolveErosionParams", "LAUNCH_CURVE", "LAUNCH_CURVE_EXACT", "scaleRevenueResult",
-  "computeCOGS", "computeSalesForceCost", "computeMarketingCost", "computeCorporateGA", "computeProgramPnL",
+  "computeCOGS", "computeSalesForceCost", "computeMarketingCost", "computeCorporateGA", "computeProgramPnL", "licensorObligationsByYear", "hasLicensorObligations",
   "SALES_REP_COST", "SGA_BENCHMARKS", "SALES_FORCE_COMP_GROWTH_PCT",
   "tsFdaQueryString", "computeDilutionPath",
   "extractAnalogEffects", "tsClassifyEffectParam", "summarizeDossier", "positionInAnalogs",
@@ -1220,6 +1220,61 @@ section("An analog's launch shape against the published curves");
   ok("selling before the data starts: refused, with the reason", !api.matchLaunchShape(med.map((p, i) => i === 0 ? { ...p, launchPredatesData: true } : p)).ok);
   ok("fewer than three full years: refused", !api.matchLaunchShape([pt(0, 10), pt(1, 30)]).ok);
   ok("a partial year is left out of the fit", api.matchLaunchShape(med.concat([pt(7, 10, { isFullYear: false })])).profile === "median");
+}
+section("Owed to a licensor: royalty, milestones, the share of partner income");
+{
+  // Year by year, by hand. Own net sales $100M, $200M, $300M; partner royalty
+  // income $10M a year. 10% royalty → $10M, $20M, $30M. 5% of partner income
+  // → $0.5M a year. $25M on approval → year 1. Sales milestones: $20M at
+  // $150M a year (first reached in year 2), $50M at $1B (never reached).
+  const lic = { enabled: true, royaltyPct: "10", sublicensePct: "5", approvalMilestoneM: "25", salesMilestones: [{ thresholdM: "150", paymentM: "20" }, { thresholdM: "1000", paymentM: "50" }] };
+  const o = api.licensorObligationsByYear([100e6, 200e6, 300e6], [10e6, 10e6, 10e6], lic);
+  ok("royalty: 10% of own sales each year", JSON.stringify(o.royalty) === JSON.stringify([10e6, 20e6, 30e6]));
+  ok("share of partner income: 5% of $10M each year", JSON.stringify(o.share) === JSON.stringify([5e5, 5e5, 5e5]));
+  ok("milestones: $25M on approval in year 1, $20M when sales first reach $150M (year 2), the $1B one never", JSON.stringify(o.milestones) === JSON.stringify([25e6, 20e6, 0]));
+  ok("total = the three added: $35.5M, $40.5M, $30.5M", JSON.stringify(o.total) === JSON.stringify([35.5e6, 40.5e6, 30.5e6]));
+  ok("off: nothing owed", api.licensorObligationsByYear([100e6], [0], { ...lic, enabled: false }).total[0] === 0);
+  ok("ticked with nothing entered is not an obligation", api.hasLicensorObligations({ licensor: { enabled: true, royaltyPct: "", salesMilestones: [] } }) === false && api.hasLicensorObligations({ licensor: lic }) === true);
+  ok("rates are clamped to 0–100%", api.licensorObligationsByYear([100e6], [0], { enabled: true, royaltyPct: "250" }).royalty[0] === 100e6);
+
+  // Through the P&L: product contribution falls by exactly what is owed.
+  const rr = { years: [{ year: 1, totalRevenue: 100e6 }, { year: 2, totalRevenue: 200e6 }], peakTotalRevenue: 200e6 };
+  const cost = { cogsPct: "10", reps: {}, marketingPctOfPeak: "0", yearsToLOE: "12", launchYearOffset: 1 };
+  const a = api.computeProgramPnL(rr, cost), b = api.computeProgramPnL(rr, { ...cost, licensor: { enabled: true, royaltyPct: "8", approvalMilestoneM: "5" } });
+  ok("product contribution falls by 8% of sales plus $5M in year 1 ($13M), $16M in year 2", a[0].productContribution - b[0].productContribution === 13e6 && a[1].productContribution - b[1].productContribution === 16e6 && b[0].licensorTotal === 13e6);
+
+  // Through the valuation: on the PepGen fixture with tax off, a 5% royalty
+  // lowers the enterprise value by exactly the present value of 5% of each
+  // year's revenue × the odds of launch — computeNPV on that series alone
+  // (linear without a terminal value).
+  const pgF = JSON.parse(fs.readFileSync(path.join(__dirname, "fixtures", "pepgen_case.json"), "utf8"));
+  // Start from the fixture without its own 1% OUI royalty.
+  const pg0 = { ...pgF, taxation: { ...(pgF.taxation || {}), enabled: false }, terminalValue: { enabled: false }, programs: [{ ...pgF.programs[0], licensor: { enabled: false } }] };
+  const pgL = { ...pg0, programs: [{ ...pg0.programs[0], licensor: { enabled: true, royaltyPct: "5" } }] };
+  const dr = Number(pg0.discountRatePct), tvOff = { enabled: false };
+  const v0 = api.computeCaseValuation(pg0, api.getEffectiveScenarioPreset(pg0, "base"), "base", dr, tvOff);
+  const v1 = api.computeCaseValuation(pgL, api.getEffectiveScenarioPreset(pgL, "base"), "base", dr, tvOff);
+  const pv0 = v0.programVals[0], rev = api.getProgramRevenueResult(pg0.programs[0], 25).years.map(y => y.totalRevenue);
+  const series = v0.calendar.map((c, cy) => { const i = cy - (pv0.launchYearOffset || 0); return i >= 0 && rev[i] != null ? -Math.round(rev[i] * 0.05) * pv0.posToLaunch : 0; });
+  near("PepGen: EV falls by the PV of 5% of revenue × the odds of launch", v1.npvResult.npv - v0.npvResult.npv, api.computeNPV(series, dr, tvOff, series.map(() => 0)).npv, 1);
+  ok("... and so does Base per share (" + v0.equity.perShare.toFixed(4) + " → " + v1.equity.perShare.toFixed(4) + ")", v1.equity.perShare < v0.equity.perShare);
+
+  // Partner payments: 5% of an upfront goes on to the licensor.
+  const partnered = { programs: [{ ...pg0.programs[0], partnership: { enabled: true, upfrontM: "10", milestones: [] }, licensor: { enabled: true, sublicensePct: "5" } }] };
+  near("a $10M upfront with a 5% sublicense fee adds $9.5M", api.computePartnershipContribution(partnered, 0.12), 9.5e6, 1e-6);
+
+  // Napkin: the multiple applies to peak revenue less the royalty at peak;
+  // the approval milestone comes off at its odds-weighted present value.
+  // Quick program, $500M peak, 4x, launch in year 2, 5 years to peak, 13%:
+  // value drop = 500M × 10% × 4 × p / 1.13^7 + 25M × p / 1.13^2.
+  const qp = { ...pg0.programs[0], revenueMode: "quick", quickRevenue: { peakRevenue: "500000000", yearsToPeak: "5", profile: "median" }, launchYearOffset: "2", partnership: { enabled: false } };
+  const qc = { ...pg0, programs: [qp] };
+  const qcL = { ...pg0, programs: [{ ...qp, licensor: { enabled: true, royaltyPct: "10", approvalMilestoneM: "25" } }] };
+  const sm0 = api.computeSimpleMultipleValuation(qc, api.getEffectiveScenarioPreset(qc, "base"), "base", 4, 13);
+  const sm1 = api.computeSimpleMultipleValuation(qcL, api.getEffectiveScenarioPreset(qcL, "base"), "base", 4, 13);
+  const p = sm0.programVals[0].posToLaunch, ly = sm0.programVals[0].launchYearOffset;
+  near("Napkin: the drop is the royalty at peak × the multiple plus the approval milestone, both at odds and discounted", sm0.programVals[0].pv - sm1.programVals[0].pv,
+    500e6 * 0.10 * 4 * p / Math.pow(1.13, ly + 5) + 25e6 * p / Math.pow(1.13, ly), 1);
 }
 section("The IRA clock: opt-in, no default cut, US revenue only");
 {
@@ -5093,8 +5148,10 @@ section("Stoke, the whole case recomputed from its inputs (Bear, Base, Bull)");
   //       the odds the company is in that state (developing / launched);
   //       tax 21% of the success case's profit after a $301.7M NOL, x P(launch);
   //       discount 12% in every scenario (Bear and Bull vary share and odds)
+  //   Owed        to Southampton: 2% of US sales, 5% of the Biogen royalty and of
+  //               the milestone
   //   Equity      NPV + $420M cash as filed (rolling forward is off) + PRV $190M x P(launch) / 1.12 + milestone
-  //               $100M x P(launch) / 1.12 + $194M raise
+  //               $100M x 95% x P(launch) / 1.12 + $194M raise
   //   Shares      68,229,972 + 11,532,638 x (1 - 13.84 / 24.80) + 2,157,698
   //               + 194M / ($24.80 x 0.97, the ATM priced 3% below today) = 83,548,148
   // The scenario runs caught a real defect: Bear/Bull left the royalty part of
@@ -5104,7 +5161,7 @@ section("Stoke, the whole case recomputed from its inputs (Bear, Base, Bull)");
   const p = c.programs[0];
   const rnd = api.computeRnDToLaunch(p);
   const ramp = api.LAUNCH_CURVE_EXACT[5].median.map(x => x / 100);
-  const expectPS = { bear: 17.2604, base: 28.7624, bull: 41.8729 };
+  const expectPS = { bear: 16.8554, base: 28.0085, bull: 40.7094 };
   for (const [key, share, posMult, addPct] of [["bear", 70, 75, 0], ["base", 100, 100, 0], ["bull", 130, 120, 0]]) {
     const r = (12 + addPct) / 100, N = 25, L = 1;
     const eff = api.computeEffectivePoS(p, { posMultiplierPct: posMult });
@@ -5122,7 +5179,9 @@ section("Stoke, the whole case recomputed from its inputs (Bear, Base, Bull)");
       roy.push(exPts * 1.40 * 187500 * em * 0.15);
     }
     const peakUS = Math.max(...us);
-    const contrib = us.map((u, i) => u + roy[i] - 0.10 * u - (i < 12 ? 50 * 280000 * Math.pow(1.02, i) + 0.03 * peakUS : 0));
+    // Owed to Southampton: 2% of Stoke's own (US) sales and 5% of the Biogen
+    // royalty it receives.
+    const contrib = us.map((u, i) => u + roy[i] - 0.10 * u - 0.02 * u - 0.05 * roy[i] - (i < 12 ? 50 * 280000 * Math.pow(1.02, i) + 0.03 * peakUS : 0));
     const bCost = rnd.items.reduce((a, i) => a + i.costM, 0);
     const rd0 = rnd.items.reduce((a, i) => a + i.costM * (200 / bCost) * 0.70 * 1e6 * reach[i.key], 0) + 50 * 280000 * 0.30 * pos;
     const ga = v => v <= 0 ? 95e6 : v >= 400e6 ? v * 0.17 : 95e6 + (400e6 * 0.17 - 95e6) * v / 400e6;
@@ -5152,7 +5211,8 @@ section("Stoke, the whole case recomputed from its inputs (Bear, Base, Bull)");
     }
     const shares = 64526242 + 3703730 + 11532638 * (1 - 13.84 / 24.80) + 2157698 + 194e6 / (24.80 * 0.97);
     const cash = 420e6; // as the filing reported it (rolling forward is off)
-    const perShare = (npv + cash + (190e6 + 100e6) * pos / Math.pow(1 + r, L) + 194e6) / shares;
+    // The $100M Biogen approval milestone less the 5% owed on to Southampton.
+    const perShare = (npv + cash + (190e6 + 100e6 * 0.95) * pos / Math.pow(1 + r, L) + 194e6) / shares;
     const app = api.computeCaseValuation(c, api.getEffectiveScenarioPreset(c, key), key, 12, c.terminalValue);
     near("Stoke " + key + ": NPV equals the independent rebuild", app.npvResult.npv, npv, 25);
     near("Stoke " + key + ": 83,548,868 diluted shares", app.equity.dilutedShares, shares, 0.5);
@@ -5346,7 +5406,7 @@ section("Raise priced as a discount to today, the Napkin-vs-build flag, the mode
   const v = k => api.computeCaseValuation(st, api.getEffectiveScenarioPreset(st, k), k, 12, st.terminalValue).equity.perShare.toFixed(2);
   ok("snapshot: dated, labelled, and quotes Bear/Base/Bull as the engine computes them", snap.date === "2026-09-28" && snap.label === "What the model says (snapshot, 2026-09-28)" &&
     snap.thesis.includes("Base fair value ~$" + v("base")) && snap.thesis.includes("Bear ~$" + v("bear")) && snap.thesis.includes("Bull ~$" + v("bull")));
-  ok("snapshot: the price-implied odds against the case's 65%", /The price implies ~55% odds of launch against this case's 65%/.test(snap.thesis));
+  ok("snapshot: the price-implied odds against the case's 65%", /The price implies ~56% odds of launch against this case's 65%/.test(snap.thesis));
   ok("snapshot: the failure floor by the case's method", /if the next readout fails, ~\$1\.30 is left \(the filing's cash/.test(snap.thesis));
   // ... and what it rested on (the fixture has the price date and cash date,
   // no pinned catalyst: its Calibration Log is not in the fixture).
@@ -5497,7 +5557,8 @@ section("PepGen, the whole case recomputed from its inputs (Bear, Base, Bull)");
   //                curve's years y-2 and y-1; the benchmark lag, left blank)
   //   After LOE    (year 10) 45% of volume x 65% of price, in one year
   //   Costs        COGS 12%; 60 specialty reps x $280,000 (+2%/yr) to LOE, 30% in
-  //                the year before launch; marketing 3% of peak revenue to LOE
+  //                the year before launch; marketing 3% of peak revenue to LOE;
+  //                1% royalty owed to OUI on net sales
   //   Corporate    $26M a year before revenue; 17% (34% x 50%) of revenue above
   //   G&A          $400M, straight line between — on the revenue it has if
   //                launched; before launch x the odds it is still developing (or
@@ -5514,7 +5575,7 @@ section("PepGen, the whole case recomputed from its inputs (Bear, Base, Bull)");
   const rnd = api.computeRnDToLaunch(p);
   const ramp = [11, 31, 58, 76, 89, 100].map(x => x / 100);
   near("the six-year median launch curve is the one typed here", 0, ramp.reduce((s, v, i) => s + Math.abs(v - api.launchCurveForYears(6, "median")[i] / 100), 0), 1e-12);
-  const expectPS = { bear: 0.8942, base: 1.6857, bull: 3.1177 };
+  const expectPS = { bear: 0.8866, base: 1.6647, bull: 3.0736 };
   for (const [key, share, posMult, addPct] of [["bear", 60, 60, 0], ["base", 100, 100, 0], ["bull", 140, 150, 0]]) {
     const r = (14 + addPct) / 100, N = 25, L = 5;
     const eff = api.computeEffectivePoS(p, { posMultiplierPct: posMult });
@@ -5528,7 +5589,9 @@ section("PepGen, the whole case recomputed from its inputs (Bear, Base, Bull)");
       rev.push((pts * 280000 * Math.pow(1.02, y - 1) + exPts * 1.8 * 175000) * (y <= 10 ? 1 : 0.45 * 0.65));
     }
     const peakRev = Math.max(...rev);
-    const contrib = rev.map((R, i) => R - 0.12 * R - (i < 10 ? 60 * 280000 * Math.pow(1.02, i) + 0.03 * peakRev : 0));
+    // Owed to OUI: 1% of every year's net sales (no partner, so the 10%
+    // sublicense share has nothing to apply to).
+    const contrib = rev.map((R, i) => R - 0.12 * R - 0.01 * R - (i < 10 ? 60 * 280000 * Math.pow(1.02, i) + 0.03 * peakRev : 0));
     const bCost = rnd.items.reduce((s2, i) => s2 + i.costM, 0), bYears = rnd.items.reduce((s2, i) => s2 + i.years, 0);
     const rd = new Array(L).fill(0), rdFull = new Array(L).fill(0); let cur = 0;
     rnd.items.forEach(i => {

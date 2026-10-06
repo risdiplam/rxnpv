@@ -976,8 +976,8 @@ function useValuationSections({ theCase, onChange, goToTab }) {
 // today, the same way "Launch in year" does: this year is the next twelve months.
 const PROJECTION_VIEW_KEY = "rxnpv_proj_view";
 const PROJECTION_TABLE_ROWS = 16;
-function projectionsCsv(rows, startYear, npvResult) {
-  const cols = ["Year", "Phase", "Revenue if it works", "Revenue x odds", "R&D", "COGS + sales & marketing", "Corporate G&A", "Cash tax", "Cash flow", "Discount factor", "Present value", "Running total"];
+function projectionsCsv(rows, startYear, npvResult, licensor) {
+  const cols = ["Year", "Phase", "Revenue if it works", "Revenue x odds", "R&D", licensor ? "COGS + sales & marketing + owed to licensor" : "COGS + sales & marketing", "Corporate G&A", "Cash tax", "Cash flow", "Discount factor", "Present value", "Running total"];
   const m = v => (v / 1e6).toFixed(2);
   const lines = [cols.join(",")].concat(rows.map(r => [startYear + r.index, r.phase || "", m(r.revenueIfWorks), m(r.revenue), m(-r.rnd), m(-r.commercialCosts), m(-r.ga), m(-r.tax), m(r.fcf), r.discountFactor.toFixed(4), m(r.pv), m(r.runningPV)].map(x => /[,"]/.test(String(x)) ? '"' + String(x).replace(/"/g, '""') + '"' : x).join(",")));
   if (npvResult.terminalValuePV) lines.push(["Terminal value (present value)", "", "", "", "", "", "", "", "", "", m(npvResult.terminalValuePV), m(npvResult.npv)].join(","));
@@ -1006,7 +1006,7 @@ function ProjectionsCard({ theCase, result, successResult }) {
   const saveCsv = async () => {
     const slug = (theCase.ticker || theCase.name || "case").replace(/[^A-Za-z0-9]+/g, "-").replace(/^-|-$/g, "") || "case";
     try {
-      const r = await window.electronAPI.saveAsset({ data: projectionsCsv(rows, startYear, npv), suggestedName: slug + "-projections.csv", filterName: "CSV", extensions: ["csv"] });
+      const r = await window.electronAPI.saveAsset({ data: projectionsCsv(rows, startYear, npv, (theCase.programs || []).some(hasLicensorObligations)), suggestedName: slug + "-projections.csv", filterName: "CSV", extensions: ["csv"] });
       setCsvMsg(r && r.ok ? "Saved." : r && r.canceled ? null : "Could not save: " + ((r && r.error) || "unknown error"));
     } catch (e) { setCsvMsg("Could not save: " + e.message); }
   };
@@ -1023,8 +1023,8 @@ function ProjectionsCard({ theCase, result, successResult }) {
         h("div", { className: "proj-toggle", role: "group", "aria-label": "Projection view", "data-no-export": "" },
           [["both", "Chart + table"], ["chart", "Chart"], ["table", "Table"]].map(([k, l]) => h("button", { key: k, type: "button", "aria-pressed": view === k, className: view === k ? "on" : "", onClick: () => pickView(k) }, l))))),
     view !== "table" && h(ExportableBlock, { title: (theCase.name || "Case") + " — year-by-year cash flows (Base case" + (works ? ", if it works)" : ")") },
-      h(ProjectionChart, { rows, startYear, height: 300, works: !!works, label: works ? "Year-by-year cash flows if the drug is approved and running present value, base case" : "Year-by-year odds-weighted cash flows and running present value, base case" })),
-    view !== "chart" && h(ProjectionTable, { rows: shown, allCount: rows.length, startYear, npv, works: !!works,
+      h(ProjectionChart, { rows, startYear, height: 300, works: !!works, licensor: (theCase.programs || []).some(hasLicensorObligations), label: works ? "Year-by-year cash flows if the drug is approved and running present value, base case" : "Year-by-year odds-weighted cash flows and running present value, base case" })),
+    view !== "chart" && h(ProjectionTable, { rows: shown, allCount: rows.length, startYear, npv, works: !!works, licensor: (theCase.programs || []).some(hasLicensorObligations),
       footer: h(React.Fragment, null,
         rows.length > PROJECTION_TABLE_ROWS && h("button", { type: "button", className: "link-btn", "data-no-export": "", onClick: () => setShowAll(!showAll) },
           showAll ? "Show the first " + PROJECTION_TABLE_ROWS + " years" : "Show all " + rows.length + " years (to " + (startYear + rows[rows.length - 1].index) + ")"),
@@ -1039,7 +1039,7 @@ function ProjectionsCard({ theCase, result, successResult }) {
 // left of the total line (the report passes none).
 // works: the rows are the if-it-works world, so the "× odds" revenue column
 // would only repeat the first — it is left out.
-function ProjectionTable({ rows, startYear, npv, footer, compact, works }) {
+function ProjectionTable({ rows, startYear, npv, footer, compact, works, licensor }) {
   const h = React.createElement;
   const hasPhase = rows.some(r => r.phase);
   const m = v => v === 0 ? "—" : fmtMoney(v, Math.abs(v) >= 1e9 ? 2 : 0);
@@ -1048,7 +1048,7 @@ function ProjectionTable({ rows, startYear, npv, footer, compact, works }) {
   // "Costs" column and the discount factor is left out, so all of it prints.
   const cols = compact
     ? [["Year", "l"], hasPhase && ["Phase", "l"], ["If it works"], !works && ["× odds"], ["Costs"], ["Tax"], ["Cash flow"], ["Present value"], ["Running total"]]
-    : [["Year", "l"], hasPhase && ["Phase", "l"], [works ? "Revenue" : "Revenue if it works"], !works && ["Revenue × odds"], ["R&D"], ["COGS + S&M"], ["G&A"], ["Tax"], ["Cash flow"], ["Discount"], ["Present value"], ["Running total"]];
+    : [["Year", "l"], hasPhase && ["Phase", "l"], [works ? "Revenue" : "Revenue if it works"], !works && ["Revenue × odds"], ["R&D"], [licensor ? "COGS, S&M + licensor" : "COGS + S&M"], ["G&A"], ["Tax"], ["Cash flow"], ["Discount"], ["Present value"], ["Running total"]];
   const shownCols = cols.filter(Boolean);
   const span = shownCols.length - 2;
   const cell = (v, cls) => h("td", { className: cls || "" }, v);

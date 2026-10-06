@@ -66,7 +66,11 @@ function newProgram() {
     // is a direct, undiscounted add; each milestone is risk-adjusted to its
     // own gate and discounted from its own expected timing, not lumped in
     // with launch.
-    partnership: { enabled: false, territory: "exUS", royaltyPct: "", upfrontM: "", costSharingPct: "", milestones: [] }
+    partnership: { enabled: false, territory: "exUS", royaltyPct: "", upfrontM: "", costSharingPct: "", milestones: [] },
+    // What the company owes the licensor it in-licensed this asset from
+    // (October 2026): the mirror of a partnership. Off by default; see
+    // licensorObligationsByYear in costEngine.js.
+    licensor: { enabled: false, name: "", royaltyPct: "", sublicensePct: "", approvalMilestoneM: "", salesMilestones: [], note: "" }
   };
 }
 
@@ -134,7 +138,8 @@ function ProgramEditor({ program, onChange, onDelete, discountRatePct, terminalV
         reps: { primaryCare: cs.reps.primaryCare || 0, specialty: cs.reps.specialty || 0, hospital: cs.reps.hospital || 0 },
         marketingPctOfPeak: cs.marketingPctOfPeak !== "" ? cs.marketingPctOfPeak : MARKETING_BENCHMARKS.baseCasePctOfPeakRevenue,
         yearsToLOE: rb.exclusivity.yearsToLOE,
-        launchYearOffset: program.launchYearOffset
+        launchYearOffset: program.launchYearOffset,
+        licensor: program.licensor
       });
     } catch (e) {}
   }
@@ -717,6 +722,8 @@ function ProgramEditor({ program, onChange, onDelete, discountRatePct, terminalV
       );
     })()),
 
+    show("inputs") && h(LicensorFields, { program, set }),
+
     // ── Evidence Log — the "why" behind judgment-call inputs, living inside
     // the case itself rather than a separate document that drifts out of
     // sync. Deliberately general-purpose: entries aren't tied to a specific
@@ -884,4 +891,56 @@ function IraClockFields({ program, set }) {
         ira.enabled && !(Number(ira.reductionPct) > 0) && h("div", { style: { ...UI.caption, marginTop: 4 } }, "On, but with no cut entered it changes nothing."),
         h("div", { style: { ...UI.caption, marginTop: 6, lineHeight: 1.6 } },
           "A clock, not a prediction of the negotiation. Single-source status, exclusions and renegotiation can all change it." + (rare ? " This program is marked rare disease: since 2025, drugs approved only for rare diseases are largely excluded from negotiation — check before using this." : "")))));
+}
+
+// ── Owed to a licensor (October 2026) ──────────────────────────────────────
+// The other side of a partnership: what the company pays the party it
+// in-licensed the asset from. Common in small-cap biotech — an academic
+// licence with a low royalty, or an asset bought out of another company with
+// approval and sales milestones attached. None of it is a default.
+function LicensorFields({ program, set }) {
+  const h = React.createElement;
+  const lic = program.licensor || { enabled: false, name: "", royaltyPct: "", sublicensePct: "", approvalMilestoneM: "", salesMilestones: [], note: "" };
+  const setLic = patch => set("licensor", { ...lic, ...patch });
+  const [draft, setDraft] = React.useState({ thresholdM: "", paymentM: "" });
+  const rows = lic.salesMilestones || [];
+  const partnered = !!(program.partnership && program.partnership.enabled);
+  const inputStyle = { padding: "6px 9px", minHeight: 28, borderRadius: 6, border: "1.5px solid var(--rule)", background: "var(--surface)", color: "var(--ink-1)", fontFamily: "var(--mono)", fontSize: 12, width: 110 };
+  const summary = hasLicensorObligations(program)
+    ? [numOr(lic.royaltyPct, 0) > 0 ? lic.royaltyPct + "% royalty" : null, numOr(lic.approvalMilestoneM, 0) > 0 ? "$" + lic.approvalMilestoneM + "M on approval" : null,
+       rows.length ? rows.length + " sales milestone" + (rows.length === 1 ? "" : "s") : null, numOr(lic.sublicensePct, 0) > 0 ? lic.sublicensePct + "% of partner income" : null].filter(Boolean).join(" · ")
+    : "";
+  return h("div", { "data-nav": "licensor", style: { marginTop: 14, padding: "10px 14px", borderRadius: 8, background: "var(--surface-2)", border: "1px dashed var(--rule)" } },
+    h("label", { style: { display: "flex", alignItems: "center", gap: 8, fontSize: 12, fontFamily: "var(--mono)", color: "var(--ink-2)", cursor: "pointer", marginBottom: lic.enabled ? 10 : 0 } },
+      h("input", { type: "checkbox", checked: !!lic.enabled, onChange: e => setLic({ enabled: e.target.checked }) }),
+      "In-licensed asset (royalties or milestones owed to a licensor)" + (summary ? " · " + summary : "")),
+    lic.enabled && h("div", null,
+      h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginBottom: 10, lineHeight: 1.6 } },
+        "What the company pays the party it licensed this drug from. Each payment exists only if the drug sells, so it is weighted by the odds of launch with the revenue: the royalty on every year's own sales, the approval milestone in the launch year, each sales milestone in the first year sales reach its level. Take the terms from the 10-K's licence section; where it gives a range (\u201chigh-single to low-double digits\u201d), enter the rate you expect at peak."),
+      h("label", { style: { display: "flex", flexDirection: "column", gap: 4, fontSize: 12, fontFamily: "var(--sans)", color: "var(--ink-2)", marginBottom: 8, maxWidth: 420 } },
+        "Licensor",
+        h("input", { type: "text", value: lic.name || "", "aria-label": "Licensor", placeholder: "e.g. BioMarin (via Allievex)", onChange: e => setLic({ name: e.target.value }), style: { ...inputStyle, width: "100%" } })),
+      h("div", { style: { display: "flex", flexWrap: "wrap", gap: "0 16px" } },
+        h(BenchField, { label: "Royalty owed", value: lic.royaltyPct || "", onChange: v => setLic({ royaltyPct: v }), suffix: "%", placeholder: "none",
+          help: "Percent of the company's own net sales. A tiered royalty is entered as its blended rate at peak." }),
+        h(BenchField, { label: "Milestone owed on approval", value: lic.approvalMilestoneM || "", onChange: v => setLic({ approvalMilestoneM: v }), suffix: "$M", placeholder: "none",
+          help: "Paid in the launch year, weighted by the odds of approval." }),
+        h(BenchField, { label: "Share of partner income owed", value: lic.sublicensePct || "", onChange: v => setLic({ sublicensePct: v }), suffix: "%", placeholder: "none",
+          help: "A sublicense fee: the percent of royalties, upfronts and milestones a partner pays the company that goes on to the licensor." + (partnered ? "" : " Only matters if the asset is also partnered (Partnership above).") })),
+      h("div", { style: { marginTop: 8 } },
+        h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-2)", marginBottom: 6 } }, "Sales milestones owed"),
+        rows.length === 0 && h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginBottom: 6 } }, "None added."),
+        rows.map((m, i) => h("div", { key: m.id || i, className: "licensor-milestone", style: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, padding: "6px 10px", borderRadius: 6, background: "var(--surface)", marginBottom: 6, fontSize: 11, fontFamily: "var(--mono)" } },
+          h("span", null, "$" + m.paymentM + "M when annual net sales first reach $" + m.thresholdM + "M"),
+          h(ConfirmXButton, { onConfirm: () => setLic({ salesMilestones: rows.filter((_, j) => j !== i) }), title: "Delete this sales milestone", style: { padding: "3px 8px", fontSize: 10 } }))),
+        h("div", { style: { display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" } },
+          h("input", { type: "number", min: 0, value: draft.thresholdM, "aria-label": "Sales level ($M a year)", placeholder: "sales $M/yr", onChange: e => setDraft({ ...draft, thresholdM: e.target.value }), style: inputStyle }),
+          h("input", { type: "number", min: 0, value: draft.paymentM, "aria-label": "Milestone payment ($M)", placeholder: "pays $M", onChange: e => setDraft({ ...draft, paymentM: e.target.value }), style: inputStyle }),
+          h("button", { type: "button", disabled: !(Number(draft.paymentM) > 0) || draft.thresholdM === "",
+            onClick: () => { setLic({ salesMilestones: [...rows, { id: newId("lm"), thresholdM: draft.thresholdM, paymentM: draft.paymentM }] }); setDraft({ thresholdM: "", paymentM: "" }); },
+            style: { padding: "5px 12px", minHeight: 28, borderRadius: 6, border: "1px solid var(--rule)", background: "transparent", color: "var(--ink-2)", fontFamily: "var(--mono)", fontSize: 11, cursor: "pointer" } }, "+ Add sales milestone"))),
+      h("label", { style: { display: "flex", flexDirection: "column", gap: 4, fontSize: 12, fontFamily: "var(--sans)", color: "var(--ink-2)", marginTop: 10, maxWidth: 520 } },
+        "Source",
+        h("input", { type: "text", value: lic.note || "", "aria-label": "Licence terms source", placeholder: "e.g. 10-Q Q2 2026, note 3", onChange: e => setLic({ note: e.target.value }), style: { ...inputStyle, width: "100%" } })),
+      partnered && h("div", { style: { ...UI.caption, marginTop: 8, lineHeight: 1.5 } }, "The royalty owed applies to the company's own sales; what the partner sells is covered by the share of partner income above.")));
 }

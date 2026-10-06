@@ -118,7 +118,8 @@ function assumptionNavSections(theCase, program) {
     { id: "pos", label: "Probability of success", state: changed(pick(program, ["posOverridePct", "posBiomarkerUse", "posDiseaseType"]), pick(dp, ["posOverridePct", "posBiomarkerUse", "posDiseaseType"])) },
     { id: "waterfall", label: "Risk waterfall", state: "result" },
     { id: "prv", label: "Priority review voucher", state: (program.prv || {}).enabled ? "set" : "" },
-    { id: "partner", label: "Partnership", state: (program.partnership || {}).enabled ? "set" : "" });
+    { id: "partner", label: "Partnership", state: (program.partnership || {}).enabled ? "set" : "" },
+    { id: "licensor", label: "Owed to a licensor", state: (program.licensor || {}).enabled ? "set" : "" });
   groups.push({ label: program.drugName || program.name || "Program", items });
   return groups;
 }
@@ -266,7 +267,8 @@ function CaseView({ theCase, onChange, onDelete, onNavigateToTools, onReopenSave
         reps: { primaryCare: cs.reps.primaryCare || 0, specialty: cs.reps.specialty || 0, hospital: cs.reps.hospital || 0 },
         marketingPctOfPeak: cs.marketingPctOfPeak !== "" ? cs.marketingPctOfPeak : MARKETING_BENCHMARKS.baseCasePctOfPeakRevenue,
         yearsToLOE: getRevenueBuild(p.program).exclusivity.yearsToLOE,
-        launchYearOffset: p.launchYearOffset
+        launchYearOffset: p.launchYearOffset,
+        licensor: p.program.licensor
       });
     } catch (e) {}
     return { id: p.id, launchYearOffset: p.launchYearOffset, pnl };

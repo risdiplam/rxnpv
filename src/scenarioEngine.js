@@ -217,7 +217,8 @@ function computeProgramValuation(program, scenario, scenarioKey) {
     reps: { primaryCare: cs.reps.primaryCare || 0, specialty: cs.reps.specialty || 0, hospital: cs.reps.hospital || 0 },
     marketingPctOfPeak: cs.marketingPctOfPeak !== "" ? cs.marketingPctOfPeak : MARKETING_BENCHMARKS.baseCasePctOfPeakRevenue,
     yearsToLOE: getRevenueBuild(program).exclusivity.yearsToLOE,
-    launchYearOffset: program.launchYearOffset
+    launchYearOffset: program.launchYearOffset,
+    licensor: program.licensor
   });
 
   const rnd = computeRnDToLaunch(program);
@@ -738,7 +739,10 @@ function computePartnershipContribution(theCase, r, scenario) {
   (theCase.programs || []).forEach(prog => {
     const partnership = prog.partnership;
     if (!partnership || !partnership.enabled) return;
-    upfrontContribution += (numOr(partnership.upfrontM, 0)) * 1e6;
+    // The share of partner payments owed on to the licensor (a sublicense
+    // fee), when the asset is itself in-licensed.
+    const keep = prog.licensor && prog.licensor.enabled ? 1 - Math.min(100, Math.max(0, numOr(prog.licensor.sublicensePct, 0))) / 100 : 1;
+    upfrontContribution += (numOr(partnership.upfrontM, 0)) * 1e6 * keep;
     if (!partnership.milestones || !partnership.milestones.length) return;
     // The same effective odds the program itself is valued at — override-aware
     // and scenario-scaled — so a milestone moves with Bear/Bull and with a
@@ -772,7 +776,7 @@ function computePartnershipContribution(theCase, r, scenario) {
         posToGate = stage ? stage.posToReachStage : 1; // gate already behind current phase -> certain
         yearsToGate = yearsToReachStage[m.gate] != null ? yearsToReachStage[m.gate] : 0;
       }
-      const riskAdjusted = (valueM * 1e6) * posToGate;
+      const riskAdjusted = (valueM * 1e6) * posToGate * keep;
       const discounted = yearsToGate > 0 ? riskAdjusted / Math.pow(1 + r, yearsToGate) : riskAdjusted;
       milestoneContribution += discounted;
     });
@@ -898,9 +902,29 @@ function computeSimpleMultipleValuation(theCase, scenario, scenarioKey, multiple
 
     const posToLaunch = computeEffectivePoS(p, scenario).posToLaunch;
 
-    const peakEV = peakRevenue * multiple;
+    // Owed to a licensor: the multiple applies to peak revenue less the
+    // royalty and the partner-income share owed at peak; milestones owed come
+    // off at their odds-weighted present value — approval in the launch year,
+    // each sales milestone the peak reaches by the peak year (an
+    // approximation the full model times exactly).
+    let licensorDeduction = 0, owedPV = 0;
+    if (p.licensor && p.licensor.enabled) {
+      const lic = p.licensor;
+      const baseRev = getProgramRevenueResult(p, 25);
+      const commercialShare = baseRev.peakTotalRevenue > 0 && baseRev.peakCommercialRevenue != null ? baseRev.peakCommercialRevenue / baseRev.peakTotalRevenue : 1;
+      const pctOf = v => Math.min(100, Math.max(0, numOr(v, 0))) / 100;
+      const peakCommercial = peakRevenue * commercialShare;
+      licensorDeduction = peakCommercial * pctOf(lic.royaltyPct) + (peakRevenue - peakCommercial) * pctOf(lic.sublicensePct);
+      const approval = Math.max(0, numOr(lic.approvalMilestoneM, 0)) * 1e6;
+      if (approval > 0) owedPV += approval * posToLaunch / Math.pow(1 + r, launchYearOffset);
+      (lic.salesMilestones || []).forEach(m => {
+        const pay = Math.max(0, numOr(m.paymentM, 0)) * 1e6;
+        if (pay > 0 && peakCommercial >= Math.max(0, numOr(m.thresholdM, 0)) * 1e6) owedPV += pay * posToLaunch / Math.pow(1 + r, yearsToPeakFromToday);
+      });
+    }
+    const peakEV = (peakRevenue - licensorDeduction) * multiple;
     const riskedEV = peakEV * posToLaunch;
-    const pv = riskedEV / Math.pow(1 + r, yearsToPeakFromToday);
+    const pv = riskedEV / Math.pow(1 + r, yearsToPeakFromToday) - owedPV;
 
     return { id: p.id, name: p.drugName || p.name, peakRevenue, posToLaunch, pv, launchYearOffset, peakEV, riskedEV };
   });

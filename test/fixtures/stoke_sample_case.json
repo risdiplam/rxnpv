@@ -103,6 +103,15 @@
      }
     ]
    },
+   "licensor": {
+    "enabled": true,
+    "name": "University of Southampton (TANGO licence, 2016)",
+    "royaltyPct": "2",
+    "sublicensePct": "5",
+    "approvalMilestoneM": "",
+    "salesMilestones": [],
+    "note": "10-K FY2025, License and research agreements: royalties on product sales (rate not disclosed), a mid-single-digit % of sublicense revenue, milestones (not disclosed)"
+   },
    "ira": {
     "enabled": false,
     "reductionPct": "",

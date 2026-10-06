@@ -182,7 +182,7 @@ const PROJECTION_PARTS = [
 ];
 // works: the rows are the if-it-works world (no odds), so the legend and the
 // tooltip say plain "Revenue" and there is no revenue at risk to key.
-function ProjectionChart({ rows, startYear, height, label, works }) {
+function ProjectionChart({ rows, startYear, height, label, works, licensor }) {
   const h = React.createElement;
   height = height || 300;
   const wrapRef = React.useRef(null);
@@ -222,7 +222,7 @@ function ProjectionChart({ rows, startYear, height, label, works }) {
 
   return h("div", { ref: wrapRef, style: { position: "relative" } },
     h("div", { className: "proj-legend" },
-      PROJECTION_PARTS.filter(p => !(works && p.key === "atRisk")).map(p => h("span", { key: p.key }, h("i", { style: { background: p.color, opacity: p.opacity || 1 } }), works && p.key === "revenue" ? "Revenue" : p.label)),
+      PROJECTION_PARTS.filter(p => !(works && p.key === "atRisk")).map(p => h("span", { key: p.key }, h("i", { style: { background: p.color, opacity: p.opacity || 1 } }), works && p.key === "revenue" ? "Revenue" : licensor && p.key === "commercialCosts" ? "COGS, S&M & licensor" : p.label)),
       h("span", null, h("i", { className: "proj-legend-line" }), "Running present value"),
       rows.some(r => r.isLaunch) && h("span", null, h("i", { className: "proj-legend-band launch" }), "Launch year"),
       rows.some(r => r.isLOE) && h("span", null, h("i", { className: "proj-legend-band loe" }), "Loss of exclusivity")),

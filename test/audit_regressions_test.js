@@ -321,9 +321,9 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
     ok(!!fr && /Price \$24\.80 entered 2026-09-25/.test(fr.textContent) && /Cash \$420\.0M as of 2026-06-30/.test(fr.textContent)
       && /Next: EMPEROR Phase 3 topline, 2027-Q3 \(pinned\)/.test(fr.textContent) && /Company guidance, Q2 2026 10-Q/.test(fr.querySelector("[title*=pinned]") ? fr.querySelector("[title*=pinned]").title : "") && /Odds 65%, your figure/.test(fr.textContent),
       "Overview: the freshness line gives price date, cash date, the pinned catalyst and the odds' source (" + (fr && fr.textContent) + ")");
-    // The odds gap in points (55% implied against 65%), and what it held fixed.
+    // The odds gap in points (56% implied against 65%), and what it held fixed.
     const gapEl = panel && panel.querySelector(".implied-gap");
-    ok(!!gapEl && /−10 pts vs yours/.test(gapEl.textContent), "Overview: the price-implied odds show the gap in points (" + (gapEl && gapEl.textContent) + ")");
+    ok(!!gapEl && /−9 pts vs yours/.test(gapEl.textContent), "Overview: the price-implied odds show the gap in points (" + (gapEl && gapEl.textContent) + ")");
     const heldBtn = gapEl && [...gapEl.querySelectorAll("button")].find(b => b.textContent === "held fixed");
     if (heldBtn) { click(heldBtn); await wait(200); }
     ok(!!gapEl && /everything else held: Base peak revenue \$1\.31B \(the full build\), launch in year 1/.test(gapEl.textContent), "Overview: 'held fixed' lists what the reverse-solve held still");
@@ -332,19 +332,19 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
     ok(!!fp && /≈\$1\.30\s*charging the rest of Phase 3 at its benchmark cost\s*\(in use\)/.test(fp.textContent) && /≈\$0\.46\s*burning \$19\.5M a month to the readout; date from the pinned catalyst/.test(fp.textContent), "Overview: both failure floors, the stage one in use (" + (fp && fp.textContent) + ")");
     const table = panel && panel.querySelector(".proj-table");
     ok(!!table && table.querySelectorAll("tbody tr").length === 16, "Projections: the table shows the first 16 years");
-    ok(!!table && /Enterprise value \$1\.62B/.test(table.querySelector("tfoot").textContent), "Projections: the table ends at the Base enterprise value");
+    ok(!!table && /Enterprise value \$1\.56B/.test(table.querySelector("tfoot").textContent), "Projections: the table ends at the Base enterprise value");
     const lastRun = table && [...table.querySelectorAll("tbody tr")].pop().lastChild.textContent;
     // "If it works" beside the odds-weighted scenarios, and the Projections
     // card's world toggle: the if-it-works table drops the "× odds" column and
     // ends at the enterprise value of the case at 100% odds.
-    ok(/If it works\s*\$42\.01/.test(panel.textContent) && /not the failure case/.test(panel.textContent), "Headline: If it works $41.32 beside Bear/Base/Bull, with Base explained");
+    ok(/If it works\s*\$40\.85/.test(panel.textContent) && /not the failure case/.test(panel.textContent), "Headline: If it works $40.85 beside Bear/Base/Bull, with Base explained");
     const worldBtn = l => [...panel.querySelectorAll('[aria-label="Which world to show"] button')].find(b => b.textContent === l);
     click(worldBtn("If it works")); await wait(300);
     const wTable = panel.querySelector(".proj-table");
     const heads = wTable ? [...wTable.querySelectorAll("thead th")].map(t => t.textContent) : [];
     ok(worldBtn("If it works") && worldBtn("If it works").getAttribute("aria-pressed") === "true" && heads.includes("Revenue") && !heads.includes("Revenue × odds") && /Enterprise value \$2\.\d\dB/.test(wTable.querySelector("tfoot").textContent), "Projections: If it works shows the success world (" + (wTable && wTable.querySelector("tfoot").textContent) + ")");
     click(worldBtn("× odds")); await wait(300);
-    ok(/Enterprise value \$1\.62B/.test(panel.querySelector(".proj-table tfoot").textContent), "Projections: × odds goes back to the odds-weighted table");
+    ok(/Enterprise value \$1\.56B/.test(panel.querySelector(".proj-table tfoot").textContent), "Projections: × odds goes back to the odds-weighted table");
     ok(!!panel.querySelector('svg[aria-label^="Year-by-year"]'), "Projections: the chart renders");
     const showAll = [...panel.querySelectorAll("button")].find(b => /^Show all \d+ years/.test(b.textContent));
     ok(!!showAll, "Projections: offers the remaining years");
@@ -369,7 +369,7 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
     ok(w.readGlance(3, 40, 60, 10, 20, 25, null).text.includes("above even your Bull case"), "Glance: a price above Bull says so");
     const gl = [...panel.querySelectorAll("[data-export-section]")].find(e => e.getAttribute("data-export-section") === "The case at a glance");
     const gt = gl ? [...gl.querySelectorAll("svg text")].map(t => t.textContent) : [];
-    ok(!!gl && ["WHAT THE EVIDENCE SAYS", "ODDS OF REACHING LAUNCH", "65%", "price implies 55%", "Base $28.76", "today $24.80"].every(t => gt.includes(t)) && gt.some(t => /^\+\d+ more in the Evidence Log$/.test(t)), "Glance: evidence, odds and value panels render (" + gt.slice(0, 12).join(" | ") + ")");
+    ok(!!gl && ["WHAT THE EVIDENCE SAYS", "ODDS OF REACHING LAUNCH", "65%", "price implies 56%", "Base $28.01", "today $24.80"].every(t => gt.includes(t)) && gt.some(t => /^\+\d+ more in the Evidence Log$/.test(t)), "Glance: evidence, odds and value panels render (" + gt.slice(0, 12).join(" | ") + ")");
     ok(!!gl && gt.includes("Lead asset and mechanism") && gt.includes("Diagnosed 75%, treated 60%"), "Glance: the sample's high-confidence facts and its least certain judgment are shown");
     click([...gl.querySelectorAll("button")].find(b => b.textContent === "Hide")); await wait(200);
     ok(![...panel.querySelectorAll("[data-export-section]")].some(e => e.getAttribute("data-export-section") === "The case at a glance") && w.localStorage.getItem("rxnpv_glance_hidden") === "1", "Glance: Hide removes it and remembers");
@@ -383,8 +383,8 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
     ok(w.readOutcomeTree([{ label: "A", failProb: 0.2 }, { label: "B", failProb: 0.15 }], 1, 1).verdict === "The risk is spread across 2 gates.", "Tree: under 60% at one gate reads as spread");
     const tree = [...panel.querySelectorAll("[data-export-section]")].find(e => e.getAttribute("data-export-section") === "How the catalysts play out");
     const tt = tree ? [...tree.querySelectorAll("svg text, .tree-list")].map(t => t.textContent).join(" | ") : "";
-    ok(!!tree && ["Launches", "$42.01 a share", "≈$1.30 a share", "positive · 72%", "approved · 91%", "resubmitted · 4%", "Approved a year late"].every(t => tt.includes(t)) || (!!tree && /Phase 3 readout.*positive 80%.*≈\$1\.30/.test(tt)), "Tree: gates, odds and endings render (" + tt.slice(0, 160) + ")");
-    ok(!!tree && /0\.65 × \$42\.01/.test(tree.textContent), "Tree: the weighted sum is written out");
+    ok(!!tree && ["Launches", "$40.85 a share", "≈$1.30 a share", "positive · 72%", "approved · 91%", "resubmitted · 4%", "Approved a year late"].every(t => tt.includes(t)) || (!!tree && /Phase 3 readout.*positive 80%.*≈\$1\.30/.test(tt)), "Tree: gates, odds and endings render (" + tt.slice(0, 160) + ")");
+    ok(!!tree && /0\.65 × \$40\.85/.test(tree.textContent), "Tree: the weighted sum is written out");
 
     // Readout scenarios reading: price $20; clear $30 (+50%), modest $22 (+10%),
     // miss $2 (-90%); weighted $24 = +20%; miss chance 0.25 -> "one time in four".
@@ -432,7 +432,7 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
     // Snapshots are kept, dated (October 2026): a new dated entry is added
     // beside the sample's undated one.
     const snapEntries = snapCase().programs[0].evidenceLog.filter(e => /^What the model says \(snapshot, \d{4}-\d\d-\d\d\)$/.test(e.label));
-    ok(snapEntries.length === 1 && snapCase().programs[0].evidenceLog.length === nBefore + 1 && /^Generated from this case's model on /.test(snapEntries[0].source) && /Base fair value ~\$28\.76/.test(snapEntries[0].thesis),
+    ok(snapEntries.length === 1 && snapCase().programs[0].evidenceLog.length === nBefore + 1 && /^Generated from this case's model on /.test(snapEntries[0].source) && /Base fair value ~\$28\.01/.test(snapEntries[0].thesis),
       "Snapshot: replaces the one snapshot entry in place with the model's own figures (" + (snapEntries[0] && snapEntries[0].thesis.slice(0, 80)) + ")");
     click(d.getElementById("casetab-overview")); await wait(300);
 
@@ -440,7 +440,7 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
     const rng = [...panel.querySelectorAll("[data-export-section]")].find(e => e.getAttribute("data-export-section") === "The whole range, on one line");
     const rt = rng ? [...rng.querySelectorAll("svg text")].map(t => t.textContent) : [];
     ok(!!rng && ["If it fails", "≈$1.30", "If it works", "Today", "Bear", "Base", "Bull"].every(t => rt.includes(t)), "Range strip: floor, scenarios, today and success all marked (" + rt.join(" | ") + ")");
-    ok(!!rng && /paying 58% of the way from failure to success/.test(rng.textContent), "Range strip: the reading places the price between failure and success");
+    ok(!!rng && /paying 59% of the way from failure to success/.test(rng.textContent), "Range strip: the reading places the price between failure and success");
     ok(!!rng && /1 year of wind-down G&A \$95\.0M/.test(rng.textContent), "Range strip: the floor's arithmetic is written out");
     ok(!!rng && /assumes the whole current stage is still to pay/.test(rng.textContent), "Range strip: the floor says its default assumes the current stage is unpaid (GAP-003)");
 
@@ -453,24 +453,24 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
     if (burnBox) { click(burnBox.querySelector("input")); await wait(400); }
     const rngOn = [...panel.querySelectorAll("[data-export-section]")].find(e => e.getAttribute("data-export-section") === "The whole range, on one line");
     const rtOn = rngOn ? [...rngOn.querySelectorAll("svg text")].map(t => t.textContent) : [];
-    ok(rtOn.includes("≈$0.46") && rtOn.includes("$28.76") && /15\.0 months to the readout/.test(rngOn.textContent) && /pinned catalyst \(2027-Q3, to the end of that window\)/.test(rngOn.textContent), "Floor: switched on, the floor is the burn estimate and Base is unchanged (" + rtOn.join(" | ") + ")");
+    ok(rtOn.includes("≈$0.46") && rtOn.includes("$28.01") && /15\.0 months to the readout/.test(rngOn.textContent) && /pinned catalyst \(2027-Q3, to the end of that window\)/.test(rngOn.textContent), "Floor: switched on, the floor is the burn estimate and Base is unchanged (" + rtOn.join(" | ") + ")");
     const offBox = rngOn && [...rngOn.querySelectorAll("label")].find(l => /Rough estimate from the monthly burn/.test(l.textContent));
     if (offBox) { click(offBox.querySelector("input")); await wait(400); }
 
     // Break-even and the value bridge, side by side.
     const beSec = [...panel.querySelectorAll("[data-export-section]")].find(e => e.getAttribute("data-export-section") === "Break-even peak revenue");
-    ok(!!beSec && /The price needs about \$1\.09B of peak revenue/.test(beSec.textContent) && !!beSec.querySelector('svg[aria-label^="Fair value per share at each peak"]'), "Break-even: headline and chart (" + (beSec && beSec.textContent.slice(0, 60)) + ")");
+    ok(!!beSec && /The price needs about \$1\.13B of peak revenue/.test(beSec.textContent) && !!beSec.querySelector('svg[aria-label^="Fair value per share at each peak"]'), "Break-even: headline and chart (" + (beSec && beSec.textContent.slice(0, 60)) + ")");
     const br = d.getElementById("ws-bridge");
-    ok(!!br && /The price is \$3\d\d\.\dM below what this case finds/.test(br.textContent) && !!br.querySelector('svg[aria-label^="Value bridge"]'), "Bridge: gap headline and waterfall");
-    ok(!!br && /= Equity value \$2\.40B ÷ [\d,]+ diluted shares = \$28\.76 a share/.test(br.textContent), "Bridge: the exact one-line version ends at the Base per-share value");
-    ok(!!br && /A 10-point gap/.test(br.textContent), "Bridge: the reading states the odds gap");
+    ok(!!br && /The price is \$2\d\d\.\dM below what this case finds/.test(br.textContent) && !!br.querySelector('svg[aria-label^="Value bridge"]'), "Bridge: gap headline and waterfall");
+    ok(!!br && /= Equity value \$2\.34B ÷ [\d,]+ diluted shares = \$28\.01 a share/.test(br.textContent), "Bridge: the exact one-line version ends at the Base per-share value");
+    ok(!!br && /A 9-point gap/.test(br.textContent), "Bridge: the reading states the odds gap");
 
     // Monte Carlo: a histogram of every trial with labelled markers, not five bars.
     click([...panel.querySelectorAll("button")].find(b => b.textContent.includes("Run 3,000 trials"))); await wait(4000);
     const hist = panel.querySelector('svg[aria-label^="Histogram of 3,000"]');
     ok(!!hist && hist.querySelectorAll("rect").length >= 8, "Monte Carlo: histogram of every trial renders");
     const labels = hist ? [...hist.querySelectorAll("text")].map(t => t.textContent) : [];
-    ok(["P10 ", "Median ", "P90 ", "Today $24.80", "Base $28.76"].every(l => labels.some(t => t.startsWith(l))), "Monte Carlo: P10, median, P90, today and Base are all marked (" + labels.filter(t => /\s\$/.test(t)).join(" | ") + ")");
+    ok(["P10 ", "Median ", "P90 ", "Today $24.80", "Base $28.01"].every(l => labels.some(t => t.startsWith(l))), "Monte Carlo: P10, median, P90, today and Base are all marked (" + labels.filter(t => /\s\$/.test(t)).join(" | ") + ")");
     ok(/Above today's price/.test(panel.textContent), "Monte Carlo: states the share of trials above today's price");
   }
 
@@ -521,7 +521,7 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
     ok([...d.querySelectorAll('input[aria-label="Company name or ticker"]')].some(i => i.value === "STOK"), "Case tools: Company Lookup starts on the ticker");
     click(btnT("Valuation")); await wait(150); click(btnT("Binary Event")); await wait(500);
     const bf = l => valOf('input[aria-label="' + l + '"]');
-    ok(bf("Today") === "24.80" && bf("If it works") === "42.01" && bf("If it fails") === "1.30" && bf("Your PoS (%)") === "65", "Case tools: Binary Event starts from price, success, failure floor and odds (" + [bf("Today"), bf("If it works"), bf("If it fails"), bf("Your PoS (%)")].join(" / ") + ")");
+    ok(bf("Today") === "24.80" && bf("If it works") === "40.85" && bf("If it fails") === "1.30" && bf("Your PoS (%)") === "65", "Case tools: Binary Event starts from price, success, failure floor and odds (" + [bf("Today"), bf("If it works"), bf("If it fails"), bf("Your PoS (%)")].join(" / ") + ")");
     // Typing over a field keeps the typed value.
     const t = d.querySelector('input[aria-label="Today"]');
     Object.getOwnPropertyDescriptor(w.HTMLInputElement.prototype, "value").set.call(t, "20"); t.dispatchEvent(new w.Event("input", { bubbles: true })); await wait(200);

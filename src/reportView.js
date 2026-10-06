@@ -304,8 +304,8 @@ function ReportView({ theCase, onBack, updateCase }) {
         inc("cashFlow") && valMethod === "dcf" && baseResult ? h("div", { style: cardStyle, className: reportDark ? "theme-scope-dark" : "theme-scope-light" },
           h("div", { style: { fontSize: 13, fontWeight: 700, marginBottom: 4, color: rpt.ink2 } }, "Year by Year (Base Case)"),
           h("div", { style: { fontSize: 11, color: rpt.ink3, marginBottom: 10 } }, "Odds-weighted cash flows by year; the pale top of each bar is the revenue added if success were certain. " + new Date().getFullYear() + " is the twelve months from the report date."),
-          h(ProjectionChart, { rows: computeProjectionRows(baseResult, theCase), startYear: new Date().getFullYear(), height: 260, label: "Year-by-year odds-weighted cash flows and running present value, base case" }),
-          h(ProjectionTable, { rows: computeProjectionRows(baseResult, theCase), startYear: new Date().getFullYear(), npv: baseResult.npvResult, compact: true })
+          h(ProjectionChart, { rows: computeProjectionRows(baseResult, theCase), startYear: new Date().getFullYear(), height: 260, licensor: theCase.programs.some(hasLicensorObligations), label: "Year-by-year odds-weighted cash flows and running present value, base case" }),
+          h(ProjectionTable, { rows: computeProjectionRows(baseResult, theCase), startYear: new Date().getFullYear(), npv: baseResult.npvResult, compact: true, licensor: theCase.programs.some(hasLicensorObligations) })
         ) : null,
 
         // Sum-of-the-Parts — multi-program, DCF-mode only, same rule as the

@@ -75,6 +75,44 @@ function computeMarketingCost(years, peakRevenue, marketingPctOfPeak, yearsToLOE
 }
 
 // ── Full per-year P&L for one program (before corporate G&A) ──
+// ── What an in-licensing company owes its licensor (October 2026) ─────────
+// Many small biotechs in-license their lead asset and owe the licensor on
+// it: a royalty on their own net sales, a milestone on approval, milestones
+// when annual sales first cross set levels, and often a share of whatever a
+// partner pays them (a "sublicense fee"). lic: program.licensor. All of it is
+// a cost that exists only once the drug sells, so it comes out of product
+// contribution and is weighted by the odds of launch with the revenue.
+//   royaltyPct      — % of the company's OWN net sales (commercialRevenue);
+//                     a tiered royalty is entered as its blended rate
+//   sublicensePct   — % of partner royalty income (partnerRoyalty) owed on
+//                     (upfronts and milestones received: computePartnershipContribution)
+//   approvalMilestoneM — paid in the first launch year
+//   salesMilestones — [{ thresholdM, paymentM }], each paid once, in the first
+//                     year the company's own net sales reach the threshold
+function licensorObligationsByYear(commercialRevenue, partnerRoyalty, lic) {
+  const n = commercialRevenue.length;
+  const zeros = () => new Array(n).fill(0);
+  if (!lic || !lic.enabled) return { royalty: zeros(), share: zeros(), milestones: zeros(), total: zeros() };
+  const pct = v => Math.min(100, Math.max(0, numOr(v, 0))) / 100;
+  const royalty = commercialRevenue.map(r => Math.round(r * pct(lic.royaltyPct)));
+  const share = (partnerRoyalty || zeros()).map(r => Math.round(r * pct(lic.sublicensePct)));
+  const milestones = zeros();
+  const approval = Math.max(0, numOr(lic.approvalMilestoneM, 0)) * 1e6;
+  if (approval > 0 && n > 0) milestones[0] += Math.round(approval);
+  (lic.salesMilestones || []).forEach(m => {
+    const threshold = Math.max(0, numOr(m.thresholdM, 0)) * 1e6, pay = Math.max(0, numOr(m.paymentM, 0)) * 1e6;
+    if (!(pay > 0)) return;
+    const at = commercialRevenue.findIndex(r => r > 0 && r >= threshold);
+    if (at >= 0) milestones[at] += Math.round(pay);
+  });
+  return { royalty, share, milestones, total: royalty.map((v, i) => v + share[i] + milestones[i]) };
+}
+// True when a program owes anything to a licensor (labels and notes read it).
+function hasLicensorObligations(program) {
+  const lic = program && program.licensor;
+  return !!(lic && lic.enabled && (numOr(lic.royaltyPct, 0) > 0 || numOr(lic.sublicensePct, 0) > 0 || numOr(lic.approvalMilestoneM, 0) > 0 || (lic.salesMilestones || []).some(m => numOr(m.paymentM, 0) > 0)));
+}
+
 function computeProgramPnL(revenueResult, cost) {
   const years = revenueResult.years.map(y => y.year);
   const revenue = revenueResult.years.map(y => y.totalRevenue);
@@ -98,10 +136,13 @@ function computeProgramPnL(revenueResult, cost) {
   const grossProfit = revenue.map((r, i) => r - cogs[i]);
   const salesForce = computeSalesForceCost(years, cost.reps, cost.yearsToLOE, cost.launchYearOffset);
   const marketing = computeMarketingCost(years, peakCommercial, cost.marketingPctOfPeak, cost.yearsToLOE);
-  const productContribution = grossProfit.map((gp, i) => gp - salesForce[i] - marketing[i]);
+  const owed = licensorObligationsByYear(commercialRevenue, royaltyRevenue, cost.licensor);
+  const productContribution = grossProfit.map((gp, i) => gp - salesForce[i] - marketing[i] - owed.total[i]);
   const rows = years.map((y, i) => ({
     year: y, revenue: revenue[i], cogs: cogs[i], grossProfit: grossProfit[i],
-    salesForce: salesForce[i], marketing: marketing[i], productContribution: productContribution[i]
+    salesForce: salesForce[i], marketing: marketing[i],
+    licensorRoyalty: owed.royalty[i], licensorShare: owed.share[i], licensorMilestones: owed.milestones[i], licensorTotal: owed.total[i],
+    productContribution: productContribution[i]
   }));
   rows.prelaunchSalesForceCost = computePrelaunchSalesForceCost(cost.reps);
   return rows;
@@ -133,13 +174,13 @@ function computeCompanyPnL(programPnLs, corporateGA, totalYears) {
   totalYears = totalYears || 22;
   const calendar = [];
   for (let cy = 0; cy < totalYears; cy++) {
-    let revenue = 0, cogs = 0, grossProfit = 0, salesForce = 0, marketing = 0, productContribution = 0;
+    let revenue = 0, cogs = 0, grossProfit = 0, salesForce = 0, marketing = 0, licensor = 0, productContribution = 0;
     programPnLs.forEach(p => {
       const idx = cy - (p.launchYearOffset || 0);
       const row = idx >= 0 ? p.pnl[idx] : null;
       if (row) {
         revenue += row.revenue; cogs += row.cogs; grossProfit += row.grossProfit;
-        salesForce += row.salesForce; marketing += row.marketing; productContribution += row.productContribution;
+        salesForce += row.salesForce; marketing += row.marketing; licensor += row.licensorTotal || 0; productContribution += row.productContribution;
       }
       // Pre-launch sales force ramp: incurred the calendar year immediately before launch
       if (idx === -1 && p.pnl.prelaunchSalesForceCost) {
@@ -147,7 +188,7 @@ function computeCompanyPnL(programPnLs, corporateGA, totalYears) {
         productContribution -= p.pnl.prelaunchSalesForceCost;
       }
     });
-    calendar.push({ calendarYear: cy, revenue, cogs, grossProfit, salesForce, marketing, productContribution });
+    calendar.push({ calendarYear: cy, revenue, cogs, grossProfit, salesForce, marketing, licensor, productContribution });
   }
   const gaByYear = computeCorporateGA(calendar.map(c => c.revenue), corporateGA.preCommercialAnnualM, corporateGA.gaShareOfMatureSgaPct);
   calendar.forEach((c, i) => { c.corporateGA = gaByYear[i]; c.ebit = c.productContribution - gaByYear[i]; });
