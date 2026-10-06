@@ -131,9 +131,9 @@ The app assumes pre-revenue. A user modelling an early-commercial name (launched
 
 ## 7. Valuation (mature — leave alone)
 
-rNPV/DCF, Quick + Detailed revenue, scenarios, Simple Multiple, PRV, capital structure and dilution, dilution-path financing, partnership economics, full-case Monte Carlo, sensitivity, sum-of-the-parts, risk waterfall, reverse-solve, binary-event implied PoS, portfolio aggregation, PDF report.
+rNPV/DCF, Quick + Detailed revenue, scenarios, Simple Multiple, PRV, capital structure and dilution, dilution-path financing, partnership economics, what is owed to a licensor (October 2026: royalty, approval and sales milestones, share of partner income), full-case Monte Carlo, sensitivity, sum-of-the-parts, risk waterfall, reverse-solve, binary-event implied PoS, portfolio aggregation, PDF report.
 
-**DECIDED — no further DCF mechanics.** This side is complete and heavily verified. New work goes into the workbenches above.
+**DECIDED — no further DCF mechanics.** This side is complete and heavily verified. New work goes into the workbenches above. *One deliberate exception, October 5, 2026, at the user's request:* what an in-licensing company owes its licensor (royalty, approval and sales milestones, share of partner income), because preparing the SPRB trial case showed it is common in pre-revenue biotech and was otherwise unmodelled.
 
 ---
 

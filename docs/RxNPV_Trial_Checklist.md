@@ -32,8 +32,8 @@ Work top to bottom over a few sessions; tick as you go. Part 1 builds **Spruce (
 - [ ] **Revenue build (Full):** patients (prevalence or incidence), diagnosed, treated, share, price and basis. Check one number by hand: peak revenue ≈ patients × diagnosed × treated × share × net price. If it disagrees, report it.
 - [ ] **Price basis:** try WAC vs ASP and see the conversion note; then set what your source quotes.
 - [ ] **Exclusivity & LOE:** biologic defaults. Open **Medicare price negotiation (IRA)**: it should warn that rare-disease-only drugs are largely excluded. Leave it off.
-- [ ] **Cost Structure:** COGS % plus ~10 points for the BioMarin royalty (the workaround).
-- [ ] **R&D to Launch → Override total cost:** the ~$4M filing fee plus the $25.5M milestone.
+- [ ] **Cost Structure:** COGS % (benchmark, or your own figure).
+- [ ] **In-licensed asset (royalties or milestones owed to a licensor):** BioMarin, ~10% royalty, $25.5M on approval, one or two sales milestones you judge. The summary line shows what's owed, the section list gains a dot, and fair value falls. On the Overview's year-by-year table, the cost column becomes "COGS, S&M + licensor". Add a sales milestone, then delete it (two clicks). Untick the section and check the value returns exactly.
 - [ ] **PRV:** on (TA-ERT is eligible); the bridge gains a voucher line.
 - [ ] **Corporate G&A:** pre-commercial G&A (Q2 run rate × 4); wind-down years.
 - [ ] **Section list** (left of Assumptions): dots mark sections you changed or that still need input. Clicking one jumps there.
@@ -105,5 +105,4 @@ Work top to bottom over a few sessions; tick as you go. Part 1 builds **Spruce (
 - The samples are dated (Stoke 2026-09-25, PepGen 2026-09-29); their freshness line goes amber after a week. That's correct.
 - Runways count from today: a filing's cash ages until the next 10-Q (Stoke and PepGen file in November).
 - Registry "Phase 4" for an unapproved drug, and completion dates, are shown as registered.
-- The app cannot yet model royalties or milestones owed to a licensor (see the SPRB sheet for the workaround).
 - Short text-only sections export with more margin than the screen; that's by design.

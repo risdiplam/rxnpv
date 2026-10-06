@@ -25,7 +25,7 @@ Spruce is a single-asset company. Its asset is **tralesinidase alfa (TA-ERT)**, 
 | ATM | **$75M** with Jefferies, **unused** at June 30 | 10-Q, Liquidity |
 | Burn | Cash used in operations H1 2026 ≈ **$30.9M** (≈ $5.1M a month). Q2 operating expenses $16.5M, including $0.9M of stock compensation | EDGAR XBRL; Q2 2026 results release |
 | Company runway guidance | "into the second half of 2027" | Q2 2026 results release |
-| Owed to BioMarin (licensor) | Up to **$25.5M** for the first MPS IIIB product; up to **$100M per licensed product** in sales milestones; **high-single- to low-double-digit tiered royalties** on net sales | 10-Q Q2 2026, note 3 (Allievex obligations assumed) |
+| Owed to BioMarin (licensor) | Up to **$25.5M** for the first MPS IIIB product; up to **$100M per licensed product** in sales milestones; **high-single- to low-double-digit tiered royalties** on net sales. Enter these in the program's "In-licensed asset" section | 10-Q Q2 2026, note 3 (Allievex obligations assumed) |
 | Designations | Breakthrough, Rare Pediatric Disease (**PRV-eligible**; the program was reauthorized in Feb 2026 through Sep 30, 2029), Fast Track, Orphan (US and EU) | Q2 2026 release; 10-K FY2025 |
 | Trials (`trialIds`) | NCT02754076 (Phase 1/2, completed, n=23), NCT03784287 (extension), NCT05492799 (long-term ICV; registered as "Phase 4" by Allievex), **NCT07579910** (TrAnsform, the confirmatory study, Phase 3, n=14, not yet recruiting, start 2026-12), NCT07733856 (expanded access) | ClinicalTrials.gov, read 2026-10-05 |
 | Target | **NAGLU** (ENSG00000108784) | Open Targets |
@@ -42,13 +42,15 @@ Spruce is a single-asset company. Its asset is **tralesinidase alfa (TA-ERT)**, 
 - **Debt to enter.** The balance sheet's $7.1M, or the $16.6M face that will actually be repaid. The app's EDGAR pull exports $7.1M and shows the face beside it. Using the face is the stricter choice. Don't also enter the $4M convertible: it's part of the same loan, and at $60 it's out of the money.
 - **Fully diluted shares.** At $45.52 only the RSUs are in the money, so about **3.0M** (2,874,013 + 127,084). Simple mode: type it. Detailed mode is the better test: basic shares; options 127,084 at $0 (the RSUs); warrants 64,000 at $50; leave out the $297 warrants (far out of the money).
 
-## What the app can't model directly for SPRB — and the workaround
+## Two SPRB specifics
 
-- **Royalties and milestones owed to a licensor.** Partnership Economics models money a partner pays *to* the company, not money the company owes. Workarounds:
-  - Add the royalty (about 10%) to **COGS %** in Cost Structure. Mathematically it's the same thing: a percentage of revenue, before tax.
-  - Add the **$25.5M** milestone to **R&D to Launch → Override total cost**. It's then charged before launch, close to the odds of approval, which is slightly conservative.
-  - Write both down in the Evidence Log.
-  - This is a real gap for in-licensed assets; whether to build a proper input is your decision.
+- **What Spruce owes BioMarin** goes in **Assumptions → (the program) → In-licensed asset (royalties or milestones owed to a licensor)**:
+  - Licensor: "BioMarin (via Allievex)".
+  - **Royalty owed: ~10%.** Disclosed only as "high-single- to low-double-digit tiered", so the blended rate at peak is your call.
+  - **Milestone owed on approval: $25.5M.** Disclosed as "up to $25.5M for the first MPS IIIB product".
+  - **Sales milestones:** up to $100M per licensed product, but the sales levels aren't disclosed. Add one or two at levels you judge (say $25M when sales reach $150M a year) and log the guess.
+  - **Share of partner income:** leave blank. Spruce has no partner, and no sublicense fee is disclosed.
+  - The program's value drops by roughly the odds-weighted present value of all this; Live impact shows how much.
 - **Medicare launch data.** Brineura (a children's drug) has **no Medicare record**, and the Launch tracker will say so. Medicare Part B does carry older MPS ERTs: Vimizim, Elaprase, Aldurazyme and Naglazyme, plus Lamzede (launched 2023). They're useful for the shape of a ramp only; their Medicare dollars are tiny.
 
 ## What the app should show (expected results)

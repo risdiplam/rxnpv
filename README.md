@@ -91,6 +91,7 @@ Suggested real-world inputs, most of them the cases used against the live servic
 | **Bear / Base / Bull scenarios** | Multipliers on share and PoS, overridable per case. The discount rate stays the same in every scenario by default (the odds carry the risk of failure; see the methodology review). | Open *Edit Bear / Bull assumptions* and change the Bear PoS multiplier. The Bear card should move. |
 | **Capital structure and dilution** | Cash (as the last filing reported it, with its date and the monthly burn; *Roll the cash forward* is an opt-in estimate), debt and diluted shares. Optional future raise, priced as a % below today's price or at a fixed price, and a dilution path to launch whose raises bring their cash with their shares. | Enable *Model dilution path to launch*. The preview line shows the raises, the expected cash and the shares; value per share moves up or down depending on whether the raise price is above or below the case's own value. |
 | **PRV, partnership economics** | Priority review voucher; royalty, milestone, upfront and cost-sharing overlay. Links to Licensing Comps. | Enable partnership. The EV→per-share bridge gains a line. |
+| **Owed to a licensor** | For an in-licensed asset: a royalty owed on the company's own net sales, a milestone on approval, sales milestones and a share of partner income, each weighted by the odds of launch. Napkin applies them at peak. | Tick "In-licensed asset" on a program, enter a 10% royalty: Base falls, and the year-by-year cost column becomes "COGS, S&M + licensor". |
 | **Full-case Monte Carlo** | 3,000 trials sampling PoS, share and discount rate between the Bear and Bull bounds. | Click **Run 3,000 trials**. A fair-value distribution appears. |
 | **Implied PoS and reverse-solve** | Given the current price, what PoS (or peak revenue, share or timing) the market is pricing in. | Set a current price. *What [case]'s price implies* appears. |
 | **Red flags** | Checks your own inputs against benchmarks, including a warning when post-approval M&A multiples are applied to a pre-approval asset. | Set a very high peak share. A flag appears. |
@@ -108,7 +109,7 @@ Suggested real-world inputs, most of them the cases used against the live servic
 | **Saved tab and worked examples** | Results saved from Tools and Simulation with their inputs; the sample cases carry one worked example per tool, each reopening its tool with sourced inputs. | Open the Stoke sample's Saved tab and open any example. |
 | **Sum-of-the-parts, risk waterfalls** | Per-program value contribution (needs 2+ programs); unrisked → risked NPV. | Add a second program. The SOTP and pipeline waterfall appear. |
 
-**Automated:** `final_regression_pass.js` covers the core valuation paths. `math_verification.js` (1,594 checks at the last update; it prints the current count) covers every formula against hand-derived values.
+**Automated:** `final_regression_pass.js` covers the core valuation paths. `math_verification.js` (1,606 checks at the last update; it prints the current count) covers every formula against hand-derived values.
 
 ### Tools: six workbenches, 19 tools, grouped by the question being asked
 
@@ -191,7 +192,7 @@ A cross-case summary: fair value against price, runway, modelled against implied
 
 | Suite | Covers |
 |---|---|
-| `math_verification.js` | 1,594 checks (at the last update; the suite prints the current count) of engine math against values derived by hand, from closed forms or from published constants. Never against the app's own output. Needs no DOM. |
+| `math_verification.js` | 1,606 checks (at the last update; the suite prints the current count) of engine math against values derived by hand, from closed forms or from published constants. Never against the app's own output. Needs no DOM. |
 | `net_test.js` | `resilientFetch`, the one fetch every integration uses: what is retried (dropped connections, timeouts, 408/425/429/5xx), what is not (400/403/404), and the waits. |
 | `backup_test.js` | Backup and restore (ADD vs REPLACE, unknown keys dropped, caches excluded) and both sample cases, pinned to the independent rebuilds. |
 | `worked_examples_test.js` | Every worked example in the sample cases opens its tool, fills it and runs; none reach the report. |
