@@ -133,7 +133,7 @@ The app assumes pre-revenue. A user modelling an early-commercial name (launched
 
 rNPV/DCF, Quick + Detailed revenue, scenarios, Simple Multiple, PRV, capital structure and dilution, dilution-path financing, partnership economics, what is owed to a licensor (October 2026: royalty, approval and sales milestones, share of partner income), full-case Monte Carlo, sensitivity, sum-of-the-parts, risk waterfall, reverse-solve, binary-event implied PoS, portfolio aggregation, PDF report.
 
-**DECIDED — no further DCF mechanics.** This side is complete and heavily verified. New work goes into the workbenches above. *One deliberate exception, October 5, 2026, at the user's request:* what an in-licensing company owes its licensor (royalty, approval and sales milestones, share of partner income), because preparing the SPRB trial case showed it is common in pre-revenue biotech and was otherwise unmodelled.
+**No longer closed (October 9, 2026).** The user: "we can absolutely add or fix DCF mechanics if it genuinely improves the product. that applies to every area of the application." The earlier "no further DCF mechanics" line is retired; every area is judged on merit. The licensor input (October 5) was the first exception; the October 2026 workflow (section 12) adds drug-level licences, convertible preferred and multi-program catalyst values.
 
 ---
 
@@ -144,7 +144,7 @@ Each of these has been considered and declined on the merits. Recording them her
 - **Chemistry / molecule cards / cheminformatics** — built, then removed; fails the product test
 - **QSP, PBPK, NONMEM-class modelling** — institutional, out of scope
 - **Docking, structure prediction** — out of scope
-- **Group-sequential / adaptive design engines** — previously declined, unchanged
+- **Group-sequential / adaptive design engines** — still declined as engines. *Narrow reversal, October 2026:* a small "what result crosses this interim analysis" calculator (section 12), because interim OS looks are catalysts in oncology
 - **Black-box AI outcome prediction** — actively unwanted; the app's value is showing its reasoning
 - **HTA / ICER / payer value models** — institutional
 - **13F institutional holdings** — different filing type from Form 4
@@ -218,3 +218,27 @@ An external pass by Grok, audited by Spark, reviewed against the code on 2026-10
 - **"Who reads out first" (T3)** leaves out the case's own registered trials (its program's trial IDs) — the first live check listed Stoke's own Phase 3 as a competitor.
 - **Samples** carry every new field that has a real source: pinned catalysts, price dates, cash sources, ATM and shelf figures from their filings, a window-dated PepGen entry, "What would change my mind". Not filled: options prices (no real chain), competitor lists and condition merges (user actions), the IRA clock (rare-disease drugs, largely excluded). Neither sample has a time-to-event primary, so the delayed-separation and readout-timing features are exercised by test designs. Bear/Base/Bull unchanged throughout.
 
+
+
+---
+
+## 12. October 2026 workflow (Spark handoff v2 + the Summit oncology build)
+
+Decided with the user on October 9, 2026; the full verdicts, reasons and done tests are in [`RxNPV_Build_Workflow_Oct2026.md`](RxNPV_Build_Workflow_Oct2026.md), the oncology findings in [`RxNPV_Oncology_Gap_Review.md`](RxNPV_Oncology_Gap_Review.md). The user took every recommendation and asked for one install at the end. Status lines move to **BUILT** as each batch passes its done test.
+
+| Batch | Item | Status |
+|---|---|---|
+| 0 | Spark's verified textbook examples as independent math checks (Lachin, Schoenfeld, Lehr, Friedman power, Fisher); the fragility example excluded — Walsh's method gives 1, the handoff's 2 | **BUILT** |
+| 1 | Program labels when two programs share a drug name; simulator program picker height | planned |
+| 1 | Convertible preferred that converts to common (counted as shares at any price, never as debt) | planned |
+| 1 | Incidence mode labelled as time on treatment; price-per-dose helper | planned |
+| 1 | "Who reads out first" and the competitor scan by rival drug names | planned |
+| 2 | What each catalyst is worth (multi-program), with optional same-drug read-across; Binary Event program picker | planned |
+| 2 | Range of endings (seeded success/failure simulation, read-across; mean equals Base) | planned |
+| 2 | Drug-level licence: royalty (optional marginal tiers) and sales milestones on the drug's total sales | planned |
+| 3 | Dead or underpowered; subgroup check; false-positive chance; interim boundaries; safety exposure; results-overdue, enrolment-shortfall and dropout-asymmetry flags; regression-to-the-mean caution; NI margin as a share; Zia response haircut preset; peak vs comps red flag; press-release reader (no score) | planned |
+| 4 | FDA decision date from the submission date; patent term extension estimate | planned |
+| 5 | Trial Glossary additions (cluster randomisation, enrichment, blinding, seamless designs, 3+3, composites, ITT vs per-protocol, comparator quality, LOCF, crossover dilution, publication bias) | planned |
+| 6 | Summit Therapeutics as the third full sample | planned |
+
+**Declined from the handoff, with reasons in the workflow document:** V5 discount-rate ladder (double counts risk), V7 real options and V8 sales-path simulation (an unsourceable volatility), V11 value-share ladder, V12 two-party option valuation, V13 platform feed-rate value, V3 market-growth compounding, F4 event health check, M1/M6/M7 (covered), M15, R10/R11/R19 curve fitting, P1/P8 tables (no data), P3, P6, P7, G1, G2, D3, E5 (registry history is not public), E9, E10's risk tiers.

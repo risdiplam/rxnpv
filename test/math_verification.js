@@ -5643,6 +5643,35 @@ section("PepGen, the whole case recomputed from its inputs (Bear, Base, Bull)");
 report();
 
 // ════════════════════════════════════════════════════════════════════════════
+section("Textbook cross-checks (Friedman, Motulsky — Spark handoff, October 2026)");
+// Independent worked examples from published textbooks, recomputed by hand in
+// the handoff; each is set against the app's own solver, not its output.
+{
+  // Friedman ch. 8 (Lachin): pC 0.40, pI 0.30, two-sided 5%, 90% power.
+  // p = 0.35; 1.96·√(2·0.35·0.65) = 1.3221; 1.2816·√(0.24 + 0.21) = 0.8597;
+  // 2N = 2 × 2.1818² / 0.01 = 952.0 → 476.0 a side, so the smallest whole n is 477.
+  const zA = 1.959964, zB = 1.281552, pbar = 0.35;
+  const twoN = 2 * Math.pow(zA * Math.sqrt(2 * pbar * (1 - pbar)) + zB * Math.sqrt(0.4 * 0.6 + 0.3 * 0.7), 2) / 0.01;
+  near("Lachin: 2N = 952 (Friedman's 952.3 with z rounded to 1.282)", twoN, 952.0, 0.5);
+  ok("the app's two-proportion solver needs 477 a side", api.solveSampleSizeTwoProportion(0.4, 0.3, 0.9, 0.05, "two", 1).n1 === Math.ceil(twoN / 2));
+  // Friedman p. 175: the same trial run at 350 a side. Zβ = (−1.3221 + √350 × 0.1)
+  // / √0.45 = (−1.3221 + 1.8708) / 0.6708 = 0.818 → power Φ(0.818) = 0.793.
+  near("Friedman: 350 a side gives power 0.793", api.closedFormPowerTwoProportion(0.4, 0.3, 350, 350, 0.05), 0.793, 0.001);
+  // Friedman pp. 185–186: hazards 0.30 vs 0.20, 90% power. Events = 4(1.96 + 1.2816)² / ln(1.5)²
+  // = 4 × 10.507 / 0.16440 = 255.7 → 256.
+  ok("Schoenfeld: hazard ratio 2/3 needs 256 events", api.solveEventsNeeded(0.2 / 0.3, 0.9, 0.05, 1).n === 256);
+  // Motulsky ch. 20 (Lehr): SD 10, difference 5, 80% power → 2 × (2.8 × 10 / 5)² = 62.7 → 63 a group.
+  ok("Lehr: SD 10, difference 5, 80% power → 63 a group", api.solveSampleSizeMeans(5, 10, 0.8, 0.05, "two", 1).n1 === 63);
+  // Fisher's exact, 15/60 vs 5/60: two-sided p = 0.0257 (Motulsky-style worked example).
+  near("Fisher: 15/60 vs 5/60, two-sided p = 0.0257", api.fisherExactTwoSided(15, 45, 5, 55), 0.0257, 0.00005);
+  // The handoff's fragility index for this table is 2, by removing responders
+  // from the treated arm. Walsh (2014) adds events to the arm with fewer:
+  // 15/60 vs 6/60 already gives p = 0.0528, so the index is 1 — the app is right.
+  ok("fragility follows Walsh: 15/60 vs 5/60 → 1 (not the handoff's 2)", api.computeFragilityIndex(15, 60, 5, 60).fragilityIndex === 1);
+}
+report();
+
+// ════════════════════════════════════════════════════════════════════════════
 console.log("\n" + "═".repeat(64));
 if (fail === 0) {
   console.log(`ALL MATH VERIFICATION PASSED — ${pass} checks`);
