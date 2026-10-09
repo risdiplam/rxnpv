@@ -227,9 +227,33 @@ function useCasePrefill(activeCase, caseValue, value, setValue, replaceable) {
 // range strip), what is left if the next readout fails (computeFailureFloor)
 // and the case's own odds of launch. Single-program DCF cases only; anything
 // it cannot compute honestly comes back blank.
-function caseBinaryDefaults(theCase) {
+// Several programs (October 2026): one program at a time, chosen by
+// programId (default: the first still in development) — "if it works" is that
+// program at certain odds and "if it fails" that program at zero, every other
+// program at its own odds.
+function caseBinaryDefaults(theCase, programId) {
   const out = { price: "", success: "", fail: "", pos: "" };
-  if (!theCase || !theCase.programs || theCase.programs.length !== 1 || (theCase.valuationMethod || "dcf") !== "dcf") return out;
+  if (!theCase || !theCase.programs || !theCase.programs.length || (theCase.valuationMethod || "dcf") !== "dcf") return out;
+  if (theCase.programs.length > 1) {
+    try {
+      const dr = theCase.discountRatePct !== "" && theCase.discountRatePct != null ? Number(theCase.discountRatePct) : DISCOUNT_RATE_GUIDANCE.earlyBiotechSelfView[0];
+      const tv = theCase.terminalValue || { enabled: false };
+      const tvp = { enabled: tv.enabled, method: tv.method, growthPct: tv.growthPct, exitMultiple: tv.exitMultiple };
+      const preset = getEffectiveScenarioPreset(theCase, "base");
+      const base = computeCaseValuation(theCase, preset, "base", dr, tvp);
+      const p = theCase.programs.find(q => q.id === programId) || theCase.programs.find(q => q.currentPhase !== "approved") || theCase.programs[0];
+      const m = (preset.posMultiplierPct || 100) / 100;
+      const at = pct => computeCaseValuation({ ...theCase, programs: theCase.programs.map(q => q.id === p.id ? { ...q, posOverridePct: String(pct / m) } : q) }, preset, "base", dr, tvp).equity.perShare;
+      const pv = base.programVals.find(v => v.id === p.id);
+      if (theCase.currentPrice !== "" && theCase.currentPrice != null) out.price = String(theCase.currentPrice);
+      const win = at(100), lose = at(0);
+      if (isFinite(win)) out.success = win.toFixed(2);
+      if (isFinite(lose)) out.fail = lose.toFixed(2);
+      if (pv && pv.posToLaunch < 0.9999) out.pos = String(Math.round(pv.posToLaunch * 1000) / 10);
+      out.programId = p.id;
+    } catch (e) { /* blank is the honest answer */ }
+    return out;
+  }
   try {
     const dr = theCase.discountRatePct !== "" && theCase.discountRatePct != null ? Number(theCase.discountRatePct) : DISCOUNT_RATE_GUIDANCE.earlyBiotechSelfView[0];
     const tv = theCase.terminalValue || { enabled: false };
@@ -1611,6 +1635,77 @@ function orderByCompletion(studies, opts) {
   return { rows: dated.slice(0, o.cap || 12), undated: undated.length, readsFirstCount: dated.filter(r => r.readsFirst).length, total: dated.length, ownExcluded: (studies || []).length - rows.length };
 }
 
+// ── FDA decision date from the submission date (October 2026; Ng ch. 8,
+// PDUFA VII goals) ──────────────────────────────────────────────────────────
+// New molecular entities and original BLAs are reviewed under "the Program":
+// the clock starts at the 60-day filing date, then 10 months (standard) or 6
+// (priority) — 12 or 8 months from submission. Other original NDAs and
+// efficacy supplements: 10 or 6 months from submission. Resubmissions after a
+// complete response: Class 1, 2 months; Class 2, 6 months. A major amendment
+// late in review extends the goal by 3 months. FDA meets most goal dates but
+// not all; a company's announced date always beats this.
+//   kind: "program" | "other" | "resub1" | "resub2"; review: "standard" | "priority"
+function addMonthsIso(iso, months) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso || ""));
+  if (!m) return null;
+  const y = Number(m[1]), mo = Number(m[2]) - 1 + months, d = Number(m[3]);
+  const last = new Date(Date.UTC(y, mo + 1, 0)).getUTCDate();
+  const out = new Date(Date.UTC(y, mo, Math.min(d, last)));
+  return out.toISOString().slice(0, 10);
+}
+function addDaysIso(iso, days) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso || ""));
+  if (!m) return null;
+  return new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]) + days)).toISOString().slice(0, 10);
+}
+function fdaGoalDate(submittedIso, kind, review, majorAmendment) {
+  const sub = /^\d{4}-\d{2}-\d{2}$/.test(String(submittedIso || "")) ? submittedIso : null;
+  if (!sub) return null;
+  const pri = review === "priority";
+  let goal, filing = null, rule;
+  if (kind === "resub1") { goal = addMonthsIso(sub, 2); rule = "Class 1 resubmission: 2 months from receipt"; }
+  else if (kind === "resub2") { goal = addMonthsIso(sub, 6); rule = "Class 2 resubmission: 6 months from receipt"; }
+  else if (kind === "other") { goal = addMonthsIso(sub, pri ? 6 : 10); rule = (pri ? "Priority" : "Standard") + " review of a non-NME NDA or an efficacy supplement: " + (pri ? 6 : 10) + " months from submission"; }
+  else { filing = addDaysIso(sub, 60); goal = addMonthsIso(filing, pri ? 6 : 10); rule = "New molecular entity or original BLA (the Program), " + (pri ? "priority" : "standard") + ": the 60-day filing date (" + filing + ") plus " + (pri ? 6 : 10) + " months"; }
+  if (majorAmendment) { goal = addMonthsIso(goal, 3); rule += ", plus 3 months for a major amendment"; }
+  return { goal, filing, rule };
+}
+
+// ── Patent term extension estimate (October 2026; 35 U.S.C. §156, Ng ch. 11) ──
+// Half of the testing phase (IND in effect → NDA/BLA submitted, counted only
+// after the patent issued) plus all of the approval phase (submission →
+// approval), at most 5 years — and never past 14 years after approval. One
+// patent per product may be extended; due-diligence reductions are ignored.
+// Regulatory floors from the approval date are shown beside it: biologic 12
+// years, orphan 7, new chemical entity 5. Effective exclusivity is the later of
+// the extended patent and the floor that applies.
+function yearsBetweenIso(a, b) {
+  const pa = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(a || "")), pb = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(b || ""));
+  if (!pa || !pb) return null;
+  return (Date.UTC(+pb[1], +pb[2] - 1, +pb[3]) - Date.UTC(+pa[1], +pa[2] - 1, +pa[3])) / (365.25 * 86400000);
+}
+function addYearsIso(iso, years) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso || ""));
+  if (!m) return null;
+  return new Date(Date.UTC(+m[1], +m[2] - 1, +m[3]) + years * 365.25 * 86400000).toISOString().slice(0, 10);
+}
+function estimatePatentTermExtension(p) {
+  const { expiry, ind, submitted, approval, issued } = p || {};
+  const ok = [expiry, ind, submitted, approval].every(x => /^\d{4}-\d{2}-\d{2}$/.test(String(x || "")));
+  if (!ok) return null;
+  const testStart = issued && /^\d{4}-\d{2}-\d{2}$/.test(issued) && issued > ind ? issued : ind;
+  const testing = Math.max(0, yearsBetweenIso(testStart, submitted) || 0);
+  const approvalPhase = Math.max(0, yearsBetweenIso(submitted, approval) || 0);
+  const raw = testing / 2 + approvalPhase;
+  const capped5 = Math.min(5, raw);
+  const extendedRaw = addYearsIso(expiry, capped5);
+  const cap14 = addYearsIso(approval, 14);
+  const extended = extendedRaw > cap14 ? (cap14 > expiry ? cap14 : expiry) : extendedRaw;
+  const binding = raw > 5 ? "five-year" : extendedRaw > cap14 ? "fourteen-year" : null;
+  const floors = { biologic: addYearsIso(approval, 12), orphan: addYearsIso(approval, 7), nce: addYearsIso(approval, 5) };
+  return { testing, approvalPhase, raw, pteYears: Math.max(0, yearsBetweenIso(expiry, extended) || 0), extended, binding, cap14, floors };
+}
+
 // The case's next catalyst: the earliest pending pinned entry whose window
 // has not ended, else the earliest pending dated one. Returns
 // { program, entry, window, pinned } or null. `today` is a local Date.
@@ -2318,6 +2413,69 @@ function readSingleArm(n, lower, upper) {
   const verdict = width >= 30 ? "Too few patients to pin the rate down." : width >= 15 ? "A rough estimate." : "A fairly precise estimate.";
   return { verdict, text: "With " + n + " patient" + (n === 1 ? "" : "s") + ", the true rate could be anywhere from " + (lower * 100).toFixed(0) + "% to " + (upper * 100).toFixed(0) + "%, " + aNum(Math.round(width)) + " " + width.toFixed(0) + "-point range. A comparator's rate inside that range cannot be ruled out." };
 }
+// ── Reading a readout (October 2026) ───────────────────────────────────────
+// Dead, or just underpowered? (Motulsky ch. 19, Greenhalgh ch. 3–4.) Placed
+// against the smallest effect the user says would matter, typed on the same
+// scale; which side counts as "better" is read from where that threshold sits
+// relative to no effect, never assumed.
+function readMeaningfulEffect(lower, upper, threshold, scale) {
+  if (![lower, upper, threshold].every(isFinite) || upper <= lower) return null;
+  const nullV = scale === "ratio" ? 1 : 0;
+  if (threshold === nullV) return null;
+  const dir = threshold > nullV ? 1 : -1;            // which way is "better"
+  const beyond = v => dir > 0 ? v >= threshold : v <= threshold;
+  const near = dir > 0 ? lower : upper, far = dir > 0 ? upper : lower;
+  const includesNull = lower <= nullV && upper >= nullV;
+  const fmtV = v => scale === "ratio" ? v.toFixed(2) : (Math.abs(v) >= 10 ? v.toFixed(1) : v.toFixed(2));
+  const thr = fmtV(threshold);
+  if (beyond(near)) return { verdict: "A meaningful effect, whatever the true value inside the interval.", text: "Even the least favourable end (" + fmtV(near) + ") is past the " + thr + " you said matters." };
+  if (!includesNull && !beyond(far)) return { verdict: "Real, but smaller than what you said matters.", text: "The interval excludes no effect, yet even its best end (" + fmtV(far) + ") falls short of " + thr + "." };
+  if (!includesNull) return { verdict: "Real; whether it is big enough is not settled.", text: "The interval excludes no effect and reaches " + thr + ", but its other end (" + fmtV(near) + ") sits short of it." };
+  if (beyond(far)) return { verdict: "Not definitive: a meaningful effect is still possible.", text: "The interval includes no effect but also reaches " + fmtV(far) + ", past the " + thr + " that matters — a miss like this is too imprecise to call dead; it says the trial could not tell, not that the drug does nothing. Read it with the trial's size (Sample Size / Power)." };
+  return { verdict: "Definitively negative on this measure.", text: "The interval includes no effect and its best end (" + fmtV(far) + ") stops short of the " + thr + " you said matters, so a meaningful effect is ruled out — not just unproven." };
+}
+// The chance a significant result is noise, given a prior (Motulsky ch. 18).
+function readFalsePositive(fprp, priorPct, powerPct, alpha) {
+  if (!isFinite(fprp)) return null;
+  const pct = Math.round(fprp * 100);
+  return { verdict: "About " + pct + "% of results like this would be false positives.", text: "If " + Math.round(priorPct) + "% of drugs like this one truly work, a trial with " + Math.round(powerPct) + "% power and a " + (alpha * 100).toFixed(alpha * 100 < 1 ? 1 : 0) + "% significance level produces a significant result " + (pct >= 50 ? "more often by luck than because the drug works." : pct >= 20 ? "that is wrong about one time in " + Math.max(2, Math.round(1 / fprp)) + "." : "that is usually real.") + " The prior is yours; a benchmark phase success rate is a reasonable start." };
+}
+// A nominal p-value (from an analysis the trial did not plan or control for).
+function readNominalP(p) {
+  if (!isFinite(p)) return null;
+  return { verdict: "A nominal p-value is not a confirmed result.", text: "It comes from an analysis outside the trial's planned, error-controlled tests — a later data cut, longer follow-up, a subgroup — so the usual 5% false-positive rate does not apply to it, however small it looks (here " + (p < 0.001 ? "<0.001" : p.toFixed(3)) + "). Regulators weigh it as supportive, not as a win." };
+}
+// Two subgroups: is the difference between them real? (Motulsky ch. 45.)
+function readSubgroup(res, nTested, scale) {
+  if (!res) return null;
+  const pTxt = res.p < 0.001 ? "<0.001" : res.p.toFixed(3);
+  const bonf = nTested > 1 ? 0.05 / nTested : null;
+  const range = scale === "ratio" ? "Subgroup A's ratio is " + res.ratioOfRatios.toFixed(2) + "× subgroup B's (" + res.diffLower.toFixed(2) + " to " + res.diffUpper.toFixed(2) + ")." : "A minus B: " + res.diff.toFixed(2) + " (" + res.diffLower.toFixed(2) + " to " + res.diffUpper.toFixed(2) + ").";
+  if (res.p >= 0.05) return { verdict: "No evidence the two subgroups differ (interaction p = " + pTxt + ").", text: range + " One subgroup looking significant and the other not is the classic trap: with no true difference at all, that pattern turns up in about 38% of trials (Bland & Altman). Treat the drug as working similarly in both until a test of the difference says otherwise." };
+  if (bonf && res.p >= bonf) return { verdict: "A difference at 5%, but not after allowing for " + nTested + " subgroups (needs p < " + bonf.toFixed(4) + ").", text: range + " With that many subgroups tested, one difference this size is expected by chance; treat it as a hypothesis for the next trial." };
+  return { verdict: "The subgroups do differ (interaction p = " + pTxt + ").", text: range + (nTested > 1 ? " It survives a Bonferroni allowance for " + nTested + " subgroups." : " If more than two subgroups were examined, enter how many — a single difference among many is expected by chance.") + " Still a hypothesis unless the subgroup was pre-specified." };
+}
+// What a clean safety record can rule out (Friedman ch. 4).
+function readSafetyExposure(events, n, upper) {
+  if (![events, n, upper].every(isFinite) || n <= 0 || !(upper > 0)) return null;
+  const oneIn = Math.round(1 / upper);
+  if (events === 0) return { verdict: "No events in " + n.toLocaleString() + " patients still allows a true rate up to " + (upper * 100).toFixed(upper < 0.01 ? 2 : 1) + "% — about 1 in " + oneIn.toLocaleString() + ".", text: "The rule of three: zero events in n patients only rules out rates above about 3/n. A safety database this size cannot reliably detect anything rarer than 1 in " + oneIn.toLocaleString() + " — the rare serious events that end drugs after launch are usually far rarer than that." };
+  return { verdict: "The true rate could be as high as " + (upper * 100).toFixed(1) + "% (about 1 in " + oneIn.toLocaleString() + ").", text: events + " event" + (events === 1 ? "" : "s") + " in " + n.toLocaleString() + " patients; the upper bound is how bad the true rate could plausibly be, which is what a safety read should be judged on." };
+}
+// Interim boundaries and the hazard ratio needed to cross them.
+function readInterim(b, hrNeeded, events) {
+  if (!b) return null;
+  return { verdict: "To stop early for benefit at " + Math.round(b.t * 100) + "% of the information, the result needs z ≥ " + b.zInterim.toFixed(2) + " (nominal p ≤ " + (b.pInterim < 0.0001 ? b.pInterim.toExponential(1) : b.pInterim.toFixed(4)) + ")" + (hrNeeded ? " — a hazard ratio of " + hrNeeded.toFixed(2) + " or better with " + Math.round(events) + " events." : "."),
+    text: "Early looks demand far stronger evidence, so the overall false-positive rate stays at " + (b.alpha * 100).toFixed(0) + "%. If it does not cross, the final analysis then needs z ≥ " + b.zFinal.toFixed(2) + " (p ≤ " + b.pFinal.toFixed(4) + ") instead of 1.96. Not crossing at an interim is the expected outcome even for a drug that works — most stops for benefit happen late." };
+}
+function readConditionalPower(cpTrend, cpDesign) {
+  if (!isFinite(cpTrend) && !isFinite(cpDesign)) return null;
+  const pc = v => Math.round(v * 100) + "%";
+  const zone = v => v < 0.1 ? "a futility stop would be reasonable" : v < 0.2 ? "the usual futility zone" : "well clear of futility";
+  return { verdict: (isFinite(cpTrend) ? "If the trend so far continues, " + pc(cpTrend) + " chance of winning at the end" : "") + (isFinite(cpTrend) && isFinite(cpDesign) ? "; " : "") + (isFinite(cpDesign) ? (isFinite(cpTrend) ? "if" : "If") + " the design effect is true from here, " + pc(cpDesign) : "") + ".",
+    text: "Conditional power is the chance the trial still wins, given what has been seen. " + (isFinite(cpTrend) ? "On the trend: " + zone(cpTrend) + ". " : "") + "The two assumptions bracket it: the trend is noisy early, and the design effect is the sponsor's hope. Below 10–20% is where data monitoring committees usually consider stopping for futility." };
+}
+
 // Assurance: the share of simulated trials that read out significant.
 function readAssurance(pct, sided) {
   if (!isFinite(pct)) return null;

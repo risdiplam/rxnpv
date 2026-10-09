@@ -747,6 +747,102 @@ function stressRange(planned, opts) {
   return out.sort((a, b) => a - b);
 }
 
+// ── Reading a readout (October 2026; Spark handoff v2, Motulsky / Friedman) ──
+
+// Do two subgroup results actually differ? (Motulsky ch. 45, Bland & Altman
+// 2011.) "Significant in A, not in B" is not evidence that A and B differ —
+// in Bland & Altman's simulations, with no true difference at all, 38% showed
+// exactly that pattern. The test is on the difference of the two estimates,
+// on the log scale for ratios, with each SE recovered from its interval.
+function subgroupInteraction(e1, l1, u1, e2, l2, u2, scale, confidenceLevel) {
+  const ratio = scale === 'ratio';
+  const vals = [e1, l1, u1, e2, l2, u2].map(Number);
+  if (!vals.every(isFinite) || (ratio && vals.some(v => v <= 0)) || !(vals[2] > vals[1]) || !(vals[5] > vals[4])) return null;
+  const t = v => ratio ? Math.log(v) : v;
+  const zc = normalInvCDF(1 - (1 - (confidenceLevel || 0.95)) / 2);
+  const se1 = (t(vals[2]) - t(vals[1])) / (2 * zc), se2 = (t(vals[5]) - t(vals[4])) / (2 * zc);
+  const diff = t(vals[0]) - t(vals[3]);
+  const se = Math.sqrt(se1 * se1 + se2 * se2);
+  const z = diff / se;
+  const p = 2 * (1 - normalCDF(Math.abs(z)));
+  return { diff, se, z, p, se1, se2, ratioOfRatios: ratio ? Math.exp(diff) : null,
+    diffLower: ratio ? Math.exp(diff - zc * se) : diff - zc * se, diffUpper: ratio ? Math.exp(diff + zc * se) : diff + zc * se };
+}
+
+// The chance a "significant" result is a false positive, given a prior chance
+// the effect is real (Motulsky ch. 18, his Table 26.1 formula):
+//   FPRP = α(1 − prior) / (α(1 − prior) + power × prior).
+function falsePositiveRisk(priorPct, alpha, powerPct) {
+  const prior = Number(priorPct) / 100, a = Number(alpha), pw = Number(powerPct) / 100;
+  if (!(prior > 0 && prior <= 1) || !(a > 0 && a < 1) || !(pw > 0 && pw <= 1)) return null;
+  const num = a * (1 - prior);
+  return num / (num + pw * prior);
+}
+
+// What a safety record can rule out (Friedman ch. 4; the rule of three).
+// Zero events in n: the one-sided upper bound is exact, 1 − (1 − conf)^(1/n)
+// (≈ 3/n at 95%). Events seen: the Wilson upper bound.
+function safetyUpperBound(events, n, confidenceLevel) {
+  const k = Number(events), N = Number(n), c = confidenceLevel || 0.95;
+  if (!(N > 0) || !(k >= 0) || k > N) return null;
+  if (k === 0) return { upper: 1 - Math.pow(1 - c, 1 / N), exact: true, ruleOfThree: 3 / N };
+  return { upper: wilsonScoreInterval(k, N, c).upper, exact: false, ruleOfThree: null };
+}
+
+// ── Interim analysis: what result crosses? (Friedman ch. 17) ───────────────
+// One efficacy look at information fraction t (events so far ÷ events planned)
+// with no earlier efficacy looks, then the final analysis. Spending families:
+//   obf      — Lan–DeMets O'Brien–Fleming-type: α(t) = 2[1 − Φ(z_{α/2}/√t)],
+//              so the boundary is z_{α/2}/√t (3.10 at t = 0.4);
+//   pocock   — Lan–DeMets Pocock-type: α(t) = α ln(1 + (e − 1)t);
+//   haybittle — Haybittle–Peto: z = 3.0 at the interim.
+// The final boundary is solved so the whole trial spends exactly α:
+// P(|Z1| < c1 and |Z2| < c2) = 1 − α, Z1 and Z2 correlated √t.
+function interimBoundary(t, alpha, family) {
+  const tt = Number(t), a = alpha || 0.05;
+  if (!(tt > 0 && tt < 1)) return null;
+  const zHalf = normalInvCDF(1 - a / 2);
+  let c1;
+  if (family === 'pocock') c1 = normalInvCDF(1 - a * Math.log(1 + (Math.E - 1) * tt) / 2);
+  else if (family === 'haybittle') c1 = 3;
+  else c1 = zHalf / Math.sqrt(tt);
+  const r = Math.sqrt(tt), s = Math.sqrt(1 - tt);
+  const noReject = c2 => {
+    const N = 400, h = 2 * c1 / N;
+    let acc = 0;
+    for (let i = 0; i <= N; i++) {
+      const z = -c1 + i * h;
+      const f = Math.exp(-z * z / 2) / Math.sqrt(2 * Math.PI) * (normalCDF((c2 - r * z) / s) - normalCDF((-c2 - r * z) / s));
+      acc += (i === 0 || i === N ? 1 : i % 2 ? 4 : 2) * f;
+    }
+    return acc * h / 3;
+  };
+  let lo = zHalf * 0.9, hi = zHalf * 1.6;
+  for (let it = 0; it < 80; it++) { const mid = (lo + hi) / 2; if (noReject(mid) < 1 - a) lo = mid; else hi = mid; }
+  const c2 = (lo + hi) / 2;
+  return { t: tt, alpha: a, family: family || 'obf', zInterim: c1, pInterim: 2 * (1 - normalCDF(c1)), zFinal: c2, pFinal: 2 * (1 - normalCDF(c2)) };
+}
+// The hazard ratio a given z corresponds to with this many events (Schoenfeld):
+// z = |ln HR| × √(D × θ(1 − θ)), θ = share randomised to the drug.
+function hazardRatioForZ(z, events, allocationRatio) {
+  const D = Number(events), k = allocationRatio || 1;
+  if (!(D > 0) || !isFinite(z)) return null;
+  const th = k / (1 + k);
+  return Math.exp(-z / Math.sqrt(D * th * (1 - th)));
+}
+// Conditional power: the chance the trial still wins at the end, given the
+// interim z (signed toward benefit) at information t and a drift θ = E[Z at
+// the end] (Friedman ch. 17, B-value form):
+//   CP = 1 − Φ[(zFinal − z_t √t − θ(1 − t)) / √(1 − t)].
+// Under the current trend θ = z_t / √t; under a design hazard ratio,
+// θ = |ln HR| √(D θa(1 − θa)) with D the planned total events.
+function conditionalPower(t, zt, theta, zFinal) {
+  const tt = Number(t);
+  if (!(tt > 0 && tt < 1) || !isFinite(zt) || !isFinite(theta)) return null;
+  const zc = isFinite(zFinal) ? zFinal : normalInvCDF(0.975);
+  return 1 - normalCDF((zc - zt * Math.sqrt(tt) - theta * (1 - tt)) / Math.sqrt(1 - tt));
+}
+
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     randUniform, randNormal, randExponential, randBinomialCount,
@@ -761,6 +857,7 @@ if (typeof module !== 'undefined' && module.exports) {
     solveMinDetectableEffect, solveMinDetectableRateTwoProportion, solveMinDetectableDeltaMeans, solveMinDetectableHazardRatio,
     wilsonScoreInterval, ciFromPValue, pValueFromCI, ciFromPValueRatio, pValueFromCIRatio,
     shrinkBinaryResponseRate, shrinkHazardRatio, BINARY_SHRINKAGE_FACTOR, HR_SHRINKAGE_FACTOR,
-    projectTreatmentRate, effectiveNAfterDropout, inflateForDropout, stressPowerOver, stressRange
+    projectTreatmentRate, effectiveNAfterDropout, inflateForDropout, stressPowerOver, stressRange,
+    subgroupInteraction, falsePositiveRisk, safetyUpperBound, interimBoundary, hazardRatioForZ, conditionalPower
   };
 }

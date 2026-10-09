@@ -277,6 +277,30 @@ function ActualVsModelTool({ cases, updateCase, activeCase }) {
 // around or challenge under Paragraph IV; the drug SUBSTANCE (compound) patent
 // is the hard floor. Showing both, labelled, is honest — one number would be
 // false precision dressed up as sourced data.
+// ── Patent term extension estimate (October 2026) ──────────────────────────
+// The 10-K says "patents expire 2039, not including any extension". This puts
+// the extension rules on that date (estimatePatentTermExtension, helpers.js)
+// and sets it beside the regulatory floors.
+function PatentTermEstimator({ activeCase }) {
+  const h = React.createElement;
+  const [f, setF] = React.useState({ expiry: "", ind: "", submitted: "", approval: "", issued: "" });
+  const r = estimatePatentTermExtension(f);
+  const prog = activeCase && activeCase.programs && (activeCase.programs.find(p => p.currentPhase === "filed") || activeCase.programs[0]);
+  const biologic = prog && prog.modality === "biologic";
+  const date = (key, label) => h("div", null, h("div", { style: UI.fieldLabel }, label), h("input", { type: "date", "aria-label": label, value: f[key], onChange: e => setF({ ...f, [key]: e.target.value }), style: { ...UI.input, minHeight: 28 } }));
+  return toolCard(h, [
+    toolLabel(h, "Patent term extension estimate"),
+    h("div", { className: "prose", style: { ...UI.intro, marginBottom: 10 } }, "A drug patent can be extended for time lost to development: half of the testing phase (IND in effect until the NDA or BLA is submitted, counted only after the patent issued) plus all of the FDA review, at most five years, and never past fourteen years after approval. Only one patent per product. Enter the key patent's expiry from the 10-K and the dates as known or expected."),
+    h("div", { style: { display: "flex", gap: 12, flexWrap: "wrap" } },
+      date("expiry", "Patent expiry before extension"), date("ind", "IND in effect"), date("submitted", "NDA or BLA submitted"), date("approval", "Approval (or expected)"), date("issued", "Patent issued (optional)")),
+    r && h("div", { style: { marginTop: 12 } },
+      h("div", { style: UI.stat }, "Extended to " + r.extended),
+      h("div", { style: UI.caption }, "Testing phase " + r.testing.toFixed(1) + " years (half counts: " + (r.testing / 2).toFixed(1) + ") + review " + r.approvalPhase.toFixed(1) + " years = " + r.raw.toFixed(1) + " years" + (r.binding === "five-year" ? ", cut to the five-year maximum" : "") + (r.binding === "fourteen-year" ? "; the fourteen-years-after-approval cap (" + r.cap14 + ") binds, so the extension is " + r.pteYears.toFixed(1) + " years" : "") + "."),
+      h(Explain, { verdict: "Regulatory floors from this approval date: biologic 12 years to " + r.floors.biologic + ", orphan 7 to " + r.floors.orphan + ", new chemical entity 5 to " + r.floors.nce + ".",
+        text: "Exclusivity effectively ends at the later of the extended patent (" + r.extended + ") and whichever floor applies" + (biologic ? " — for this case's biologic, " + (r.extended > r.floors.biologic ? r.extended + ", the patent" : r.floors.biologic + ", the 12-year floor") : "") + ". A patent can still be challenged or designed around; the floors cannot. Set the program's years to LOE to match (Assumptions → Exclusivity & LOE)." }))
+  ]);
+}
+
 function ExclusivityTool({ cases, updateCase, activeCase }) {
   const h = React.createElement;
   const [name, setName] = React.useState("");
@@ -375,7 +399,8 @@ function ExclusivityTool({ cases, updateCase, activeCase }) {
         h(Note, { summary: "Patent expiry is not the same as loss of exclusivity" },
           h("div", { style: { lineHeight: 1.6 } },
             "A generic can challenge a patent before it expires (Paragraph IV), settle for an earlier agreed entry date, or design around a formulation patent entirely. Separately, regulatory exclusivities — new chemical entity, orphan — can run past a patent. This is the published patent landscape: a sourced starting point, not the verdict.")))
-    ]))
+    ])),
+    h(PatentTermEstimator, { activeCase })
   );
 }
 

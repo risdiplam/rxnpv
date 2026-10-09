@@ -27,7 +27,9 @@ const TRIAL_STATS_SUBTABS = [
   { id: 'singleArmCI', label: 'Single-Arm CI' },
   { id: 'outcome2x2', label: '2×2 Outcome Analysis' },
   { id: 'nonInferiority', label: 'Non-Inferiority' },
-  { id: 'multiplicity', label: 'Multiplicity Adjustment' }
+  { id: 'multiplicity', label: 'Multiplicity Adjustment' },
+  { id: 'subgroup', label: 'Subgroup Check' },
+  { id: 'interim', label: 'Interim Analysis' }
 ];
 
 let activeTab = 'trialOutcome';
@@ -331,7 +333,9 @@ function renderTrialStatsTab(content) {
     singleArmCI: renderSingleArmCITab,
     outcome2x2: renderOutcome2x2Tab,
     nonInferiority: renderNonInferiorityTab,
-    multiplicity: renderMultiplicityTab
+    multiplicity: renderMultiplicityTab,
+    subgroup: renderSubgroupTab,
+    interim: renderInterimTab
   };
   subrenderers[activeStatsSubtab](content);
 }
@@ -452,6 +456,13 @@ function runP2P3() {
       el('span', { class: 'sublabel' }, `shrinkage-adjusted Phase 3 planning assumption (observed ${observed.toFixed(1)}% ÷ ${r.factor.toFixed(2)}${r.factor !== BINARY_SHRINKAGE_FACTOR ? ', your factor; the literature average is ' + BINARY_SHRINKAGE_FACTOR.toFixed(2) : ''})`)
     ]));
     resultsDiv.appendChild(el('p', { class: 'subtle' }, `Your raw ${observed.toFixed(1)}% Phase 2 result, unadjusted, is the optimistic case — useful as an upper bound, not the planning default.`));
+    // A second, absolute check (October 2026; Prasad ch. 2): early-phase
+    // response rates averaged 12.9 points above later randomised trials of the
+    // same drugs in the same cancers (Zia et al.; 81% of 49 comparisons
+    // favoured the earlier study). Shown beside the ratio, not instead of it.
+    const zia = Math.max(0, observed - 12.9);
+    resultsDiv.appendChild(explainNode({ verdict: 'An absolute check: ' + observed.toFixed(1) + '% − 12.9 points = ' + zia.toFixed(1) + '%.',
+      text: 'Zia et al. found early response rates averaged 12.9 percentage points above the later randomised trials of the same drugs, with the earlier figure higher in 81% of 49 comparisons. Unconfirmed responses (no second scan four or more weeks later) shrink further: rociletinib\u2019s 59% fell to 34% once confirmed. The two methods bracket a planning range: ' + Math.min(zia, r.projectedP3Pct).toFixed(1) + '% to ' + Math.max(zia, r.projectedP3Pct).toFixed(1) + '%.' }));
     const compareSvg = renderForestPlot([
       { label: 'Observed Phase 2', estimate: observed, lower: observed, upper: observed, color: 'var(--amber)' },
       { label: 'Shrinkage-adjusted Phase 3', estimate: r.projectedP3Pct, lower: r.projectedP3Pct, upper: r.projectedP3Pct }
@@ -519,6 +530,7 @@ function renderSampleSizeTab(content) {
   const ssForm = el('div', { class: 'panel' }, [
     el('h2', {}, 'Sample size / power'),
     el('p', { class: 'subtle' }, 'Two directions of one relationship. Sample size: given an assumed effect, what N do I need? Minimum detectable effect: given an N already fixed, what is the smallest effect that would read out significant?'),
+    el('p', { class: 'subtle' }, 'Every answer here is only as good as the effect and variability you assume. A trial sized from a small pilot (under about 30 patients) rests on a variance estimate that is itself a guess — the \u201cadequately powered\u201d trial may not be (Chow, Controversial Statistical Issues ch. 6).'),
     note('How both directions are solved', 'Both search over the same verified closed-form power functions already used to cross-check the Monte Carlo simulator on Trial Outcome/PoS, rather than separate hand-derived inverse formulas — so the two directions are guaranteed to agree with each other by construction rather than by coincidence.'),
     field('Solve for', selectInput('ssSolveMode', [
       { value: 'sampleSize', label: 'Sample size (given an assumed effect)' },
@@ -608,6 +620,28 @@ function renderPciFields() {
     { value: '0.90', label: '90%' },
     { value: '0.99', label: '99%' }
   ], '0.95')));
+  // Optional context (October 2026): what would matter, whether the analysis
+  // was a planned one, and a prior — each adds one reading, blank adds none.
+  container.appendChild(field('Smallest effect that matters (optional)', numberInput('pciMeaningful', '', { step: '0.01', placeholder: scale === 'ratio' ? 'e.g. 0.80' : 'e.g. 3' })));
+  container.appendChild(field('This analysis was', selectInput('pciNominal', [
+    { value: 'planned', label: 'A planned, pre-specified test' },
+    { value: 'nominal', label: 'Unplanned or updated (a "nominal" p-value)' }
+  ], 'planned')));
+  container.appendChild(field('Prior chance the effect is real, % (optional)', numberInput('pciPrior', '', { step: '1', placeholder: 'e.g. 30' })));
+  container.appendChild(field('Power assumed for that, %', numberInput('pciPower', 80, { step: '1' })));
+}
+
+// The three optional readings under a P-value ↔ CI result.
+function appendPciContext(resultsDiv, lower, upper, scale, pTwo) {
+  const thr = numVal('pciMeaningful');
+  if (isFinite(thr) && val('pciMeaningful') !== '') { const r = explainNode(readMeaningfulEffect(lower, upper, thr, scale)); if (r) resultsDiv.appendChild(r); }
+  if (val('pciNominal') === 'nominal') { const r = explainNode(readNominalP(pTwo)); if (r) resultsDiv.appendChild(r); }
+  const prior = numVal('pciPrior'), power = numVal('pciPower');
+  if (val('pciPrior') !== '' && isFinite(prior) && pTwo < 0.05) {
+    const f = falsePositiveRisk(prior, 0.05, isFinite(power) ? power : 80);
+    const r = f != null ? explainNode(readFalsePositive(f, prior, isFinite(power) ? power : 80, 0.05)) : null;
+    if (r) resultsDiv.appendChild(r);
+  }
 }
 
 function runPValueCI() {
@@ -648,6 +682,7 @@ function runPValueCI() {
     ], { scale: scale === 'ratio' ? 'log' : 'linear', referenceLine: scale === 'ratio' ? 1 : 0, xLabel: (scale === 'ratio' ? 'Ratio (log scale)' : 'Difference') });
     const ciRead = explainNode(readInterval(r.lower, r.upper, scale, levelPct));
     if (ciRead) resultsDiv.appendChild(ciRead);
+    appendPciContext(resultsDiv, r.lower, r.upper, scale, sided === 'one' ? Math.min(1, p * 2) : p);
     appendChartWithExport(resultsDiv, forestSvg, 'p-value-to-ci');
   } else {
     const lower = numVal('pciLower'), upper = numVal('pciUpper');
@@ -668,6 +703,7 @@ function runPValueCI() {
     ], { scale: scale === 'ratio' ? 'log' : 'linear', referenceLine: scale === 'ratio' ? 1 : 0, xLabel: (scale === 'ratio' ? 'Ratio (log scale)' : 'Difference') });
     const pRead = explainNode(readPValue(r.pTwoSided));
     if (pRead) resultsDiv.appendChild(pRead);
+    appendPciContext(resultsDiv, lower, upper, scale, r.pTwoSided);
     appendChartWithExport(resultsDiv, forestSvg, 'ci-to-p-value');
   }
 }
@@ -686,7 +722,11 @@ function renderSingleArmCITab(content) {
     fieldGrid([
       field('Events (e.g. responders)', numberInput('saEvents', 9)),
       field('Total N', numberInput('saN', 20)),
-      field('Confidence level', numberInput('saConfidence', 0.95, { step: '0.01' }))
+      field('Confidence level', numberInput('saConfidence', 0.95, { step: '0.01' })),
+      field('These are', selectInput('saKind', [
+        { value: 'rate', label: 'Responses or another rate' },
+        { value: 'safety', label: 'Adverse events (a safety read)' }
+      ], 'rate'))
     ]),
     el('button', { class: 'runbtn', onclick: runSingleArmCI }, 'Calculate'),
     el('div', { id: 'saResults', class: 'results' })
@@ -713,6 +753,13 @@ function runSingleArmCI() {
   resultsDiv.appendChild(el('p', { class: 'subtle' }, `${events}/${n} patients.`));
   const saRead = explainNode(readSingleArm(n, r.lower, r.upper));
   if (saRead) resultsDiv.appendChild(saRead);
+  // A safety count (October 2026): what the record can rule out — the rule of
+  // three when nothing was seen. Always shown for zero events.
+  if (val('saKind') === 'safety' || events === 0) {
+    const sb = safetyUpperBound(events, n, confidence);
+    const sr = sb ? explainNode(readSafetyExposure(events, n, sb.upper)) : null;
+    if (sr) resultsDiv.appendChild(sr);
+  }
   const forestSvg = renderForestPlot([
     { label: `${events}/${n}`, estimate: r.phat * 100, lower: r.lower * 100, upper: r.upper * 100 }
   ], { scale: 'linear', xLabel: 'Rate (%)' });
@@ -847,7 +894,8 @@ function renderNonInferiorityTab(content) {
       field('Non-inferiority requires the estimate to stay', selectInput('niDirection', [
         { value: 'below', label: 'BELOW the margin (typical when higher = worse, e.g. hazard/risk ratio for an adverse outcome)' },
         { value: 'above', label: 'ABOVE the margin (typical when lower = worse, e.g. a beneficial-effect ratio or difference)' }
-      ], 'below'))
+      ], 'below')),
+      field('Comparator\u2019s effect against placebo (optional, same scale)', numberInput('niHist', '', { step: '0.01', placeholder: 'e.g. 0.70' }))
     ]),
     el('button', { class: 'runbtn', onclick: runNonInferiority }, 'Assess'),
     el('div', { id: 'niResults', class: 'results' })
@@ -887,8 +935,136 @@ function runNonInferiority() {
     established
       ? `The full confidence interval stays ${direction} ${margin.toFixed(3)} — the worst case within the CI still clears the pre-specified margin.`
       : `Part of the confidence interval falls on the wrong side of ${margin.toFixed(3)} — even though the point estimate itself may look fine, the trial can't rule out a true effect worse than the margin allows.`));
+  // How much of the comparator's own effect the margin gives away (October
+  // 2026; Prasad ch. 5, Chow ch. 17: Δ = γ(θA − θP)). On the log scale for
+  // ratios. At 100% or more the trial cannot fail — "not much worse" could
+  // then mean "no better than placebo".
+  const hist = numVal('niHist');
+  if (val('niHist') !== '' && isFinite(hist) && (scale !== 'ratio' || hist > 0)) {
+    const share = scale === 'ratio' ? Math.abs(Math.log(margin)) / Math.abs(Math.log(hist)) : Math.abs(margin) / Math.abs(hist);
+    if (isFinite(share) && share > 0) {
+      const pc = Math.round(share * 100);
+      resultsDiv.appendChild(explainNode({ verdict: 'The margin gives away ' + pc + '% of what the comparator achieves against placebo.',
+        text: share >= 1 ? 'At 100% or more the trial cannot fail in any meaningful sense: passing would not rule out a drug no better than placebo.'
+          : share >= 0.5 ? 'A permissive margin: regulators usually want at least half of the comparator\u2019s effect kept. Industry-funded non-inferiority trials reach their goal about 96% of the time (55 of 57, Flacco).'
+          : 'A conservative margin: more than half of the comparator\u2019s effect must be kept to pass.' }));
+    }
+  }
   resultsDiv.appendChild(el('p', { class: 'subtle' },
     "A margin is a clinical judgment call made BEFORE a trial reads out, not something this tool derives — always check the trial's own pre-specified margin (usually in its protocol or a prior regulatory agreement) rather than picking one after the fact."));
+}
+
+// ── Tab: Subgroup Check (October 2026) ─────────────────────────────────────
+// "Significant in subgroup A, not in B" is not evidence that A and B differ
+// (Motulsky ch. 45). Tests the difference itself, from the two intervals.
+function renderSubgroupTab(content) {
+  const form = el('div', { class: 'panel' }, [
+    el('h2', {}, 'Do two subgroups really differ?'),
+    el('p', { class: 'subtle' }, 'A test of the difference between two subgroup results (an interaction test), from each one’s estimate and interval — on the log scale for ratios. Motulsky ch. 45; Bland & Altman, BMJ 2011.'),
+    note('New here? When you would use this', 'A release says the drug "worked especially well in patients with high biomarker levels" (HR 0.58, significant) "and less clearly in low" (HR 0.85, not significant). That does not show the two groups differ: with no true difference at all, one subgroup comes out significant and the other not in about 38% of trials, by chance. The honest test asks whether the two estimates differ from each other, given how uncertain each is. Copy each subgroup’s estimate and 95% interval from the forest plot or the table, and say how many subgroups the company looked at — a single difference among ten is expected by chance.'),
+    fieldGrid([
+      field('Scale', selectInput('sgScale', [
+        { value: 'ratio', label: 'Ratio (hazard ratio, odds ratio, risk ratio)' },
+        { value: 'linear', label: 'Difference (mean difference, risk difference)' }
+      ], 'ratio')),
+      field('Subgroup A — estimate', numberInput('sgA', 0.58, { step: '0.01' })),
+      field('Subgroup A — CI lower', numberInput('sgAl', 0.38, { step: '0.01' })),
+      field('Subgroup A — CI upper', numberInput('sgAu', 0.89, { step: '0.01' })),
+      field('Subgroup B — estimate', numberInput('sgB', 0.85, { step: '0.01' })),
+      field('Subgroup B — CI lower', numberInput('sgBl', 0.61, { step: '0.01' })),
+      field('Subgroup B — CI upper', numberInput('sgBu', 1.18, { step: '0.01' })),
+      field('Subgroups examined in all', numberInput('sgN', 2, { step: '1', min: 2 })),
+      field('Confidence level of those intervals', selectInput('sgLevel', [
+        { value: '0.95', label: '95% (standard)' }, { value: '0.90', label: '90%' }
+      ], '0.95'))
+    ]),
+    el('button', { class: 'runbtn', onclick: runSubgroup }, 'Test the difference'),
+    el('div', { id: 'sgResults', class: 'results' })
+  ]);
+  content.appendChild(form);
+}
+
+function runSubgroup() {
+  const resultsDiv = document.getElementById('sgResults');
+  if (!resultsDiv) return;
+  resultsDiv.innerHTML = '';
+  const scale = val('sgScale'), level = parseFloat(val('sgLevel')) || 0.95;
+  const v = ['sgA', 'sgAl', 'sgAu', 'sgB', 'sgBl', 'sgBu'].map(numVal);
+  const res = subgroupInteraction(v[0], v[1], v[2], v[3], v[4], v[5], scale, level);
+  if (!res) { resultsDiv.appendChild(el('p', { class: 'error' }, 'Each interval must have its upper bound above its lower' + (scale === 'ratio' ? ', and ratios must be positive.' : '.'))); return; }
+  const nTested = Math.max(2, Math.round(numVal('sgN') || 2));
+  resultsDiv.appendChild(el('div', { class: 'headline' }, [
+    el('span', { class: 'bignum' }, 'p = ' + (res.p < 0.001 ? '<0.001' : res.p.toFixed(3))),
+    el('span', { class: 'sublabel' }, 'interaction test: z = ' + res.z.toFixed(2) + (scale === 'ratio' ? ', ratio of ratios ' + res.ratioOfRatios.toFixed(2) + ' (' + res.diffLower.toFixed(2) + ' to ' + res.diffUpper.toFixed(2) + ')' : ', difference ' + res.diff.toFixed(2) + ' (' + res.diffLower.toFixed(2) + ' to ' + res.diffUpper.toFixed(2) + ')'))
+  ]));
+  const read = explainNode(readSubgroup(res, nTested, scale));
+  if (read) resultsDiv.appendChild(read);
+  const forestSvg = renderForestPlot([
+    { label: 'Subgroup A', estimate: v[0], lower: v[1], upper: v[2] },
+    { label: 'Subgroup B', estimate: v[3], lower: v[4], upper: v[5] }
+  ], { scale: scale === 'ratio' ? 'log' : 'linear', referenceLine: scale === 'ratio' ? 1 : 0, xLabel: scale === 'ratio' ? 'Ratio (log scale)' : 'Difference' });
+  appendChartWithExport(resultsDiv, forestSvg, 'subgroup-check');
+}
+
+// ── Tab: Interim Analysis (October 2026) ───────────────────────────────────
+// What result stops a trial early for benefit at an interim look, what the
+// final analysis then needs, and — given an interim result — the chance it
+// still wins (Friedman ch. 17). One interim look; not a group-sequential
+// design engine (still declined).
+function renderInterimTab(content) {
+  const form = el('div', { class: 'panel' }, [
+    el('h2', {}, 'Interim analysis: what result crosses?'),
+    el('p', { class: 'subtle' }, 'One efficacy look before the final analysis, with the significance level split between them by a standard spending rule. Lan & DeMets (1983); Friedman, Fundamentals of Clinical Trials ch. 17.'),
+    note('New here? Why interim looks are catalysts', 'Event-driven trials (overall survival, progression-free survival) often check the data part-way through. A trial can stop early for benefit only if the result is far stronger than the final analysis would need, because every extra look is another chance of a false positive. This tool answers the question a holder actually has before an interim: what hazard ratio would cross the line, and if it does not, what the final analysis then needs. The events are the trial’s event counts (deaths, for OS) at the interim and at the final analysis, from the protocol or company guidance — or type the fraction directly. Enter an interim result, if one has been reported, and a design hazard ratio, to see the chance the trial still wins.'),
+    fieldGrid([
+      field('Events at the interim', numberInput('imEvents', 200, { step: '1' })),
+      field('Events at the final analysis', numberInput('imTotal', 500, { step: '1' })),
+      field('Spending rule', selectInput('imFamily', [
+        { value: 'obf', label: 'O’Brien–Fleming-type (most common: strict early)' },
+        { value: 'pocock', label: 'Pocock-type (even across looks)' },
+        { value: 'haybittle', label: 'Haybittle–Peto (z = 3 at the interim)' }
+      ], 'obf')),
+      field('Overall significance (two-sided)', numberInput('imAlpha', 0.05, { step: '0.001' })),
+      field('Randomisation (drug : control)', numberInput('imAlloc', 1, { step: '0.5' })),
+      field('Interim hazard ratio, if reported (optional)', numberInput('imHR', '', { step: '0.01', placeholder: 'e.g. 0.80' })),
+      field('Design hazard ratio (optional)', numberInput('imDesignHR', '', { step: '0.01', placeholder: 'e.g. 0.75' }))
+    ]),
+    el('button', { class: 'runbtn', onclick: runInterim }, 'Calculate'),
+    el('div', { id: 'imResults', class: 'results' })
+  ]);
+  content.appendChild(form);
+}
+
+function runInterim() {
+  const resultsDiv = document.getElementById('imResults');
+  if (!resultsDiv) return;
+  resultsDiv.innerHTML = '';
+  const d = numVal('imEvents'), D = numVal('imTotal'), alpha = numVal('imAlpha'), alloc = numVal('imAlloc') || 1;
+  if (!(d > 0) || !(D > d) || !(alpha > 0 && alpha < 0.5)) { resultsDiv.appendChild(el('p', { class: 'error' }, 'The interim needs fewer events than the final analysis, and the significance level must be between 0 and 0.5.')); return; }
+  const t = d / D;
+  const b = interimBoundary(t, alpha, val('imFamily'));
+  const hrI = hazardRatioForZ(b.zInterim, d, alloc), hrF = hazardRatioForZ(b.zFinal, D, alloc);
+  resultsDiv.appendChild(el('div', { class: 'headline' }, [
+    el('span', { class: 'bignum' }, 'HR ≤ ' + hrI.toFixed(2)),
+    el('span', { class: 'sublabel' }, 'needed to stop for benefit at ' + Math.round(t * 100) + '% of the information (' + Math.round(d) + ' of ' + Math.round(D) + ' events): z ≥ ' + b.zInterim.toFixed(2) + ', nominal p ≤ ' + (b.pInterim < 0.0001 ? b.pInterim.toExponential(1) : b.pInterim.toFixed(4)))
+  ]));
+  resultsDiv.appendChild(el('table', { class: 'desctable' }, [
+    el('tr', {}, ['Look', 'Events', 'Boundary z', 'Nominal p', 'Hazard ratio needed'].map(t => el('td', { style: 'font-weight:700' }, t))),
+    el('tr', {}, [el('td', {}, 'Interim'), el('td', {}, String(Math.round(d))), el('td', {}, b.zInterim.toFixed(2)), el('td', {}, b.pInterim < 0.0001 ? b.pInterim.toExponential(1) : b.pInterim.toFixed(4)), el('td', {}, '≤ ' + hrI.toFixed(3))]),
+    el('tr', {}, [el('td', {}, 'Final'), el('td', {}, String(Math.round(D))), el('td', {}, b.zFinal.toFixed(2)), el('td', {}, b.pFinal.toFixed(4)), el('td', {}, '≤ ' + hrF.toFixed(3))])
+  ]));
+  const read = explainNode(readInterim(b, hrI, d));
+  if (read) resultsDiv.appendChild(read);
+  const hrObs = numVal('imHR'), hrDes = numVal('imDesignHR');
+  const th = alloc / (1 + alloc);
+  const zt = val('imHR') !== '' && hrObs > 0 ? -Math.log(hrObs) * Math.sqrt(d * th * (1 - th)) : NaN;
+  if (isFinite(zt)) {
+    const cpT = conditionalPower(t, zt, zt / Math.sqrt(t), b.zFinal);
+    const cpD = val('imDesignHR') !== '' && hrDes > 0 ? conditionalPower(t, zt, -Math.log(hrDes) * Math.sqrt(D * th * (1 - th)), b.zFinal) : NaN;
+    resultsDiv.appendChild(el('p', { class: 'subtle' }, 'Interim HR ' + hrObs.toFixed(2) + ' with ' + Math.round(d) + ' events is z = ' + zt.toFixed(2) + (zt >= b.zInterim ? ' — it crosses the boundary.' : ' — short of the ' + b.zInterim.toFixed(2) + ' needed to stop.')));
+    const cr = explainNode(readConditionalPower(cpT, cpD));
+    if (cr) resultsDiv.appendChild(cr);
+  }
 }
 
 // ── Tab: Multiplicity Adjustment ────────────────────────────────────────────

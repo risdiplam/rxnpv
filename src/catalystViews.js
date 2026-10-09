@@ -233,3 +233,122 @@ function ReadoutScenariosSection({ theCase, discountRatePct, tv, baseValue, onCh
       fda ? "Defaults: an approval means launch (odds 100%); a narrow label carries " + READOUT_DEFAULTS.modestSharePct + "% of Base peak share, a broad one " + READOUT_DEFAULTS.clearSharePct + "%. Not approved is the failure floor. Values are the model re-run, not a forecast of the share price on the day."
         : "Defaults: a modest win leaves the odds this case already has after a positive readout (" + pct1(r.conditionalPosPct) + "%); a clear win closes 40% of the gap to certainty (" + pct1(r.defaults.clearPosPct) + "%). A miss is the failure floor. Values are the model re-run, not a forecast of the share price on the day."));
 }
+
+// ── What each catalyst is worth (multi-program cases, October 2026) ────────
+// Reading: which catalyst swings the case most, and which comes first.
+function readCatalystLadder(rows, price, base) {
+  if (!rows || !rows.length) return null;
+  const swing = r => r.passValue - r.failValue;
+  const big = rows.slice().sort((a, b) => swing(b) - swing(a))[0];
+  const first = rows[0];
+  const verdict = big.gate + " on " + big.program + " moves the case most: " + fmtShare(big.passValue) + " if " + big.passWord + ", " + fmtShare(big.failValue) + " if " + big.failWord + ".";
+  const bits = [];
+  if (first !== big) bits.push("The first to come is the " + first.gate + " on " + first.program + (first.timing ? " (" + first.timing.dateText + ")" : "") + ": " + fmtShare(first.passValue) + " or " + fmtShare(first.failValue) + ".");
+  if (price != null) {
+    const above = rows.filter(r => r.failValue >= price);
+    if (above.length) bits.push(above.length === rows.length ? "Every failure still leaves the value above today's " + fmtShare(price) + "." : "A failure of " + andList(above.map(r => r.program)) + " still leaves the value above today's " + fmtShare(price) + ".");
+    else if (rows.every(r => r.passValue < price)) bits.push("No single success on its own reaches today's " + fmtShare(price) + " — the price needs several of them.");
+  }
+  bits.push("Weighted by its own odds each row comes back to about Base (" + fmtShare(base) + "); a row is one result with everything else at today's odds, not a forecast of the price on the day.");
+  return { verdict, text: bits.join(" ") };
+}
+
+// bare: inside the report — no export bar, no input (the report draws its own card).
+function CatalystLadderSection({ theCase, discountRatePct, tv, onChange, bare }) {
+  const h = React.createElement;
+  let L = null;
+  try {
+    const drBase = discountRatePct !== "" && discountRatePct != null ? Number(discountRatePct) : DISCOUNT_RATE_GUIDANCE.earlyBiotechSelfView[0];
+    L = computeCatalystLadder(theCase, drBase, { enabled: tv.enabled, method: tv.method, growthPct: tv.growthPct, exitMultiple: tv.exitMultiple });
+  } catch (e) { L = null; }
+  if (!L) return null;
+  const price = L.price;
+  const s = theCase.catalystLadder || {};
+  const move = v => price ? (v >= price ? "+" : "−") + Math.abs(Math.round((v / price - 1) * 100)) + "%" : "—";
+  const axisHi = niceAxisTicks(0, Math.max(...L.rows.map(r => r.passValue), price || 0), 4).hi;
+  const bar = r => h("svg", { viewBox: "0 0 200 22", width: 200, height: 22, "aria-hidden": "true", style: { display: "block" } },
+    h("line", { x1: 4 + r.failValue / axisHi * 192, x2: 4 + r.passValue / axisHi * 192, y1: 11, y2: 11, stroke: "var(--ink-3)", strokeWidth: 2 }),
+    h("circle", { cx: 4 + r.failValue / axisHi * 192, cy: 11, r: 4, fill: "var(--red)" }),
+    h("circle", { cx: 4 + r.passValue / axisHi * 192, cy: 11, r: 4, fill: "var(--green)" }),
+    price != null && h("line", { x1: 4 + price / axisHi * 192, x2: 4 + price / axisHi * 192, y1: 1, y2: 21, stroke: "var(--warn)", strokeWidth: 1.5 }));
+  const anyTwins = L.rows.some(r => r.twins > 0);
+  const Wrap = (props, ...kids) => bare ? h.apply(null, ["div", null].concat(kids)) : h.apply(null, [ExportSection, props].concat(kids));
+  return Wrap({ title: "What each catalyst is worth", reportSection: "ladder", style: { marginTop: 16, borderTop: "1px dashed var(--rule)", paddingTop: 14 } },
+    h("div", { style: { fontSize: 13, fontFamily: "var(--display)", fontWeight: 600, color: "var(--ink-1)", marginBottom: 4 } }, "What each catalyst is worth"),
+    h("div", { className: "prose", style: { ...UI.caption, marginBottom: 10 } },
+      "Each program's next gate, in date order, run through the model as if already known — that program passing or failing, every other program at today's odds. A failure pays the stage it is in and nothing after it. Dates come from the Calibration Log; a date marked ~ is the end of the current stage on the R&D timeline."),
+    h("div", { className: "proj-table-wrap" },
+      h("table", { className: "proj-table rs-table" },
+        h("thead", null, h("tr", null, ["Catalyst", "When", "Chance it passes", "If it passes", "If it fails", "vs today", price != null ? "│ today " + fmtShare(price) : ""].map((c, i) => h("th", { key: i, scope: "col", className: i <= 1 || i === 6 ? "l" : "", style: i === 6 ? { color: "var(--warn)" } : null }, c)))),
+        h("tbody", null, L.rows.map(r => h("tr", { key: r.programId },
+          h("td", { className: "l", style: { fontFamily: "var(--sans)" } }, h("div", { style: { fontWeight: 600, color: "var(--ink-1)" } }, r.gate), h("div", { style: { fontSize: 10, color: "var(--ink-3)" } }, r.program)),
+          h("td", { className: "l" }, r.timing ? r.timing.dateText + (r.timing.pinned ? " (pinned)" : "") : "—"),
+          h("td", null, Math.round(r.pass * 100) + "%"),
+          h("td", { className: "strong", style: { color: "var(--green)" } }, fmtShare(r.passValue)),
+          h("td", { className: "strong", style: { color: "var(--red)" } }, fmtShare(r.failValue)),
+          h("td", null, move(r.passValue) + " / " + move(r.failValue)),
+          h("td", { className: "l" }, bar(r))))))),
+    bare && L.readAcrossPct > 0 && h("div", { style: { ...UI.caption, marginTop: 8 } }, "Read-across between programs of the same drug: " + Math.round(L.readAcrossPct) + "% (a failure cuts the others' odds by that much; a pass raises them enough to keep their average)."),
+    !bare && anyTwins && h("div", { style: { display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", marginTop: 10, fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-2)" } },
+      h("span", null, "When a readout fails, cut the same drug's other programs' odds by"),
+      h("input", { type: "number", min: 0, max: 100, step: 5, className: "rs-input", value: s.readAcrossPct == null ? "" : s.readAcrossPct, placeholder: "0", "aria-label": "Read-across to the same drug's other programs (%)",
+        onChange: e => onChange({ ...theCase, catalystLadder: { ...s, readAcrossPct: e.target.value }, updatedAt: Date.now() }) }),
+      h("span", null, "%"),
+      h("span", { style: UI.caption }, "Blank or 0: each program is judged on its own, as the valuation assumes. A pass raises the others by just enough to keep their average where it is, so this widens the swings without moving Base. Your judgment — nothing calibrates it.")),
+    h(Explain, readCatalystLadder(L.rows, price, L.base)));
+}
+
+// ── Range of endings (multi-program cases, October 2026) ───────────────────
+function readRangeOfEndings(r) {
+  if (!r || r.tooMany) return null;
+  const n = r.developing;
+  const mostLikelyCount = r.byCount.indexOf(Math.max(...r.byCount));
+  const verdict = r.price != null
+    ? (r.belowPrice >= 0.995 ? "Every way this case can end leaves a share worth less than today's " + fmtShare(r.price) + " — even the best ending gives " + fmtShare(r.max) + "."
+      : r.belowPrice <= 0.005 ? "No way this case can end leaves a share worth less than today's " + fmtShare(r.price) + "."
+      : Math.round(r.belowPrice * 100) + "% of the ways this case can end, by probability, leave a share worth less than today's " + fmtShare(r.price) + ".")
+    : "The middle 80% of endings runs from " + fmtShare(r.p10) + " to " + fmtShare(r.p90) + ".";
+  const bits = [];
+  if (r.price != null) bits.push("The middle 80% of endings runs from " + fmtShare(r.p10) + " to " + fmtShare(r.p90) + ", with a median of " + fmtShare(r.p50) + ".");
+  bits.push("The most likely count is " + mostLikelyCount + " of " + n + " programs reaching market (" + Math.round(r.byCount[mostLikelyCount] * 100) + "%); all " + n + " " + Math.round(r.byCount[n] * 100) + "%, none " + Math.round(r.byCount[0] * 100) + "%.");
+  bits.push("Probability-weighted the endings average " + fmtShare(r.mean) + " against a Base of " + fmtShare(r.base) + (Math.abs(r.mean - r.base) / Math.max(0.01, Math.abs(r.base)) < 0.005 ? " — the same model, counted ending by ending." : ": the gap is company G&A and tax, which depend on the whole company, not on any one program."));
+  return { verdict, text: bits.join(" ") };
+}
+
+function RangeOfEndingsSection({ theCase, discountRatePct, tv, bare }) {
+  const h = React.createElement;
+  let r = null;
+  try {
+    const drBase = discountRatePct !== "" && discountRatePct != null ? Number(discountRatePct) : DISCOUNT_RATE_GUIDANCE.earlyBiotechSelfView[0];
+    r = computeRangeOfEndings(theCase, drBase, { enabled: tv.enabled, method: tv.method, growthPct: tv.growthPct, exitMultiple: tv.exitMultiple });
+  } catch (e) { r = null; }
+  if (!r) return null;
+  const title = "Range of endings";
+  const Wrap = (props, ...kids) => bare ? h.apply(null, ["div", null].concat(kids)) : h.apply(null, [ExportSection, props].concat(kids));
+  if (r.tooMany) return Wrap({ title, style: { marginTop: 16, borderTop: "1px dashed var(--rule)", paddingTop: 14 } },
+    h("div", { style: { fontSize: 13, fontFamily: "var(--display)", fontWeight: 600, color: "var(--ink-1)", marginBottom: 4 } }, title),
+    h("div", { style: UI.caption }, "This case has " + r.count.toLocaleString() + " ways to end — more than the 2,000 it counts one by one. The catalyst table above still applies."));
+  const stat = (k, v, sub) => h("div", { className: "mc-stat" }, h("div", { style: UI.caption }, k), h("div", { style: UI.stat }, v), sub && h("div", { style: UI.caption }, sub));
+  return Wrap({ title, reportSection: "endings", style: { marginTop: 16, borderTop: "1px dashed var(--rule)", paddingTop: 14 } },
+    h("div", { style: { fontSize: 13, fontFamily: "var(--display)", fontWeight: 600, color: "var(--ink-1)", marginBottom: 4 } }, title),
+    h("div", { className: "prose", style: { ...UI.caption, marginBottom: 10 } },
+      "Every way the programs can end — each launching, or failing at one of its remaining gates — valued by the model and weighted by its chance: " + r.count.toLocaleString() + " endings, counted exactly. " + (r.readAcrossPct > 0 ? "With " + Math.round(r.readAcrossPct) + "% read-across between programs of the same drug (set in the catalyst table), which bunches the endings toward all-or-nothing." : "Programs are independent here, as in the valuation; read-across in the catalyst table above links programs of the same drug.")),
+    h("div", { className: "mc-stats" },
+      stat("P10", fmtShare(r.p10)), stat("Median", fmtShare(r.p50), "Base " + fmtShare(r.base)), stat("P90", fmtShare(r.p90)),
+      r.belowPrice != null && stat("Below today's price", Math.round(r.belowPrice * 100) + "%")),
+    h(ExportableBlock, { title: (theCase.name || "Case") + " — range of endings" },
+      h(HistogramChart, { sortedValues: r.sample, price: r.price, height: 230, label: "Histogram of fair value per share across every way the programs can end, weighted by probability",
+        markers: [
+          { value: r.p10, label: "P10", color: "var(--ink-3)", dash: "4,3" },
+          { value: r.p50, label: "Median", color: "var(--ink-1)", dash: "4,3" },
+          { value: r.p90, label: "P90", color: "var(--ink-3)", dash: "4,3" },
+          r.price != null && { value: r.price, label: "Today", color: "var(--warn)" }
+        ].filter(Boolean) }),
+      h("div", { style: { ...UI.caption, marginTop: 4 } }, "Bar height is probability, not a count of runs: each ending drawn in proportion to its chance.")),
+    h("div", { style: { marginTop: 10, fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-2)" } },
+      h("div", { style: { marginBottom: 4 } }, "The five most likely endings"),
+      r.likely.map((e, i) => h("div", { key: i, style: { display: "flex", justifyContent: "space-between", gap: 12, padding: "3px 0", borderBottom: "1px solid var(--rule)" } },
+        h("span", null, e.launched.length ? andList(e.launched) + (e.launched.length === 1 ? " launches" : " launch") + (e.launched.length < r.developing ? "; the rest fail" : "") : "Every program fails"),
+        h("span", null, Math.round(e.prob * 1000) / 10 + "% · " + fmtShare(e.value))))),
+    h(Explain, readRangeOfEndings(r)));
+}

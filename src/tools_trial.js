@@ -1138,6 +1138,54 @@ function TrialWatchTool({ activeCase, updateCase, initialNctId, onConsumedInitia
 // was posted. Rows where the first trial differs from every other are shaded.
 // Typical use: a Phase 3 you are modelling next to the trials that got drugs
 // approved in the same indication.
+// ── Press-Release Reader (October 2026) ────────────────────────────────────
+// Paste a release; it quotes the phrases that usually signal a weaker result
+// than it sounds, the p-values near 0.05 and the intervals that include no
+// effect (scanPressRelease, trialDecoder.js). Nothing is fetched or scored.
+function PressReleaseTool({ activeCase }) {
+  const h = React.createElement;
+  const [text, setText] = React.useState("");
+  const [scan, setScan] = React.useState(null);
+  const run = () => setScan(scanPressRelease(text));
+  const reading = scan ? readPressRelease(scan) : null;
+  const row = (k, kids) => h("div", { key: k, style: { padding: "8px 0", borderBottom: "1px solid var(--rule)" } }, kids);
+  const quote = (q, i) => h("div", { key: i, style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-3)", marginTop: 3, lineHeight: 1.5 } }, "“" + q + "”");
+  return h("div", null,
+    toolCard(h, [
+      toolLabel(h, "Read a press release"),
+      h(Note, { summary: "New here? What this does, and what it does not" },
+        h("div", { style: { lineHeight: 1.6 } }, "Paste the text of a results release. The reader quotes back the phrases that usually mean a result is weaker than it sounds (“trend toward significance”, “numerically”, a “nominal” p-value, a subgroup or a new data cut), every p-value close to 0.05, and any hazard, odds or risk ratio whose interval includes no effect — each with what it usually means. It does not score the release: wording is evidence about how to read the numbers, not a verdict. The phrase list draws on Ritchie (Science Fictions, 2020) and Goldacre (Bad Pharma, 2012). Nothing you paste leaves this computer.")),
+      h("textarea", { value: text, "aria-label": "Press release text", placeholder: "Paste the release here", onChange: e => setText(e.target.value), rows: 8,
+        style: { width: "100%", boxSizing: "border-box", padding: "9px 11px", borderRadius: 7, border: "1.5px solid var(--rule)", background: "var(--surface)", color: "var(--ink-1)", fontFamily: "var(--sans)", fontSize: 13, lineHeight: 1.5, resize: "vertical" } }),
+      h("div", { style: { display: "flex", gap: 8, marginTop: 8 } },
+        h("button", { type: "button", onClick: run, disabled: text.trim().length < 20,
+          style: { padding: "7px 16px", minHeight: 28, borderRadius: 6, border: "1px solid var(--teal)", background: "var(--teal-bg)", color: "var(--teal)", fontFamily: "var(--mono)", fontSize: 12, fontWeight: 700, cursor: text.trim().length < 20 ? "default" : "pointer" } }, "Read it"))
+    ]),
+    scan && toolCard(h, [
+      toolLabel(h, "What the wording and the numbers say"),
+      reading && h(Explain, reading),
+      scan.ratios.length > 0 && h("div", { style: { marginTop: 10 } },
+        h("div", { style: UI.fieldLabel }, "Ratios with an interval"),
+        scan.ratios.map((r, i) => row("r" + i, [
+          h("div", { key: "t", style: { fontSize: 12, fontFamily: "var(--mono)", color: r.includesNull ? "var(--warn)" : "var(--ink-1)" } }, r.kind + " " + r.est + " (" + r.level + "% CI " + r.lower + " to " + r.upper + ")" + (r.includesNull ? " — the interval includes 1, no effect" : " — the interval excludes 1")),
+          quote(r.quote, "q")]))),
+      scan.pValues.length > 0 && h("div", { style: { marginTop: 10 } },
+        h("div", { style: UI.fieldLabel }, "P-values"),
+        scan.pValues.map((p, i) => row("p" + i, [
+          h("div", { key: "t", style: { fontSize: 12, fontFamily: "var(--mono)", color: p.nearMiss || p.justUnder || p.nominal ? "var(--warn)" : "var(--ink-1)" } },
+            "p " + p.op + " " + p.value + (p.nominal ? " — nominal: not part of the planned tests" : p.justUnder ? " — just under 0.05: a result this close turns on very few patients" : p.nearMiss ? " — missed 0.05" : "")),
+          quote(p.quote, "q")]))),
+      scan.phrases.length > 0 && h("div", { style: { marginTop: 10 } },
+        h("div", { style: UI.fieldLabel }, "Phrases"),
+        scan.phrases.map(p => row(p.key, [
+          h("div", { key: "l", style: { fontSize: 12, fontWeight: 600, color: p.good ? "var(--teal)" : "var(--ink-1)" } }, p.label + (p.count > 1 ? " ×" + p.count : "")),
+          h("div", { key: "m", className: "prose", style: { fontSize: 12, color: "var(--ink-2)", marginTop: 2, lineHeight: 1.5 } }, p.meaning),
+          p.quotes.map(quote)]))),
+      !scan.phrases.length && !scan.pValues.length && !scan.ratios.length && h("div", { style: UI.caption }, "No phrases, p-values or ratio intervals found in the text.")
+    ])
+  );
+}
+
 function TrialCompareTool({ activeCase }) {
   const h = React.createElement;
   const [input, setInput] = React.useState("");

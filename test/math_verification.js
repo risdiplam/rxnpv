@@ -106,7 +106,11 @@ const EXPORTS = [
   "summarizeOpenMarketActivity", "FORM4_CODE_LABELS",
   "extractConvertibleNotes", "pickLatestUnit", "isFilingForm", "formatHalfLife",
   "programLabel", "extractPreferredShares", "studyNamesAnyDrug",
-  "licenceRoyaltyOn", "licenceTiers", "sharedLicenceFor", "effectiveLicensor", "drugLicenceExpectedByYear", "computeSOTPBreakdown"
+  "licenceRoyaltyOn", "licenceTiers", "sharedLicenceFor", "effectiveLicensor", "drugLicenceExpectedByYear", "computeSOTPBreakdown",
+  "computeCatalystLadder", "computeRangeOfEndings",
+  "subgroupInteraction", "falsePositiveRisk", "safetyUpperBound", "interimBoundary", "hazardRatioForZ", "conditionalPower",
+  "readMeaningfulEffect", "readSubgroup", "readSafetyExposure", "scanPressRelease", "peakAboveAreaComps",
+  "fdaGoalDate", "estimatePatentTermExtension"
 ];
 const api = new Function(combined + "\nreturn {" + EXPORTS.join(",") + "};")();
 
@@ -5775,6 +5779,168 @@ section("Licence: royalty tiers and one licence across a drug's programs (Octobe
   ok("case: the milestone on combined sales costs more than on one program's own sales", val(withMs(shared)) < val(withMs({ ...shared, programs: shared.programs.map(p => ({ ...p, licensor: { ...p.licensor, shared: false } })) })));
   const sotp = api.computeSOTPBreakdown(withMs(shared), api.getEffectiveScenarioPreset(shared, "base"), "base", 14, { enabled: false });
   ok("SOTP: the shared terms are their own line, and the parts still add up", sotp.licenceGroups.length === 1 && sotp.licenceDrag < 0 && Math.abs(sotp.sumOfParts - (sotp.programBreakdown.reduce((a, p) => a + p.npv, 0) + sotp.gaDrag + sotp.licenceDrag)) < 1);
+}
+report();
+
+// ════════════════════════════════════════════════════════════════════════════
+section("Catalyst table and range of endings for several programs (October 2026)");
+{
+  // Three programs built from PepGen's inputs: a filed one, a Phase 3 and a
+  // Phase 2, two of them one drug. With no G&A and no tax the value is a sum
+  // over programs, so every identity below is exact.
+  const pg = JSON.parse(fs.readFileSync(path.join(__dirname, "fixtures", "pepgen_case.json"), "utf8"));
+  const p0 = pg.programs[0];
+  const mk = (id, name, drug, phase, odds, launch) => ({ ...JSON.parse(JSON.stringify(p0)), id, name, drugName: drug, currentPhase: phase, posOverridePct: odds, launchYearOffset: launch, rndOverride: { totalYears: "", totalCostM: "" }, calibrationLog: [], licensor: { enabled: false } });
+  const lin = { ...pg, corporateGA: { preCommercialAnnualM: "0", gaShareOfMatureSgaPct: "0" }, taxation: { enabled: false }, futureRaise: { enabled: false }, dilutionPath: { enabled: false },
+    programs: [mk("f", "Filed", "ivo", "filed", "80", "1"), mk("p3", "Phase 3", "ivo", "phase3", "50", "3"), mk("p2", "Phase 2", "other", "phase2", "25", "5")] };
+  const val = c => api.computeCaseValuation(c, api.getEffectiveScenarioPreset(c, "base"), "base", 14, { enabled: false }).equity.perShare;
+  const base = val(lin);
+  const L = api.computeCatalystLadder(lin, 14, { enabled: false });
+  ok("ladder: one row per program still in development", L.rows.length === 3);
+  L.rows.forEach(r => near("ladder: " + r.program + " — pass × value + fail × value returns Base", r.weighted, base, 1e-9));
+  const filed = L.rows.find(r => r.programId === "f");
+  near("ladder: the filed program's gate is the FDA decision, passing at its own 80%", filed.pass, 0.8, 1e-12);
+  ok("ladder: its gate is named the FDA decision", filed.gate === "FDA decision");
+  near("ladder: failing is the case with that program at zero odds", filed.failValue, val({ ...lin, programs: lin.programs.map(p => p.id === "f" ? { ...p, posOverridePct: "0" } : p) }), 1e-12);
+  near("ladder: passing an FDA decision means launch", filed.passValue, val({ ...lin, programs: lin.programs.map(p => p.id === "f" ? { ...p, posOverridePct: "100" } : p) }), 1e-9);
+  const p3 = L.rows.find(r => r.programId === "p3");
+  near("ladder: after a positive Phase 3 the odds are 50% ÷ the gate's pass chance", p3.oddsAfter, 0.5 / p3.pass, 1e-12);
+  // Read-across 20%: a failure cuts the other ivo program by 20%; a pass raises
+  // it by u = (1 − (1 − p) × 0.8) ÷ p, which leaves its average unchanged.
+  const ra = { ...lin, catalystLadder: { readAcrossPct: "20" } };
+  const LR = api.computeCatalystLadder(ra, 14, { enabled: false });
+  // To within a hundred-thousandth: the odds of launch average exactly, but the
+  // stage odds under them are rebuilt in log space, so stage costs are not
+  // exactly linear in the odds of launch (here $0.00002 on $53).
+  LR.rows.forEach(r => near("read-across: " + r.program + " still averages Base (to 1e-6 of it)", r.weighted, base, base * 1e-6));
+  const fR = LR.rows.find(r => r.programId === "f");
+  near("read-across: the filed program failing cuts the Phase 3 to 40%", fR.failValue, val({ ...lin, programs: lin.programs.map(p => p.id === "f" ? { ...p, posOverridePct: "0" } : p.id === "p3" ? { ...p, posOverridePct: "40" } : p) }), 1e-9);
+  ok("read-across: the other drug's program is untouched (the swing is wider only for the same drug)", Math.abs(LR.rows.find(r => r.programId === "p2").passValue - L.rows.find(r => r.programId === "p2").passValue) < 1e-9);
+
+  const R = api.computeRangeOfEndings(lin, 14, { enabled: false });
+  // Endings: filed 2 (fail at the FDA, launch), Phase 3 3, Phase 2 4 → 24.
+  ok("endings: every way to end is counted (2 × 3 × 4 = 24)", R.count === 24);
+  near("endings: the probabilities add to 1", R.byCount.reduce((a, b) => a + b, 0), 1, 1e-12);
+  near("endings: with no G&A or tax, the probability-weighted mean is Base exactly", R.mean, base, 1e-9);
+  near("endings: none launch with probability 0.2 × 0.5 × 0.75", R.byCount[0], 0.2 * 0.5 * 0.75, 1e-12);
+  near("endings: all three with 0.8 × 0.5 × 0.25", R.byCount[3], 0.8 * 0.5 * 0.25, 1e-12);
+  const RR = api.computeRangeOfEndings({ ...lin, catalystLadder: { readAcrossPct: "50" } }, 14, { enabled: false });
+  RR.launchOdds.forEach(o => near("endings, 50% read-across: " + o.id + " keeps its own odds of launch", o.odds, { f: 0.8, p3: 0.5, p2: 0.25 }[o.id], 1e-9));
+  near("endings, read-across: the mean is still Base (marginals kept, value additive)", RR.mean, base, 1e-9);
+  ok("endings, read-across: both ivo programs together become likelier (all-or-nothing)", RR.byCount[0] + RR.byCount[3] > R.byCount[0] + R.byCount[3]);
+  ok("single program: neither applies (the outcome tree does)", api.computeCatalystLadder({ ...lin, programs: [lin.programs[0]] }, 14, { enabled: false }) === null && api.computeRangeOfEndings({ ...lin, programs: [lin.programs[0]] }, 14, { enabled: false }) === null);
+}
+report();
+
+// ════════════════════════════════════════════════════════════════════════════
+section("Reading a readout (October 2026)");
+{
+  // Motulsky ch. 45 (the handoff's M12): 0.50 (SE 0.12) against 0.20 (SE 0.14),
+  // given as 95% intervals: z = 0.30 / √(0.0144 + 0.0196) = 1.627, p = 0.104.
+  const sg = api.subgroupInteraction(0.50, 0.50 - 1.959964 * 0.12, 0.50 + 1.959964 * 0.12, 0.20, 0.20 - 1.959964 * 0.14, 0.20 + 1.959964 * 0.14, "linear", 0.95);
+  near("subgroup: z = 1.627", sg.z, 0.30 / Math.sqrt(0.0144 + 0.0196), 1e-6);
+  near("subgroup: p = 0.104", sg.p, 0.1037, 0.0005);
+  // HARMONi-2 OS by PD-L1 (Summit 8-K, 2026-09-13): high 0.58 (0.38–0.89), low
+  // 0.85 (0.61–1.18). ln 0.58 = −0.5447, SE (ln 0.89 − ln 0.38)/3.92 = 0.2171;
+  // ln 0.85 = −0.1625, SE 0.1683; z = −0.3822 / 0.2747 = −1.391, p = 0.164.
+  const h2 = api.subgroupInteraction(0.58, 0.38, 0.89, 0.85, 0.61, 1.18, "ratio", 0.95);
+  near("subgroup, HARMONi-2 PD-L1 high vs low: z = −1.39", h2.z, -1.391, 0.005);
+  near("…p = 0.164: no evidence the PD-L1 subgroups differ", h2.p, 0.164, 0.002);
+  ok("…and the reading says so", /No evidence/.test(api.readSubgroup(h2, 4, "ratio").verdict));
+  ok("subgroup: a bad interval is refused", api.subgroupInteraction(0.5, 0.6, 0.4, 0.2, 0.1, 0.3, "linear") === null);
+
+  // Motulsky ch. 18: prior 10%, α 5%, power 80% → 0.045 / 0.125 = 36%; 1% → 86%; 50% → 5.9%.
+  near("false positives: prior 10% → 36%", api.falsePositiveRisk(10, 0.05, 80), 0.36, 1e-12);
+  near("false positives: prior 1% → 86%", api.falsePositiveRisk(1, 0.05, 80), 0.0495 / (0.0495 + 0.008), 1e-12);
+  near("false positives: prior 50% → 5.9%", api.falsePositiveRisk(50, 0.05, 80), 0.025 / 0.425, 1e-12);
+
+  // Rule of three: 0/60 → 1 − 0.05^(1/60) = 4.87%; 0/800 → 0.374%, 1 in 268.
+  near("safety: 0 of 60 → 4.87%", api.safetyUpperBound(0, 60).upper, 0.0487, 0.00005);
+  near("safety: 0 of 800 → 1 in 268", 1 / api.safetyUpperBound(0, 800).upper, 267.6, 0.5);
+  ok("safety: the reading names 1 in 268", /1 in 268/.test(api.readSafetyExposure(0, 800, api.safetyUpperBound(0, 800).upper).verdict));
+
+  // Interim boundaries. O'Brien–Fleming-type spending at t = 0.4: z = 1.96 / √0.4 = 3.099.
+  const ob = api.interimBoundary(0.4, 0.05, "obf");
+  near("interim, O'Brien–Fleming-type at 40%: z = 3.099 (to the app's inverse-normal precision)", ob.zInterim, 1.959964 / Math.sqrt(0.4), 1e-6);
+  // Pocock-type at 50%: α(0.5) = 0.05 ln(1 + 0.8591) = 0.03101 → z = Φ⁻¹(1 − 0.0155) = 2.157.
+  near("interim, Pocock-type at 50%: z = 2.157", api.interimBoundary(0.5, 0.05, "pocock").zInterim, 2.157, 0.002);
+  near("interim, Haybittle–Peto: z = 3.0", api.interimBoundary(0.5, 0.05, "haybittle").zInterim, 3, 0);
+  // The final boundary, checked by an independent seeded simulation: two
+  // looks with Z1 = √t × Z2-ish (Z2 = √t Z1 + √(1 − t) W), a trial rejects if
+  // |Z1| ≥ c1 or |Z2| ≥ c2; the share rejecting under the null should be 5%
+  // (200,000 trials: SE = √(0.05 × 0.95 / 200000) = 0.00049; tolerance 4 SE).
+  {
+    let seed = 20261009;
+    const rnd = () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+    const gauss = () => { let u = 0; while (u === 0) u = rnd(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * rnd()); };
+    let rej = 0; const N = 200000, t = 0.4;
+    for (let i = 0; i < N; i++) { const z1 = gauss(), z2 = Math.sqrt(t) * z1 + Math.sqrt(1 - t) * gauss(); if (Math.abs(z1) >= ob.zInterim || Math.abs(z2) >= ob.zFinal) rej++; }
+    near("interim: the two looks together spend 5% (seeded simulation)", rej / N, 0.05, 4 * Math.sqrt(0.05 * 0.95 / N));
+    ok("interim: the final boundary is a little above 1.96 (" + ob.zFinal.toFixed(3) + ")", ob.zFinal > 1.96 && ob.zFinal < 2.0);
+  }
+  // Schoenfeld: z 1.96 with 256 events at 1:1 → HR = exp(−1.96 / √64) = 0.7827.
+  near("hazard ratio for z = 1.96 at 256 events: 0.783", api.hazardRatioForZ(1.959964, 256, 1), Math.exp(-1.959964 / 8), 1e-12);
+  // Friedman ch. 17 (the handoff's F7): K = 5, k = 2 → t = 0.4, z = 1.0, θ = 3.24:
+  // (1.96 − 1.0 × √0.4 − 3.24 × 0.6) / √0.6 = −0.7959 → CP = 0.787.
+  near("conditional power: Friedman's worked example, 0.787", api.conditionalPower(0.4, 1.0, 3.24, 1.959964), 0.787, 0.001);
+
+  // Dead or underpowered, on HARMONi's OS (0.79, 95% CI 0.62–1.01) with 0.80
+  // as the smallest effect that matters: includes 1 but reaches 0.62 → not definitive.
+  ok("meaningful: HARMONi primary OS (0.62–1.01) is not definitive", /Not definitive/.test(api.readMeaningfulEffect(0.62, 1.01, 0.80, "ratio").verdict));
+  ok("meaningful: the updated OS (0.61–0.95) is real, size unsettled", /Real; whether/.test(api.readMeaningfulEffect(0.61, 0.95, 0.80, "ratio").verdict));
+  ok("meaningful: 0.90–1.05 rules out a 0.80 effect (definitive negative)", /Definitively negative/.test(api.readMeaningfulEffect(0.90, 1.05, 0.80, "ratio").verdict));
+  ok("meaningful: 0.55–0.75 is meaningful whatever the true value", /meaningful effect, whatever/.test(api.readMeaningfulEffect(0.55, 0.75, 0.80, "ratio").verdict));
+  ok("meaningful: a difference, benefit upward: −1.2 to +12 against 5 → not definitive (Greenhalgh's heart-failure trial)", /Not definitive/.test(api.readMeaningfulEffect(-1.2, 12, 5, "linear").verdict));
+  ok("meaningful: real but smaller than matters (0.5 to 3 against 5)", /smaller than what you said/.test(api.readMeaningfulEffect(0.5, 3, 5, "linear").verdict));
+
+  // Press-release reader on Summit-style wording (paraphrased).
+  const pr = api.scanPressRelease("Ivonescimab showed a positive trend in overall survival without achieving statistical significance, with a hazard ratio of 0.79 (95% CI: 0.62 – 1.01; p=0.057). In an updated analysis the HR was 0.76 (95% CI: 0.61 – 0.95; nominal p=0.0151). A clinically meaningful benefit was seen across subgroups; the PFS analysis was pre-specified.");
+  ok("press release: both ratio intervals read, one including 1", pr.ratios.length === 2 && pr.ratios[0].includesNull && !pr.ratios[1].includesNull);
+  ok("press release: p = 0.057 is a near miss; p = 0.0151 is nominal", pr.pValues.length === 2 && pr.pValues[0].nearMiss && pr.pValues[1].nominal);
+  ok("press release: the phrases found", ["postrend", "missed", "updated", "meaningful", "subgroup", "prespecified"].every(k => pr.phrases.some(p => p.key === k)));
+  ok("press release: 'pre-specified' is marked as a good sign, not a flag", pr.phrases.find(p => p.key === "prespecified").good && !pr.flagged.some(p => p.key === "prespecified"));
+
+  // Peak above every comp in its area: an oncology program at $40B tops Keytruda's $31.7B.
+  const pg = JSON.parse(fs.readFileSync(path.join(__dirname, "fixtures", "pepgen_case.json"), "utf8"));
+  const big = { ...pg.programs[0], therapeuticArea: "Oncology", revenueMode: "quick", quickRevenue: { peakRevenue: "40000000000", yearsToPeak: "6", profile: "median" } };
+  const ab = api.peakAboveAreaComps(big);
+  ok("peak vs comps: $40B oncology is above every oncology comp (largest Keytruda)", ab && ab.top.drug === "Keytruda" && ab.count >= 3);
+  ok("peak vs comps: $1B oncology is not flagged", api.peakAboveAreaComps({ ...big, quickRevenue: { ...big.quickRevenue, peakRevenue: "1000000000" } }) === null);
+}
+report();
+
+// ════════════════════════════════════════════════════════════════════════════
+section("FDA decision date and patent term extension (October 2026)");
+{
+  // Ng ch. 8 (the handoff's D4): an NME submitted 2026-09-01, priority review:
+  // filing 60 days later, 2026-10-31; goal 6 months after that, 2027-04-30.
+  const a = api.fdaGoalDate("2026-09-01", "program", "priority");
+  ok("FDA: NME priority — filing 2026-10-31, goal 2027-04-30", a.filing === "2026-10-31" && a.goal === "2027-04-30");
+  ok("FDA: NME standard — 10 months after filing, 2027-08-31", api.fdaGoalDate("2026-09-01", "program", "standard").goal === "2027-08-31");
+  ok("FDA: a non-NME NDA counts from submission (standard: 2027-07-01)", api.fdaGoalDate("2026-09-01", "other", "standard").goal === "2027-07-01");
+  ok("FDA: Class 1 resubmission, 2 months", api.fdaGoalDate("2026-09-01", "resub1").goal === "2026-11-01");
+  ok("FDA: Class 2 resubmission, 6 months", api.fdaGoalDate("2026-09-01", "resub2").goal === "2027-03-01");
+  ok("FDA: a major amendment adds 3 months", api.fdaGoalDate("2026-09-01", "program", "priority", true).goal === "2027-07-30");
+  ok("FDA: month ends clamp (2025-12-31 + 2 months = 2026-02-28)", api.fdaGoalDate("2025-12-31", "resub1").goal === "2026-02-28");
+  // Summit's BLA: submitted in Q4 2025, standard review, goal 2026-11-14 —
+  // the Program's 12 months from a mid-November submission.
+  ok("FDA: a 2025-11-14 BLA, standard, lands on 2026-11-13 — a day from Summit's announced 2026-11-14 (FDA counts the filing date inclusively)", api.fdaGoalDate("2025-11-14", "program", "standard").goal === "2026-11-13");
+
+  // Patent term extension: Summit-like dates. Testing phase 2022-06-01 → 2025-11-14
+  // (3.45 years, half 1.73) + review 1.0 year = 2.73 years; 2039-06-30 + 2.73 =
+  // 2042-03, past approval + 14 years (2040-11-14), so the cap binds.
+  const e = api.estimatePatentTermExtension({ expiry: "2039-06-30", ind: "2022-06-01", submitted: "2025-11-14", approval: "2026-11-14" });
+  near("PTE: raw extension 2.73 years", e.raw, 3.4537 / 2 + 1.0, 0.002);
+  ok("PTE: the 14-years-after-approval cap binds (to about 2040-11)", e.binding === "fourteen-year" && e.extended.slice(0, 7) === "2040-11");
+  ok("PTE: the biologic floor from that approval is 2038-11", e.floors.biologic.slice(0, 7) === "2038-11");
+  // No cap: 2020-01-01 → 2024-01-01 testing (4.0, half 2.0) + 1.0 review = 3.0 → 2033-01.
+  const f = api.estimatePatentTermExtension({ expiry: "2030-01-01", ind: "2020-01-01", submitted: "2024-01-01", approval: "2025-01-01" });
+  near("PTE: 2 + 1 = 3.0 years", f.raw, 3.0, 0.005);
+  ok("PTE: extended to 2033-01, no cap binding", f.extended.slice(0, 7) === "2033-01" && f.binding === null);
+  // Five-year maximum: 10 years of testing (5) + 1 of review = 6 → 5.
+  ok("PTE: the five-year maximum", api.estimatePatentTermExtension({ expiry: "2030-01-01", ind: "2010-01-01", submitted: "2020-01-01", approval: "2021-01-01" }).binding === "five-year");
+  // Testing counts only after the patent issued: issued 2022-01-01 → testing 2.0 (half 1.0) + 1.0 = 2.0.
+  near("PTE: testing counted from the issue date when later than the IND", api.estimatePatentTermExtension({ expiry: "2030-01-01", ind: "2020-01-01", submitted: "2024-01-01", approval: "2025-01-01", issued: "2022-01-01" }).raw, 2.0, 0.005);
 }
 report();
 

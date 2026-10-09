@@ -598,21 +598,25 @@ function sampleCaseSummit() {
   const pricing = o => Object.assign({ usAnnualPrice: "183000", priceBasis: "ASP", netPriceRealizationPct: "", usAnnualGrowthPct: "2", includeExUS: true, exUSPriceFactorPct: "45", exUSAnnualGrowthPct: "0", exUSPatientMultiplierPct: "150", exUSLaunchLagYears: "1.5" }, o || {});
   const excl = y => ({ yearsToLOE: y, modality: "biologic", volumeRetainedPct: "", priceDeclinePct: "" });
   const cost = { cogsPct: "12", reps: { primaryCare: "0", specialty: "0", hospital: "0" }, marketingPctOfPeak: "4" };
-  const lic = (approvalM, sales) => ({ enabled: true, name: "Akeso Inc.", royaltyPct: "11", sublicensePct: "", approvalMilestoneM: approvalM, salesMilestones: sales || [], note: "" });
+  // One licence for the molecule: the royalty and sales milestones on total
+  // ivonescimab sales sit on the lead program; the others carry only their
+  // own approval milestones.
+  const lic = (approvalM, sales) => sales ? ({ enabled: true, shared: true, name: "Akeso Inc.", royaltyPct: "11", tiers: [], sublicensePct: "", approvalMilestoneM: approvalM, salesMilestones: sales, note: "" })
+    : ({ enabled: false, shared: false, name: "", royaltyPct: "", tiers: [], sublicensePct: "", approvalMilestoneM: approvalM, salesMilestones: [], note: "" });
   const prog = (o, rb) => { const p = newProgram(); Object.assign(p.revenueBuild, rb || {}); return Object.assign(p, o); };
   const pop = (incidence, years, treatedPct) => ({ mode: "incidence", prevalence: "", incidence, diseaseDurationYears: years, diagnosisRatePct: "100", treatmentRatePct: treatedPct, eligiblePct: "100" });
   const share = (n, order, pct) => ({ numDrugs: n, orderOfEntry: order, peakShareOverridePct: pct });
   const common = { drugName: "ivonescimab", therapeuticArea: "Oncology", modality: "biologic", target: "PDCD1", revenueMode: "full", costStructure: cost };
   const programs = [
     prog(Object.assign({}, common, { name: "HARMONi — 2L+ EGFRm NSCLC", indication: "EGFR-mutant non-squamous NSCLC after a 3rd-generation TKI, with chemotherapy",
-      currentPhase: "filed", posOverridePct: "75", posBiomarkerUse: "selection", trialIds: "NCT06396065", launchYearOffset: "1", licensor: lic("100") }),
+      currentPhase: "filed", posOverridePct: "75", posBiomarkerUse: "selection", trialIds: "NCT06396065", launchYearOffset: "1", licensor: lic("100", [{ thresholdM: "1000", paymentM: "250" }, { thresholdM: "3000", paymentM: "500" }]) }),
       { population: pop("14000", "0.6", "85"), marketShare: share(4, 3, "25"), launchCurve: { yearsToPeak: "4", profile: "median" }, pricing: pricing(), exclusivity: excl("13") }),
     prog(Object.assign({}, common, { name: "HARMONi-3 — 1L squamous NSCLC", indication: "First-line metastatic squamous NSCLC, with chemotherapy, against pembrolizumab + chemotherapy",
       currentPhase: "phase3", posOverridePct: "55", trialIds: "NCT05899608", launchYearOffset: "2", licensor: lic("50") }),
       { population: pop("26800", "0.85", "85"), marketShare: share(3, 1, "35"), launchCurve: { yearsToPeak: "5", profile: "median" }, pricing: pricing(), exclusivity: excl("12") }),
     prog(Object.assign({}, common, { name: "HARMONi-3 / -7 — 1L non-squamous NSCLC", indication: "First-line metastatic non-squamous NSCLC without an actionable driver",
       currentPhase: "phase3", posOverridePct: "45", trialIds: "NCT05899608, NCT06767514", launchYearOffset: "3",
-      licensor: lic("50", [{ thresholdM: "1000", paymentM: "250" }, { thresholdM: "3000", paymentM: "500" }]) }),
+      licensor: lic("50") }),
       { population: pop("56300", "0.85", "85"), marketShare: share(3, 1, "25"), launchCurve: { yearsToPeak: "5", profile: "median" }, pricing: pricing(), exclusivity: excl("11") }),
     prog(Object.assign({}, common, { name: "HARMONi-GI3 — 1L metastatic CRC", indication: "First-line unresectable metastatic colorectal cancer, against bevacizumab + FOLFOX",
       currentPhase: "phase3", posOverridePct: "35", trialIds: "NCT07228832", launchYearOffset: "4", licensor: lic("50") }),

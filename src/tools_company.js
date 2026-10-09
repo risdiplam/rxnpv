@@ -303,6 +303,50 @@ function CompanyLookupTool({ cases, updateCase, activeCase, onWatchTrial }) {
 // each company's most recent SEC filings for context on what's already
 // happened. This tool is upfront about that distinction rather than implying
 // more certainty than the data supports.
+// ── FDA decision date from a submission (October 2026) ─────────────────────
+// For a filing whose goal date has not been announced: the PDUFA clock from
+// the submission date (fdaGoalDate, helpers.js), pinnable as the program's
+// catalyst. An announced date always beats a computed one.
+function FdaDateHelper({ activeCase, updateCase }) {
+  const h = React.createElement;
+  const [sub, setSub] = React.useState("");
+  const [kind, setKind] = React.useState("program");
+  const [review, setReview] = React.useState("standard");
+  const [amend, setAmend] = React.useState(false);
+  const [progId, setProgId] = React.useState("");
+  const [msg, setMsg] = React.useState("");
+  const r = fdaGoalDate(sub, kind, review, amend);
+  const progs = (activeCase && activeCase.programs) || [];
+  const target = progs.find(p => p.id === progId) || progs.find(p => p.currentPhase === "filed") || progs[0];
+  const sel = (label, value, onChange, opts) => h("select", { "aria-label": label, value, onChange: e => onChange(e.target.value), style: { ...UI.input, minHeight: 28 } }, opts.map(([v, t]) => h("option", { key: v, value: v }, t)));
+  const pin = () => {
+    if (!r || !target || !updateCase) return;
+    const entry = { id: newId("cal"), catalystLabel: "FDA decision (PDUFA goal, computed from the submission)", catalystDate: r.goal, yourPoS: null, marketImpliedPoS: null, outcome: "pending",
+      pin: { type: "pdufa", source: "Computed: " + r.rule + " — submitted " + sub, at: localDateStamp() },
+      notes: "Computed by the FDA date helper (Catalyst Calendar). Replace with the company's announced goal date when it has one." };
+    updateCase({ ...activeCase, programs: activeCase.programs.map(p => p.id === target.id ? { ...p, calibrationLog: [...(p.calibrationLog || []), entry] } : p), updatedAt: Date.now() });
+    setMsg("Pinned " + r.goal + " on " + programLabel(target, progs) + "'s Calibration Log.");
+  };
+  return toolCard(h, [
+    toolLabel(h, "FDA decision date from a submission"),
+    h("div", { className: "prose", style: { ...UI.intro, marginBottom: 10 } }, "When a company says it has submitted but has not announced its goal date, the PDUFA clock gives it. New molecular entities and original BLAs: 60 days to filing, then 10 months (standard) or 6 (priority). Other NDAs and efficacy supplements: 10 or 6 months from submission. An announced date always beats this one."),
+    h("div", { style: { display: "flex", gap: 12, flexWrap: "wrap", alignItems: "flex-end" } },
+      h("div", null, h("div", { style: UI.fieldLabel }, "Submitted on"), h("input", { type: "date", "aria-label": "Submission date", value: sub, onChange: e => setSub(e.target.value), style: { ...UI.input, minHeight: 28 } })),
+      h("div", null, h("div", { style: UI.fieldLabel }, "Application"), sel("Application type", kind, setKind, [["program", "New molecular entity or original BLA"], ["other", "Other NDA, or an efficacy supplement"], ["resub1", "Resubmission, Class 1"], ["resub2", "Resubmission, Class 2"]])),
+      kind !== "resub1" && kind !== "resub2" && h("div", null, h("div", { style: UI.fieldLabel }, "Review"), sel("Review type", review, setReview, [["standard", "Standard"], ["priority", "Priority"]])),
+      h("label", { style: { display: "flex", gap: 6, alignItems: "center", fontSize: 12, fontFamily: "var(--mono)", color: "var(--ink-2)", minHeight: 28 } },
+        h("input", { type: "checkbox", checked: amend, onChange: e => setAmend(e.target.checked) }), "Major amendment (+3 months)")),
+    r && h("div", { style: { marginTop: 12 } },
+      h("div", { style: UI.stat }, r.goal),
+      h("div", { style: UI.caption }, r.rule + "."),
+      progs.length > 0 && updateCase && h("div", { "data-no-export": "", style: { display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginTop: 8 } },
+        progs.length > 1 && sel("Program to pin it to", target ? target.id : "", setProgId, progs.map(p => [p.id, programLabel(p, progs)])),
+        h("button", { type: "button", onClick: pin, style: { padding: "6px 12px", minHeight: 28, borderRadius: 6, border: "1px solid var(--teal)", background: "var(--teal-bg)", color: "var(--teal)", fontFamily: "var(--mono)", fontSize: 11, fontWeight: 700, cursor: "pointer" } },
+          "Pin " + r.goal + " as " + (target ? programLabel(target, progs) : "the case") + "'s FDA decision")),
+      msg && h("div", { style: { ...UI.caption, color: "var(--teal)", marginTop: 6 } }, msg))
+  ]);
+}
+
 function CatalystCalendarTool({ cases, updateCase, activeCase }) {
   const h = React.createElement;
   // Starts on the open case only (tick others in to widen it), and moves with
@@ -503,7 +547,8 @@ function CatalystCalendarTool({ cases, updateCase, activeCase }) {
         ))
       )
     ]),
-    !isDesktop && h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", padding: "0 4px" } }, "SEC filing search (recent filings and catalyst-language matches) requires the desktop app — trial completion estimates work either way.")
+    !isDesktop && h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", padding: "0 4px" } }, "SEC filing search (recent filings and catalyst-language matches) requires the desktop app — trial completion estimates work either way."),
+    h(FdaDateHelper, { activeCase, updateCase })
   );
 }
 

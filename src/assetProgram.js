@@ -78,7 +78,7 @@ function studyNamesIntervention(study, drugName) {
   return String(study.title || "").toLowerCase().indexOf(needle) !== -1;
 }
 
-function summarizeAssetProgram(studies, drugName) {
+function summarizeAssetProgram(studies, drugName, now) {
   const all = studies || [];
   // Dedupe by NCT first: a paged or repeated query can return the same record.
   const seen = {};
@@ -136,6 +136,16 @@ function summarizeAssetProgram(studies, drugName) {
     withStatedMasking: matched.filter(s => s.masking != null && s.masking !== "").length,
     controlled: matched.filter(isControlled).length,
     withPostedResults: matched.filter(s => s.hasResults).length,
+    // Completed over a year ago with nothing posted (October 2026; Goldacre:
+    // unpublished trials are disproportionately the negative ones). A count,
+    // not a verdict — some trials are not required to post.
+    silentCompleted: matched.filter(s => {
+      if (s.hasResults || String(s.status || "") !== "COMPLETED") return false;
+      const m = /^(\d{4})-(\d{2})/.exec(String(s.primaryCompletionDate || s.completionDate || ""));
+      if (!m) return false;
+      const t = now || new Date();
+      return (t.getFullYear() - Number(m[1])) * 12 + (t.getMonth() + 1 - Number(m[2])) >= 12;
+    }).length,
     completed: matched.filter(s => String(s.status || "") === "COMPLETED").length,
     stopped: stopped.length,
     totalEnrolment: enrolments.reduce((a, b) => a + b, 0),
@@ -237,6 +247,10 @@ function describeEvidenceBase(summary) {
     text: e.withPostedResults === 0
       ? "No trial has posted results to the registry yet, so nothing here has a number attached that can be checked against a press release."
       : e.withPostedResults + " of " + e.trials + " trials have posted results." });
+  if (e.silentCompleted > 0) {
+    lines.push({ key: "silent", tone: "thin",
+      text: e.silentCompleted + " completed trial" + (e.silentCompleted === 1 ? "" : "s") + " finished more than a year ago with no results posted. Unpublished trials are disproportionately the ones that did not go well (Turner 2008: of 36 negative antidepressant trials, 22 were never published and 11 were written up as positive) — worth asking what they found." });
+  }
 
   if (e.largestEnrolment != null) {
     lines.push({ key: "size", tone: e.largestEnrolment < 100 ? "thin" : "solid",

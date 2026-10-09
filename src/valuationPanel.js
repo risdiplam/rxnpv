@@ -316,9 +316,14 @@ function useValuationSections({ theCase, onChange, goToTab }) {
             floor.burnMissing
               ? "On, but it needs a monthly burn (Assumptions → Capital structure) — showing the stage method until then."
               : "Uses the burn the company reports to the readout date (your Calibration Log's next catalyst, else the model's timeline) instead of the stage's benchmark cost, so a trial that is already mostly paid for is not charged again. It assumes today's burn holds, so it is a rough figure; it never changes Bear, Base or Bull."))),
-        !floor && theCase.programs.length > 1 && h("div", { style: { ...UI.caption, marginTop: 8 } }, "No failure floor with more than one program — one failure leaves the others' value standing, which needs more than this arithmetic.")
+        !floor && theCase.programs.length > 1 && h("div", { style: { ...UI.caption, marginTop: 8 } }, "No single failure floor with more than one program — one failure leaves the others' value standing. What each program's failure would leave is in \u201cWhat each catalyst is worth\u201d below.")
       );
     })()),
+
+    // Several programs: each one's next gate, and every way they can end
+    // (catalystViews.js, October 2026).
+    show("overview") && !error && scenarioResults && valMethod === "dcf" && theCase.programs.length > 1 && h(CatalystLadderSection, { theCase, discountRatePct, tv, onChange }),
+    show("overview") && !error && scenarioResults && valMethod === "dcf" && theCase.programs.length > 1 && h(RangeOfEndingsSection, { theCase, discountRatePct, tv }),
 
     // How the remaining catalysts play out (catalystViews.js).
     show("overview") && (!error && scenarioResults && valMethod === "dcf" && theCase.programs.length === 1 && h(OutcomeTreeSection, { theCase, discountRatePct, tv, onChange, baseValue: baseResult && baseResult.equity ? baseResult.equity.perShare : null })),

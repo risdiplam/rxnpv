@@ -27,6 +27,9 @@ const REPORT_SECTIONS = [
   { id: "revenueChart", label: "Revenue projection chart", defaultOn: true,  group: "Charts" },
   { id: "cashFlow",     label: "Year by year",  defaultOn: true,  group: "Charts" },
   { id: "sotp",         label: "Sum-of-the-parts",         defaultOn: true,  group: "Core" },
+  // Several programs only (October 2026).
+  { id: "ladder",       label: "What each catalyst is worth", defaultOn: true, group: "Core" },
+  { id: "endings",      label: "Range of endings",         defaultOn: false, group: "Charts" },
   { id: "bridge",       label: "EV → per-share bridge",    defaultOn: true,  group: "Core" },
   { id: "priceVsValue", label: "Price vs. fair value",     defaultOn: true,  group: "Core" },
   { id: "sensitivity",  label: "Sensitivity tornado",      defaultOn: false, group: "Appendices" },
@@ -312,6 +315,10 @@ function ReportView({ theCase, onBack, updateCase }) {
         // Workspace. This is the section that shows how each program blends
         // into the total, so it needs to be in the exported report, not just
         // on-screen.
+        inc("ladder") && theCase.programs.length > 1 && valMethod === "dcf" && h("div", { style: cardStyle, className: reportDark ? "theme-scope-dark" : "theme-scope-light" },
+          h(CatalystLadderSection, { theCase, discountRatePct: theCase.discountRatePct, tv: theCase.terminalValue || { enabled: false, growthPct: "0" }, bare: true })),
+        inc("endings") && theCase.programs.length > 1 && valMethod === "dcf" && h("div", { style: cardStyle, className: reportDark ? "theme-scope-dark" : "theme-scope-light" },
+          h(RangeOfEndingsSection, { theCase, discountRatePct: theCase.discountRatePct, tv: theCase.terminalValue || { enabled: false, growthPct: "0" }, bare: true })),
         inc("sotp") && theCase.programs.length > 1 && valMethod === "dcf" && (() => {
           let sotp = null;
           try {
@@ -671,8 +678,10 @@ function DecisionMemoSection({ theCase, rpt, cardStyle }) {
       m.implied && row("Also implied", m.implied.label + " " + (m.implied.suffix === "$" ? fmtMoney(m.implied.impliedValue) : m.implied.impliedValue.toFixed(1) + m.implied.suffix) + " against your " + (m.implied.suffix === "$" ? fmtMoney(m.implied.currentValue) : m.implied.currentValue.toFixed(1) + m.implied.suffix) + (m.implied.degenerate ? " (at the edge of the range searched)" : "")),
       m.heldFixed && (m.odds || m.implied) && row("Held fixed", andList(m.heldFixed)),
       !m.price && row("Price-implied", "set a price on the case to see what it implies"))),
-    head("If it fails"),
-    m.multiProgram ? h("div", { style: { fontSize: 12, color: rpt.ink2 } }, "No single failure floor — more than one program, and one failure leaves the others standing.")
+    head(m.multiProgram ? "What each catalyst is worth" : "If it fails"),
+    m.multiProgram ? (m.ladder && m.ladder.length ? h("table", { style: { borderCollapse: "collapse", width: "100%" } }, h("tbody", null,
+        m.ladder.map((r, i) => h(React.Fragment, { key: i }, row(r.gate + (r.when ? ", " + r.when : ""), r.program + ": " + Math.round(r.pass * 100) + "% chance — " + sh(r.passValue) + vs(r.passValue) + " if " + r.passWord + ", " + sh(r.failValue) + vs(r.failValue) + " if " + r.failWord))))) :
+        h("div", { style: { fontSize: 12, color: rpt.ink2 } }, "No single failure floor — more than one program, and one failure leaves the others standing."))
       : m.floors ? h("table", { style: { borderCollapse: "collapse", width: "100%" } }, h("tbody", null,
         row("Stage cost" + (m.floors.active === "stage" ? " (in use)" : ""), sh(m.floors.stage.perShare) + " a share — charging the rest of " + m.floors.stage.stageLabel + " at its benchmark cost" + (m.floors.stage.why ? "; $0 because " + m.floors.stage.why : "")),
         m.floors.burn ? row("Burn to readout" + (m.floors.active === "burn" ? " (in use)" : ""), sh(m.floors.burn.perShare) + " a share — date from " + m.floors.burn.source + (m.floors.burn.why ? "; $0 because " + m.floors.burn.why : "")) : row("Burn to readout", "no monthly burn on the case"))) : h("div", { style: { fontSize: 12, color: rpt.ink2 } }, "—"),

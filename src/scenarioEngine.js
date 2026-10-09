@@ -715,6 +715,203 @@ function computeReadoutScenarios(theCase, discountRateBasePct, terminalValuePara
   return { gate: g, conditionalPosPct: conditional, defaults, settings: set, rows, weighted: rows.reduce((a, r) => a + r.prob * r.value, 0) };
 }
 
+// ── What each catalyst is worth (multi-program cases, October 2026) ────────
+// The single-program outcome tree and readout scenarios answer "what is the
+// next readout worth"; a company with several programs has one next gate per
+// program (Summit: the FDA decision on HARMONi, then HARMONi-3's squamous
+// readout, ...). One row per program still in development, in date order —
+// the program's pending pinned Calibration entry first, else its pending
+// entry, else the end of its current stage on the R&D timeline (marked as an
+// estimate). Each row values two results "as if known", everything else at
+// today's odds:
+//   passes — this program's odds become those after the gate (posToLaunch ÷
+//            the gate's pass chance), the gate itself behind it;
+//   fails  — this program at zero odds: its current stage is paid, nothing
+//            after it, no revenue (the same stage-weighted model as the DCF).
+// Read-across (theCase.catalystLadder.readAcrossPct, blank = 0, off): when a
+// readout fails, the other programs of the same drug have their odds cut by
+// that share; when it passes, they rise by the amount that keeps their
+// average where it is — p × u + (1 − p) × (1 − x) = 1 — so the read-across
+// never moves the case's own expected value, only how far each result swings.
+// It is the user's judgment about how much one indication tells about the
+// others; nothing calibrates it.
+function catalystLadderSettings(theCase) {
+  const s = (theCase && theCase.catalystLadder) || {};
+  const x = s.readAcrossPct !== "" && s.readAcrossPct != null && isFinite(Number(s.readAcrossPct)) ? Math.min(100, Math.max(0, Number(s.readAcrossPct))) : 0;
+  return { readAcross: x / 100 };
+}
+// When each program's next gate is: { window, dateText, estimated, entry }.
+function programGateTiming(theCase, program, pv, today) {
+  const now = today || new Date();
+  const next = nextCaseCatalyst(theCase, now, [program]);
+  if (next) return { window: next.window, dateText: next.entry.catalystDate, estimated: false, entryLabel: next.entry.catalystLabel || "", pinned: next.pinned };
+  const items = pv.riskAdjItems || [];
+  if (!items.length) return null;
+  // The stage timeline as the valuation runs it: scaled to the launch year
+  // the case sets (the same squeeze distributeRnDCostByYear applies).
+  const total = items.reduce((a, it) => a + it.years, 0);
+  const launch = Math.max(1, pv.launchYearOffset || 0);
+  const squeeze = total > launch ? launch / total : 1;
+  const years = items[0].years * squeeze;
+  const end = new Date(now.getFullYear(), now.getMonth(), now.getDate() + Math.round(years * 365.25));
+  const iso = end.getFullYear() + "-" + String(end.getMonth() + 1).padStart(2, "0");
+  return { window: parseCatalystWindow(iso), dateText: "~" + iso, estimated: true, entryLabel: "", pinned: false };
+}
+function computeCatalystLadder(theCase, discountRateBasePct, terminalValueParams, today) {
+  if (!theCase || !theCase.programs || theCase.programs.length < 2) return null;
+  if ((theCase.valuationMethod || "dcf") !== "dcf") return null;
+  const preset = getEffectiveScenarioPreset(theCase, "base");
+  const m = (preset.posMultiplierPct || 100) / 100;
+  const valueOf = programs => computeCaseValuation({ ...theCase, programs }, preset, "base", discountRateBasePct, terminalValueParams).equity.perShare;
+  const baseRes = computeCaseValuation(theCase, preset, "base", discountRateBasePct, terminalValueParams);
+  const base = baseRes.equity.perShare;
+  const price = numOr(theCase.currentPrice, 0) > 0 ? Number(theCase.currentPrice) : null;
+  const { readAcross } = catalystLadderSettings(theCase);
+  // An absolute odds figure written as the override the preset scales.
+  const asOverride = p => String(Math.min(1, Math.max(0, p)) / m * 100);
+  const effOf = id => (baseRes.programVals.find(v => v.id === id) || {}).posToLaunch;
+  const rows = [];
+  theCase.programs.forEach(p => {
+    const pv = baseRes.programVals.find(v => v.id === p.id);
+    if (!pv || p.currentPhase === "approved" || !(pv.posToLaunch < 1)) return;
+    const items = pv.riskAdjItems || [];
+    if (!items.length) return;
+    const reach0 = items[0].posToReachStage != null ? items[0].posToReachStage : 1;
+    const next = items.length > 1 ? (items[1].posToReachStage != null ? items[1].posToReachStage : 1) : pv.posToLaunch;
+    const pass = reach0 > 0 ? Math.min(1, next / reach0) : 0;
+    const after = pass > 0 ? Math.min(1, pv.posToLaunch / pass) : 0;
+    const key = licenceDrugKey(p);
+    const u = pass > 0 ? (1 - (1 - pass) * (1 - readAcross)) / pass : 1;
+    const twinIds = key ? theCase.programs.filter(q => q.id !== p.id && licenceDrugKey(q) === key && q.currentPhase !== "approved").map(q => q.id) : [];
+    const shifted = (q, f) => twinIds.indexOf(q.id) !== -1 && readAcross > 0 ? { ...q, posOverridePct: asOverride(effOf(q.id) * f) } : q;
+    const passValue = valueOf(theCase.programs.map(q => q.id === p.id ? { ...q, posOverridePct: asOverride(after), _passedStages: 1 } : shifted(q, u)));
+    const failValue = valueOf(theCase.programs.map(q => q.id === p.id ? { ...q, posOverridePct: "0" } : shifted(q, 1 - readAcross)));
+    const regulatory = items[0].key === "regulatory";
+    const timing = programGateTiming(theCase, p, pv, today);
+    rows.push({ programId: p.id, program: programLabel(p, theCase.programs), gate: regulatory ? "FDA decision" : items[0].label + " readout",
+      passWord: regulatory ? "approved" : "positive", failWord: regulatory ? "not approved" : "negative",
+      pass, oddsAfter: after, posToLaunch: pv.posToLaunch, passValue, failValue, weighted: pass * passValue + (1 - pass) * failValue,
+      passMovePct: price ? (passValue - price) / price * 100 : null, failMovePct: price ? (failValue - price) / price * 100 : null,
+      twins: twinIds.length, timing });
+  });
+  if (!rows.length) return null;
+  rows.sort((a, b) => (a.timing && a.timing.window ? a.timing.window.start : Infinity) - (b.timing && b.timing.window ? b.timing.window.start : Infinity));
+  return { base, price, readAcrossPct: readAcross * 100, rows };
+}
+
+// ── Range of endings (multi-program cases, October 2026) ───────────────────
+// The multi-program counterpart of the outcome tree: every way the programs
+// can end — each one launching or failing at one of its remaining gates —
+// valued by the model and weighted by its probability. Exact enumeration, no
+// sampling. A launch is the program at certain odds; a failure at gate g is
+// the program with its first g stages passed and nothing after (so stage g's
+// cost is paid). Programs are taken in the order their next gates come; with
+// read-across, each program's launch odds are scaled by the outcomes of the
+// same drug's programs already resolved (× u after a launch, × (1 − x) after
+// a failure, as in the catalyst ladder), then normalised so each program's
+// own odds of launch are exactly the case's. With read-across at zero the
+// programs are independent, as the valuation assumes, and with no G&A or tax
+// (both depend on the whole company) the mean equals the Base value exactly;
+// otherwise it sits near it, as the outcome tree's does. Capped at 2,000
+// endings.
+function computeRangeOfEndings(theCase, discountRateBasePct, terminalValueParams, today) {
+  if (!theCase || !theCase.programs || theCase.programs.length < 2) return null;
+  if ((theCase.valuationMethod || "dcf") !== "dcf") return null;
+  const preset = getEffectiveScenarioPreset(theCase, "base");
+  const baseRes = computeCaseValuation(theCase, preset, "base", discountRateBasePct, terminalValueParams);
+  const { readAcross } = catalystLadderSettings(theCase);
+  // Each program's possible endings with their base probabilities.
+  const progs = theCase.programs.map(p => {
+    const pv = baseRes.programVals.find(v => v.id === p.id);
+    const items = (pv && pv.riskAdjItems) || [];
+    if (!pv || p.currentPhase === "approved" || !(pv.posToLaunch < 1) || !items.length) return { p, fixed: true, p0: 1, endings: [{ kind: "launch", gate: null, base: 1 }] };
+    const endings = [];
+    for (let g = 0; g < items.length; g++) {
+      const reach = items[g].posToReachStage != null ? items[g].posToReachStage : 1;
+      const next = g + 1 < items.length ? (items[g + 1].posToReachStage != null ? items[g + 1].posToReachStage : 1) : pv.posToLaunch;
+      endings.push({ kind: "fail", gate: g, gateLabel: items[g].key === "regulatory" ? "FDA decision" : items[g].label + " readout", base: Math.max(0, reach - next) });
+    }
+    endings.push({ kind: "launch", gate: null, base: pv.posToLaunch });
+    const timing = programGateTiming(theCase, p, pv, today);
+    return { p, fixed: false, p0: pv.posToLaunch, endings, start: timing && timing.window ? timing.window.start : Infinity, key: licenceDrugKey(p) };
+  });
+  const count = progs.reduce((a, x) => a * x.endings.length, 1);
+  if (count > 2000) return { tooMany: true, count };
+  const order = progs.map((x, i) => i).sort((a, b) => (progs[a].start || 0) - (progs[b].start || 0));
+  // States: { choice: [ending index per program, by position in theCase.programs], prob }.
+  let states = [{ choice: new Array(progs.length).fill(-1), prob: 1 }];
+  order.forEach(j => {
+    const x = progs[j];
+    if (x.fixed) { states.forEach(s => { s.choice[j] = 0; }); return; }
+    // Read-across factor from the same drug's programs already resolved in this state.
+    const factor = s => {
+      if (!(readAcross > 0) || !x.key) return 1;
+      let f = 1;
+      order.forEach(k => {
+        if (k === j || s.choice[k] < 0 || progs[k].fixed || progs[k].key !== x.key) return;
+        const pk = progs[k].p0, launched = progs[k].endings[s.choice[k]].kind === "launch";
+        f *= launched ? (1 - (1 - pk) * (1 - readAcross)) / pk : 1 - readAcross;
+      });
+      return f;
+    };
+    const fs = states.map(factor);
+    // Normalise so this program's own odds of launch stay the case's: find c
+    // with Σ prob × min(1, c × p0 × f) = p0 (bisection; c = 1 when f ≡ 1).
+    const marg = c => states.reduce((a, s, i) => a + s.prob * Math.min(1, c * x.p0 * fs[i]), 0);
+    let c = 1;
+    if (Math.abs(marg(1) - x.p0) > 1e-12) {
+      let lo = 0, hi = 1;
+      while (marg(hi) < x.p0 && hi < 1e6) hi *= 2;
+      for (let it = 0; it < 80; it++) { const mid = (lo + hi) / 2; if (marg(mid) < x.p0) lo = mid; else hi = mid; }
+      c = (lo + hi) / 2;
+    }
+    const failBase = 1 - x.p0;
+    const next = [];
+    states.forEach((s, i) => {
+      const pl = Math.min(1, c * x.p0 * fs[i]);
+      x.endings.forEach((e, ei) => {
+        const pr = e.kind === "launch" ? pl : (failBase > 0 ? (1 - pl) * e.base / failBase : 0);
+        if (!(pr > 0)) return;
+        const choice = s.choice.slice(); choice[j] = ei;
+        next.push({ choice, prob: s.prob * pr });
+      });
+    });
+    states = next;
+  });
+  const valuePreset = { ...preset, posMultiplierPct: 100 };
+  const endings = states.map(s => {
+    const programs = theCase.programs.map((p, j) => {
+      const e = progs[j].endings[s.choice[j]];
+      if (progs[j].fixed) return p;
+      return e.kind === "launch" ? { ...p, posOverridePct: "100" } : { ...p, posOverridePct: "0", _passedStages: e.gate };
+    });
+    const value = computeCaseValuation({ ...theCase, programs }, valuePreset, "base", discountRateBasePct, terminalValueParams).equity.perShare;
+    const launched = progs.filter((x, j) => !x.fixed && x.endings[s.choice[j]].kind === "launch").map(x => programLabel(x.p, theCase.programs));
+    return { prob: s.prob, value, launched, choice: s.choice };
+  });
+  const total = endings.reduce((a, e) => a + e.prob, 0);
+  const mean = endings.reduce((a, e) => a + e.prob * e.value, 0) / (total || 1);
+  const price = numOr(theCase.currentPrice, 0) > 0 ? Number(theCase.currentPrice) : null;
+  const sorted = endings.slice().sort((a, b) => a.value - b.value);
+  const quantile = q => { let acc = 0; for (const e of sorted) { acc += e.prob / total; if (acc >= q - 1e-12) return e.value; } return sorted.length ? sorted[sorted.length - 1].value : null; };
+  // Launch counts: how many of the developing programs reach market.
+  const developing = progs.filter(x => !x.fixed).length;
+  const byCount = new Array(developing + 1).fill(0);
+  endings.forEach(e => { byCount[e.launched.length] += e.prob; });
+  // A sample the histogram can draw: each ending repeated in proportion to its
+  // probability (2,000 tokens) — the percentiles above are exact.
+  const sample = [];
+  sorted.forEach(e => { const n = Math.round(e.prob / total * 2000); for (let k = 0; k < n; k++) sample.push(e.value); });
+  return {
+    count: endings.length, mean, base: baseRes.equity.perShare, price, readAcrossPct: readAcross * 100,
+    min: sorted.length ? sorted[0].value : null, max: sorted.length ? sorted[sorted.length - 1].value : null,
+    launchOdds: progs.map((x, j) => ({ id: x.p.id, odds: endings.filter(e => x.fixed || x.endings[e.choice[j]].kind === "launch").reduce((a, e) => a + e.prob, 0) / (total || 1) })),
+    p10: quantile(0.10), p50: quantile(0.50), p90: quantile(0.90),
+    belowPrice: price != null ? endings.filter(e => e.value < price).reduce((a, e) => a + e.prob, 0) / total : null,
+    byCount, developing, likely: endings.slice().sort((a, b) => b.prob - a.prob).slice(0, 5), sample
+  };
+}
+
 // ── Partnership economics — upfront and milestones, as a cash figure to add
 // on top of a computed equity value. Upfront is added directly (near-certain /
 // already-contracted, so not PoS-risked and not discounted — same treatment as
@@ -1610,6 +1807,23 @@ function napkinBuildPeakMismatch(program) {
   } catch (e) { return null; }
 }
 
+// The comps in a program's therapeutic area (its first word matched in the
+// comp's area, the app's area aliases applied) — null unless there are at
+// least three and the program's peak is above all of them.
+function peakAboveAreaComps(program) {
+  try {
+    const area = String(program.therapeuticArea || "").trim();
+    if (!area) return null;
+    const words = [area].concat(AREA_ALIASES[area] || []).map(w => String(w).toLowerCase().split(/[\s/(]/)[0]).filter(Boolean);
+    const comps = PEAK_SALES_COMPS.drugs.filter(d => words.some(w => String(d.area || "").toLowerCase().indexOf(w) === 0));
+    if (comps.length < 3) return null;
+    const peak = getProgramRevenueResult(program, 25).peakTotalRevenue;
+    const top = comps.reduce((a, d) => d.peakSalesB > a.peakSalesB ? d : a, comps[0]);
+    if (!(peak > top.peakSalesB * 1e9)) return null;
+    return { peak, top, count: comps.length, area };
+  } catch (e) { return null; }
+}
+
 function computeRedFlags(theCase) {
   const flags = [];
   const programs = theCase.programs || [];
@@ -1639,6 +1853,19 @@ function computeRedFlags(theCase) {
           message: `${progName}'s Napkin peak (${fmtMoney(mismatch.quick)}) is ${mismatch.ratio >= 1 ? mismatch.ratio.toFixed(1) + "x" : (1 / mismatch.ratio).toFixed(1) + "x below"} the full build's (${fmtMoney(mismatch.full)}). Only the ${inUse} is in the valuation now, so switching modes would move the value by roughly that much. Worth deciding which one you believe — the price, the share of patients treated, or a wider label are the usual reasons they differ.`
         });
       }
+    }
+
+    // 0c. A peak above every drug in the Peak Sales Comps for its area
+    // (October 2026; Bogdan & Villiger's warning that peak sales are the most
+    // gameable input). The comps are a hand-picked list of notable sellers, not
+    // a representative sample — a percentile against them would mislead — so
+    // the only flag is the extreme one: higher than all of them.
+    {
+      const ab = peakAboveAreaComps(program);
+      if (ab) flags.push({
+        programId: program.id, programName: progName, severity: "medium",
+        message: `${progName}'s peak (${fmtMoney(ab.peak)}) is above every one of the ${ab.count} ${ab.area} drugs in the Peak Sales Comps; the largest, ${ab.top.drug}, peaked at $${ab.top.peakSalesB}B. Possible, but it is a claim to be among the best-selling drugs ever in this area — and the comps already lean to the winners, since only drugs that sold are published.`
+      });
     }
 
     // 1. PoS override far from the phase/area benchmark
@@ -2119,16 +2346,21 @@ function buildDecisionMemo(theCase, today) {
     try {
       const rs = one ? computeReadoutScenarios(theCase, dr, tv) : null;
       if (rs) model = modelImpliedMove(price, rs.rows.map(r => ({ prob: r.prob, value: r.value })));
+      // Several programs: the move across the first catalyst in the table.
+      const lad = one ? null : computeCatalystLadder(theCase, dr, tv, now);
+      if (lad && lad.rows.length) model = modelImpliedMove(price, [{ prob: lad.rows[0].pass, value: lad.rows[0].passValue }, { prob: 1 - lad.rows[0].pass, value: lad.rows[0].failValue }]);
     } catch (e) { model = null; }
     if (o) options = { pct: o.pct, basis: o.basis, asOf: om.asOf || null, model, reading: model ? readImpliedMove(o.pct, model.pct) : null };
   }
   const p0 = theCase.programs[0];
+  let ladder = null;
+  if (!one) { try { const lad = computeCatalystLadder(theCase, dr, tv, now); ladder = lad ? lad.rows.map(r => ({ gate: r.gate, program: r.program, when: r.timing ? r.timing.dateText : "", pass: r.pass, passValue: r.passValue, failValue: r.failValue, passWord: r.passWord, failWord: r.failWord })) : null; } catch (e) { ladder = null; } }
   return {
     name: theCase.name || "Case", ticker: theCase.ticker || "", date: localDateStamp(now),
     price, scenarios: { bear: val("bear"), base: val("base"), bull: val("bull") }, ifWorks,
     odds, oddsSource: fresh.odds, oddsSourceText: one && posFromSimulator(p0) ? describePosSource(p0.posSource) : "",
     implied, heldFixed: one ? impliedHeldFixed(theCase) : null,
-    floors, multiProgram: !one, runway, catalyst: fresh.catalyst, freshness: fresh, options,
+    floors, multiProgram: !one, ladder, runway, catalyst: fresh.catalyst, freshness: fresh, options,
     changeMyMind: theCase.memo || {}
   };
 }

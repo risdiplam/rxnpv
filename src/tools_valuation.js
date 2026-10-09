@@ -118,7 +118,10 @@ function BinaryEventTool({ cases, activeCase, updateCase }) {
   const [yourPoS, setYourPoS] = React.useState("");
   const [unit, setUnit] = React.useState("perShare");
   // Per share only: the case's figures are per-share values.
-  const bd = React.useMemo(() => caseBinaryDefaults(activeCase), [activeCase]);
+  // Several programs: one at a time (October 2026).
+  const [progId, setProgId] = React.useState("");
+  const multi = !!(activeCase && activeCase.programs && activeCase.programs.length > 1);
+  const bd = React.useMemo(() => caseBinaryDefaults(activeCase, progId), [activeCase, progId]);
   const perShare = unit === "perShare";
   const f1 = useCasePrefill(activeCase, perShare ? bd.price : "", current, setCurrent);
   const f2 = useCasePrefill(activeCase, perShare ? bd.success : "", success, setSuccess);
@@ -154,6 +157,12 @@ function BinaryEventTool({ cases, activeCase, updateCase }) {
           h("option", { value: "perShare" }, "per share"),
           h("option", { value: "marketCap" }, "market cap ($M)"))
       ),
+      multi && h("div", { style: { display: "flex", gap: 8, alignItems: "center", marginBottom: 12, flexWrap: "wrap" } },
+        h("span", { style: UI.caption }, "Program:"),
+        h("select", { "aria-label": "Program", value: bd.programId || "", onChange: e => { setProgId(e.target.value); setCurrent(""); setSuccess(""); setFail(""); setYourPoS(""); },
+          style: { padding: "6px 10px", minHeight: 28, borderRadius: 6, border: "1.5px solid var(--rule)", background: "var(--surface)", color: "var(--ink-1)", fontFamily: "var(--mono)", fontSize: 12 } },
+          activeCase.programs.map(p => h("option", { key: p.id, value: p.id }, programLabel(p, activeCase.programs)))),
+        h("span", { style: UI.caption }, "If it works: this program at certain odds; if it fails: this program at zero — every other program at its own odds.")),
       h("div", { style: { display: "flex", gap: 12, flexWrap: "wrap" } },
         field("Today", current, setCurrent, "e.g. 10", "what it costs now"),
         field("If it works", success, setSuccess, "e.g. 30", "your success-case value"),
