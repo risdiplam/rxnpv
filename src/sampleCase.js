@@ -585,3 +585,53 @@ function sampleCasePepGen() {
     pinnedResults: examples
   });
 }
+
+// ── Summit Therapeutics (SMMT) — DRAFT, the oncology sample (October 2026).
+// One molecule, ivonescimab (PD-1 x VEGF bispecific, in-licensed from Akeso),
+// across several indications at different stages: modelled as one program
+// per indication. Researched 2026-10-09 from the Q2 2026 10-Q, the FY2025
+// 10-K, 8-Ks through September 2026 and ClinicalTrials.gov.
+const SAMPLE_SUMMIT_AS_OF = "2026-10-09";
+
+function sampleCaseSummit() {
+  const base = newCase();
+  const pricing = o => Object.assign({ usAnnualPrice: "183000", priceBasis: "ASP", netPriceRealizationPct: "", usAnnualGrowthPct: "2", includeExUS: true, exUSPriceFactorPct: "45", exUSAnnualGrowthPct: "0", exUSPatientMultiplierPct: "150", exUSLaunchLagYears: "1.5" }, o || {});
+  const excl = y => ({ yearsToLOE: y, modality: "biologic", volumeRetainedPct: "", priceDeclinePct: "" });
+  const cost = { cogsPct: "12", reps: { primaryCare: "0", specialty: "0", hospital: "0" }, marketingPctOfPeak: "4" };
+  const lic = (approvalM, sales) => ({ enabled: true, name: "Akeso Inc.", royaltyPct: "11", sublicensePct: "", approvalMilestoneM: approvalM, salesMilestones: sales || [], note: "" });
+  const prog = (o, rb) => { const p = newProgram(); Object.assign(p.revenueBuild, rb || {}); return Object.assign(p, o); };
+  const pop = (incidence, years, treatedPct) => ({ mode: "incidence", prevalence: "", incidence, diseaseDurationYears: years, diagnosisRatePct: "100", treatmentRatePct: treatedPct, eligiblePct: "100" });
+  const share = (n, order, pct) => ({ numDrugs: n, orderOfEntry: order, peakShareOverridePct: pct });
+  const common = { drugName: "ivonescimab", therapeuticArea: "Oncology", modality: "biologic", target: "PDCD1", revenueMode: "full", costStructure: cost };
+  const programs = [
+    prog(Object.assign({}, common, { name: "HARMONi — 2L+ EGFRm NSCLC", indication: "EGFR-mutant non-squamous NSCLC after a 3rd-generation TKI, with chemotherapy",
+      currentPhase: "filed", posOverridePct: "75", posBiomarkerUse: "selection", trialIds: "NCT06396065", launchYearOffset: "1", licensor: lic("100") }),
+      { population: pop("14000", "0.6", "85"), marketShare: share(4, 3, "25"), launchCurve: { yearsToPeak: "4", profile: "median" }, pricing: pricing(), exclusivity: excl("13") }),
+    prog(Object.assign({}, common, { name: "HARMONi-3 — 1L squamous NSCLC", indication: "First-line metastatic squamous NSCLC, with chemotherapy, against pembrolizumab + chemotherapy",
+      currentPhase: "phase3", posOverridePct: "55", trialIds: "NCT05899608", launchYearOffset: "2", licensor: lic("50") }),
+      { population: pop("26800", "0.85", "85"), marketShare: share(3, 1, "35"), launchCurve: { yearsToPeak: "5", profile: "median" }, pricing: pricing(), exclusivity: excl("12") }),
+    prog(Object.assign({}, common, { name: "HARMONi-3 / -7 — 1L non-squamous NSCLC", indication: "First-line metastatic non-squamous NSCLC without an actionable driver",
+      currentPhase: "phase3", posOverridePct: "45", trialIds: "NCT05899608, NCT06767514", launchYearOffset: "3",
+      licensor: lic("50", [{ thresholdM: "1000", paymentM: "250" }, { thresholdM: "3000", paymentM: "500" }]) }),
+      { population: pop("56300", "0.85", "85"), marketShare: share(3, 1, "25"), launchCurve: { yearsToPeak: "5", profile: "median" }, pricing: pricing(), exclusivity: excl("11") }),
+    prog(Object.assign({}, common, { name: "HARMONi-GI3 — 1L metastatic CRC", indication: "First-line unresectable metastatic colorectal cancer, against bevacizumab + FOLFOX",
+      currentPhase: "phase3", posOverridePct: "35", trialIds: "NCT07228832", launchYearOffset: "4", licensor: lic("50") }),
+      { population: pop("47500", "0.75", "70"), marketShare: share(3, 1, "20"), launchCurve: { yearsToPeak: "5", profile: "median" }, pricing: pricing(), exclusivity: excl("10") })
+  ];
+  return Object.assign(base, {
+    name: "Summit Therapeutics — sample case", ticker: "SMMT", valuationDate: SAMPLE_SUMMIT_AS_OF, currentPrice: "17.17", priceAsOf: "2026-10-08",
+    discountRatePct: "12", valuationMethod: "dcf",
+    corporateGA: { preCommercialAnnualM: "80", gaShareOfMatureSgaPct: "50", windDownYears: "1" },
+    terminalValue: { enabled: false, method: "exitMultiple", growthPct: "0", exitMultiple: "4" },
+    taxation: { enabled: true, effectiveRatePct: "21", startingNOLM: String(93.2e6) },
+    capitalStructure: { mode: "detailed", dilutedSharesSimple: "", basicShares: String(797749602 + 108955369),
+      cash: String(690.7e6 + 2000e6 + 67.2e6), debt: "0", cashAsOf: "2026-06-30", monthlyBurn: String(43.9e6), carryCashForward: false,
+      opts: "118367815", optK: "4.45", war: "730000", warK: "0", convFace: "0", convPrice: "0",
+      cashSource: "Q2 2026 10-Q $690.7M + $68.4M ATM after June (net ~$67.2M) + AstraZeneca $2.0B preferred (closed Oct 2026)",
+      atmUndrawn: String(380e6), debtUndrawn: "", milestoneExpected: "", shelfRemaining: "", facilitiesNote: "$380M J.P. Morgan ATM (July 23, 2026); S-3ASR automatic shelf" },
+    futureRaise: { enabled: false, amountM: "", priceMode: "discount", discountPct: "10", priceOverride: "" },
+    modelYearZero: "2026",
+    programs,
+    pinnedResults: []
+  });
+}

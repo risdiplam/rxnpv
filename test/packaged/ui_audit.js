@@ -228,7 +228,7 @@ app.whenReady().then(async () => {
   // and tool is checked against a real, fully filled case.
   if (args.sample) {
     await click("Load sample case", 400);
-    await click(args.sample === "pepgen" ? "PepGen — DM1, Phase 2" : "Stoke — Dravet, Phase 3", 1500);
+    await click(args.sample === "pepgen" ? "PepGen — DM1, Phase 2" : args.sample === "summit" ? "Summit — lung cancer, filed" : "Stoke — Dravet, Phase 3", 1500);
     await js(`document.getElementById("casetab-overview") && document.getElementById("casetab-overview").click()`); await sleep(500);
   } else {
     await click("+ New case", 700);

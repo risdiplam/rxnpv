@@ -144,7 +144,7 @@ function App() {
   // the price too high).
   const [showSamples, setShowSamples] = React.useState(false);
   const loadSampleCase = (which) => {
-    const c = which === "pepgen" ? sampleCasePepGen() : sampleCaseStoke();
+    const c = which === "pepgen" ? sampleCasePepGen() : which === "summit" ? sampleCaseSummit() : sampleCaseStoke();
     setCases(prev => [...prev, c]);
     setActiveCaseId(c.id);
     setView("workspace");
@@ -247,7 +247,8 @@ function App() {
           h("button", { onClick: () => setShowSamples(v => !v), "aria-expanded": showSamples, style: smallBtnStyle(), title: "Adds a complete, sourced example case — your own cases are not touched" }, "Load sample case"),
           showSamples && h("div", { style: { display: "flex", flexDirection: "column", gap: 4, paddingLeft: 10, borderLeft: "2px solid var(--rule)" } },
             h("button", { onClick: () => loadSampleCase("stoke"), style: smallBtnStyle(), title: "Stoke Therapeutics — zorevunersen, Dravet syndrome, Phase 3" }, "Stoke — Dravet, Phase 3"),
-            h("button", { onClick: () => loadSampleCase("pepgen"), style: smallBtnStyle(), title: "PepGen — PGN-EDODM1, myotonic dystrophy type 1, Phase 2" }, "PepGen — DM1, Phase 2")),
+            h("button", { onClick: () => loadSampleCase("pepgen"), style: smallBtnStyle(), title: "PepGen — PGN-EDODM1, myotonic dystrophy type 1, Phase 2" }, "PepGen — DM1, Phase 2"),
+            h("button", { onClick: () => loadSampleCase("summit"), style: smallBtnStyle(), title: "Summit Therapeutics — ivonescimab, lung and colorectal cancer, filed and Phase 3" }, "Summit — lung cancer, filed")),
           // Backup status is always visible: the one place a user would
           // notice that nothing is protecting their work.
           h("button", { type: "button", className: "side-link", onClick: () => setShowBackup(true), style: { marginTop: 4 } },
@@ -295,6 +296,7 @@ function App() {
                 h("div", { style: { fontFamily: "var(--mono)", fontSize: 13, marginBottom: 20 } }, "Create a case to start building a bottoms-up revenue model."),
                 h("button", { onClick: () => loadSampleCase("stoke"), style: { padding: "10px 22px", marginRight: 10, borderRadius: 8, border: "1px solid var(--rule)", background: "var(--surface)", color: "var(--ink-1)", fontFamily: "var(--mono)", fontSize: 13, cursor: "pointer" } }, "Open the Stoke sample"),
                 h("button", { onClick: () => loadSampleCase("pepgen"), style: { padding: "10px 22px", marginRight: 10, borderRadius: 8, border: "1px solid var(--rule)", background: "var(--surface)", color: "var(--ink-1)", fontFamily: "var(--mono)", fontSize: 13, cursor: "pointer" } }, "Open the PepGen sample"),
+                h("button", { onClick: () => loadSampleCase("summit"), style: { padding: "10px 22px", marginRight: 10, borderRadius: 8, border: "1px solid var(--rule)", background: "var(--surface)", color: "var(--ink-1)", fontFamily: "var(--mono)", fontSize: 13, cursor: "pointer" } }, "Open the Summit sample"),
                 h("button", { onClick: createCase, style: { padding: "10px 22px", borderRadius: 8, border: "1px solid var(--teal)", background: "var(--teal-bg)", color: "var(--teal)", fontFamily: "var(--mono)", fontSize: 13, fontWeight: 700, cursor: "pointer" } }, "+ New case")
               )
         )

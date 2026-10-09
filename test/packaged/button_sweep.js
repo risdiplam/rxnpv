@@ -138,9 +138,9 @@ app.whenReady().then(async () => {
     // A finished sample case, so every section has content.
     if (!args.case) {
       await click("Load sample case", 300);
-      await click(args.sample === "stoke" ? "Stoke — Dravet, Phase 3" : "PepGen — DM1, Phase 2", 1500);
+      await click(args.sample === "stoke" ? "Stoke — Dravet, Phase 3" : args.sample === "summit" ? "Summit — lung cancer, filed" : "PepGen — DM1, Phase 2", 1500);
     }
-    const caseName = args.case ? String(args.case) : args.sample === "stoke" ? "Stoke Therapeutics — sample case" : "PepGen — sample case";
+    const caseName = args.case ? String(args.case) : args.sample === "stoke" ? "Stoke Therapeutics — sample case" : args.sample === "summit" ? "Summit Therapeutics — sample case" : "PepGen — sample case";
     const openCase = `(() => { const b = [...document.querySelectorAll("button, [role=button]")].find(x => x.textContent.includes(${JSON.stringify(caseName)})); if (b) b.click(); return !!b; })()`;
 
     const stops = [];
