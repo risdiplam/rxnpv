@@ -379,7 +379,7 @@ const PR_PHRASES = [
   { key: "updated", re: /\b(?:updated|additional|longer[-\s]term)\s+(?:follow[-\s]up\s+)?(?:overall\s+survival\s+|OS\s+)?analys[ie]s\b|\bdata\s+cut[-\s]?off\b|\blonger\s+follow[-\s]up\b/gi, label: "an updated analysis or a new data cut", meaning: "An analysis after the planned one. Unless the protocol pre-specified it, its p-values are nominal, and the company chose when to look." },
   { key: "subgroup", re: /\bsubgroups?\b/gi, label: "a subgroup result", meaning: "A result in part of the trial. Check that it was pre-specified, and test any claimed difference between subgroups (Simulation → Trial Statistics → Subgroup Check)." },
   { key: "consistent", re: /\bconsistent\s+(?:benefit|efficacy|results?|trend)\s+(?:was\s+observed\s+)?across\s+(?:all\s+|pre-?specified\s+|pre-?defined\s+|key\s+|important\s+|clinical\s+)?subgroups\b/gi, label: "“consistent across subgroups”", meaning: "Usually read off a forest plot. Subgroups are small; consistency is easy to claim and hard to test." },
-  { key: "descriptive", re: /\bdescriptive(?:\s+only)?\b|\bnot\s+formally\s+powered\b/gi, label: "“descriptive” or “not formally powered”", meaning: "The company itself says this comparison carries no formal test." },
+  { key: "descriptive", re: /\bdescriptive(?:\s+only)?\b|\bnot\s+(?:formally\s+)?powered\b/gi, label: "“descriptive” or “not powered”", meaning: "The company itself says this comparison carries no formal test." },
   { key: "prespecified", re: /\bpre-?specified\b|\bprotocol-?specified\b/gi, label: "“pre-specified”", meaning: "A good sign: planned before the data were seen. Check it is the primary or a controlled secondary, not one of many.", good: true }
 ];
 function prSnippet(text, start, end) {

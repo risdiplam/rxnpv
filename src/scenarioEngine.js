@@ -722,7 +722,7 @@ function computeReadoutScenarios(theCase, discountRateBasePct, terminalValuePara
 // readout, ...). One row per program still in development, in date order —
 // the program's pending pinned Calibration entry first, else its pending
 // entry, else the end of its current stage on the R&D timeline (marked as an
-// estimate). Each row values two results "as if known", everything else at
+// estimate), sorted by when each window closes. Each row values two results "as if known", everything else at
 // today's odds:
 //   passes — this program's odds become those after the gate (posToLaunch ÷
 //            the gate's pass chance), the gate itself behind it;
@@ -795,7 +795,9 @@ function computeCatalystLadder(theCase, discountRateBasePct, terminalValueParams
       twins: twinIds.length, timing });
   });
   if (!rows.length) return null;
-  rows.sort((a, b) => (a.timing && a.timing.window ? a.timing.window.start : Infinity) - (b.timing && b.timing.window ? b.timing.window.start : Infinity));
+  // By when each is known at the latest: a fixed FDA date in November comes
+  // before an "H2" readout window that opened in July.
+  rows.sort((a, b) => (a.timing && a.timing.window ? a.timing.window.end : Infinity) - (b.timing && b.timing.window ? b.timing.window.end : Infinity));
   return { base, price, readAcrossPct: readAcross * 100, rows };
 }
 
@@ -833,7 +835,7 @@ function computeRangeOfEndings(theCase, discountRateBasePct, terminalValueParams
     }
     endings.push({ kind: "launch", gate: null, base: pv.posToLaunch });
     const timing = programGateTiming(theCase, p, pv, today);
-    return { p, fixed: false, p0: pv.posToLaunch, endings, start: timing && timing.window ? timing.window.start : Infinity, key: licenceDrugKey(p) };
+    return { p, fixed: false, p0: pv.posToLaunch, endings, start: timing && timing.window ? timing.window.end : Infinity, key: licenceDrugKey(p) };
   });
   const count = progs.reduce((a, x) => a * x.endings.length, 1);
   if (count > 2000) return { tooMany: true, count };

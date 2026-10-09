@@ -1645,18 +1645,20 @@ function orderByCompletion(studies, opts) {
 // late in review extends the goal by 3 months. FDA meets most goal dates but
 // not all; a company's announced date always beats this.
 //   kind: "program" | "other" | "resub1" | "resub2"; review: "standard" | "priority"
+// Dates here are calendar days held in UTC end to end (parsed with Date.UTC,
+// read back with getUTC*), so no local-time shift can move them a day.
+function isoFromUtc(d) { return d.getUTCFullYear() + "-" + String(d.getUTCMonth() + 1).padStart(2, "0") + "-" + String(d.getUTCDate()).padStart(2, "0"); }
 function addMonthsIso(iso, months) {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso || ""));
   if (!m) return null;
   const y = Number(m[1]), mo = Number(m[2]) - 1 + months, d = Number(m[3]);
   const last = new Date(Date.UTC(y, mo + 1, 0)).getUTCDate();
-  const out = new Date(Date.UTC(y, mo, Math.min(d, last)));
-  return out.toISOString().slice(0, 10);
+  return isoFromUtc(new Date(Date.UTC(y, mo, Math.min(d, last))));
 }
 function addDaysIso(iso, days) {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso || ""));
   if (!m) return null;
-  return new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]) + days)).toISOString().slice(0, 10);
+  return isoFromUtc(new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]) + days)));
 }
 function fdaGoalDate(submittedIso, kind, review, majorAmendment) {
   const sub = /^\d{4}-\d{2}-\d{2}$/.test(String(submittedIso || "")) ? submittedIso : null;
@@ -1687,7 +1689,7 @@ function yearsBetweenIso(a, b) {
 function addYearsIso(iso, years) {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso || ""));
   if (!m) return null;
-  return new Date(Date.UTC(+m[1], +m[2] - 1, +m[3]) + years * 365.25 * 86400000).toISOString().slice(0, 10);
+  return isoFromUtc(new Date(Date.UTC(+m[1], +m[2] - 1, +m[3]) + years * 365.25 * 86400000));
 }
 function estimatePatentTermExtension(p) {
   const { expiry, ind, submitted, approval, issued } = p || {};
