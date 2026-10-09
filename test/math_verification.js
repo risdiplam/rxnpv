@@ -104,7 +104,9 @@ const EXPORTS = [
   "periodMonths", "sumTranchesAtLatestDate", "calcRunwayFromFacts", "extractDebt", "edgarFullyDilutedShares", "edgarAsOf",
   "extractSharesOutstanding", "extractDilutedShares", "extractOptions", "extractWarrants",
   "summarizeOpenMarketActivity", "FORM4_CODE_LABELS",
-  "extractConvertibleNotes", "pickLatestUnit", "isFilingForm", "formatHalfLife"
+  "extractConvertibleNotes", "pickLatestUnit", "isFilingForm", "formatHalfLife",
+  "programLabel", "extractPreferredShares", "studyNamesAnyDrug",
+  "licenceRoyaltyOn", "licenceTiers", "sharedLicenceFor", "effectiveLicensor", "drugLicenceExpectedByYear", "computeSOTPBreakdown"
 ];
 const api = new Function(combined + "\nreturn {" + EXPORTS.join(",") + "};")();
 
@@ -5668,6 +5670,111 @@ section("Textbook cross-checks (Friedman, Motulsky — Spark handoff, October 20
   // from the treated arm. Walsh (2014) adds events to the arm with fewer:
   // 15/60 vs 6/60 already gives p = 0.0528, so the index is 1 — the app is right.
   ok("fragility follows Walsh: 15/60 vs 5/60 → 1 (not the handoff's 2)", api.computeFragilityIndex(15, 60, 5, 60).fragilityIndex === 1);
+}
+report();
+
+// ════════════════════════════════════════════════════════════════════════════
+section("One drug in several indications; convertible preferred (October 2026)");
+{
+  const mk = (id, drugName, name, indication) => ({ id, drugName, name, indication });
+  const a = mk("a", "ivonescimab", "HARMONi — 2L+ EGFRm NSCLC"), b = mk("b", "ivonescimab", "HARMONi-3 — 1L squamous NSCLC"), c = mk("c", "zorevunersen", "Dravet");
+  const progs = [a, b, c];
+  ok("a drug alone in its case is named by the drug", api.programLabel(c, progs) === "zorevunersen");
+  ok("two programs of one drug are named by their programs", api.programLabel(a, progs) === "HARMONi — 2L+ EGFRm NSCLC" && api.programLabel(b, progs) === "HARMONi-3 — 1L squamous NSCLC");
+  ok("matching is case-insensitive", api.programLabel(mk("d", "IVONESCIMAB", "X"), [a, mk("d", "IVONESCIMAB", "X")]) === "X");
+  const d1 = mk("d1", "ivo", "New Program", "1L NSCLC, all comers"), d2 = mk("d2", "ivo", "New Program", "colorectal");
+  ok("default-named twins fall back to drug — indication", api.programLabel(d1, [d1, d2]) === "ivo — 1L NSCLC" && api.programLabel(d2, [d1, d2]) === "ivo — colorectal");
+  const e1 = mk("e1", "ivo", "New Program"), e2 = mk("e2", "ivo", "New Program");
+  ok("and are numbered when nothing else tells them apart", api.programLabel(e1, [e1, e2]) === "ivo — program (1)" && api.programLabel(e2, [e1, e2]) === "ivo — program (2)");
+  ok("no list given: the drug name, as before", api.programLabel(a) === "ivonescimab");
+
+  // Convertible preferred counts as its as-converted shares at any price, and
+  // never as debt: AstraZeneca's 108,955,369 at $18.36 with the stock at $17.17.
+  const cap = { mode: "detailed", basicShares: "797749602", cash: "1000", debt: "0", currentPrice: "17.17", prefShares: "108955369" };
+  const r = api.computeCapitalStructure(cap);
+  near("preferred adds its as-converted shares", r.dilutedShares, 797749602 + 108955369, 0);
+  near("and takes nothing off net cash", r.netCash, 1000, 0);
+  near("the same as adding the shares to basic by hand", r.dilutedShares, api.computeCapitalStructure({ ...cap, prefShares: "", basicShares: String(797749602 + 108955369) }).dilutedShares, 0);
+  near("below conversion the note field instead treats $2.0B as debt (why it is the wrong place)", api.computeCapitalStructure({ ...cap, prefShares: "", convFace: "2000000000", convPrice: "18.3561" }).netCash, 1000 - 2e9, 0);
+  near("a price above conversion changes nothing for preferred", api.computeCapitalStructure({ ...cap, currentPrice: "25" }).dilutedShares, 797749602 + 108955369, 0);
+  near("simple mode ignores the field (the typed diluted count is the whole count)", api.computeCapitalStructure({ mode: "simple", dilutedSharesSimple: "1000", prefShares: "500" }).dilutedShares, 1000, 0);
+  near("blank or negative is zero", api.computeCapitalStructure({ ...cap, prefShares: "-5" }).dilutedShares, 797749602, 0);
+
+  // EDGAR: preferred outstanding at the latest 10-Q, from either tag.
+  const fact = (val, end, form) => ({ val, end, form: form || "10-Q", fy: 2026, fp: "Q2", filed: "2026-08-01" });
+  const facts = { facts: { "us-gaap": {
+    PreferredStockSharesOutstanding: { units: { shares: [fact(0, "2025-12-31", "10-K"), fact(5000, "2026-06-30")] } },
+    TemporaryEquitySharesOutstanding: { units: { shares: [fact(7000, "2026-03-31")] } } } } };
+  const pref = api.extractPreferredShares(facts);
+  ok("EDGAR: the latest preferred count is read (5,000 at 2026-06-30, PreferredStockSharesOutstanding)", pref && pref.count === 5000 && pref.asOf === "2026-06-30" && pref.tag === "PreferredStockSharesOutstanding");
+  ok("EDGAR: none reported → null", api.extractPreferredShares({ facts: { "us-gaap": { PreferredStockSharesOutstanding: { units: { shares: [fact(0, "2026-06-30")] } } } } }) === null);
+
+  // Who reads out first by rival drugs: a hit must name one of them.
+  const st = (title, intr, other) => ({ protocolSection: { identificationModule: { briefTitle: title }, armsInterventionsModule: { interventions: [{ name: intr, otherNames: other || [] }] } } });
+  const names = ["pumitamig", "BNT327", "PF-08634404"];
+  ok("rival drugs: matched through an intervention's other names", api.studyNamesAnyDrug(st("A study in NSCLC", "Drug X", ["BNT327"]), names));
+  ok("rival drugs: matched through the title", api.studyNamesAnyDrug(st("Symbiotic-Lung-01: PF-08634404 plus chemotherapy", "Chemo"), names));
+  ok("rival drugs: a pembrolizumab trial is left out", !api.studyNamesAnyDrug(st("Pembrolizumab in NSCLC", "Pembrolizumab"), names));
+}
+report();
+
+// ════════════════════════════════════════════════════════════════════════════
+section("Licence: royalty tiers and one licence across a drug's programs (October 2026)");
+{
+  // Bogdan & Villiger's tiered royalty, applied marginally: 5% to $100M,
+  // 6.5% from $100M to $250M, 7.5% above. On $300M: 5 + 9.75 + 3.75 = $18.5M.
+  const lic = { tiers: [{ upToM: "250", pct: "6.5" }, { upToM: "", pct: "7.5" }, { upToM: "100", pct: "5" }] }; // unsorted on purpose
+  near("tiers: $300M of sales owes $18.5M", api.licenceRoyaltyOn(300e6, lic), 18.5e6, 1e-6);
+  near("tiers: $100M owes $5M (the boundary belongs to the lower tier)", api.licenceRoyaltyOn(100e6, lic), 5e6, 1e-6);
+  near("tiers: $50M owes $2.5M", api.licenceRoyaltyOn(50e6, lic), 2.5e6, 1e-6);
+  near("tiers: sales past the last ceiling pay the last rate", api.licenceRoyaltyOn(300e6, { tiers: [{ upToM: "100", pct: "5" }, { upToM: "200", pct: "8" }] }), 5e6 + 8e6 + 8e6, 1e-6);
+  near("no tiers: the flat royaltyPct (11% of $1B)", api.licenceRoyaltyOn(1e9, { royaltyPct: "11", tiers: [] }), 110e6, 1e-6);
+  near("a blank tier rate is ignored", api.licenceRoyaltyOn(1e9, { royaltyPct: "11", tiers: [{ upToM: "100", pct: "" }] }), 110e6, 1e-6);
+
+  // One drug, two programs; the licence on A is shared. A: 50% odds, own
+  // sales 0 / $100M / $200M; B: 40%, 0 / 0 / $150M. 10% royalty plus $50M
+  // when total sales first reach $250M. The four worlds:
+  //   both (0.2):  totals 0 / 100 / 350 → royalty 0 / 10 / 35, milestone in year 2
+  //   A only (0.3): 0 / 100 / 200 → 0 / 10 / 20      B only (0.2): 0 / 0 / 150 → 0 / 0 / 15
+  // Expected royalty: year 1 = 0.5 × 10 = 5; year 2 = 7 + 6 + 3 = 16 (= 10% of
+  // the odds-weighted 160 — a flat royalty is linear); milestone 0.2 × 50 = 10.
+  const A = { id: "A", drugName: "Ivo", licensor: { enabled: true, shared: true, name: "Akeso", royaltyPct: "10", approvalMilestoneM: "100", sublicensePct: "5", salesMilestones: [{ thresholdM: "250", paymentM: "50" }] } };
+  const B = { id: "B", drugName: "ivo ", licensor: { enabled: false, approvalMilestoneM: "40" } };
+  const C = { id: "C", drugName: "other", licensor: { enabled: true, royaltyPct: "3" } };
+  const progs = [A, B, C];
+  const rowsOf = arr => arr.map(v => ({ commercialRevenue: v * 1e6 }));
+  const pvs = [{ id: "A", posToLaunch: 0.5, launchYearOffset: 0, pnl: rowsOf([0, 100, 200]) }, { id: "B", posToLaunch: 0.4, launchYearOffset: 0, pnl: rowsOf([0, 0, 150]) }, { id: "C", posToLaunch: 1, launchYearOffset: 0, pnl: rowsOf([5, 5, 5]) }];
+  const owed = api.drugLicenceExpectedByYear(pvs, progs, 3);
+  near("shared: year-1 royalty $5M", owed.royalty[1], 5e6, 1e-6);
+  near("shared: year-2 royalty $16M", owed.royalty[2], 16e6, 1e-6);
+  near("shared: the $250M milestone is worth $10M in year 2 (only both together reach it)", owed.milestones[2], 10e6, 1e-6);
+  near("shared: nothing in year 0", owed.total[0], 0, 0);
+  ok("shared: one group, led by A, covering A and B (drug names matched loosely); C stays per program", owed.groups.length === 1 && owed.groups[0].leadId === "A" && owed.groups[0].memberIds.join() === "A,B");
+  // B launching a year later moves its sales: year-2 totals become 0/100/200 + B's 0 → no milestone.
+  const late = api.drugLicenceExpectedByYear([pvs[0], { ...pvs[1], launchYearOffset: 1 }, pvs[2]], progs, 3);
+  near("shared: offsets are respected (B a year later: year-2 milestone falls away)", late.milestones[2], 0, 0);
+  ok("shared: a group with a member missing is left to the caller (SOTP stand-alone parts)", api.drugLicenceExpectedByYear([pvs[0]], progs, 3).groups.length === 0);
+  const eA = api.effectiveLicensor(A, progs), eB = api.effectiveLicensor(B, progs);
+  ok("per program: the lead keeps its approval milestone and the sublicense share, no royalty or sales milestones", eA.royaltyPct === "0" && eA.approvalMilestoneM === "100" && eA.sublicensePct === "5" && eA.salesMilestones.length === 0);
+  ok("per program: a covered program carries only its own approval milestone, enabled", eB.enabled && eB.approvalMilestoneM === "40" && eB.royaltyPct === "0" && eB.sublicensePct === "5");
+  ok("per program: an unrelated drug keeps its own licence", api.effectiveLicensor(C, progs) === C.licensor);
+  ok("not shared: nothing groups", api.sharedLicenceFor(B, [{ ...A, licensor: { ...A.licensor, shared: false } }, B]) === null);
+  ok("shared but alone in the case: inert", api.sharedLicenceFor(A, [A, C]) === null);
+
+  // Whole-case identity: a flat royalty shared across two programs values
+  // exactly as the same royalty entered on each (linear; no milestones).
+  const pgCase = JSON.parse(fs.readFileSync(path.join(__dirname, "fixtures", "pepgen_case.json"), "utf8"));
+  const base0 = pgCase.programs[0];
+  const twin = { ...JSON.parse(JSON.stringify(base0)), id: "twin", name: "Second indication", launchYearOffset: "7", posOverridePct: "10" };
+  const perProg = { ...pgCase, programs: [{ ...base0, name: "First", licensor: { enabled: true, royaltyPct: "8" } }, { ...twin, licensor: { enabled: true, royaltyPct: "8" } }] };
+  const shared = { ...pgCase, programs: [{ ...base0, name: "First", licensor: { enabled: true, shared: true, royaltyPct: "8" } }, { ...twin, licensor: { enabled: false } }] };
+  const val = c => api.computeCaseValuation(c, api.getEffectiveScenarioPreset(c, "base"), "base", 14, { enabled: false }).equity.perShare;
+  near("case: a flat 8% shared across two programs = 8% on each", val(shared), val(perProg), 1e-9);
+  // And a sales milestone on the drug's total sales costs at least what one on each program's own sales would.
+  const withMs = c => ({ ...c, programs: c.programs.map((p, i) => i === 0 ? { ...p, licensor: { ...p.licensor, salesMilestones: [{ thresholdM: "1000", paymentM: "200" }] } } : p) });
+  ok("case: the milestone on combined sales costs more than on one program's own sales", val(withMs(shared)) < val(withMs({ ...shared, programs: shared.programs.map(p => ({ ...p, licensor: { ...p.licensor, shared: false } })) })));
+  const sotp = api.computeSOTPBreakdown(withMs(shared), api.getEffectiveScenarioPreset(shared, "base"), "base", 14, { enabled: false });
+  ok("SOTP: the shared terms are their own line, and the parts still add up", sotp.licenceGroups.length === 1 && sotp.licenceDrag < 0 && Math.abs(sotp.sumOfParts - (sotp.programBreakdown.reduce((a, p) => a + p.npv, 0) + sotp.gaDrag + sotp.licenceDrag)) < 1);
 }
 report();
 

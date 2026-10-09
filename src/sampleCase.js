@@ -624,7 +624,7 @@ function sampleCaseSummit() {
     corporateGA: { preCommercialAnnualM: "80", gaShareOfMatureSgaPct: "50", windDownYears: "1" },
     terminalValue: { enabled: false, method: "exitMultiple", growthPct: "0", exitMultiple: "4" },
     taxation: { enabled: true, effectiveRatePct: "21", startingNOLM: String(93.2e6) },
-    capitalStructure: { mode: "detailed", dilutedSharesSimple: "", basicShares: String(797749602 + 108955369),
+    capitalStructure: { mode: "detailed", dilutedSharesSimple: "", basicShares: "797749602", prefShares: "108955369",
       cash: String(690.7e6 + 2000e6 + 67.2e6), debt: "0", cashAsOf: "2026-06-30", monthlyBurn: String(43.9e6), carryCashForward: false,
       opts: "118367815", optK: "4.45", war: "730000", warK: "0", convFace: "0", convPrice: "0",
       cashSource: "Q2 2026 10-Q $690.7M + $68.4M ATM after June (net ~$67.2M) + AstraZeneca $2.0B preferred (closed Oct 2026)",

@@ -45,19 +45,38 @@ async function fetchHistoricalComps(condition, phase, opts = {}) {
     'aggFilters': 'phase:' + (TS_PHASE_TO_AGGFILTER[phase] || phase),
     // PrimaryCompletionDate: "who reads out first" orders by it (October
     // 2026). A filtered query drops any field it is not asked for.
-    'fields': 'NCTId,BriefTitle,OfficialTitle,Condition,Keyword,ConditionMeshTerm,OverallStatus,Phase,StartDate,PrimaryCompletionDate,CompletionDate,EnrollmentCount,LeadSponsorName,InterventionName,PrimaryOutcomeMeasure',
+    'fields': 'NCTId,BriefTitle,OfficialTitle,Condition,Keyword,ConditionMeshTerm,OverallStatus,Phase,StartDate,PrimaryCompletionDate,CompletionDate,EnrollmentCount,LeadSponsorName,InterventionName,InterventionOtherName,PrimaryOutcomeMeasure',
     'pageSize': String(opts.pageSize || 100),
     'format': 'json'
   };
-  if (opts.intervention) params['query.intr'] = opts.intervention;
+  // Several drugs, comma-separated (October 2026: "who reads out first" by
+  // rival drugs — 342 active Phase 3 trials in NSCLC, 13 of them the PD-1 ×
+  // VEGF class). Searched with OR, then each hit re-checked against its own
+  // registered interventions, because query.intr is a loose text search.
+  const names = opts.intervention ? assetProgramNames(opts.intervention) : [];
+  if (names.length) params['query.intr'] = names.map(n => /\s/.test(n) ? '"' + n + '"' : n).join(' OR ');
 
   const data = await tsCtgovFetch(params);
   // Hits CT.gov matched only through a synonym (T-DM1 for "myotonic
   // dystrophy type 1") are dropped and counted — see filterStudiesByCondition.
   const rel = filterStudiesByCondition(data.studies, condition);
-  const out = summarizeStudiesResponse({ ...data, studies: rel.kept }, { condition, phase, intervention: opts.intervention || null });
+  const onDrug = names.length > 1 ? rel.kept.filter(s => studyNamesAnyDrug(s, names)) : rel.kept;
+  const out = summarizeStudiesResponse({ ...data, studies: onDrug }, { condition, phase, intervention: opts.intervention || null });
   out.droppedUnrelated = rel.dropped;
+  out.droppedOffDrug = rel.kept.length - onDrug.length;
   return out;
+}
+
+// A raw v2 study names one of the drugs among its registered interventions
+// (name or other names) or in its titles. Case-insensitive containment.
+function studyNamesAnyDrug(s, names) {
+  const p = s.protocolSection || {};
+  const hay = [];
+  ((p.armsInterventionsModule || {}).interventions || []).forEach(i => { if (i.name) hay.push(i.name); (i.otherNames || []).forEach(n => hay.push(n)); });
+  const id = p.identificationModule || {};
+  hay.push(id.briefTitle || "", id.officialTitle || "");
+  const text = hay.join(" | ").toLowerCase();
+  return names.some(n => text.indexOf(String(n).toLowerCase()) !== -1);
 }
 
 function parseHistoricalStudy(s) {

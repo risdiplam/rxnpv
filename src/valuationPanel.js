@@ -581,7 +581,9 @@ function useValuationSections({ theCase, onChange, goToTab }) {
             h(BenchField, { label: "Warrants strike", value: cap.warK, onChange: v => setCap({ warK: v }), suffix: "$" }),
             h("div", { style: { flex: "1 1 100%", fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", margin: "4px 0" } }, "Convertible notes (if-converted method — converts to shares only if in the money, else stays as debt)"),
             h(MillionsField, { label: "Convertible face value", value: cap.convFace, onChange: v => setCap({ convFace: v }), placeholder: "none" }),
-            h(BenchField, { label: "Conversion price", value: cap.convPrice, onChange: v => setCap({ convPrice: v }), suffix: "$", placeholder: "none" })
+            h(BenchField, { label: "Conversion price", value: cap.convPrice, onChange: v => setCap({ convPrice: v }), suffix: "$", placeholder: "none" }),
+            h("div", { style: { flex: "1 1 100%", fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", margin: "4px 0" } }, "Convertible preferred (counted as the common shares it converts into, at any price — for preferred that takes dividends and liquidation proceeds as if converted, as most biotech private-placement preferred does; preferred with a liquidation preference or a redemption right is closer to debt)"),
+            h(BenchField, { label: "Preferred, as-converted common shares", value: cap.prefShares, onChange: v => setCap({ prefShares: v }), placeholder: "none" })
           )
     )),
 
@@ -712,7 +714,7 @@ function useValuationSections({ theCase, onChange, goToTab }) {
               // next to "$M" — so the field read 1000000000 $M, and editing it
               // again multiplied the assumption by another million (FIN-001).
               theCase.programs.filter(p => (p.revenueMode || "quick") !== "full").map(p => h(MillionsField, {
-                key: p.id, label: (p.drugName || p.name) + " — peak revenue override",
+                key: p.id, label: programLabel(p, theCase.programs) + " — peak revenue override",
                 value: ((p.quickRevenue || {}).scenarioOverrides || {})[key] ? p.quickRevenue.scenarioOverrides[key].peakRevenue : "",
                 onChange: raw => {
                   const nextPrograms = theCase.programs.map(pr => pr.id === p.id
@@ -893,7 +895,8 @@ function useValuationSections({ theCase, onChange, goToTab }) {
                 const label = same.length > 1 ? p.name + " (" + (same.indexOf(p) + 1) + ")" : p.name;
                 return barRow(p.id, label, p.npv, p.npv >= 0 ? "var(--green)" : "var(--red)");
               }),
-              barRow("__ga_drag__", "Corporate G&A (shared)", sotp.gaDrag, "var(--red)")
+              barRow("__ga_drag__", "Corporate G&A (shared)", sotp.gaDrag, "var(--red)"),
+              (sotp.licenceGroups || []).length > 0 && barRow("__lic_drag__", "Owed to " + (sotp.licenceGroups.map(g => g.licensor).filter(Boolean).join(", ") || "the licensor") + " on total drug sales (shared)", sotp.licenceDrag, "var(--red)")
             ),
             h("div", { style: { display: "flex", justifyContent: "space-between", fontSize: 13, fontFamily: "var(--mono)", padding: "8px 10px", marginTop: 8, borderTop: "1px solid var(--rule)", fontWeight: 700 } },
               h("span", { style: { color: "var(--ink-1)" } }, "Total Enterprise Value"),

@@ -170,7 +170,7 @@ function ActualVsModelTool({ cases, updateCase, activeCase }) {
     if (!theCase || !theCase.programs || !theCase.programs.length) return [];
     const results = theCase.programs.map(p => {
       const offset = resolveLaunchYearOffset(p);
-      try { return { id: p.id, name: p.drugName || p.name, launchYearOffset: offset, revenueResult: getProgramRevenueResult(p, Math.max(20, COMPANY_CALENDAR_YEARS - offset + 2)) }; }
+      try { return { id: p.id, name: programLabel(p, theCase.programs), launchYearOffset: offset, revenueResult: getProgramRevenueResult(p, Math.max(20, COMPANY_CALENDAR_YEARS - offset + 2)) }; }
       catch (e) { return null; }
     }).filter(Boolean);
     return results.length ? aggregateCompanyRevenue(results, COMPANY_CALENDAR_YEARS) : [];

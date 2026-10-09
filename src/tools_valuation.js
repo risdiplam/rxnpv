@@ -245,7 +245,7 @@ function FdmcTool({ cases, updateCase, activeCase }) {
   const [pulling, setPulling] = React.useState(false);
   const [pullError, setPullError] = React.useState(null);
   const [pullResult, setPullResult] = React.useState(null);
-  const [fields, setFields] = React.useState({ currentPrice: "", dilutedSharesSimple: "", basicShares: "", opts: "", optK: "", war: "", warK: "", convFace: "", convPrice: "" });
+  const [fields, setFields] = React.useState({ currentPrice: "", dilutedSharesSimple: "", basicShares: "", opts: "", optK: "", war: "", warK: "", convFace: "", convPrice: "", prefShares: "" });
   const [importCaseId, setImportCaseId] = useActiveCaseId(activeCase);
   const [exportCaseId, setExportCaseId] = useActiveCaseId(activeCase);
   const [exportMsg, setExportMsg] = React.useState(null);
@@ -283,7 +283,7 @@ function FdmcTool({ cases, updateCase, activeCase }) {
       dilutedSharesSimple: cap.dilutedSharesSimple || "",
       basicShares: cap.basicShares || "",
       opts: cap.opts || "", optK: cap.optK || "", war: cap.war || "", warK: cap.warK || "",
-      convFace: cap.convFace || "", convPrice: cap.convPrice || ""
+      convFace: cap.convFace || "", convPrice: cap.convPrice || "", prefShares: cap.prefShares || ""
     });
     if (cap.mode) setMode(cap.mode);
   };
@@ -296,7 +296,7 @@ function FdmcTool({ cases, updateCase, activeCase }) {
     const c = cases.find(x => x.id === exportCaseId);
     if (!c) return;
     const patch = { mode, dilutedSharesSimple: fields.dilutedSharesSimple, basicShares: fields.basicShares,
-      opts: fields.opts, optK: fields.optK, war: fields.war, warK: fields.warK, convFace: fields.convFace, convPrice: fields.convPrice };
+      opts: fields.opts, optK: fields.optK, war: fields.war, warK: fields.warK, convFace: fields.convFace, convPrice: fields.convPrice, prefShares: fields.prefShares };
     updateCase({
       ...c, currentPrice: fields.currentPrice || c.currentPrice, capitalStructure: { ...(c.capitalStructure || {}), ...patch },
       programs: appendEdgarEvidenceToPrograms(c.programs, pullResult, "Diluted Market Cap's “Pull from EDGAR”"),
@@ -306,7 +306,7 @@ function FdmcTool({ cases, updateCase, activeCase }) {
   };
 
   const capResult = computeCapitalStructure({ mode, currentPrice: fields.currentPrice, dilutedSharesSimple: fields.dilutedSharesSimple,
-    basicShares: fields.basicShares, opts: fields.opts, optK: fields.optK, war: fields.war, warK: fields.warK, convFace: fields.convFace, convPrice: fields.convPrice, cash: "0", debt: "0" });
+    basicShares: fields.basicShares, opts: fields.opts, optK: fields.optK, war: fields.war, warK: fields.warK, convFace: fields.convFace, convPrice: fields.convPrice, prefShares: fields.prefShares, cash: "0", debt: "0" });
   const price = Number(fields.currentPrice) || 0;
   const fdmc = price > 0 ? capResult.dilutedShares * price : null;
 
@@ -351,7 +351,8 @@ function FdmcTool({ cases, updateCase, activeCase }) {
               h(BenchField, { label: "Warrants outstanding", value: fields.war, onChange: v => setF({ war: v }) }),
               h(BenchField, { label: "Warrants strike", value: fields.warK, onChange: v => setF({ warK: v }), suffix: "$" }),
               h(MillionsField, { label: "Convertible face value", value: fields.convFace, onChange: v => setF({ convFace: v }) }),
-              h(BenchField, { label: "Conversion price", value: fields.convPrice, onChange: v => setF({ convPrice: v }), suffix: "$" })
+              h(BenchField, { label: "Conversion price", value: fields.convPrice, onChange: v => setF({ convPrice: v }), suffix: "$" }),
+              h(BenchField, { label: "Preferred, as-converted common shares", value: fields.prefShares, onChange: v => setF({ prefShares: v }) })
             )
       ),
 
@@ -359,7 +360,7 @@ function FdmcTool({ cases, updateCase, activeCase }) {
         h("div", null, h("div", { style: UI.caption }, "Diluted shares"),
           h("div", { style: UI.stat }, fmtNum(capResult.dilutedShares))),
         mode === "detailed" && h("div", null, h("div", { style: UI.caption }, "From dilutive securities"),
-          h("div", { style: { fontSize: 18, fontFamily: "var(--mono)", fontWeight: 700, color: "var(--ink-2)" } }, "+" + fmtNum(capResult.optionShares + capResult.warrantShares + capResult.convertShares))),
+          h("div", { style: { fontSize: 18, fontFamily: "var(--mono)", fontWeight: 700, color: "var(--ink-2)" } }, "+" + fmtNum(capResult.optionShares + capResult.warrantShares + capResult.convertShares + (capResult.preferredShares || 0)))),
         h("div", null, h("div", { style: UI.caption }, "Fully diluted market cap"),
           h("div", { style: { fontSize: 22, fontFamily: "var(--mono)", fontWeight: 800, color: "var(--teal)" } }, fdmc != null ? fmtMoney(fdmc) : "—"))
       ),

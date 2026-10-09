@@ -23,7 +23,7 @@ function newCase() {
     capitalStructure: {
       mode: "simple", dilutedSharesSimple: "",
       basicShares: "", cash: "", debt: "",
-      opts: "", optK: "", war: "", warK: "", convFace: "", convPrice: "",
+      opts: "", optK: "", war: "", warK: "", convFace: "", convPrice: "", prefShares: "",
       cashAsOf: "", monthlyBurn: "", carryCashForward: false
     },
     scenarioOverrides: {
@@ -40,7 +40,7 @@ function caseMissingInputs(theCase) {
   if ((cap.mode || "simple") === "simple" && !cap.dilutedSharesSimple) missing.push("diluted shares");
   if (cap.mode === "detailed" && !cap.basicShares) missing.push("basic shares");
   theCase.programs.forEach((p, i) => {
-    const label = p.drugName || p.name || ("Program " + (i + 1));
+    const label = programLabel(p, theCase.programs) || ("Program " + (i + 1));
     if ((p.revenueMode || "quick") === "quick") {
       if (!p.quickRevenue || !p.quickRevenue.peakRevenue) missing.push(label + " peak revenue");
     } else {
@@ -119,8 +119,8 @@ function assumptionNavSections(theCase, program) {
     { id: "waterfall", label: "Risk waterfall", state: "result" },
     { id: "prv", label: "Priority review voucher", state: (program.prv || {}).enabled ? "set" : "" },
     { id: "partner", label: "Partnership", state: (program.partnership || {}).enabled ? "set" : "" },
-    { id: "licensor", label: "Owed to a licensor", state: (program.licensor || {}).enabled ? "set" : "" });
-  groups.push({ label: program.drugName || program.name || "Program", items });
+    { id: "licensor", label: "Owed to a licensor", state: (program.licensor || {}).enabled || sharedLicenceFor(program, theCase.programs) ? "set" : "" });
+  groups.push({ label: programLabel(program, theCase.programs), items });
   return groups;
 }
 
@@ -244,7 +244,7 @@ function CaseView({ theCase, onChange, onDelete, onNavigateToTools, onReopenSave
     const resolvedOffset = resolveLaunchYearOffset(p);
     const projYears = Math.max(20, COMPANY_CALENDAR_YEARS - resolvedOffset + 2);
     try { rev = getProgramRevenueResult(p, projYears); } catch (e) {}
-    return { id: p.id, name: p.drugName || p.name, launchYearOffset: resolvedOffset, revenueResult: rev, program: p };
+    return { id: p.id, name: programLabel(p, theCase.programs), launchYearOffset: resolvedOffset, revenueResult: rev, program: p };
   });
   const programResults = allProgramAttempts.filter(p => p.revenueResult);
   // Dropping a program that fails to compute is the right behaviour — one
@@ -268,12 +268,19 @@ function CaseView({ theCase, onChange, onDelete, onNavigateToTools, onReopenSave
         marketingPctOfPeak: cs.marketingPctOfPeak !== "" ? cs.marketingPctOfPeak : MARKETING_BENCHMARKS.baseCasePctOfPeakRevenue,
         yearsToLOE: getRevenueBuild(p.program).exclusivity.yearsToLOE,
         launchYearOffset: p.launchYearOffset,
-        licensor: p.program.licensor
+        licensor: effectiveLicensor(p.program, theCase.programs)
       });
     } catch (e) {}
     return { id: p.id, launchYearOffset: p.launchYearOffset, pnl };
   });
-  const companyPnL = programPnLs.length ? computeCompanyPnL(programPnLs, corpGA, COMPANY_CALENDAR_YEARS) : [];
+  // "If every program works": a licence shared across one drug's programs is
+  // owed on their combined sales, every one of them selling (October 2026).
+  const companyPnL = (() => {
+    const rows = programPnLs.length ? computeCompanyPnL(programPnLs, corpGA, COMPANY_CALENDAR_YEARS) : [];
+    const owed = drugLicenceExpectedByYear(programPnLs.map(p => ({ ...p, posToLaunch: 1 })), theCase.programs, rows.length);
+    if (!owed.groups.length) return rows;
+    return rows.map((c, i) => ({ ...c, licensor: (c.licensor || 0) + owed.total[i], productContribution: c.productContribution - owed.total[i], ebit: c.ebit - owed.total[i] }));
+  })();
   const peakEbitYear = companyPnL.length ? companyPnL.reduce((best, c) => c.ebit > best.ebit ? c : best, companyPnL[0]) : null;
   const ebitSeries = companyPnL.length ? [
     { name: "Revenue", color: "var(--ink-2)", points: companyPnL.map(c => ({ v: c.revenue, label: new Date().getFullYear() + c.calendarYear })) },
@@ -312,13 +319,13 @@ function CaseView({ theCase, onChange, onDelete, onNavigateToTools, onReopenSave
         const phaseLabel = (p.currentPhase || "").replace("phase", "Ph");
         return h("button", {
           key: p.id, onClick: () => setActiveProgId(p.id),
-          title: multi ? "Show " + (p.drugName || p.name) : undefined,
+          title: multi ? "Show " + programLabel(p, theCase.programs) : undefined,
           style: { padding: multi ? "6px 14px" : "7px 16px", borderRadius: 7, border: "1px solid " + (isActive ? "var(--teal)" : "var(--rule)"),
             background: isActive ? "var(--teal-bg)" : "var(--surface)", color: isActive ? "var(--teal)" : "var(--ink-2)",
             fontFamily: "var(--mono)", fontSize: 12, fontWeight: isActive ? 700 : 400, cursor: "pointer",
             textAlign: "left", lineHeight: 1.35 }
         },
-          h("div", null, p.drugName || p.name),
+          h("div", null, programLabel(p, theCase.programs)),
           multi && h("div", { style: { fontSize: 10, color: isActive ? "var(--teal)" : "var(--ink-3)", fontWeight: 400 } },
             [phaseLabel, peak ? fmtMoney(peak) + " peak" : null].filter(Boolean).join(" · "))
         );

@@ -196,7 +196,7 @@ function computeEffectivePoS(program, scenario) {
 // present, it's used directly instead of scaling the base peak revenue by
 // shareMultiplierPct, so Bear/Bull can have a genuinely independent peak
 // revenue assumption, not just a percentage of Base.
-function computeProgramValuation(program, scenario, scenarioKey) {
+function computeProgramValuation(program, scenario, scenarioKey, programs) {
   const qOverride = scenarioKey && program.quickRevenue && program.quickRevenue.scenarioOverrides
     ? program.quickRevenue.scenarioOverrides[scenarioKey] : null;
   const hasOverride = (program.revenueMode || "quick") !== "full" && qOverride && qOverride.peakRevenue !== "" && qOverride.peakRevenue != null;
@@ -218,7 +218,7 @@ function computeProgramValuation(program, scenario, scenarioKey) {
     marketingPctOfPeak: cs.marketingPctOfPeak !== "" ? cs.marketingPctOfPeak : MARKETING_BENCHMARKS.baseCasePctOfPeakRevenue,
     yearsToLOE: getRevenueBuild(program).exclusivity.yearsToLOE,
     launchYearOffset: program.launchYearOffset,
-    licensor: program.licensor
+    licensor: effectiveLicensor(program, programs)
   });
 
   const rnd = computeRnDToLaunch(program);
@@ -251,7 +251,7 @@ function computeProgramValuation(program, scenario, scenarioKey) {
   const launchYearOffset = resolveLaunchYearOffset(program);
 
   return {
-    id: program.id, name: program.drugName || program.name,
+    id: program.id, name: programLabel(program, programs),
     launchYearOffset,
     revenueResult: scaledRevenue, pnl, rnd, posToLaunch, riskAdjItems: riskAdj.items,
     // Exposed so the stage-attrition profile the override produces is
@@ -273,7 +273,7 @@ function computeProgramValuation(program, scenario, scenarioKey) {
 // Several: the odds-weighted flow is taxed (there is no single success world).
 // Used by the valuation and by the SOTP, so the two stay on the same method.
 function taxedCaseCalendar(theCase, programVals, corpGA, scenario, scenarioKey) {
-  const risked = computeCompanyRiskAdjustedCF(programVals, corpGA, 25);
+  const risked = applyDrugLicences(computeCompanyRiskAdjustedCF(programVals, corpGA, 25), programVals, theCase.programs);
   const tax = theCase.taxation;
   if (!tax || !tax.enabled) return risked;
   if (theCase.programs.length !== 1 || programVals.length !== 1 || !(programVals[0].posToLaunch < 1)) return applyTaxToCalendar(risked, tax);
@@ -284,7 +284,7 @@ function taxedCaseCalendar(theCase, programVals, corpGA, scenario, scenarioKey) 
 }
 
 function computeCaseValuation(theCase, scenario, scenarioKey, discountRateBasePct, terminalValueParams) {
-  const programVals = theCase.programs.map(p => computeProgramValuation(p, scenario, scenarioKey));
+  const programVals = theCase.programs.map(p => computeProgramValuation(p, scenario, scenarioKey, theCase.programs));
   const corpGA = theCase.corporateGA || { preCommercialAnnualM: "", gaShareOfMatureSgaPct: "50" };
   const calendar = taxedCaseCalendar(theCase, programVals, corpGA, scenario, scenarioKey);
   const discountRate = (discountRateBasePct != null && discountRateBasePct !== "" && !isNaN(Number(discountRateBasePct)) ? Number(discountRateBasePct) : DISCOUNT_RATE_GUIDANCE.earlyBiotechSelfView[0]) + scenario.discountRateAddPct;
@@ -741,7 +741,8 @@ function computePartnershipContribution(theCase, r, scenario) {
     if (!partnership || !partnership.enabled) return;
     // The share of partner payments owed on to the licensor (a sublicense
     // fee), when the asset is itself in-licensed.
-    const keep = prog.licensor && prog.licensor.enabled ? 1 - Math.min(100, Math.max(0, numOr(prog.licensor.sublicensePct, 0))) / 100 : 1;
+    const lic = effectiveLicensor(prog, theCase.programs);
+    const keep = lic && lic.enabled ? 1 - Math.min(100, Math.max(0, numOr(lic.sublicensePct, 0))) / 100 : 1;
     upfrontContribution += (numOr(partnership.upfrontM, 0)) * 1e6 * keep;
     if (!partnership.milestones || !partnership.milestones.length) return;
     // The same effective odds the program itself is valued at — override-aware
@@ -795,7 +796,7 @@ function computeSOTPBreakdown(theCase, scenario, scenarioKey, discountRateBasePc
   const zeroGA = { preCommercialAnnualM: "0", gaShareOfMatureSgaPct: "0" };
 
   const programBreakdown = theCase.programs.map(p => {
-    const pv = computeProgramValuation(p, scenario, scenarioKey);
+    const pv = computeProgramValuation(p, scenario, scenarioKey, theCase.programs);
     // Taxed per program so the parts stay in the same (after-tax) units as the
     // headline. Each program accumulates its own NOL shield, whereas real NOLs
     // pool company-wide — so with tax on, the parts are a slightly
@@ -805,7 +806,7 @@ function computeSOTPBreakdown(theCase, scenario, scenarioKey, discountRateBasePc
     const effectiveTVParams = (scenOv && scenOv.exitMultiple !== "" && scenOv.exitMultiple != null)
       ? { ...terminalValueParams, exitMultiple: scenOv.exitMultiple } : terminalValueParams;
     const npv = computeNPV(calendar.map(c => c.riskAdjFCF), discountRate, effectiveTVParams, calendar.map(c => c.revenue));
-    return { id: p.id, name: p.drugName || p.name, npv: npv.npv, peakRevenue: pv.peakRevenue, posToLaunch: pv.posToLaunch };
+    return { id: p.id, name: programLabel(p, theCase.programs), npv: npv.npv, peakRevenue: pv.peakRevenue, posToLaunch: pv.posToLaunch };
   });
 
   // Company-level G&A drag, discounted on its own (negative contribution).
@@ -820,14 +821,19 @@ function computeSOTPBreakdown(theCase, scenario, scenarioKey, discountRateBasePc
   // applyTaxToCalendar machinery rather than re-deriving an effective rate.
   // With taxation off this is identical to the old behaviour.
   const corpGA = theCase.corporateGA || { preCommercialAnnualM: "", gaShareOfMatureSgaPct: "50" };
-  const allProgramVals = theCase.programs.map(p => computeProgramValuation(p, scenario, scenarioKey));
+  const allProgramVals = theCase.programs.map(p => computeProgramValuation(p, scenario, scenarioKey, theCase.programs));
   const withGA = taxedCaseCalendar(theCase, allProgramVals, corpGA, scenario, scenarioKey);
   const withoutGA = taxedCaseCalendar(theCase, allProgramVals, zeroGA, scenario, scenarioKey);
   const gaOnlyCF = withGA.map((c, i) => c.riskAdjFCF - (withoutGA[i] ? withoutGA[i].riskAdjFCF : 0));
   const gaNPV = computeNPV(gaOnlyCF, discountRate, { enabled: false }, withGA.map(() => 0));
+  // A licence shared by several programs of one drug (royalty and sales
+  // milestones on the drug's total sales) belongs to no single program, so the
+  // stand-alone parts leave it out and it is its own line, like G&A.
+  const licOwed = drugLicenceExpectedByYear(allProgramVals, theCase.programs, withoutGA.length);
+  const licenceDrag = licOwed.groups.length ? -computeNPV(licOwed.total, discountRate, { enabled: false }, licOwed.total.map(() => 0)).npv : 0;
 
-  const sumOfParts = programBreakdown.reduce((s, p) => s + p.npv, 0) + gaNPV.npv;
-  return { programBreakdown, gaDrag: gaNPV.npv, sumOfParts };
+  const sumOfParts = programBreakdown.reduce((s, p) => s + p.npv, 0) + gaNPV.npv + licenceDrag;
+  return { programBreakdown, gaDrag: gaNPV.npv, licenceDrag, licenceGroups: licOwed.groups, sumOfParts };
 }
 
 // ── Per-asset risk waterfall: unrisked value (as if success were certain) vs
@@ -840,12 +846,12 @@ function computeSOTPBreakdown(theCase, scenario, scenarioKey, discountRateBasePc
 // not a probability-weighted portion of it), which is what "Value if
 // success" means in the source material's own rNPV framing, not just
 // zeroing out the revenue-side discount alone.
-function computeProgramRiskWaterfall(program, scenario, scenarioKey, discountRateBasePct, terminalValueParams) {
+function computeProgramRiskWaterfall(program, scenario, scenarioKey, discountRateBasePct, terminalValueParams, programs) {
   const discountRate = (discountRateBasePct != null && discountRateBasePct !== "" && !isNaN(Number(discountRateBasePct)) ? Number(discountRateBasePct) : DISCOUNT_RATE_GUIDANCE.earlyBiotechSelfView[0]) + scenario.discountRateAddPct;
   const zeroGA = { preCommercialAnnualM: "0", gaShareOfMatureSgaPct: "0" };
 
   const npvFor = (prog, scen) => {
-    const pv = computeProgramValuation(prog, scen, scenarioKey);
+    const pv = computeProgramValuation(prog, scen, scenarioKey, programs);
     const calendar = computeCompanyRiskAdjustedCF([pv], zeroGA, 25);
     const npv = computeNPV(calendar.map(c => c.riskAdjFCF), discountRate, terminalValueParams, calendar.map(c => c.revenue));
     return { npv: npv.npv, posToLaunch: pv.posToLaunch };
@@ -908,13 +914,12 @@ function computeSimpleMultipleValuation(theCase, scenario, scenarioKey, multiple
     // each sales milestone the peak reaches by the peak year (an
     // approximation the full model times exactly).
     let licensorDeduction = 0, owedPV = 0;
-    if (p.licensor && p.licensor.enabled) {
-      const lic = p.licensor;
-      const baseRev = getProgramRevenueResult(p, 25);
-      const commercialShare = baseRev.peakTotalRevenue > 0 && baseRev.peakCommercialRevenue != null ? baseRev.peakCommercialRevenue / baseRev.peakTotalRevenue : 1;
+    const baseRevForShare = getProgramRevenueResult(p, 25);
+    const peakCommercial = peakRevenue * (baseRevForShare.peakTotalRevenue > 0 && baseRevForShare.peakCommercialRevenue != null ? baseRevForShare.peakCommercialRevenue / baseRevForShare.peakTotalRevenue : 1);
+    const lic = effectiveLicensor(p, theCase.programs);
+    if (lic && lic.enabled) {
       const pctOf = v => Math.min(100, Math.max(0, numOr(v, 0))) / 100;
-      const peakCommercial = peakRevenue * commercialShare;
-      licensorDeduction = peakCommercial * pctOf(lic.royaltyPct) + (peakRevenue - peakCommercial) * pctOf(lic.sublicensePct);
+      licensorDeduction = licenceRoyaltyOn(peakCommercial, lic) + (peakRevenue - peakCommercial) * pctOf(lic.sublicensePct);
       const approval = Math.max(0, numOr(lic.approvalMilestoneM, 0)) * 1e6;
       if (approval > 0) owedPV += approval * posToLaunch / Math.pow(1 + r, launchYearOffset);
       (lic.salesMilestones || []).forEach(m => {
@@ -926,10 +931,36 @@ function computeSimpleMultipleValuation(theCase, scenario, scenarioKey, multiple
     const riskedEV = peakEV * posToLaunch;
     const pv = riskedEV / Math.pow(1 + r, yearsToPeakFromToday) - owedPV;
 
-    return { id: p.id, name: p.drugName || p.name, peakRevenue, posToLaunch, pv, launchYearOffset, peakEV, riskedEV };
+    return { id: p.id, name: programLabel(p, theCase.programs), peakRevenue, posToLaunch, pv, launchYearOffset, peakEV, riskedEV, _peakCommercial: peakCommercial, _ytp: yearsToPeakFromToday };
   });
 
-  const npv = programVals.reduce((s, pv) => s + pv.pv, 0);
+  // A licence shared by several programs of one drug (Napkin's version of
+  // drugLicenceExpectedByYear): over every combination of members working, the
+  // royalty on their combined peak own sales comes off at the multiple and is
+  // discounted from the latest member's peak year; each sales milestone the
+  // combined peak reaches is paid then. An approximation the full model times
+  // exactly, as for one program.
+  let licenceOwedPV = 0;
+  const groupsDone = new Set();
+  theCase.programs.forEach(p => {
+    const g = sharedLicenceFor(p, theCase.programs);
+    if (!g || groupsDone.has(g.key)) return;
+    groupsDone.add(g.key);
+    const mem = g.members.map(m => programVals.find(v => v.id === m.id)).filter(Boolean);
+    if (mem.length > 10) return;
+    const L = g.lead.licensor;
+    for (let mask = 1; mask < (1 << mem.length); mask++) {
+      let prob = 1, peak = 0, ytp = 0;
+      mem.forEach((v, i) => { if ((mask >> i) & 1) { prob *= v.posToLaunch; peak += v._peakCommercial; ytp = Math.max(ytp, v._ytp); } else prob *= 1 - v.posToLaunch; });
+      if (!(prob > 0)) continue;
+      const disc = Math.pow(1 + r, ytp);
+      let owed = licenceRoyaltyOn(peak, L) * multiple;
+      (L.salesMilestones || []).forEach(m => { const pay = Math.max(0, numOr(m.paymentM, 0)) * 1e6; if (pay > 0 && peak >= Math.max(0, numOr(m.thresholdM, 0)) * 1e6) owed += pay; });
+      licenceOwedPV += prob * owed / disc;
+    }
+  });
+
+  const npv = programVals.reduce((s, pv) => s + pv.pv, 0) - licenceOwedPV;
   const capStruct = effectiveCapitalStructure(theCase);
   let capResult = computeCapitalStructure({ ...capStruct, currentPrice: theCase.currentPrice });
   capResult = applyFutureRaise(capResult, theCase.futureRaise, theCase.currentPrice);
@@ -1190,12 +1221,12 @@ function facilitiesPhrase(fac) {
 
 function computeForwardRunway(theCase, opts) {
   const scenario = { label: "unrisked", shareMultiplierPct: 100, posMultiplierPct: 100, discountRateAddPct: 0, color: "" };
-  const programVals = theCase.programs.map(p => computeProgramValuation({ ...p, posOverridePct: "100" }, scenario, null));
+  const programVals = theCase.programs.map(p => computeProgramValuation({ ...p, posOverridePct: "100" }, scenario, null, theCase.programs));
 
   const corpGA = theCase.corporateGA || { preCommercialAnnualM: "", gaShareOfMatureSgaPct: "50" };
   // Cash tax is a real outflow, so it belongs in a runway/financing projection
   // just as much as in a valuation.
-  const calendar = applyTaxToCalendar(computeCompanyRiskAdjustedCF(programVals, corpGA, 25), theCase.taxation);
+  const calendar = applyTaxToCalendar(applyDrugLicences(computeCompanyRiskAdjustedCF(programVals, corpGA, 25), programVals, theCase.programs), theCase.taxation);
 
   const capStruct = effectiveCapitalStructure(theCase);
   // extraCash: the facilities above, for the "with facilities" runway only.
@@ -1334,11 +1365,11 @@ function computeDilutionPath(theCase, scenario, discountRateBasePct, opts) {
   // understating exactly the burn this function exists to model. shareMultiplierPct
   // stays real, so revenue — and therefore post-launch dilution — still
   // varies correctly by scenario.
-  const programVals = theCase.programs.map(p => computeProgramValuation({ ...p, posOverridePct: "100" }, { ...scenario, posMultiplierPct: 100 }, null));
+  const programVals = theCase.programs.map(p => computeProgramValuation({ ...p, posOverridePct: "100" }, { ...scenario, posMultiplierPct: 100 }, null, theCase.programs));
   const corpGA = theCase.corporateGA || { preCommercialAnnualM: "", gaShareOfMatureSgaPct: "50" };
   // Cash tax is a real outflow, so it belongs in a runway/financing projection
   // just as much as in a valuation.
-  const calendar = applyTaxToCalendar(computeCompanyRiskAdjustedCF(programVals, corpGA, 25), theCase.taxation);
+  const calendar = applyTaxToCalendar(applyDrugLicences(computeCompanyRiskAdjustedCF(programVals, corpGA, 25), programVals, theCase.programs), theCase.taxation);
 
   const minBuffer = numOr(dp.minCashBufferM, 0); // raw dollars, despite the "M" field name — MillionsField converts to raw dollars before storage
   const targetMonths = numOr(dp.targetRunwayMonths, 18);
@@ -1358,7 +1389,7 @@ function computeDilutionPath(theCase, scenario, discountRateBasePct, opts) {
   // A raise only happens while the company is still pursuing its programs:
   // one sized for after a failed readout never takes place. Weight each year's
   // raise by the odds the company is still going then (risked programs).
-  const riskedVals = theCase.programs.map(p => computeProgramValuation(p, scenario, null));
+  const riskedVals = theCase.programs.map(p => computeProgramValuation(p, scenario, null, theCase.programs));
   const active = computeCompanyActiveByYear(riskedVals, (theCase.corporateGA || {}).windDownYears, 25);
 
   // The manual raise's proceeds are real cash on hand before any projected
@@ -1584,7 +1615,7 @@ function computeRedFlags(theCase) {
   const programs = theCase.programs || [];
 
   programs.forEach(program => {
-    const progName = program.drugName || program.name || "Program";
+    const progName = programLabel(program, programs);
 
     // 0. A territory-limited royalty in Napkin mode is applied to all revenue.
     if (quickModeTerritoryMismatch(program)) {
@@ -1732,7 +1763,7 @@ function computeRedFlags(theCase) {
       ? computeForwardRunway({ ...theCase, capitalStructure: { ...theCase.capitalStructure, cash: String(numOr(theCase.capitalStructure.cash, 0) + raiseAmt) } })
       : runway0;
     if (runway.runwayYears != null) {
-      const launchTimelines = programs.map(p => ({ name: p.drugName || p.name || "Program", years: resolveLaunchYearOffset(p) }));
+      const launchTimelines = programs.map(p => ({ name: programLabel(p, programs), years: resolveLaunchYearOffset(p) }));
       const nearest = launchTimelines.reduce((min, cur) => cur.years < min.years ? cur : min, launchTimelines[0]);
       if (nearest && runway.runwayYears < nearest.years) {
         const withRaise = raiseAmt > 0 && runway0.runwayYears != null;
@@ -1927,7 +1958,7 @@ function computePortfolioSummary(cases) {
         // a case that turns cash-positive (Stoke) as a bare dash.
         runwayYears: cashEntered ? runway.runwayYears : null,
         runwayOutlasts: cashEntered && runway.runwayYears == null,
-        programName: primaryProgram ? (primaryProgram.drugName || primaryProgram.name) : null,
+        programName: primaryProgram ? programLabel(primaryProgram, theCase.programs) : null,
         therapeuticArea: primaryProgram ? primaryProgram.therapeuticArea : null,
         modality: primaryProgram ? primaryProgram.modality : null,
         currentPhase: primaryProgram ? primaryProgram.currentPhase : null,

@@ -239,7 +239,7 @@ function PeakSalesCompsTool({ cases, updateCase, activeCase }) {
   const ownPeakDrugs = (exportCase ? exportCase.programs : []).map(p => {
     let peakB = null;
     try { peakB = getProgramRevenueResult(p, 25).peakTotalRevenue / 1e9; } catch (e) {}
-    return peakB != null && peakB > 0 ? { drug: (p.drugName || p.name) + " (your case)", company: exportCase.name, peakSalesB: peakB, _own: true } : null;
+    return peakB != null && peakB > 0 ? { drug: programLabel(p, exportCase.programs) + " (your case)", company: exportCase.name, peakSalesB: peakB, _own: true } : null;
   }).filter(Boolean);
   const q = filter.trim().toLowerCase();
   const filtered = allPeakSalesDrugs
@@ -254,7 +254,7 @@ function PeakSalesCompsTool({ cases, updateCase, activeCase }) {
     );
     updateCase({ ...exportCase, programs: updatedPrograms, updatedAt: Date.now() });
     const progName = exportCase.programs.find(p => p.id === exportProgramId);
-    setExportMsg("Exported " + possessive(drug.drug) + " peak sales ($" + drug.peakSalesB + "B) to \"" + (progName ? (progName.drugName || progName.name) : "program") + "\" in \"" + exportCase.name + "\"");
+    setExportMsg("Exported " + possessive(drug.drug) + " peak sales ($" + drug.peakSalesB + "B) to \"" + (progName ? programLabel(progName, exportCase.programs) : "program") + "\" in \"" + exportCase.name + "\"");
   };
 
   // Every program in the export-target case, not just the one selected for
@@ -263,7 +263,7 @@ function PeakSalesCompsTool({ cases, updateCase, activeCase }) {
   const ownDrugs = (exportCase ? exportCase.programs : []).map(p => {
     let peakB = null;
     try { peakB = getProgramRevenueResult(p, 25).peakTotalRevenue / 1e9; } catch (e) {}
-    return peakB != null && peakB > 0 ? { drug: p.drugName || p.name, peakSalesB: peakB, _own: true } : null;
+    return peakB != null && peakB > 0 ? { drug: programLabel(p, exportCase.programs), peakSalesB: peakB, _own: true } : null;
   }).filter(Boolean);
 
   return h("div", null,
@@ -321,7 +321,7 @@ function PeakSalesCompsTool({ cases, updateCase, activeCase }) {
         exportCase && h(IncludeInReportToggle, { theCase: exportCase, updateCase, reportKey: "peakSalesComps", label: "Include comp chart in PDF report" }),
         exportCase && h("select", { "aria-label": "Program to export to", value: exportProgramId, onChange: e => setExportProgramId(e.target.value),
           style: { padding: "6px 10px", borderRadius: 6, border: "1.5px solid var(--rule)", background: "var(--surface)", color: "var(--ink-1)", fontFamily: "var(--mono)", fontSize: 12 } },
-          exportCase.programs.map(p => h("option", { key: p.id, value: p.id }, p.drugName || p.name))
+          exportCase.programs.map(p => h("option", { key: p.id, value: p.id }, programLabel(p, exportCase.programs)))
         )
       ),
       exportMsg && h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--teal)", marginBottom: 10 } }, exportMsg),
@@ -470,7 +470,7 @@ function LicensingCompsTool({ cases, updateCase, activeCase }) {
     });
     updateCase({ ...exportCase, programs: updatedPrograms, updatedAt: Date.now() });
     const progName = exportCase.programs.find(p => p.id === exportProgramId);
-    setExportMsg("Exported " + deal.licensor + "/" + deal.licensee + " terms to \"" + (progName ? (progName.drugName || progName.name) : "program") + "\" — enabled Partnership Economics with this deal's upfront" + (deal.royaltyLow != null ? " and royalty midpoint" : "") + ".");
+    setExportMsg("Exported " + deal.licensor + "/" + deal.licensee + " terms to \"" + (progName ? programLabel(progName, exportCase.programs) : "program") + "\" — enabled Partnership Economics with this deal's upfront" + (deal.royaltyLow != null ? " and royalty midpoint" : "") + ".");
   };
 
   return h("div", null,
@@ -494,7 +494,7 @@ function LicensingCompsTool({ cases, updateCase, activeCase }) {
         h(CasePicker, { cases, selectedId: exportCaseId, onChange: setExportCaseId }),
         exportCase && exportCase.programs.length > 0 && h("select", { "aria-label": "Program to export to", value: exportProgramId, onChange: e => setExportProgramId(e.target.value),
           style: { padding: "6px 10px", borderRadius: 6, border: "1.5px solid var(--rule)", background: "var(--surface)", color: "var(--ink-1)", fontFamily: "var(--mono)", fontSize: 12 } },
-          exportCase.programs.map(p => h("option", { key: p.id, value: p.id }, p.drugName || p.name))),
+          exportCase.programs.map(p => h("option", { key: p.id, value: p.id }, programLabel(p, exportCase.programs)))),
         exportMsg && h("span", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--teal)" } }, exportMsg)
       ),
 

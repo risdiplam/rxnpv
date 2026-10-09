@@ -1694,8 +1694,15 @@ function renderReadoutTiming(resultsDiv, t) {
   const pinBtn = el('button', { type: 'button', class: 'runbtn' }, 'Pin ' + windowText + ' as a catalyst window');
   pinBtn.addEventListener('click', () => {
     row.innerHTML = '';
-    const prog = theCase.programs[0];
-    row.appendChild(el('span', {}, 'Add a pinned Calibration Log entry for ' + (prog.drugName || prog.name || 'the program') + ' dated ' + windowText + '? It becomes the next catalyst if it comes before any other pin.'));
+    // On a multi-program case the readout belongs to one indication: ask which.
+    let pinIdx = 0;
+    if (theCase.programs.length > 1) {
+      const pick = el('select', { 'aria-label': 'Program this readout belongs to', style: 'min-height:28px;padding:3px 8px', onchange: e => { pinIdx = Number(e.target.value); } },
+        theCase.programs.map((p, i) => el('option', { value: String(i) }, programLabel(p, theCase.programs))));
+      row.appendChild(el('span', {}, ['Add a pinned Calibration Log entry dated ' + windowText + ' to ', pick, '? It becomes that program\u2019s next catalyst if it comes before any other pin.']));
+    } else {
+      row.appendChild(el('span', {}, 'Add a pinned Calibration Log entry for ' + programLabel(theCase.programs[0], theCase.programs) + ' dated ' + windowText + '? It becomes the next catalyst if it comes before any other pin.'));
+    }
     const yes = el('button', { type: 'button', class: 'runbtn' }, 'Confirm');
     const no = el('button', { type: 'button', style: 'padding:6px 12px;border-radius:6px;border:1px solid var(--rule);background:transparent;color:var(--ink-2);cursor:pointer' }, 'Cancel');
     yes.addEventListener('click', () => {
@@ -1703,7 +1710,7 @@ function renderReadoutTiming(resultsDiv, t) {
       const entry = { id: newId('cal'), catalystLabel: 'Event target reached: ' + t.targetEvents + ' events (simulated)', catalystDate: windowText, yourPoS: null, marketImpliedPoS: null, outcome: 'pending',
         pin: { type: 'topline', source: 'Trial simulator: ' + t.targetEvents + ' events, trial start ' + start[0] + ', 10th–90th percentile', at: localDateStamp() },
         notes: 'Median ' + at(t.median) + '. ' + (t.neverShare > 0 ? Math.round(t.neverShare * 100) + '% of runs did not reach the target on the planned follow-up.' : '') };
-      live.updateCase({ ...c, programs: c.programs.map((p, i) => i === 0 ? { ...p, calibrationLog: [...(p.calibrationLog || []), entry] } : p), updatedAt: Date.now() });
+      live.updateCase({ ...c, programs: c.programs.map((p, i) => i === pinIdx ? { ...p, calibrationLog: [...(p.calibrationLog || []), entry] } : p), updatedAt: Date.now() });
       row.innerHTML = '';
       row.appendChild(el('span', { style: 'color:var(--teal);font-weight:700' }, 'Pinned ' + windowText + ' on the case\u2019s Calibration Log.'));
     });
@@ -1733,8 +1740,8 @@ function renderUseAsCaseOdds(resultsDiv, result, run) {
     box.innerHTML = '';
     box.appendChild(el('div', { style: 'font-weight:700;margin-bottom:6px' }, 'Use as this case\u2019s odds'));
     if (theCase.programs.length > 1) {
-      const sel = el('select', { 'aria-label': 'Program to apply the odds to', onchange: e => { progIdx = Number(e.target.value); draw(); } },
-        theCase.programs.map((p, i) => { const o = el('option', { value: String(i) }, p.drugName || p.name || ('Program ' + (i + 1))); if (i === progIdx) o.selected = true; return o; }));
+      const sel = el('select', { 'aria-label': 'Program to apply the odds to', style: 'min-height:28px;padding:3px 8px', onchange: e => { progIdx = Number(e.target.value); draw(); } },
+        theCase.programs.map((p, i) => { const o = el('option', { value: String(i) }, programLabel(p, theCase.programs)); if (i === progIdx) o.selected = true; return o; }));
       box.appendChild(el('div', { style: 'margin-bottom:8px' }, ['Program: ', sel]));
     }
     const program = theCase.programs[progIdx];
@@ -1745,7 +1752,7 @@ function renderUseAsCaseOdds(resultsDiv, result, run) {
       el('div', {}, [el('b', {}, pct(win * 100)), ' chance this ' + conv.trialStage + ' trial reads out significant in the direction you expect' +
         (run.posDirectional != null && run.posDirectional < run.pos - 0.0005 ? ' (the ' + pct(run.pos * 100) + ' above also counts significant results the wrong way)' : '')]),
       el('div', {}, ['\u00d7 ', el('b', {}, pct(conv.laterOdds * 100)), ' benchmark odds of the steps after it (' + conv.laterStages.map(s => s.label + ' ' + Math.round(s.pos * 100) + '%').join(', ') + ')']),
-      el('div', {}, ['= ', el('b', {}, pct(conv.oddsPct)), ' odds of reaching launch for ' + (program.drugName || program.name || 'this program') + ', against ', el('b', {}, pct(conv.beforePct)), ' now (' + (conv.beforeSource === 'typed' ? 'your figure' : 'the benchmark') + ').'])
+      el('div', {}, ['= ', el('b', {}, pct(conv.oddsPct)), ' odds of reaching launch for ' + programLabel(program, theCase.programs) + ', against ', el('b', {}, pct(conv.beforePct)), ' now (' + (conv.beforeSource === 'typed' ? 'your figure' : 'the benchmark') + ').'])
     ];
     lines.forEach(l => { l.style.marginBottom = '3px'; box.appendChild(l); });
     box.appendChild(el('div', { class: 'subtle', style: 'margin-top:6px' }, 'It counts only a significant result on this endpoint under your prior. A safety problem, a primary endpoint different from the one simulated, or a prior that is too hopeful are not in it — a reason the case\u2019s own figure can sit lower.'));
@@ -2024,7 +2031,7 @@ function appendExportToCaseSection(resultsDiv, p50Value) {
     const c = bridge.cases.find(x => x.id === caseId);
     programContainer.innerHTML = '';
     if (c && c.programs && c.programs.length) {
-      const progOptions = c.programs.map(p => ({ value: p.id, label: p.drugName || p.name }));
+      const progOptions = c.programs.map(p => ({ value: p.id, label: programLabel(p, c.programs) }));
       programContainer.appendChild(selectInput('simExportProgramId', progOptions, c.programs[0].id));
     }
   }
@@ -2044,7 +2051,7 @@ function appendExportToCaseSection(resultsDiv, p50Value) {
     );
     liveBridge.updateCase({ ...targetCase, programs: updatedPrograms, updatedAt: Date.now() });
     const progName = targetCase.programs.find(p => p.id === programId);
-    exportMsg.textContent = 'Exported median peak sales ($' + formatNumber(p50Value) + ') to "' + (progName ? (progName.drugName || progName.name) : 'program') + '" in "' + targetCase.name + '".';
+    exportMsg.textContent = 'Exported median peak sales ($' + formatNumber(p50Value) + ') to "' + (progName ? programLabel(progName, targetCase.programs) : 'program') + '" in "' + targetCase.name + '".';
   };
 
   resultsDiv.appendChild(field('Case', caseSelect));

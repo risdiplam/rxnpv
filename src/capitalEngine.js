@@ -34,14 +34,20 @@ function ifConvertedShares(faceValue, convPrice, currentPrice) {
 
 // ── Full diluted share count + capital structure summary ──
 // capStruct = { mode: 'simple'|'detailed', dilutedSharesSimple, basicShares, currentPrice,
-//               cash, debt, opts, optK, war, warK, convFace, convPrice }
+//               cash, debt, opts, optK, war, warK, convFace, convPrice, prefShares }
+// prefShares (October 2026): preferred stock that converts into common and
+// shares in dividends and liquidation as if converted — the usual biotech PIPE
+// instrument (AstraZeneca's $2.0B in Summit, 1:1,000 at $18.36). Economically
+// it is common stock, so its as-converted shares count at any price. The
+// if-converted note field would have treated it as $2.0B of debt while the
+// price sat below $18.36.
 function computeCapitalStructure(capStruct) {
   const price = numOr(capStruct.currentPrice, 0);
   if (capStruct.mode === "simple") {
     return {
       dilutedShares: numOr(capStruct.dilutedSharesSimple, 0),
       basicShares: numOr(capStruct.dilutedSharesSimple, 0),
-      optionShares: 0, warrantShares: 0, convertShares: 0, convertsInTheMoney: false,
+      preferredShares: 0, optionShares: 0, warrantShares: 0, convertShares: 0, convertsInTheMoney: false,
       netCash: (numOr(capStruct.cash, 0)) - (numOr(capStruct.debt, 0))
     };
   }
@@ -49,12 +55,13 @@ function computeCapitalStructure(capStruct) {
   const optionShares = treasuryMethodShares(capStruct.opts, capStruct.optK, price);
   const warrantShares = treasuryMethodShares(capStruct.war, capStruct.warK, price);
   const conv = ifConvertedShares(capStruct.convFace, capStruct.convPrice, price);
+  const preferredShares = Math.max(0, numOr(capStruct.prefShares, 0));
   // Convention: "debt" entered by the user should EXCLUDE any convertible note tracked separately
   // here. If the convertible doesn't convert to equity, its face value counts as debt (subtracted
   // from net cash below); if it does convert, it becomes shares instead and drops out of net cash.
   return {
-    dilutedShares: basic + optionShares + warrantShares + conv.shares,
-    basicShares: basic, optionShares, warrantShares, convertShares: conv.shares, convertsInTheMoney: conv.converts,
+    dilutedShares: basic + preferredShares + optionShares + warrantShares + conv.shares,
+    basicShares: basic, preferredShares, optionShares, warrantShares, convertShares: conv.shares, convertsInTheMoney: conv.converts,
     netCash: (numOr(capStruct.cash, 0)) - (numOr(capStruct.debt, 0)) - (conv.converts ? 0 : (numOr(capStruct.convFace, 0)))
   };
 }

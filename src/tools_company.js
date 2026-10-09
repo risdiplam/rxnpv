@@ -95,7 +95,7 @@ function CompanyLookupTool({ cases, updateCase, activeCase, onWatchTrial }) {
       programs: appendEdgarEvidenceToPrograms(c.programs, edgarResult, "Company Lookup's EDGAR pull"),
       updatedAt: Date.now()
     });
-    setExportMsg("Exported to \"" + c.name + "\"" + (!edgarResult.options && !edgarResult.warrants ? " — shares are basic only; add options and warrants yourself" : ""));
+    setExportMsg("Exported to \"" + c.name + "\"" + (!edgarResult.options && !edgarResult.warrants ? " — shares are basic only; add options and warrants yourself" : "") + (edgarResult.preferred ? " — the preferred shares are not included; enter what they convert into" : ""));
   };
 
   const loadInsiderActivity = async () => {
@@ -142,6 +142,9 @@ function CompanyLookupTool({ cases, updateCase, activeCase, onWatchTrial }) {
           ),
           !edgarResult.options && !edgarResult.warrants && h("div", { className: "dilution-untagged", style: { color: "var(--warn)", marginTop: 2 } },
             "Options and warrants are not tagged in this company's filings" + (edgarResult.antidilutive ? "; its " + edgarResult.antidilutive.asOf + " filing excludes " + fmtNum(edgarResult.antidilutive.count) + " potentially dilutive shares (options, warrants, RSUs, conversions) from EPS" : "") + ". The export uses basic shares only: add them from the filing's equity note (Assumptions → Capital structure → Detailed)."),
+          edgarResult.preferred && h("div", { className: "preferred-tagged", style: { color: "var(--warn)", marginTop: 2 } },
+            "The " + edgarResult.preferred.asOf + " filing reports " + fmtNum(edgarResult.preferred.count) + " preferred shares outstanding (" + edgarResult.preferred.tag + "). If they convert into common, enter the common shares they convert into under Capital structure → Detailed → Convertible preferred; the export leaves them out."),
+          h("div", { style: { color: "var(--ink-3)", fontSize: 10, marginTop: 2 } }, "Shares and cash are as of the last filing. A placement announced since (an 8-K) is not in them — check the company's recent 8-Ks before exporting."),
           edgarResult.sourceFilingUrl && h("div", { style: { marginTop: 4 } }, h(ExternalLink, { href: edgarResult.sourceFilingUrl, style: { fontSize: 10 } }, "→ View source filing" + (edgarResult.sourceFilingLabel ? " (" + edgarResult.sourceFilingLabel + ")" : "")))
         ),
         h("div", { style: { display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginTop: 10, paddingTop: 10, borderTop: "1px dashed var(--rule)" } },
@@ -451,7 +454,7 @@ function CatalystCalendarTool({ cases, updateCase, activeCase }) {
           pins.map((x, i) => h("div", { key: i, style: { padding: "8px 12px", borderRadius: 6, background: "var(--surface-2)", fontSize: 11, fontFamily: "var(--mono)" } },
             h("div", { style: { display: "flex", justifyContent: "space-between", gap: 10 } },
               h("span", { style: { color: "var(--teal)", fontWeight: 700 } }, (x.e.catalystDate || "undated") + " · " + catalystPinLabel(x.e.pin)),
-              h("span", { style: { color: "var(--ink-3)" } }, caseDisplayName(x.c) + " · " + (x.p.drugName || x.p.name || "Program"))),
+              h("span", { style: { color: "var(--ink-3)" } }, caseDisplayName(x.c) + " · " + programLabel(x.p, x.c.programs))),
             h("div", { style: { color: "var(--ink-1)", marginTop: 2 } }, x.e.catalystLabel),
             h("div", { style: { color: "var(--ink-3)", marginTop: 2 } }, "Source: " + (x.e.pin.source || "not given") + (x.e.pin.at ? " · pinned " + x.e.pin.at : ""))))
         )

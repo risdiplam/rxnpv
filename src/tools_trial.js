@@ -785,6 +785,8 @@ function TrialWatchTool({ activeCase, updateCase, initialNctId, onConsumedInitia
   const casePhase = activeCase && activeCase.programs && activeCase.programs[0] && /^phase[123]$/.test(activeCase.programs[0].currentPhase) ? activeCase.programs[0].currentPhase.toUpperCase() : "";
   const phaseFromCase = useCasePrefill(activeCase, casePhase, ctPhase, setCtPhase, "PHASE2");
   const [ctIntervention, setCtIntervention] = React.useState("");
+  // The rival drugs a case saved with its competitor list come back with it.
+  useCasePrefill(activeCase, activeCase && activeCase.competitorReads ? activeCase.competitorReads.intervention || "" : "", ctIntervention, setCtIntervention, "");
   const [ctLoading, setCtLoading] = React.useState(false);
   const [ctSummary, setCtSummary] = React.useState(null);
   const [ctError, setCtError] = React.useState(null);
@@ -883,7 +885,7 @@ function TrialWatchTool({ activeCase, updateCase, initialNctId, onConsumedInitia
           style: { padding: "7px 10px", borderRadius: 6, border: "1.5px solid var(--rule)", background: "var(--surface)", color: "var(--ink-1)", fontFamily: "var(--mono)", fontSize: 12 } },
           h("option", { value: "PHASE1" }, "Phase 1"), h("option", { value: "PHASE2" }, "Phase 2"),
           h("option", { value: "PHASE3" }, "Phase 3"), h("option", { value: "PHASE4" }, "Phase 4")),
-        h("input", { type: "text", value: ctIntervention, placeholder: "Intervention (optional)", "aria-label": "Intervention", onChange: e => setCtIntervention(e.target.value),
+        h("input", { type: "text", value: ctIntervention, placeholder: "Intervention or rival drugs, comma-separated (optional)", "aria-label": "Intervention", onChange: e => setCtIntervention(e.target.value),
           style: { flex: "1 1 180px", padding: "7px 10px", borderRadius: 6, border: "1.5px solid var(--rule)", background: "var(--surface)", color: "var(--ink-1)", fontFamily: "var(--mono)", fontSize: 13 } }),
         h("button", { onClick: searchComps, disabled: ctLoading,
           style: { padding: "7px 16px", borderRadius: 6, border: "1px solid var(--teal)", background: "var(--teal-bg)", color: "var(--teal)", fontFamily: "var(--mono)", fontSize: 12, fontWeight: 700, cursor: ctLoading ? "default" : "pointer" }
@@ -895,6 +897,7 @@ function TrialWatchTool({ activeCase, updateCase, initialNctId, onConsumedInitia
         h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", fontWeight: 700, color: "var(--ink-2)", marginBottom: 6 } },
           ctSummary.totalMatched + " matching trials on ClinicalTrials.gov (showing " + ctSummary.sampleSize + ")"),
         ctSummary.droppedUnrelated > 0 && h("div", { style: { ...UI.caption, marginBottom: 6 } }, conditionDropNote(ctSummary.droppedUnrelated, ctSummary.query.condition)),
+        ctSummary.droppedOffDrug > 0 && h("div", { style: { ...UI.caption, marginBottom: 6 } }, ctSummary.droppedOffDrug + " more left out: ClinicalTrials.gov returned them for the drug names, but none registers any of " + assetProgramNames(ctSummary.query.intervention).join(", ") + " as an intervention or in its title."),
         h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-2)", lineHeight: 1.7 } },
           ctSummary.medianDurationMonths != null && h("div", null, "Median start-to-completion: " + ctSummary.medianDurationMonths + " months"),
           ctSummary.medianEnrollment != null && h("div", null, "Median enrollment: " + ctSummary.medianEnrollment)
@@ -1043,10 +1046,10 @@ function TrialWatchTool({ activeCase, updateCase, initialNctId, onConsumedInitia
                 r.readsFirst && h("span", { style: { color: "var(--warn)", fontWeight: 700 } }, "reads first")))),
             (ord.undated > 0 || ord.ownExcluded > 0) && h("div", { style: { ...UI.caption, marginTop: 4 } }, [ord.undated > 0 ? ord.undated + " with no completion date left out" : null, ord.ownExcluded > 0 ? ord.ownExcluded + " of the case's own trials left out (its program's trial IDs)" : null].filter(Boolean).join("; ") + "."),
             activeCase && updateCase && h("button", { type: "button", "data-no-export": "",
-              onClick: () => updateCase({ ...activeCase, competitorReads: { condition: ctCondition, phase: ctPhase, at: localDateStamp(), rows: ord.rows.slice(0, 10).map(r => ({ nctId: r.nctId, sponsor: r.sponsor, phase: r.phase, date: r.date, which: r.which })) }, updatedAt: Date.now() }),
+              onClick: () => updateCase({ ...activeCase, competitorReads: { condition: ctCondition, phase: ctPhase, intervention: ctIntervention.trim() || undefined, at: localDateStamp(), rows: ord.rows.slice(0, 10).map(r => ({ nctId: r.nctId, sponsor: r.sponsor, phase: r.phase, date: r.date, which: r.which })) }, updatedAt: Date.now() }),
               style: { marginTop: 8, padding: "4px 10px", minHeight: 28, borderRadius: 6, border: "1px solid var(--rule)", background: "transparent", color: "var(--ink-2)", fontFamily: "var(--mono)", fontSize: 10.5, cursor: "pointer" } },
               activeCase.competitorReads ? "Update the competitor list saved to " + caseDisplayName(activeCase) : "Save to " + caseDisplayName(activeCase) + " for the Portfolio catalyst list"),
-            activeCase && activeCase.competitorReads && h("div", { style: { ...UI.caption, marginTop: 4 } }, "Saved " + activeCase.competitorReads.at + " from \u201c" + activeCase.competitorReads.condition + "\u201d."));
+            activeCase && activeCase.competitorReads && h("div", { style: { ...UI.caption, marginTop: 4 } }, "Saved " + activeCase.competitorReads.at + " from \u201c" + activeCase.competitorReads.condition + "\u201d" + (activeCase.competitorReads.intervention ? ", drugs \u201c" + activeCase.competitorReads.intervention + "\u201d" : "") + "."));
         })()
       )
     ]),

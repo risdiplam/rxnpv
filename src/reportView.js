@@ -271,7 +271,7 @@ function ReportView({ theCase, onBack, updateCase }) {
             h("tbody", null, theCase.programs.map((p, i) => {
               const pv = baseResult ? baseResult.programVals.find(pv => pv.id === p.id) : null;
               return h("tr", { key: i, style: { borderBottom: "1px solid " + rpt.rule } },
-                h("td", { style: { padding: "5px 8px" } }, p.drugName || p.name),
+                h("td", { style: { padding: "5px 8px" } }, programLabel(p, theCase.programs)),
                 h("td", { style: { padding: "5px 8px" } }, (p.currentPhase || "").replace("phase","Phase ")),
                 h("td", { style: { padding: "5px 8px" } }, p.therapeuticArea),
                 h("td", { style: { padding: "5px 8px" } }, p.revenueMode === "full" ? "Full" : "Quick"),
@@ -330,6 +330,9 @@ function ReportView({ theCase, onBack, updateCase }) {
                 h("tr", { style: { borderBottom: "1px solid " + rpt.rule } },
                   h("td", { style: { padding: "5px 8px", color: rpt.ink3 } }, "Corporate G&A (shared)"),
                   h("td", { style: { padding: "5px 8px", textAlign: "right", fontFamily: "var(--mono)", color: rpt.red } }, fmtMoney(sotp.gaDrag))),
+                (sotp.licenceGroups || []).length > 0 && h("tr", { style: { borderBottom: "1px solid " + rpt.rule } },
+                  h("td", { style: { padding: "5px 8px", color: rpt.ink3 } }, "Owed to " + (sotp.licenceGroups.map(g => g.licensor).filter(Boolean).join(", ") || "the licensor") + " on total drug sales (shared)"),
+                  h("td", { style: { padding: "5px 8px", textAlign: "right", fontFamily: "var(--mono)", color: rpt.red } }, fmtMoney(sotp.licenceDrag))),
                 h("tr", null,
                   h("td", { style: { padding: "5px 8px", fontWeight: 700 } }, "Total Enterprise Value"),
                   h("td", { style: { padding: "5px 8px", textAlign: "right", fontFamily: "var(--mono)", fontWeight: 700 } }, fmtMoney(sotp.sumOfParts)))
@@ -414,7 +417,7 @@ function ReportView({ theCase, onBack, updateCase }) {
           const ownDrugs = theCase.programs.map(p => {
             let peakB = null;
             try { peakB = getProgramRevenueResult(p, 25).peakTotalRevenue / 1e9; } catch (e) {}
-            return peakB != null && peakB > 0 ? { drug: p.drugName || p.name, peakSalesB: peakB, _own: true } : null;
+            return peakB != null && peakB > 0 ? { drug: programLabel(p, theCase.programs), peakSalesB: peakB, _own: true } : null;
           }).filter(Boolean);
           if (!ownDrugs.length) return null;
           const allDrugs = [...PEAK_SALES_COMPS.drugs, ...loadCustomComps(CUSTOM_PEAKSALES_KEY)];

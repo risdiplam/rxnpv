@@ -83,7 +83,13 @@ function computeMarketingCost(years, peakRevenue, marketingPctOfPeak, yearsToLOE
 // a cost that exists only once the drug sells, so it comes out of product
 // contribution and is weighted by the odds of launch with the revenue.
 //   royaltyPct      — % of the company's OWN net sales (commercialRevenue);
-//                     a tiered royalty is entered as its blended rate
+//                     a tiered royalty can be its blended rate, or:
+//   tiers           — [{ upToM, pct }] (October 2026), marginal like tax
+//                     bands: pct applies to the slice of annual sales up to
+//                     upToM ($M a year); a blank upToM is the top band. When
+//                     any tier carries a rate, tiers replace royaltyPct.
+//   shared          — the terms cover every program of the same drug (a
+//                     licence is per molecule): see drugLicenceExpectedByYear
 //   sublicensePct   — % of partner royalty income (partnerRoyalty) owed on
 //                     (upfronts and milestones received: computePartnershipContribution)
 //   approvalMilestoneM — paid in the first launch year
@@ -94,7 +100,7 @@ function licensorObligationsByYear(commercialRevenue, partnerRoyalty, lic) {
   const zeros = () => new Array(n).fill(0);
   if (!lic || !lic.enabled) return { royalty: zeros(), share: zeros(), milestones: zeros(), total: zeros() };
   const pct = v => Math.min(100, Math.max(0, numOr(v, 0))) / 100;
-  const royalty = commercialRevenue.map(r => Math.round(r * pct(lic.royaltyPct)));
+  const royalty = commercialRevenue.map(r => Math.round(licenceRoyaltyOn(r, lic)));
   const share = (partnerRoyalty || zeros()).map(r => Math.round(r * pct(lic.sublicensePct)));
   const milestones = zeros();
   const approval = Math.max(0, numOr(lic.approvalMilestoneM, 0)) * 1e6;
@@ -107,10 +113,113 @@ function licensorObligationsByYear(commercialRevenue, partnerRoyalty, lic) {
   });
   return { royalty, share, milestones, total: royalty.map((v, i) => v + share[i] + milestones[i]) };
 }
+// The royalty on one year's own net sales: marginal tiers when any carries a
+// rate, else the flat royaltyPct. Tiers are sorted by their ceiling, blank
+// ceiling last; sales past the last ceiling pay the last tier's rate.
+function licenceTiers(lic) {
+  const t = ((lic && lic.tiers) || []).filter(x => x && x.pct !== "" && x.pct != null && isFinite(Number(x.pct)))
+    .map(x => ({ upTo: x.upToM !== "" && x.upToM != null && Number(x.upToM) > 0 ? Number(x.upToM) * 1e6 : Infinity, pct: Math.min(100, Math.max(0, Number(x.pct))) / 100 }));
+  return t.sort((a, b) => a.upTo - b.upTo);
+}
+function licenceRoyaltyOn(sales, lic) {
+  const r = Math.max(0, sales || 0);
+  const tiers = licenceTiers(lic);
+  if (!tiers.length) return r * Math.min(100, Math.max(0, numOr(lic && lic.royaltyPct, 0))) / 100;
+  let owed = 0, floor = 0;
+  for (const t of tiers) {
+    if (r <= floor) break;
+    owed += (Math.min(r, t.upTo) - floor) * t.pct;
+    floor = t.upTo;
+  }
+  if (r > floor) owed += (r - floor) * tiers[tiers.length - 1].pct;
+  return owed;
+}
+
+// ── One licence across several programs of the same drug (October 2026) ──
+// A licence is per molecule: Akeso's royalty and its $3.5B of sales milestones
+// run on total ivonescimab sales, whichever indication they come from.
+// Programs are "the same drug" when their drug names match (case-insensitive).
+// A program whose licensor is enabled and marked shared leads; every other
+// program of that drug is covered by it. Inert with one program of the drug.
+function licenceDrugKey(p) { return String((p && p.drugName) || "").trim().toLowerCase(); }
+function sharedLicenceFor(program, programs) {
+  const key = licenceDrugKey(program);
+  if (!key || !programs) return null;
+  const same = programs.filter(q => licenceDrugKey(q) === key);
+  if (same.length < 2) return null;
+  const lead = same.find(q => q.licensor && q.licensor.enabled && q.licensor.shared);
+  return lead ? { lead, members: same, key } : null;
+}
+// The licence a program's own P&L carries. Covered by a shared licence: only
+// its own approval milestone and the sublicense share of partner income stay
+// per program; the royalty and sales milestones move to the drug level.
+function effectiveLicensor(program, programs) {
+  const g = sharedLicenceFor(program, programs);
+  if (!g) return program.licensor;
+  const L = g.lead.licensor, own = program.licensor || {};
+  return { enabled: true, name: L.name, royaltyPct: "0", tiers: [], sublicensePct: L.sublicensePct, salesMilestones: [],
+    approvalMilestoneM: program.id === g.lead.id ? L.approvalMilestoneM : own.approvalMilestoneM, _covered: g.lead.id };
+}
+// The drug-level royalty and sales milestones, by calendar year, as expected
+// values. pvs: program valuations (each with its program, posToLaunch,
+// launchYearOffset and pnl rows carrying commercialRevenue); programs: the
+// case's programs. A group counts only when every member is in pvs (a
+// stand-alone program in the SOTP is valued without the drug-level terms,
+// which are shown as their own line). Exact under the valuation's own
+// assumption that programs succeed independently: every combination of
+// members working or not is enumerated (2^m, m capped at 10), its own-sales
+// total built year by year, the royalty and the first year each sales level
+// is reached computed on that total, and weighted by the combination's
+// probability. A flat royalty with no milestones gives exactly the
+// per-program answer (linear); tiers and thresholds do not.
+function drugLicenceExpectedByYear(pvs, programs, totalYears) {
+  const out = { royalty: new Array(totalYears).fill(0), milestones: new Array(totalYears).fill(0), total: new Array(totalYears).fill(0), groups: [] };
+  const seen = new Set();
+  (programs || []).forEach(p => {
+    const g = sharedLicenceFor(p, programs);
+    if (!g || seen.has(g.key)) return;
+    seen.add(g.key);
+    const members = g.members.map(m => pvs.find(v => v.id === m.id)).filter(Boolean);
+    if (members.length !== g.members.length || members.length > 10) return;
+    const L = g.lead.licensor;
+    const salesAt = (v, cy) => { const row = v.pnl && v.pnl[cy - (v.launchYearOffset || 0)]; return row ? row.commercialRevenue || 0 : 0; };
+    const roy = new Array(totalYears).fill(0), mil = new Array(totalYears).fill(0);
+    const m = members.length;
+    for (let mask = 0; mask < (1 << m); mask++) {
+      let prob = 1;
+      for (let i = 0; i < m; i++) prob *= (mask >> i) & 1 ? members[i].posToLaunch : 1 - members[i].posToLaunch;
+      if (!(prob > 0)) continue;
+      const total = [];
+      for (let cy = 0; cy < totalYears; cy++) {
+        let s = 0;
+        for (let i = 0; i < m; i++) if ((mask >> i) & 1) s += salesAt(members[i], cy);
+        total.push(s);
+        roy[cy] += prob * licenceRoyaltyOn(s, L);
+      }
+      (L.salesMilestones || []).forEach(ms => {
+        const threshold = Math.max(0, numOr(ms.thresholdM, 0)) * 1e6, pay = Math.max(0, numOr(ms.paymentM, 0)) * 1e6;
+        if (!(pay > 0)) return;
+        const at = total.findIndex(s => s > 0 && s >= threshold);
+        if (at >= 0) mil[at] += prob * pay;
+      });
+    }
+    for (let cy = 0; cy < totalYears; cy++) { out.royalty[cy] += roy[cy]; out.milestones[cy] += mil[cy]; out.total[cy] += roy[cy] + mil[cy]; }
+    out.groups.push({ key: g.key, leadId: g.lead.id, licensor: L.name || "", memberIds: g.members.map(x => x.id) });
+  });
+  return out;
+}
+// Applies the drug-level terms to a company calendar (computeCompanyRiskAdjustedCF's
+// output): they come out of product contribution and free cash flow, before tax.
+function applyDrugLicences(calendar, pvs, programs) {
+  const owed = drugLicenceExpectedByYear(pvs, programs, calendar.length);
+  if (!owed.groups.length) return calendar;
+  return calendar.map((c, i) => ({ ...c, drugLicence: owed.total[i], riskAdjProductContribution: c.riskAdjProductContribution - owed.total[i], riskAdjFCF: c.riskAdjFCF - owed.total[i] }));
+}
+
 // True when a program owes anything to a licensor (labels and notes read it).
 function hasLicensorObligations(program) {
   const lic = program && program.licensor;
-  return !!(lic && lic.enabled && (numOr(lic.royaltyPct, 0) > 0 || numOr(lic.sublicensePct, 0) > 0 || numOr(lic.approvalMilestoneM, 0) > 0 || (lic.salesMilestones || []).some(m => numOr(m.paymentM, 0) > 0)));
+  return !!(lic && lic.enabled && (numOr(lic.royaltyPct, 0) > 0 || licenceTiers(lic).some(t => t.pct > 0) || numOr(lic.sublicensePct, 0) > 0 || numOr(lic.approvalMilestoneM, 0) > 0 || (lic.salesMilestones || []).some(m => numOr(m.paymentM, 0) > 0)));
 }
 
 function computeProgramPnL(revenueResult, cost) {
@@ -139,7 +248,7 @@ function computeProgramPnL(revenueResult, cost) {
   const owed = licensorObligationsByYear(commercialRevenue, royaltyRevenue, cost.licensor);
   const productContribution = grossProfit.map((gp, i) => gp - salesForce[i] - marketing[i] - owed.total[i]);
   const rows = years.map((y, i) => ({
-    year: y, revenue: revenue[i], cogs: cogs[i], grossProfit: grossProfit[i],
+    year: y, revenue: revenue[i], commercialRevenue: commercialRevenue[i], cogs: cogs[i], grossProfit: grossProfit[i],
     salesForce: salesForce[i], marketing: marketing[i],
     licensorRoyalty: owed.royalty[i], licensorShare: owed.share[i], licensorMilestones: owed.milestones[i], licensorTotal: owed.total[i],
     productContribution: productContribution[i]

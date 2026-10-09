@@ -70,8 +70,29 @@ function newProgram() {
     // What the company owes the licensor it in-licensed this asset from
     // (October 2026): the mirror of a partnership. Off by default; see
     // licensorObligationsByYear in costEngine.js.
-    licensor: { enabled: false, name: "", royaltyPct: "", sublicensePct: "", approvalMilestoneM: "", salesMilestones: [], note: "" }
+    licensor: { enabled: false, name: "", royaltyPct: "", tiers: [], shared: false, sublicensePct: "", approvalMilestoneM: "", salesMilestones: [], note: "" }
   };
+}
+
+// Annual price from a price per dose (October 2026). Infused cancer drugs are
+// priced per dose or cycle; the build wants a price per patient-year on drug.
+// Time on treatment is Step 1's job, so this is doses a year, not doses a
+// course. Nothing here is saved — "Use" writes the product into the price.
+function PricePerDoseHelper({ onUse }) {
+  const h = React.createElement;
+  const [open, setOpen] = React.useState(false);
+  const [perDose, setPerDose] = React.useState("");
+  const [doses, setDoses] = React.useState("");
+  const annual = numOr(perDose, 0) * numOr(doses, 0);
+  return h("div", { style: { flex: "1 1 100%" } },
+    h("button", { type: "button", className: "link-btn", "aria-expanded": open, onClick: () => setOpen(!open), style: { fontSize: 11 } }, (open ? "▾ " : "▸ ") + "From a price per dose"),
+    open && h("div", { style: { display: "flex", gap: 12, flexWrap: "wrap", alignItems: "flex-end", marginTop: 6, padding: "8px 10px", borderRadius: 7, background: "var(--surface-2)" } },
+      h(BenchField, { label: "Price per dose", value: perDose, onChange: setPerDose, suffix: "$", placeholder: "e.g. 11144" }),
+      h(BenchField, { label: "Doses a year on drug", value: doses, onChange: setDoses, placeholder: "e.g. 17.4 (every 3 weeks)" }),
+      h("button", { type: "button", disabled: !(annual > 0), onClick: () => onUse(String(Math.round(annual))),
+        style: { padding: "6px 12px", borderRadius: 6, border: "1px solid var(--teal)", background: "var(--teal-bg)", color: "var(--teal)", fontFamily: "var(--mono)", fontSize: 11, fontWeight: 700, cursor: annual > 0 ? "pointer" : "default", opacity: annual > 0 ? 1 : 0.5, minHeight: 28 } },
+        annual > 0 ? "Use " + fmtMoney(annual) + " a year" : "Use"),
+      h("div", { style: { ...UI.caption, flex: "1 1 100%", lineHeight: 1.5 } }, "A year on drug, not a course — how long patients stay on it goes in Step 1 (years each patient is treated). For a real-world check, Tools → Commercial → Launch & Actuals shows Medicare's spend per patient a year: about $79K for Keytruda in 2024, against ~$194K for a full year at Medicare's own rate ($55.72 a mg, 200 mg every three weeks), because most patients are not on it all year.")));
 }
 
 function ProgramEditor({ program, onChange, onDelete, discountRatePct, terminalValue, valuationMethod, basePosAdjustmentPct, onNavigateToTools, part, theCase }) {
@@ -144,9 +165,9 @@ function ProgramEditor({ program, onChange, onDelete, discountRatePct, terminalV
     } catch (e) {}
   }
 
-  const chartSeries = result ? [{ name: (program.drugName || program.name) + " — US", color: "var(--teal)", points: result.years.map(y => ({ v: y.usRevenue, label: y.year })) },
-    rb.pricing.includeExUS ? { name: (program.drugName || program.name) + " — Total (US + ex-US)", color: "var(--amber)", points: result.years.map(y => ({ v: y.totalRevenue, label: y.year })) } : null,
-    pnl ? { name: (program.drugName || program.name) + " — Product contribution", color: "var(--slate)", points: pnl.map(y => ({ v: y.productContribution, label: y.year })) } : null
+  const chartSeries = result ? [{ name: programLabel(program, theCase && theCase.programs) + " — US", color: "var(--teal)", points: result.years.map(y => ({ v: y.usRevenue, label: y.year })) },
+    rb.pricing.includeExUS ? { name: programLabel(program, theCase && theCase.programs) + " — Total (US + ex-US)", color: "var(--amber)", points: result.years.map(y => ({ v: y.totalRevenue, label: y.year })) } : null,
+    pnl ? { name: programLabel(program, theCase && theCase.programs) + " — Product contribution", color: "var(--slate)", points: pnl.map(y => ({ v: y.productContribution, label: y.year })) } : null
   ].filter(Boolean) : [];
 
   return h("div", { style: { marginBottom: 30 } },
@@ -163,7 +184,7 @@ function ProgramEditor({ program, onChange, onDelete, discountRatePct, terminalV
     // level — a program carries its own revenue build, Evidence Log and
     // Calibration Log, all lost with no confirmation before this existed.
     show("inputs") && (confirmingDelete && h(ConfirmDialog, {
-      title: "Remove " + (program.drugName || program.name || "this program") + "?",
+      title: "Remove " + programLabel(program, theCase && theCase.programs) + "?",
       message: "This removes its revenue build, cost structure, Evidence Log and Calibration Log entries. This can't be undone.",
       confirmLabel: "Remove program",
       onCancel: () => setConfirmingDelete(false),
@@ -304,8 +325,8 @@ function ProgramEditor({ program, onChange, onDelete, discountRatePct, terminalV
         ? h(BenchField, { label: "Prevalence (existing cases, target region)", value: rb.population.prevalence, onChange: v => set("revenueBuild.population.prevalence", v), placeholder: "e.g. 20000", suffix: "pts" })
         : h(React.Fragment, null,
             h(BenchField, { label: "Annual incidence (new cases/yr)", value: rb.population.incidence, onChange: v => set("revenueBuild.population.incidence", v), placeholder: "e.g. 50000", suffix: "pts/yr" }),
-            h(BenchField, { label: "Disease duration (yrs pt lives w/ disease)", value: rb.population.diseaseDurationYears, onChange: v => set("revenueBuild.population.diseaseDurationYears", v), placeholder: "e.g. 5", suffix: "yrs",
-              help: "Prevalence = Incidence × Disease duration" })
+            h(BenchField, { label: "Years each patient is treated", value: rb.population.diseaseDurationYears, onChange: v => set("revenueBuild.population.diseaseDurationYears", v), placeholder: "e.g. 5", suffix: "yrs",
+              help: "Patients on treatment = incidence × years. A chronic disease: how long a patient lives with it. Cancer: how long a patient stays on this drug — usually under a year, and shorter than survival (October 2026)." })
           ),
       h(BenchField, { label: "Diagnosis rate", value: rb.population.diagnosisRatePct, onChange: v => set("revenueBuild.population.diagnosisRatePct", v), suffix: "%", placeholder: "% of cases diagnosed" }),
       h(BenchField, { label: "Treatment rate", value: rb.population.treatmentRatePct, onChange: v => set("revenueBuild.population.treatmentRatePct", v), suffix: "%", placeholder: "% of diagnosed who get treated" }),
@@ -389,6 +410,7 @@ function ProgramEditor({ program, onChange, onDelete, discountRatePct, terminalV
     h(SectionCard, { nav: "price", title: "Step 5 of 5 · Pricing", subtitle: "US annual price per patient — and which price basis that number is on" },
       h(BenchField, { label: "US annual price per patient", value: rb.pricing.usAnnualPrice, onChange: v => set("revenueBuild.pricing.usAnnualPrice", v), suffix: "$/yr", placeholder: "e.g. 150000",
         help: "Whatever number you have — list or net. Tell the model which basis it's on below and it converts." }),
+      h(PricePerDoseHelper, { onUse: v => set("revenueBuild.pricing.usAnnualPrice", v) }),
       h("div", { style: { flex: "1 1 220px" } },
         h("div", { style: UI.fieldLabel }, "That price is on a…"),
         h("select", { "aria-label": "Price basis", value: rb.pricing.priceBasis || "ASP", onChange: e => set("revenueBuild.pricing.priceBasis", e.target.value),
@@ -470,7 +492,7 @@ function ProgramEditor({ program, onChange, onDelete, discountRatePct, terminalV
 
     // ── Output readout ──
     show("inputs") && (error ? h("div", { style: { padding: 14, borderRadius: 8, background: "var(--red-bg)", border: "1px solid var(--red)", color: "var(--red)", fontFamily: "var(--mono)", fontSize: 12 } }, "Calculation error: " + error)
-    : h(ExportSection, { nav: "output", title: (program.drugName || program.name || "Program") + " — revenue build output", style: { background: "var(--surface)", border: "1px solid var(--rule)", borderRadius: 10, padding: "16px 18px" } },
+    : h(ExportSection, { nav: "output", title: programLabel(program, theCase && theCase.programs) + " — revenue build output", style: { background: "var(--surface)", border: "1px solid var(--rule)", borderRadius: 10, padding: "16px 18px" } },
         h("div", { style: { display: "flex", gap: 24, flexWrap: "wrap", marginBottom: 14 } },
           // Quick mode types a peak revenue and never estimates patients, so
           // the count is not shown there (it printed 0).
@@ -491,7 +513,7 @@ function ProgramEditor({ program, onChange, onDelete, discountRatePct, terminalV
             h("div", { style: { fontSize: 22, fontFamily: "var(--mono)", fontWeight: 700, color: "var(--ink-1)" } }, fmtMoney(Math.max(...pnl.map(y => y.productContribution)))),
             h("div", { style: UI.caption }, "revenue − COGS − sales − marketing"))
         ),
-        h(ExportableBlock, { title: (program.drugName || program.name || "Program") + " — revenue by year" },
+        h(ExportableBlock, { title: programLabel(program, theCase && theCase.programs) + " — revenue by year" },
           h(RevenueChart, { series: chartSeries, showLegend: true }))
       )),
 
@@ -600,10 +622,10 @@ function ProgramEditor({ program, onChange, onDelete, discountRatePct, terminalV
         const tv = terminalValue || { enabled: false };
         const scenario = applyBasePosAdjustment(SCENARIO_PRESETS.base, basePosAdjustmentPct);
         wf = computeProgramRiskWaterfall(program, scenario, "base", discountRatePct,
-          { enabled: tv.enabled, method: tv.method, growthPct: tv.growthPct, exitMultiple: tv.exitMultiple });
+          { enabled: tv.enabled, method: tv.method, growthPct: tv.growthPct, exitMultiple: tv.exitMultiple }, theCase && theCase.programs);
       } catch (e) { wfError = e.message; }
       if (wfError) return null;
-      return h(ExportSection, { nav: "waterfall", title: "Risk waterfall — " + (program.drugName || program.name || "this asset"), style: { marginTop: 14, padding: "12px 14px", borderRadius: 8, background: "var(--surface)", border: "1px solid var(--rule)" } },
+      return h(ExportSection, { nav: "waterfall", title: "Risk waterfall — " + programLabel(program, theCase && theCase.programs), style: { marginTop: 14, padding: "12px 14px", borderRadius: 8, background: "var(--surface)", border: "1px solid var(--rule)" } },
         h("div", { style: { fontSize: 11, fontFamily: "var(--display)", fontWeight: 600, color: "var(--ink-1)", marginBottom: 4 } }, "Risk waterfall — this asset only"),
         // Stated because the numbers are not comparable with the headline
         // otherwise: the case valuation charges corporate G&A and (if on) tax;
@@ -613,7 +635,7 @@ function ProgramEditor({ program, onChange, onDelete, discountRatePct, terminalV
         h(Note, { summary: "What \"unrisked\" means, and why it can look worse" },
           "\"Unrisked\" means 100% PoS on both sides — the full peak revenue AND the full R&D cost paid with certainty, not just revenue scaled up. For early-stage assets this can come out more negative than the risk-adjusted number: paying the full R&D cost for certain can outweigh a distant, heavily time-discounted payoff — that's a real feature of rNPV, not an error.",
           valuationMethod === "multiple" && " This waterfall always uses the full DCF/cost-structure math, regardless of the case's Simple Multiple setting — it's a diagnostic, not the number driving your headline valuation while Simple Multiple is active."),
-        h(ExportableBlock, { title: (program.drugName || program.name || "Program") + " — risk waterfall" },
+        h(ExportableBlock, { title: programLabel(program, theCase && theCase.programs) + " — risk waterfall" },
           h(RiskWaterfallChart, { unriskedNPV: wf.unriskedNPV, riskedNPV: wf.riskedNPV, posToLaunchPct: wf.posToLaunch * 100 })),
         h(Explain, readRiskWaterfall(wf.unriskedNPV, wf.riskedNPV))
       );
@@ -722,7 +744,7 @@ function ProgramEditor({ program, onChange, onDelete, discountRatePct, terminalV
       );
     })()),
 
-    show("inputs") && h(LicensorFields, { program, set }),
+    show("inputs") && h(LicensorFields, { program, set, programs: theCase && theCase.programs }),
 
     // ── Evidence Log — the "why" behind judgment-call inputs, living inside
     // the case itself rather than a separate document that drifts out of
@@ -898,16 +920,36 @@ function IraClockFields({ program, set }) {
 // in-licensed the asset from. Common in small-cap biotech — an academic
 // licence with a low royalty, or an asset bought out of another company with
 // approval and sales milestones attached. None of it is a default.
-function LicensorFields({ program, set }) {
+function LicensorFields({ program, set, programs }) {
   const h = React.createElement;
   const lic = program.licensor || { enabled: false, name: "", royaltyPct: "", sublicensePct: "", approvalMilestoneM: "", salesMilestones: [], note: "" };
   const setLic = patch => set("licensor", { ...lic, ...patch });
   const [draft, setDraft] = React.useState({ thresholdM: "", paymentM: "" });
+  const [tierDraft, setTierDraft] = React.useState({ upToM: "", pct: "" });
   const rows = lic.salesMilestones || [];
+  const tiers = lic.tiers || [];
+  // One drug in several programs: a licence is per molecule (October 2026).
+  const drug = String(program.drugName || "").trim();
+  const twins = drug ? (programs || []).filter(q => licenceDrugKey(q) === licenceDrugKey(program)) : [];
+  const group = sharedLicenceFor(program, programs);
+  const coveredBy = group && group.lead.id !== program.id ? group.lead : null;
+  const inputStyle0 = { padding: "6px 9px", minHeight: 28, borderRadius: 6, border: "1.5px solid var(--rule)", background: "var(--surface)", color: "var(--ink-1)", fontFamily: "var(--mono)", fontSize: 12, width: 110 };
+  if (coveredBy) {
+    const L = coveredBy.licensor;
+    return h("div", { "data-nav": "licensor", style: { marginTop: 14, padding: "10px 14px", borderRadius: 8, background: "var(--surface-2)", border: "1px dashed var(--rule)" } },
+      h("div", { style: { fontSize: 12, fontFamily: "var(--mono)", color: "var(--ink-2)", marginBottom: 8 } },
+        "Owed to a licensor · covered by the " + (L.name ? L.name + " " : "") + "licence on " + programLabel(coveredBy, programs)),
+      h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginBottom: 8, lineHeight: 1.6 } },
+        "The royalty and sales milestones are charged on total " + drug + " sales across every program of the drug, from the terms entered there. This indication keeps only its own approval milestone, if the licence pays one per approval."),
+      h(BenchField, { label: "Milestone owed on this approval", value: lic.approvalMilestoneM || "", onChange: v => setLic({ approvalMilestoneM: v }), suffix: "$M", placeholder: "none",
+        help: "Paid in this program's launch year, weighted by its odds of approval." }));
+  }
+  const sharedHere = !!(lic.shared && twins.length > 1);
   const partnered = !!(program.partnership && program.partnership.enabled);
-  const inputStyle = { padding: "6px 9px", minHeight: 28, borderRadius: 6, border: "1.5px solid var(--rule)", background: "var(--surface)", color: "var(--ink-1)", fontFamily: "var(--mono)", fontSize: 12, width: 110 };
+  const inputStyle = inputStyle0;
+  const tiered = licenceTiers(lic).length > 0;
   const summary = hasLicensorObligations(program)
-    ? [numOr(lic.royaltyPct, 0) > 0 ? lic.royaltyPct + "% royalty" : null, numOr(lic.approvalMilestoneM, 0) > 0 ? "$" + lic.approvalMilestoneM + "M on approval" : null,
+    ? [tiered ? "tiered royalty" : numOr(lic.royaltyPct, 0) > 0 ? lic.royaltyPct + "% royalty" : null, sharedHere ? "on all " + twins.length + " " + drug + " programs" : null, numOr(lic.approvalMilestoneM, 0) > 0 ? "$" + lic.approvalMilestoneM + "M on approval" : null,
        rows.length ? rows.length + " sales milestone" + (rows.length === 1 ? "" : "s") : null, numOr(lic.sublicensePct, 0) > 0 ? lic.sublicensePct + "% of partner income" : null].filter(Boolean).join(" · ")
     : "";
   return h("div", { "data-nav": "licensor", style: { marginTop: 14, padding: "10px 14px", borderRadius: 8, background: "var(--surface-2)", border: "1px dashed var(--rule)" } },
@@ -922,16 +964,31 @@ function LicensorFields({ program, set }) {
         h("input", { type: "text", value: lic.name || "", "aria-label": "Licensor", placeholder: "e.g. BioMarin (via Allievex)", onChange: e => setLic({ name: e.target.value }), style: { ...inputStyle, width: "100%" } })),
       h("div", { style: { display: "flex", flexWrap: "wrap", gap: "0 16px" } },
         h(BenchField, { label: "Royalty owed", value: lic.royaltyPct || "", onChange: v => setLic({ royaltyPct: v }), suffix: "%", placeholder: "none",
-          help: "Percent of the company's own net sales. A tiered royalty is entered as its blended rate at peak." }),
+          help: tiered ? "Not used: the tiers below set the royalty." : "Percent of the company's own net sales. A tiered royalty can be entered as its blended rate at peak, or as tiers below when the deal discloses them." }),
         h(BenchField, { label: "Milestone owed on approval", value: lic.approvalMilestoneM || "", onChange: v => setLic({ approvalMilestoneM: v }), suffix: "$M", placeholder: "none",
           help: "Paid in the launch year, weighted by the odds of approval." }),
         h(BenchField, { label: "Share of partner income owed", value: lic.sublicensePct || "", onChange: v => setLic({ sublicensePct: v }), suffix: "%", placeholder: "none",
           help: "A sublicense fee: the percent of royalties, upfronts and milestones a partner pays the company that goes on to the licensor." + (partnered ? "" : " Only matters if the asset is also partnered (Partnership above).") })),
+      twins.length > 1 && h("label", { style: { display: "flex", alignItems: "flex-start", gap: 8, fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-2)", cursor: "pointer", margin: "4px 0 8px" } },
+        h("input", { type: "checkbox", checked: !!lic.shared, onChange: e => setLic({ shared: e.target.checked }), style: { marginTop: 2 } }),
+        h("span", null, "These terms cover every " + drug + " program (" + twins.length + " in this case): the royalty and sales milestones are charged on the drug's total sales; each other program keeps only its own approval milestone. A licence is usually per molecule, not per indication.")),
+      h("div", { style: { marginTop: 8 } },
+        h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-2)", marginBottom: 6 } }, "Royalty tiers (optional — marginal, like tax bands)"),
+        tiers.length === 0 && h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginBottom: 6 } }, "None: the flat royalty above applies."),
+        tiers.map((t, i) => h("div", { key: t.id || i, className: "licensor-tier", style: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, padding: "6px 10px", borderRadius: 6, background: "var(--surface)", marginBottom: 6, fontSize: 11, fontFamily: "var(--mono)" } },
+          h("span", null, t.pct + "% on " + (sharedHere ? "total " + drug : "annual") + " net sales " + (t.upToM !== "" && t.upToM != null && Number(t.upToM) > 0 ? "up to $" + t.upToM + "M a year" : "above the tiers below it")),
+          h(ConfirmXButton, { onConfirm: () => setLic({ tiers: tiers.filter((_, j) => j !== i) }), title: "Delete this royalty tier", style: { padding: "3px 8px", fontSize: 10 } }))),
+        h("div", { style: { display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 8 } },
+          h("input", { type: "number", min: 0, value: tierDraft.upToM, "aria-label": "Tier ceiling ($M a year, blank for the top tier)", placeholder: "up to $M/yr", onChange: e => setTierDraft({ ...tierDraft, upToM: e.target.value }), style: inputStyle }),
+          h("input", { type: "number", min: 0, value: tierDraft.pct, "aria-label": "Tier royalty (%)", placeholder: "rate %", onChange: e => setTierDraft({ ...tierDraft, pct: e.target.value }), style: inputStyle }),
+          h("button", { type: "button", disabled: tierDraft.pct === "" || !(Number(tierDraft.pct) >= 0),
+            onClick: () => { setLic({ tiers: [...tiers, { id: newId("lt"), upToM: tierDraft.upToM, pct: tierDraft.pct }] }); setTierDraft({ upToM: "", pct: "" }); },
+            style: { padding: "5px 12px", minHeight: 28, borderRadius: 6, border: "1px solid var(--rule)", background: "transparent", color: "var(--ink-2)", fontFamily: "var(--mono)", fontSize: 11, cursor: "pointer" } }, "+ Add royalty tier"))),
       h("div", { style: { marginTop: 8 } },
         h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-2)", marginBottom: 6 } }, "Sales milestones owed"),
         rows.length === 0 && h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--ink-3)", marginBottom: 6 } }, "None added."),
         rows.map((m, i) => h("div", { key: m.id || i, className: "licensor-milestone", style: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, padding: "6px 10px", borderRadius: 6, background: "var(--surface)", marginBottom: 6, fontSize: 11, fontFamily: "var(--mono)" } },
-          h("span", null, "$" + m.paymentM + "M when annual net sales first reach $" + m.thresholdM + "M"),
+          h("span", null, "$" + m.paymentM + "M when " + (sharedHere ? "total " + drug : "annual") + " net sales first reach $" + m.thresholdM + "M"),
           h(ConfirmXButton, { onConfirm: () => setLic({ salesMilestones: rows.filter((_, j) => j !== i) }), title: "Delete this sales milestone", style: { padding: "3px 8px", fontSize: 10 } }))),
         h("div", { style: { display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" } },
           h("input", { type: "number", min: 0, value: draft.thresholdM, "aria-label": "Sales level ($M a year)", placeholder: "sales $M/yr", onChange: e => setDraft({ ...draft, thresholdM: e.target.value }), style: inputStyle }),

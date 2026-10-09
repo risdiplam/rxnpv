@@ -250,6 +250,28 @@ function caseBinaryDefaults(theCase) {
 // One line under a tool's inputs saying which of them came from the case.
 // A case's label with its ticker — unless the name already carries it
 // ("PepGen (PEPG)" read "PepGen (PEPG) (PEPG)").
+// What a program is called on screen. The drug name, unless another program
+// in the same case carries the same drug — one molecule in several
+// indications, the normal oncology case — when the program's own name tells
+// them apart (Summit, October 2026: four programs all read "ivonescimab").
+// programs: the case's program list; without it, the drug name as before.
+function programLabel(p, programs) {
+  if (!p) return "Program";
+  const drug = String(p.drugName || "").trim(), name = String(p.name || "").trim();
+  if (!drug) return name || "Program";
+  const key = drug.toLowerCase();
+  const twins = (programs || []).filter(q => q && String(q.drugName || "").trim().toLowerCase() === key);
+  if (twins.length < 2) return drug;
+  const own = q => {
+    const n = String(q.name || "").trim();
+    return n && n !== "New Program" ? n : drug + " — " + (String(q.indication || "").split(/[,(—]/)[0].trim() || "program");
+  };
+  // Still the same as a twin (both left as "New Program", no indication): number them.
+  const mine = own(p), same = twins.filter(q => own(q) === mine);
+  // Matched by id too: valuations pass copies ({ ...p, posOverridePct: "100" }).
+  return same.length > 1 ? mine + " (" + (same.findIndex(q => q === p || (q.id != null && q.id === p.id)) + 1) + ")" : mine;
+}
+
 function caseDisplayName(c) {
   if (!c) return "";
   const name = c.name || "Untitled";
@@ -281,7 +303,7 @@ function CaseContextBar({ cases, activeCase, onSelectCase, onOpenWorkspace }) {
   }
   const p = activeCase && activeCase.programs && activeCase.programs[0];
   const facts = activeCase ? [
-    p && (p.drugName || p.name),
+    p && programLabel(p, activeCase.programs),
     p && p.indication && p.indication.split(/[—(]/)[0].trim(),
     p && p.currentPhase && p.currentPhase.replace("phase", "Phase ").replace("approved", "Approved").replace("filed", "Filed"),
     activeCase.programs.length > 1 ? activeCase.programs.length + " programs" : null,
@@ -1550,7 +1572,7 @@ function computePortfolioCatalysts(cases, today) {
       const ownNcts = new Set([].concat(...(c.programs || []).map(q => String(q.trialIds || "").toUpperCase().match(/NCT\d{8}/g) || [])));
       const comps = ((c.competitorReads && c.competitorReads.rows) || []).filter(r => !ownNcts.has(String(r.nctId || "").toUpperCase())).map(r => ({ ...r, window: r.date ? parseCatalystWindow(String(r.date)) : null }))
         .filter(r => r.window && r.window.end < w.start && r.window.end >= day).sort((a, b) => a.window.start - b.window.start).slice(0, 3);
-      items.push({ caseName: caseDisplayName(c), caseId: c.id, program: p.drugName || p.name || "Program", label: e.catalystLabel || "Catalyst", date: e.catalystDate, window: w,
+      items.push({ caseName: caseDisplayName(c), caseId: c.id, program: programLabel(p, c.programs), label: e.catalystLabel || "Catalyst", date: e.catalystDate, window: w,
         type: catalystPinLabel(e.pin), source: e.pin.source || "", sharedTag: (e.pin.sharedTag || "").trim(), funding: row ? row.status : null, beyondHorizon: rv && rv.ok ? rv.beyondHorizon : false, competitors: comps });
     }));
     if (!pins) noPin++;
@@ -1621,7 +1643,7 @@ function pendingCalibrationEntries(theCase) {
       if (entry.outcome && entry.outcome !== "pending") return;
       if (entry.closeOut) return; // closed out: done, even if left unscored
       const d = parseCatalystDate(entry.catalystDate);
-      const row = { programName: p.drugName || p.name || "Program", catalystLabel: entry.catalystLabel, catalystDate: entry.catalystDate, programId: p.id, entryId: entry.id, pinned: !!entry.pin };
+      const row = { programName: programLabel(p, theCase.programs), catalystLabel: entry.catalystLabel, catalystDate: entry.catalystDate, programId: p.id, entryId: entry.id, pinned: !!entry.pin };
       if (d && d < now) overdue.push(row); else open.push(row);
     });
   });
@@ -1728,7 +1750,7 @@ function computeRunwayVsCatalysts(theCase, opts) {
       // months out). Counted, so the Calibration Log's overdue entries are named.
       if (w.end < day) { pastCount++; return; }
       catalysts.push({
-        programName: p.drugName || p.name || "Program",
+        programName: programLabel(p, theCase.programs),
         label: entry.catalystLabel || "Catalyst",
         dateText: entry.catalystDate,
         precision: w.precision,

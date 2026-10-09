@@ -574,6 +574,24 @@ function extractWarrants(facts) {
   return { count: count.value, avgStrike: price ? price.value : null, asOf: count.asOf, priceFound: !!price, tranches: count.tranches };
 }
 
+// Preferred stock outstanding at the latest filing (October 2026). Biotech
+// private placements are usually non-voting preferred that converts into
+// common and shares in everything as if converted — economically common
+// stock that the cover-page share count leaves out. Tagged as permanent
+// equity or, with a redemption feature, temporary equity. Returns the count
+// of PREFERRED shares, not the common they convert into (the ratio is in the
+// certificate of designation, rarely tagged), or null when none is reported.
+function extractPreferredShares(facts) {
+  if (!facts || !facts.facts) return null;
+  const ug = facts.facts["us-gaap"] || {};
+  let best = null;
+  ["PreferredStockSharesOutstanding", "TemporaryEquitySharesOutstanding"].forEach(tag => {
+    const v = pickLatestUnit(ug[tag], isFilingForm);
+    if (v && v.value > 0 && (!best || (v.asOf || "") > (best.asOf || ""))) best = { count: v.value, asOf: v.asOf, tag };
+  });
+  return best;
+}
+
 function extractConvertibleNotes(facts) {
   if (!facts || !facts.facts) return null;
   const ug = facts.facts["us-gaap"] || {};
@@ -636,6 +654,7 @@ async function pullEdgarFinancials(companyName, force) {
   // (Spruce tags neither: 409,850 excluded against 2.87M basic, October 2026).
   const antidilutive = facts && facts.facts ? pickLatestUnit((facts.facts["us-gaap"] || {}).AntidilutiveSecuritiesExcludedFromComputationOfEarningsPerShareAmount, isFilingForm) : null;
   const converts = extractConvertibleNotes(facts);
+  const preferred = extractPreferredShares(facts);
   const recentFilings = subs ? recentFilingsByType(subs, ["10-K", "10-Q", "8-K"], 5) : [];
   const cikNumeric = String(Number(cikInfo.cik)); // strip leading zeros for the Archives URL format
   // Link straight to the actual filing document most likely to be the source of
@@ -658,6 +677,7 @@ async function pullEdgarFinancials(companyName, force) {
     options: options ? { count: options.count, avgStrike: options.avgStrike, priceFound: options.priceFound, asOf: options.asOf || null } : null,
     warrants: warrants ? { count: warrants.count, avgStrike: warrants.avgStrike, priceFound: warrants.priceFound, asOf: warrants.asOf || null } : null,
     convertibleFace: converts ? converts.faceValue : null,
+    preferred,
     antidilutive: antidilutive && antidilutive.value > 0 ? { count: antidilutive.value, asOf: antidilutive.asOf } : null,
     recentFilings, sourceFilingUrl,
     sourceFilingLabel: mostRecentFinancialFiling ? mostRecentFinancialFiling.form + " filed " + mostRecentFinancialFiling.date : null,
