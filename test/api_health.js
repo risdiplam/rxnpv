@@ -60,7 +60,8 @@ const code = order.map(f => fs.readFileSync(path.join(SRC, f), "utf8")).join("\n
 const NAMES = ["fetchStudyByNctId", "fetchAssetProgram", "searchTrialsBySponsor", "fetchHistoricalComps", "fetchAnalogEffects",
   "searchDrugApproval", "fetchExclusivity", "fetchApprovalHistory", "fetchDrugLabel", "fetchAdverseEventSummary",
   "pullEdgarFinancials", "searchCatalystFilings", "fetchInsiderTransactions", "searchLiterature", "publicationsForTrial",
-  "resolveTarget", "fetchTargetDossier", "fetchDrugSpending", "searchCompetitorLandscape", "resilientFetch"];
+  "resolveTarget", "fetchTargetDossier", "fetchDrugSpending", "searchCompetitorLandscape", "resilientFetch",
+  "fetchMedicaidSpending", "fetchPublicPayerSpending", "resolveDrugIdentity"];
 const api = new Function("module", "require", code + "\nreturn {" + NAMES.map(n => n + ": typeof " + n + " !== 'undefined' ? " + n + " : null").join(",") + "};")({ exports: null }, require);
 // main.js's EDGAR fetch, reproduced with the same retry rules (kept in step by hand).
 async function edgarMainFetch(url) {
@@ -203,6 +204,41 @@ const CHECKS = [
     const y24 = r.series.find(s => s.label === "2024");
     return [["2024 row", !!y24, r.series.map(s => s.label).join(",")], ["2024 spend ≈ $40.9M", y24 && near(y24.spending, 40.9e6, 0.1e6), y24 && y24.spending],
       ["a quarterly row", r.series.some(s => s.source === "quarterly"), r.latest && r.latest.label]];
+  }],
+  // Medicaid (October 2026). Figures read by hand from CMS's files on 2026-10-10.
+  ["cms", "Part B spend per patient: Keytruda", async () => {
+    // Part B writes "Avg_Spndng_Per_Bene": 2024 $79,464.46 a patient.
+    const r = await api.fetchDrugSpending("Keytruda", { programme: "Part B" }); must(r);
+    const y24 = r.series.find(s => s.label === "2024");
+    return [["2024 spend per patient ≈ $79,464", y24 && near(y24.avgSpendPerBene, 79464.46, 1), y24 && y24.avgSpendPerBene]];
+  }],
+  ["medicaid", "Annual summary + state file: Evrysdi", async () => {
+    // Annual summary 2024: $345,298,729.48. State file 2025 (national rows,
+    // matched by the FDA's two package codes): ≥ $398.95M, one package hidden.
+    const r = await api.fetchMedicaidSpending("Evrysdi"); must(r);
+    const y24 = r.series.find(s => s.label === "2024"), y25 = r.series.find(s => s.label === "2025");
+    return [["2024 ≈ $345.30M", y24 && near(y24.spending, 345.30e6, 0.1e6), y24 && y24.spending],
+      ["state file matched by package codes", r.stateFile && r.stateFile.matchedBy === "package codes", r.stateFile && r.stateFile.matchedBy],
+      ["2025 from the state file, ≥ $390M", y25 && y25.source === "state file" && y25.spending > 390e6, y25 && y25.spending]];
+  }],
+  ["medicaid", "Generic-name fallback: Exondys 51", async () => {
+    // CMS's summary spells it "Exondys-51"; found through eteplirsen. 2024 $257.42M.
+    const r = await api.fetchMedicaidSpending("Exondys 51"); must(r);
+    const y24 = r.series.find(s => s.label === "2024");
+    return [["found by generic name", r.matchedBy === "generic", r.matchedBy], ["2024 ≈ $257.42M", y24 && near(y24.spending, 257.42e6, 0.1e6), y24 && y24.spending]];
+  }],
+  ["medicaid", "Hidden is not zero: Zolgensma", async () => {
+    // Annual 2024 $118.95M; every 2025 package-quarter hidden in the state file.
+    const r = await api.fetchMedicaidSpending("Zolgensma"); must(r);
+    const y24 = r.series.find(s => s.label === "2024"), y25 = r.series.find(s => s.year === 2025);
+    return [["2024 ≈ $118.95M", y24 && near(y24.spending, 118.95e6, 0.1e6), y24 && y24.spending],
+      ["2025 hidden, spending null", y25 && y25.hidden === true && y25.spending === null, y25 && JSON.stringify({ hidden: y25.hidden, spending: y25.spending })]];
+  }],
+  ["medicaid", "All public payers: Fintepla", async () => {
+    // 2024: Medicare Part D $40.89M + Medicaid $189.78M = $230.66M; no Part B record.
+    const r = await api.fetchPublicPayerSpending("Fintepla"); must(r);
+    const row = r.combined.find(c => c.year === 2024 && c.isFullYear);
+    return [["2024 total ≈ $230.66M", row && near(row.total, 230.66e6, 0.15e6), row && row.total], ["2024 complete", row && row.complete, row && row.noFigure]];
   }]
 ];
 function must(r) { if (!r) throw new Error("no response"); if (r.ok === false) throw new Error(r.error || "ok:false"); }

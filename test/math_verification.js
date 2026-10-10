@@ -96,6 +96,8 @@ const EXPORTS = [
   "summarizeAssetProgram", "describeEvidenceBase", "studyNamesIntervention", "assetProgramNames", "assetPhaseRank", "ASSET_PROGRAM_FIELDS",
   "parseCmsPeriodLabel", "parseCmsAnnualRow", "parseCmsQuarterlyRow", "pickOverallRows",
   "mergeDrugSpendSeries", "addComparablePeriodGrowth", "impliedAnnualRunRate", "cmsSeriesFreshness", "indexToLaunch", "cmsNum", "CMS_DATASETS", "cmsNormalizeName", "cmsDisplayName",
+  "combineSamePeriods", "parseCmsAnnualRows", "drugNameKey", "ndcProductCodes", "pickDrugIdentity", "sdudNameMatches", "summariseSdudQuarters", "sdudPeriod",
+  "addComparableMedicaidGrowth", "combinePayerSeries", "payerTotalSeries", "payerPriceFigures", "PART_B_ASP_ADD_ON",
   "normalizeActualEntry", "impliedAnnualFromActual", "modelYearForCalendar", "compareActualToModel", "actualVsModelSeries",
   "diffTrialSnapshots", "snapshotPredatesDesignFields",
   "resultsRedFlags", "trUnescape", "trNum", "trRate", "trMonthsBetweenDates",
@@ -4364,6 +4366,145 @@ section("CMS drug spending — a quarter is not a year");
   ok("a suppressed (blank) count is null, never zero", api.cmsNum("") === null);
 }
 report();
+
+section("Medicare and Medicaid together — one drug, three spellings, and hidden is not zero");
+{
+  // ── Names: "Exondys 51" (FDA), "Exondys-51" (CMS's Medicaid summary),
+  // "EXONDYS 51" (the state file) are one drug ──
+  ok("FDA, CMS and state-file spellings share one key", api.drugNameKey("Exondys 51") === "exondys51" && api.drugNameKey("Exondys-51") === "exondys51" && api.drugNameKey(" EXONDYS 51 ") === "exondys51");
+  ok("CMS's footnote asterisk is not part of the key", api.drugNameKey("Uptravi*") === "uptravi");
+  ok("a different product of the same family is not the same key", api.drugNameKey("Opdivo Qvantig") !== api.drugNameKey("Opdivo"));
+
+  // ── Package codes: FDA writes labeler-product in three widths; the state
+  // file writes the 11-digit 5-4-2 form, zero padded ──
+  const c1 = api.ndcProductCodes("60923-284");   // 5-3-2: product padded to 4
+  ok("5-3-2: 60923-284 → 60923 / 0284", c1.labeler === "60923" && c1.product === "0284");
+  const c2 = api.ndcProductCodes("1234-5678");   // 4-4-2: labeler padded to 5
+  ok("4-4-2: 1234-5678 → 01234 / 5678", c2.labeler === "01234" && c2.product === "5678");
+  const c3 = api.ndcProductCodes("12345-6789");  // 5-4-1: both already full width
+  ok("5-4-1: 12345-6789 → 12345 / 6789", c3.labeler === "12345" && c3.product === "6789");
+  ok("not an NDC → null", api.ndcProductCodes("Evrysdi") === null && api.ndcProductCodes("") === null);
+
+  // ── Which drug was meant ──
+  const evr = api.pickDrugIdentity("risdiplam", [
+    { brand_name: "Evrysdi", generic_name: "risdiplam", product_ndc: "50242-175" },
+    { brand_name: "EVRYSDI", generic_name: "RISDIPLAM", product_ndc: "50242-176" },
+    { brand_name: "EVRYSDI", generic_name: "RISDIPLAM", product_ndc: "50242-176" }]);
+  ok("a generic with one brand picks that brand", evr.brand === "Evrysdi" && evr.matchedBy === "generic");
+  ok("and keeps each package code once (2, not 3)", evr.products.length === 2 && evr.products[1].product === "0176");
+  const ada = api.pickDrugIdentity("adalimumab", [
+    { brand_name: "Humira", generic_name: "adalimumab", product_ndc: "0074-0554" },
+    { brand_name: "Hadlima", generic_name: "adalimumab-bwwd", product_ndc: "0006-4133" },
+    { brand_name: "Hyrimoz", generic_name: "adalimumab", product_ndc: "61314-454" }]);
+  ok("a generic with two brands picks neither, and offers both", ada.brand === null && ada.candidates.length === 2 && ada.products.length === 0);
+  const exo = api.pickDrugIdentity("Exondys", [{ brand_name: "Exondys 51", generic_name: "eteplirsen", product_ndc: "60923-284" }]);
+  ok("the one brand a partial name finds is taken, and says so", exo.brand === "Exondys 51" && exo.matchedBy === "partial");
+  const brandHit = api.pickDrugIdentity("exondys-51", [{ brand_name: "Exondys 51", generic_name: "eteplirsen", product_ndc: "60923-284" }]);
+  ok("a brand typed with CMS's hyphen is still the brand", brandHit.matchedBy === "brand");
+
+  // ── The state file's ten-character name ──
+  ok("'EVRYSDI (r' is Evrysdi", api.sdudNameMatches("EVRYSDI (r", "Evrysdi"));
+  ok("'XYZAL' is not 'Xyz' (a letter follows)", !api.sdudNameMatches("XYZAL", "Xyz"));
+  ok("padding is ignored", api.sdudNameMatches("ZOLGENSMA ", "Zolgensma"));
+  ok("a brand of ten letters or more matches on its first ten", api.sdudNameMatches("KEYTRUDA Q", "Keytruda Qlex"));
+  ok("CMS's hyphen and the state file's space agree", api.sdudNameMatches("EXONDYS 51", "Exondys-51"));
+
+  // ── A year of national rows → quarters. Hidden is never zero ──
+  // Q1: two packages, $100 + $50, 6 + 4 prescriptions → $150, 10, complete.
+  // Q2: $200 (8 prescriptions) and one hidden package → $200 is a floor.
+  // Q3: every package hidden → no figure at all.
+  // A state's row (AL) is not national and must not be added.
+  const rows = [
+    { state: "XX", quarter: "1", suppression_used: "false", total_amount_reimbursed: "100", number_of_prescriptions: "6", units_reimbursed: "60" },
+    { state: "XX", quarter: "1", suppression_used: "false", total_amount_reimbursed: "50", number_of_prescriptions: "4", units_reimbursed: "40" },
+    { state: "XX", quarter: "2", suppression_used: "false", total_amount_reimbursed: "200", number_of_prescriptions: "8", units_reimbursed: "80" },
+    { state: "XX", quarter: "2", suppression_used: "true", total_amount_reimbursed: null, number_of_prescriptions: null, units_reimbursed: null },
+    { state: "XX", quarter: "3", suppression_used: "true", total_amount_reimbursed: null },
+    { state: "AL", quarter: "1", suppression_used: "false", total_amount_reimbursed: "999", number_of_prescriptions: "99" }];
+  const qs = api.summariseSdudQuarters(rows, 2025);
+  near("Q1: $100 + $50 = $150 (the state row left out)", qs[0].spending, 150, 0);
+  ok("Q1: 10 prescriptions, complete", qs[0].prescriptions === 10 && qs[0].status === "complete");
+  ok("Q2: $200 with one package hidden is partial", qs[1].spending === 200 && qs[1].status === "partial" && qs[1].hiddenRows === 1);
+  ok("Q3: all hidden → null, not 0", qs[2].status === "hidden" && qs[2].spending === null);
+  // Three quarters published: Q1–Q3, $150 + $200 = $350, a floor (Q2 partial, Q3 hidden).
+  const p3 = api.sdudPeriod(qs, 2025, 3);
+  ok("three quarters out → '2025 (Q1-Q3)', partial", p3.label === "2025 (Q1-Q3)" && p3.quarterCount === 3 && !p3.isFullYear);
+  near("the year so far is $150 + $200 = $350", p3.spending, 350, 0);
+  ok("a floor, not hidden, with no spend per prescription", p3.floor && !p3.hidden && p3.avgSpendPerClaim === null && p3.hiddenRows === 2);
+  // Four published, no Q4 rows at all: Q4 had no prescriptions, so the
+  // year is $350 still — and still a floor.
+  const p4 = api.sdudPeriod(qs, 2025, 4);
+  ok("four quarters out → the whole year, labelled '2025'", p4.label === "2025" && p4.isFullYear && p4.quarterCount === 4);
+  near("an unpublished-looking Q4 with no rows adds nothing", p4.spending, 350, 0);
+  // One published quarter, complete: $150 over 10 prescriptions = $15 each.
+  const p1 = api.sdudPeriod(qs, 2025, 1);
+  ok("one complete quarter → '2025 (Q1)', not a floor", p1.label === "2025 (Q1)" && !p1.floor);
+  near("spend per prescription $150 / 10 = $15", p1.avgSpendPerClaim, 15, 1e-9);
+  const hiddenYear = api.sdudPeriod(api.summariseSdudQuarters([{ state: "XX", quarter: "1", suppression_used: "true" }, { state: "XX", quarter: "2", suppression_used: "true" }], 2025), 2025, 2);
+  ok("a year where every package is hidden is 'hidden', spending null", hiddenYear.hidden && hiddenYear.spending === null);
+  ok("nothing published yet → no period", api.sdudPeriod(qs, 2025, 0) === null);
+  // Growth never runs from or to a floor.
+  const g = api.addComparableMedicaidGrowth([
+    { label: "2023", quarterCount: 4, spending: 100 }, { label: "2024", quarterCount: 4, spending: 150 }, { label: "2025", quarterCount: 4, spending: 200, floor: true }]);
+  near("2024 vs 2023: 150 / 100 − 1 = +50%", g[1].growthVsComparable, 0.5, 1e-12);
+  ok("2025 is a floor, so no growth is claimed", g[2].growthVsComparable === null);
+
+  // ── Part B lists a drug once per billing code ──
+  // $100 + $50 = $150 and 10 + 5 = 15 claims add; patients (4 and 3) do not,
+  // since one patient can sit under both codes. $150 / 15 = $10 a claim.
+  const comb = api.combineSamePeriods([
+    { label: "2024", sortKey: 20244, quarterCount: 4, spending: 100, claims: 10, beneficiaries: 4, avgSpendPerBene: 25 },
+    { label: "2024", sortKey: 20244, quarterCount: 4, spending: 50, claims: 5, beneficiaries: 3, avgSpendPerBene: 16.7 }]);
+  ok("two codes, one period", comb.length === 1 && comb[0].codes === 2);
+  near("spending adds: $150", comb[0].spending, 150, 0);
+  ok("patients and spend per patient are dropped, not summed", comb[0].beneficiaries === null && comb[0].avgSpendPerBene === null);
+  near("spend per claim recomputed: $150 / 15 = $10", comb[0].avgSpendPerClaim, 10, 1e-12);
+  // Part B spells its averages "Spndng"; Keytruda 2024: $79,464.46 a patient.
+  const pb = api.parseCmsAnnualRow({ Brnd_Name: "Keytruda", Tot_Spndng_2024: "5988521233", Tot_Benes_2024: "75361", Tot_Clms_2024: "455858",
+    Avg_Spndng_Per_Bene_2024: "79464.46084", Avg_Spndng_Per_Clm_2024: "13136.81285", Avg_Spndng_Per_Dsg_Unt_2024: "55.71920754", Tot_Spndng_2023: "" });
+  near("Part B's 'Spndng' spend per patient is read", pb.periods[0].avgSpendPerBene, 79464.46084, 1e-6);
+  near("and its spend per unit ($55.72 a mg)", pb.periods[0].avgSpendPerUnit, 55.71920754, 1e-9);
+  ok("the dataset's last year is 2024", pb.dataEndYear === 2024 && pb.dataStartYear === 2023);
+
+  // ── Payers combined ──
+  // Part D: 2024 $100, 2025 $120, 2026 Q1 $30. Medicaid: 2024 $300, 2025 $350
+  // (a floor). Part B starts 2025 at $10, so in 2024 it had nothing (0).
+  const P = (label, year, qc, spending, extra) => Object.assign({ label, year, quarterCount: qc, quarters: qc === 4 ? [1, 2, 3, 4] : [1], isFullYear: qc === 4, sortKey: year * 10 + (qc === 4 ? 4 : 1), spending }, extra || {});
+  const src = (key, series) => ({ key, result: { found: true, series } });
+  const cmb = api.combinePayerSeries([
+    src("partD", [P("2024", 2024, 4, 100), P("2025 (Q1-Q4)", 2025, 4, 120), P("2026 (Q1)", 2026, 1, 30)]),
+    src("partB", [P("2025 (Q1-Q4)", 2025, 4, 10)]),
+    src("medicaid", [P("2024", 2024, 4, 300), P("2025", 2025, 4, 350, { floor: true })])]);
+  ok("three periods, labelled by the shorter name", cmb.length === 3 && cmb[1].label === "2025");
+  near("2024: $100 + $300 (Part B not yet selling: 0) = $400", cmb[0].total, 400, 0);
+  ok("2024 is complete — a payer that starts later had nothing then", cmb[0].complete && cmb[0].noFigure.length === 0);
+  near("2025: $120 + $10 + $350 = $480", cmb[1].total, 480, 0);
+  ok("2025 is a floor (Medicaid's is), so no growth is claimed", !cmb[1].complete && cmb[1].growthVsComparable === null);
+  ok("2026 Q1: Part B and Medicaid have no figure — incomplete, never a fall", cmb[2].noFigure.join(",") === "partB,medicaid" && !cmb[2].complete && cmb[2].total === 30);
+  const tot = api.payerTotalSeries(cmb);
+  ok("the total series carries every readable row, floors marked", tot.length === 3 && tot[0].floor === false && tot[1].floor === true);
+
+  // ── What payers pay, as a price ──
+  // Evrysdi-like: Part D $332,072.80 a patient, 6,132 claims / 554 patients.
+  // Part B $106,000 a patient → ÷ 1.06 = $100,000 at ASP.
+  // Medicaid $23,735.13 a prescription × (6,132 / 554 = 11.068592) prescriptions
+  //   = 23,735.13 × 11 + 23,735.13 × 0.068592 = 261,086.43 + 1,628.04 = $262,714.47.
+  const res = { sources: [
+    src("partD", [P("2025 (Q1-Q4)", 2025, 4, 1, { avgSpendPerBene: 332072.8, claims: 6132, beneficiaries: 554 })]),
+    src("partB", [P("2024", 2024, 4, 1, { avgSpendPerBene: 106000, beneficiaries: 12 }), P("2025 (Q1)", 2025, 1, 1, { avgSpendPerBene: 50000 })]),
+    src("medicaid", [P("2024", 2024, 4, 1, { avgSpendPerClaim: 23735.13 }), P("2025", 2025, 4, 1, { avgSpendPerClaim: 99999, floor: true })])] };
+  const figs = api.payerPriceFigures(res);
+  const fig = k => figs.find(f => f.key === k);
+  near("Part D: the year's spend per patient, on a WAC basis", fig("partD").value, 332072.8, 1e-9);
+  ok("Part D's basis is WAC", fig("partD").basis === "WAC");
+  near("Part B: $106,000 ÷ 1.06 = $100,000 at ASP (the partial year is skipped)", fig("partB").value, 100000, 1e-6);
+  ok("Part B's basis is ASP", fig("partB").basis === "ASP" && fig("partB").period === "2024" && api.PART_B_ASP_ADD_ON === 1.06);
+  near("Medicaid prescriptions a year from Part D: 6,132 / 554", fig("medicaid").fills, 11.068592057761733, 1e-12);
+  near("Medicaid: $23,735.13 × 11.068592 = $262,714.47 (the 2025 floor is skipped)", fig("medicaid").value, 262714.47, 0.01);
+  near("with 12 prescriptions typed: $23,735.13 × 12 = $284,821.56", api.payerPriceFigures(res, "12").find(f => f.key === "medicaid").value, 284821.56, 1e-6);
+  const noFills = api.payerPriceFigures({ sources: [src("medicaid", [P("2024", 2024, 4, 1, { avgSpendPerClaim: 1367213.56 })])] });
+  ok("Medicaid alone with no prescriptions a year gives no price, not a guess", noFills.length === 1 && noFills[0].value === null && noFills[0].fills === null);
+}
 
 section("Actual versus modelled revenue — a partial year is not a full one");
 {

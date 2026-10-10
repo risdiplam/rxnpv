@@ -29,122 +29,248 @@ function CommercialTool({ cases, updateCase, activeCase }) {
   );
 }
 
-// ── Launch tracker: Medicare spending as an uptake proxy ───────────────────
+// ── Launch tracker: public-payer spending as an uptake proxy ───────────────
+// Medicare Part D and Part B, and Medicaid (October 2026: a children's drug
+// barely appears in Medicare). "All public payers" puts them side by side
+// with a total; each payer can also be read on its own. Engines in
+// cmsEngine.js.
+const PAYER_OPTIONS = [
+  { value: "All", label: "All public payers — Medicare and Medicaid" },
+  { value: "Part D", label: "Medicare Part D — pharmacy dispensed" },
+  { value: "Part B", label: "Medicare Part B — clinic administered" },
+  { value: "Medicaid", label: "Medicaid — every state" }
+];
+
+function launchLookup(name, payer) {
+  if (payer === "All") return fetchPublicPayerSpending(name);
+  if (payer === "Medicaid") return fetchMedicaidSpending(name);
+  return resolveDrugIdentity(name).then(identity => fetchDrugSpending(name, { programme: payer, identity }));
+}
+
+// One drug's result, in the shape the chart, the indexing and the shape match
+// read: a series of { label, year, spending } — the public total in All.
+function launchView(result, payer) {
+  if (!result || result.ok === false) return { ok: false, error: result && result.error };
+  if (payer === "All") {
+    return { ok: true, found: result.found, brand: result.brand, generic: result.generic, result,
+      series: payerTotalSeries(result.combined), dataStartYear: result.dataStartYear, candidates: result.candidates || [] };
+  }
+  return { ok: true, found: result.found, brand: result.brand, generic: result.generic, result,
+    series: (result.series || []).filter(p => !p.hidden && p.spending != null).map(p => Object.assign({}, p, { floor: !!p.floor })),
+    dataStartYear: result.dataStartYear, candidates: result.candidates || [] };
+}
+
+function payerCell(p) {
+  if (!p) return null;
+  if (p.hidden) return "hidden";
+  return (p.floor ? "≥ " : "") + fmtMoney(p.spending);
+}
+
+const LT_TH = { padding: "6px 10px", background: "var(--surface-2)", borderBottom: "1px solid var(--rule)", fontSize: 10, color: "var(--ink-3)", fontWeight: 500, whiteSpace: "nowrap" };
+const LT_TD = { padding: "6px 10px", borderBottom: "1px solid var(--rule)", fontSize: 11, textAlign: "right", color: "var(--ink-2)" };
+function growthCell(h, g, vs) {
+  return h("td", { style: { ...LT_TD, color: g == null ? "var(--ink-3)" : g >= 0 ? "var(--green)" : "var(--red)" } },
+    g == null ? "—" : (g >= 0 ? "+" : "") + (g * 100).toFixed(0) + "% vs " + vs);
+}
+
+// One payer's detail: Medicare counts patients, Medicaid counts prescriptions.
+function PayerDetailTable({ result }) {
+  const h = React.createElement;
+  const medicaid = result.programme === "Medicaid";
+  const cols = medicaid ? ["Period", "Medicaid spend", "Prescriptions", "Spend/prescription", "vs like period"]
+    : ["Period", "Medicare spend", "Beneficiaries", "Claims", "Spend/beneficiary", "vs like period"];
+  return h("div", { style: { overflowX: "auto" } },
+    h("table", { style: { borderCollapse: "collapse", fontFamily: "var(--mono)", minWidth: 560 } },
+      h("thead", null, h("tr", null, cols.map(t => h("th", { key: t, style: { ...LT_TH, textAlign: t === "Period" ? "left" : "right" } }, t)))),
+      h("tbody", null, result.series.map((p, i) => h("tr", { key: i },
+        h("td", { style: { ...LT_TD, textAlign: "left", color: "var(--ink-1)", whiteSpace: "nowrap" } },
+          p.label, !p.isFullYear && h("span", { style: { color: "var(--warn)", fontSize: 10, marginLeft: 6 } }, "partial"),
+          p.source === "state file" && h("span", { style: { color: "var(--ink-3)", fontSize: 10, marginLeft: 6 } }, "state file")),
+        h("td", { style: { ...LT_TD, color: p.hidden ? "var(--warn)" : "var(--ink-1)" } }, payerCell(p)),
+        medicaid
+          ? [h("td", { key: "rx", style: LT_TD }, p.hidden ? "—" : p.claims != null ? (p.floor ? "≥ " : "") + Math.round(p.claims).toLocaleString() : "—"),
+             h("td", { key: "pc", style: LT_TD }, p.avgSpendPerClaim != null ? fmtMoney(p.avgSpendPerClaim) : "—")]
+          : [h("td", { key: "b", style: LT_TD }, p.beneficiaries != null ? p.beneficiaries.toLocaleString() : (p.codes > 1 ? "—" : "suppressed")),
+             h("td", { key: "c", style: LT_TD }, p.claims != null ? p.claims.toLocaleString() : "—"),
+             h("td", { key: "pb", style: LT_TD }, p.avgSpendPerBene != null ? fmtMoney(p.avgSpendPerBene) : "—")],
+        growthCell(h, p.growthVsComparable, p.comparableTo))))));
+}
+
 function LaunchTrackerTool({ activeCase, updateCase }) {
   const h = React.createElement;
   const [brand, setBrand] = React.useState("");
   const brandFromCase = useCasePrefill(activeCase, caseToolDefaults(activeCase).marketedDrug, brand, setBrand);
-  const [programme, setProgramme] = React.useState("Part D");
+  const [payer, setPayer] = React.useState("All");
   const [analogInput, setAnalogInput] = React.useState("");
-  const [rows, setRows] = React.useState([]);        // [{result}] — the drug first, then analogs
+  const [views, setViews] = React.useState([]);      // the drug first, then analogs
+  const [ranPayer, setRanPayer] = React.useState("All");
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState(null);
   const seq = React.useRef(0);
 
-  const run = async () => {
-    if (!brand.trim()) return;
+  const run = async (nameOverride) => {
+    const first = String(nameOverride != null ? nameOverride : brand).trim();
+    if (!first) return;
+    if (nameOverride != null) setBrand(first);
     const mine = ++seq.current;
-    setLoading(true); setError(null); setRows([]);
-    const names = [brand.trim()].concat(
-      analogInput.split(",").map(s => s.trim()).filter(Boolean).slice(0, 3));
-    const results = await Promise.all(names.map(n => fetchDrugSpending(n, { programme })));
+    setLoading(true); setError(null); setViews([]);
+    const names = [first].concat(analogInput.split(",").map(s => s.trim()).filter(Boolean).slice(0, 3));
+    const results = await Promise.all(names.map(n => launchLookup(n, payer).catch(e => ({ ok: false, error: e.message }))));
     if (mine !== seq.current) return;      // superseded by a newer lookup
-    const failed = results.find(r => !r.ok);
+    const vs = results.map(r => launchView(r, payer));
+    const failed = vs.find(v => !v.ok);
     if (failed) { setError(failed.error); setLoading(false); return; }
-    setRows(results);
+    setViews(vs); setRanPayer(payer);
     setLoading(false);
   };
 
-  const primary = rows[0];
-  const money = (v) => v == null ? "—" : fmtMoney(v);
+  const primary = views[0];
+  const all = ranPayer === "All";
+  const payerName = all ? "public-payer" : ranPayer === "Medicaid" ? "Medicaid" : "Medicare";
+  const sources = all && primary && primary.result ? primary.result.sources : [];
+  const foundSources = sources.filter(s => s.result && s.result.found);
+  const detailResults = all ? foundSources.map(s => s.result) : (primary && primary.found ? [primary.result] : []);
+  const inputStyle = { padding: "9px 12px", borderRadius: 7, border: "1.5px solid var(--rule)", background: "var(--surface)", color: "var(--ink-1)", fontFamily: "var(--mono)", fontSize: 13 };
+
+  const matchNote = (r) => {
+    const bits = [];
+    if (r.matchedBy === "generic") bits.push(r.programme + " lists it as " + r.brand + " — found by its generic name");
+    if (r.stateFile && r.stateFile.matchedBy) bits.push("Medicaid's state file matched by " + (r.stateFile.matchedBy === "package codes"
+      ? "the FDA's package codes (" + r.stateFile.products + " product" + (r.stateFile.products === 1 ? "" : "s") + ")"
+      : "name only — the FDA's directory had no package codes for it, so a different drug starting with the same ten letters could be counted"));
+    if (r.billingCodes > 1) bits.push("Part B lists it under " + r.billingCodes + " billing codes, added together (patients are not, since one patient can sit under both)");
+    (r.stateFile ? r.stateFile.years : []).filter(y => y.error).forEach(y => bits.push("Medicaid's " + y.year + " state file could not be read (" + y.error + "), so " + y.year + " is missing rather than zero"));
+    return bits;
+  };
 
   return h("div", null,
     toolCard(h, [
       toolLabel(h, "Is the launch tracking?"),
-      h(Note, { summary: "What Medicare spending is, and the three ways it is not revenue" },
+      h(Note, { summary: "What public-payer spending is, and the ways it is not revenue" },
         h("div", { style: { lineHeight: 1.6 } },
-          "CMS publishes what Medicare paid for every drug, by brand, and — the part that makes this usable rather than historical — it publishes it quarterly, about one quarter behind. That is the only free, current, drug-level read on real-world uptake there is. ",
-          h("b", null, "It is not revenue, and the gap is large in three directions: "),
-          "it is Medicare only, so nothing commercial, Medicaid, cash or ex-US appears; it is gross of manufacturer rebates, the same 25–50% gap the revenue model's price-basis control exists for; and counts below eleven are suppressed, so a small launch reads blank rather than zero. Read the shape and the direction, never the level.")),
+          "CMS publishes what Medicare and Medicaid paid for every drug. Medicare's figures come quarterly, about one quarter behind; Medicaid's state file about three months after each quarter, with CMS's cleaned annual summary behind it. Together they are the only free, current, drug-level read on real-world uptake — and for a children's drug Medicaid is most of it, since Medicare barely sees one. ",
+          h("b", null, "It is not revenue: "),
+          "commercial insurance, cash and ex-US are in neither; every figure is before the manufacturer's rebates (25–50% for Medicare, at least 23.1% of list for Medicaid); and small counts are hidden — Medicaid hides any package-quarter under eleven prescriptions, so a one-dose gene therapy reads ",
+          h("i", null, "hidden"), ", never $0. Read the shape and the direction, never the level.")),
       h("div", { style: { display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 } },
         h("input", { type: "text", value: brand, placeholder: "brand name — e.g. Winrevair",
           "aria-label": "Brand name", onChange: e => setBrand(e.target.value), onKeyDown: e => { if (e.key === "Enter") run(); },
-          style: { flex: "1 1 200px", padding: "9px 12px", borderRadius: 7, border: "1.5px solid var(--rule)", background: "var(--surface)", color: "var(--ink-1)", fontFamily: "var(--mono)", fontSize: 13 } }),
-        h("select", { value: programme, onChange: e => setProgramme(e.target.value), "aria-label": "Medicare program",
-          style: { padding: "9px 10px", borderRadius: 7, border: "1.5px solid var(--rule)", background: "var(--surface)", color: "var(--ink-1)", fontFamily: "var(--mono)", fontSize: 12 } },
-          h("option", { value: "Part D" }, "Part D — pharmacy dispensed"),
-          h("option", { value: "Part B" }, "Part B — clinic administered")),
-        h("button", { onClick: run, disabled: loading || !brand.trim(),
+          style: { ...inputStyle, flex: "1 1 200px" } }),
+        h("select", { value: payer, onChange: e => setPayer(e.target.value), "aria-label": "Payer",
+          style: { ...inputStyle, padding: "9px 10px", fontSize: 12 } },
+          PAYER_OPTIONS.map(o => h("option", { key: o.value, value: o.value }, o.label))),
+        h("button", { onClick: () => run(), disabled: loading || !brand.trim(),
           style: { padding: "9px 18px", borderRadius: 7, border: "1px solid var(--teal)", background: "var(--teal-bg)", color: "var(--teal)", fontFamily: "var(--mono)", fontSize: 12, fontWeight: 700, cursor: loading ? "default" : "pointer", opacity: brand.trim() ? 1 : 0.5 } },
           loading ? "Reading CMS…" : "Track it")),
       h("input", { type: "text", value: analogInput, placeholder: "optional: up to 3 analog brands to compare, comma separated",
         "aria-label": "Analog brand names", onChange: e => setAnalogInput(e.target.value), onKeyDown: e => { if (e.key === "Enter") run(); },
-        style: { width: "100%", boxSizing: "border-box", marginTop: 8, padding: "8px 12px", borderRadius: 7, border: "1.5px solid var(--rule)", background: "var(--surface)", color: "var(--ink-1)", fontFamily: "var(--mono)", fontSize: 12 } }),
+        style: { ...inputStyle, width: "100%", boxSizing: "border-box", marginTop: 8, padding: "8px 12px", fontSize: 12 } }),
       h("div", { className: "prose", style: { fontSize: 10, fontFamily: "var(--sans)", color: "var(--ink-3)", lineHeight: 1.6, marginTop: 6 } },
-        "Part B covers what a clinician administers — infusions, injections given in a clinic. Part D covers what a pharmacy dispenses. A drug appears in one or the other, occasionally both, and picking the wrong one returns nothing rather than a zero."),
+        "A brand or a generic name works — the FDA's drug directory finds the drug under either, and CMS's files, which spell names their own way (“Exondys-51”, “EXONDYS 51”), are searched under both. Part B covers what a clinician administers; Part D what a pharmacy dispenses; Medicaid both."),
       h(CaseFilledNote, { activeCase, filled: [brandFromCase && "drug name"] })
     ]),
 
     error && toolCard(h, h("div", { style: UI.warnNote },
-      error + " This is a connection problem, not a finding that the drug has no Medicare spending.")),
+      error + " This is a connection problem, not a finding that the drug has no spending.")),
 
-    primary && !primary.found && toolCard(h, h("div", { className: "prose", style: { fontSize: 11.5, fontFamily: "var(--sans)", color: "var(--ink-2)", lineHeight: 1.6 } }, primary.error)),
+    primary && !primary.found && toolCard(h, [
+      h("div", { key: "m", className: "prose", style: { fontSize: 11.5, fontFamily: "var(--sans)", color: "var(--ink-2)", lineHeight: 1.6 } },
+        all ? "No Medicare or Medicaid record for “" + brand.trim() + "”. Try the trade name or the generic name. A drug with no record may not be covered yet, may be given only in hospital (inpatient drugs are paid inside the hospital's fee and never appear), or may fall under CMS's small-count rule."
+          : (primary.result && primary.result.error)),
+      primary.candidates.length > 0 && h("div", { key: "c", style: { marginTop: 8, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-2)" } },
+        "Did you mean:",
+        primary.candidates.map(c => h("button", { key: c.brand, type: "button", className: "link-btn", onClick: () => run(c.brand) },
+          c.brand + (c.generic ? " (" + c.generic.toLowerCase() + ")" : ""))))
+    ]),
 
     primary && primary.found && h("div", null,
-      toolCard(h, [
-        toolLabel(h, primary.brand + (primary.generic ? " (" + primary.generic + ")" : "") + " — Medicare " + primary.programme),
-        primary.freshness && primary.freshness.stale && h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--warn)", lineHeight: 1.6, marginBottom: 8 } },
-          "The newest period in this dataset is " + primary.freshness.latestPeriod + ", which is " + primary.freshness.monthsBehind
-            + " months old. CMS mints a new dataset address for each release, so this is most likely the app pointing at a version that has stopped being updated rather than CMS having gone quiet."),
-        h("div", { style: { overflowX: "auto" } },
-          h("table", { style: { borderCollapse: "collapse", fontFamily: "var(--mono)", minWidth: 560 } },
-            h("thead", null, h("tr", null, ["Period", "Medicare spend", "Beneficiaries", "Claims", "Spend/beneficiary", "vs like period"].map(t =>
-              h("th", { key: t, style: { padding: "6px 10px", background: "var(--surface-2)", borderBottom: "1px solid var(--rule)", fontSize: 10, color: "var(--ink-3)", fontWeight: 500, textAlign: t === "Period" ? "left" : "right", whiteSpace: "nowrap" } }, t)))),
-            h("tbody", null, primary.series.map((p, i) => h("tr", { key: i },
-              h("td", { style: { padding: "6px 10px", borderBottom: "1px solid var(--rule)", fontSize: 11, color: "var(--ink-1)", whiteSpace: "nowrap" } },
-                p.label, !p.isFullYear && h("span", { style: { color: "var(--warn)", fontSize: 10, marginLeft: 6 } }, "partial")),
-              h("td", { style: { padding: "6px 10px", borderBottom: "1px solid var(--rule)", fontSize: 11, textAlign: "right", color: "var(--ink-1)" } }, money(p.spending)),
-              h("td", { style: { padding: "6px 10px", borderBottom: "1px solid var(--rule)", fontSize: 11, textAlign: "right", color: "var(--ink-2)" } }, p.beneficiaries != null ? p.beneficiaries.toLocaleString() : "suppressed"),
-              h("td", { style: { padding: "6px 10px", borderBottom: "1px solid var(--rule)", fontSize: 11, textAlign: "right", color: "var(--ink-2)" } }, p.claims != null ? p.claims.toLocaleString() : "—"),
-              h("td", { style: { padding: "6px 10px", borderBottom: "1px solid var(--rule)", fontSize: 11, textAlign: "right", color: "var(--ink-2)" } }, money(p.avgSpendPerBene)),
-              h("td", { style: { padding: "6px 10px", borderBottom: "1px solid var(--rule)", fontSize: 11, textAlign: "right", color: p.growthVsComparable == null ? "var(--ink-3)" : p.growthVsComparable >= 0 ? "var(--green)" : "var(--red)" } },
-                p.growthVsComparable == null ? "—" : (p.growthVsComparable >= 0 ? "+" : "") + (p.growthVsComparable * 100).toFixed(0) + "% vs " + p.comparableTo)
-            ))))),
-        primary.impliedAnnual != null && h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-2)", marginTop: 8 } },
-          "Implied annual run rate from " + primary.latest.label + ": " + money(primary.impliedAnnual)),
+      all && toolCard(h, [
+        toolLabel(h, primary.brand + (primary.generic ? " (" + primary.generic + ")" : "") + " — Medicare and Medicaid"),
+        primary.result.failed.length > 0 && h("div", { style: { ...UI.warnNote, marginBottom: 8 } },
+          primary.result.failed.map(f => f.label).join(" and ") + " could not be reached, so the totals below leave " + (primary.result.failed.length === 1 ? "it" : "them") + " out — a connection problem, not a finding."),
+        (() => {
+          const rows = primary.result.combined;
+          return h("div", { style: { overflowX: "auto" } },
+            h("table", { style: { borderCollapse: "collapse", fontFamily: "var(--mono)", minWidth: 560 } },
+              h("thead", null, h("tr", null,
+                h("th", { style: { ...LT_TH, textAlign: "left" } }, "Period"),
+                foundSources.map(s => h("th", { key: s.key, style: { ...LT_TH, textAlign: "right" } }, s.label)),
+                h("th", { style: { ...LT_TH, textAlign: "right" } }, "Public total"),
+                h("th", { style: { ...LT_TH, textAlign: "right" } }, "vs like period"))),
+              h("tbody", null, rows.map((r, i) => h("tr", { key: i },
+                h("td", { style: { ...LT_TD, textAlign: "left", color: "var(--ink-1)", whiteSpace: "nowrap" } },
+                  r.label, !r.isFullYear && h("span", { style: { color: "var(--warn)", fontSize: 10, marginLeft: 6 } }, "partial")),
+                foundSources.map(s => {
+                  const p = r.values[s.key];
+                  const txt = payerCell(p) || (r.noFigure.indexOf(s.key) >= 0 ? "no figure" : "—");
+                  return h("td", { key: s.key, style: { ...LT_TD, color: p && p.hidden || r.noFigure.indexOf(s.key) >= 0 ? "var(--warn)" : "var(--ink-2)" } }, txt);
+                }),
+                h("td", { style: { ...LT_TD, color: "var(--ink-1)", fontWeight: 700 } }, r.total == null ? "hidden" : (r.complete ? "" : "≥ ") + fmtMoney(r.total)),
+                growthCell(h, r.growthVsComparable, r.comparableTo))))));
+        })(),
         h("div", { className: "prose", style: { fontSize: 10, fontFamily: "var(--sans)", color: "var(--ink-3)", lineHeight: 1.6, marginTop: 8 } },
-          "The last column only ever compares periods covering the same number of quarters — a single quarter against a full year would show a collapse in a drug that is tripling. A run rate assumes the remaining quarters look exactly like the reported ones, which for a ramping launch understates it. " + primary.caveat)
+          PAYER_SOURCES.filter(s => !foundSources.some(f => f.key === s.key) && !primary.result.failed.some(f => f.key === s.key)).map(s => s.label).join(" and ")
+            ? "No record in " + PAYER_SOURCES.filter(s => !foundSources.some(f => f.key === s.key) && !primary.result.failed.some(f => f.key === s.key)).map(s => s.label).join(" or ") + ". " : "",
+          "“≥” is a floor: part of it is hidden under CMS's small-count rule, or a payer has no figure yet for that period (not published, or too few claims — the files do not say which). “Hidden” means none of it can be read; it is never zero. Growth only compares two complete periods covering the same number of quarters. Medicare and Medicaid barely overlap for a drug: Medicare pays for a dual-eligible patient's pharmacy drugs, Medicaid does not."),
+        foundSources.some(s => matchNote(s.result).length) && h("div", { style: { fontSize: 10.5, fontFamily: "var(--sans)", color: "var(--ink-3)", lineHeight: 1.6, marginTop: 6 } },
+          foundSources.map(s => matchNote(s.result)).reduce((a, b) => a.concat(b), []).filter((x, i, arr) => arr.indexOf(x) === i).join(". ") + ".")
       ]),
 
+      detailResults.map((r, di) => toolCard(h, [
+        toolLabel(h, r.brand + (r.generic ? " (" + r.generic + ")" : "") + " — " + (r.programme === "Medicaid" ? "Medicaid" : "Medicare " + r.programme) + (all ? " detail" : "")),
+        r.freshness && r.freshness.stale && h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--warn)", lineHeight: 1.6, marginBottom: 8 } },
+          "The newest period in this record is " + r.freshness.latestPeriod + ", which is " + r.freshness.monthsBehind
+            + " months old. CMS mints a new dataset address for each release, so this is most likely the app pointing at a version that has stopped being updated rather than CMS having gone quiet."),
+        h(PayerDetailTable, { result: r }),
+        r.impliedAnnual != null && h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-2)", marginTop: 8 } },
+          "Implied annual run rate from " + r.latest.label + ": " + fmtMoney(r.impliedAnnual)),
+        !all && matchNote(r).length > 0 && h("div", { style: { fontSize: 10.5, fontFamily: "var(--sans)", color: "var(--ink-3)", lineHeight: 1.6, marginTop: 6 } }, matchNote(r).join(". ") + "."),
+        h("div", { className: "prose", style: { fontSize: 10, fontFamily: "var(--sans)", color: "var(--ink-3)", lineHeight: 1.6, marginTop: 8 } },
+          (r.programme === "Medicaid"
+            ? "Whole years to " + (r.series.filter(p => p.source !== "state file").slice(-1)[0] || { label: "—" }).label + " are CMS's annual summary, totalled before small counts are hidden; later periods are the state file (national rows, fee for service and managed care), within a few percent of the summary where both cover a year. "
+            : "The last column only ever compares periods covering the same number of quarters — a single quarter against a full year would show a collapse in a drug that is tripling. ")
+          + "A run rate assumes the remaining quarters look exactly like the reported ones, which for a ramping launch understates it. " + r.caveat)
+      ])),
+
       toolCard(h, [
-        toolLabel(h, rows.length > 1 ? "Against its analogs, indexed to first Medicare year" : "Trajectory"),
+        toolLabel(h, views.length > 1 ? "Against its analogs, indexed to first " + payerName + " year" : "Trajectory"),
         (() => {
-          const indexed = rows.filter(r => r.found && r.series.length).map((r, i) => ({
-            result: r, i, points: indexToLaunch(r.series, r.dataStartYear)
+          const indexed = views.filter(v => v.found && v.series.length).map((v, i) => ({
+            v, i, points: indexToLaunch(v.series, v.dataStartYear)
           })).filter(x => x.points.length);
           const predating = indexed.filter(x => x.points[0].launchPredatesData);
+          // One drug in All: a line per payer and the total, over the periods
+          // every payer has a readable figure for.
+          const byPayer = all && views.length === 1;
+          const chartRows = byPayer ? primary.result.combined.filter(r => r.complete) : [];
+          const left = byPayer ? primary.result.combined.filter(r => !r.complete).map(r => r.label) : [];
+          const series = byPayer
+            ? foundSources.map((s, i) => ({ name: s.label, color: COMMERCIAL_SERIES_COLORS[(i + 1) % COMMERCIAL_SERIES_COLORS.length],
+                points: chartRows.map(r => ({ v: r.values[s.key] ? r.values[s.key].spending || 0 : 0, label: r.label })) }))
+                .concat(foundSources.length > 1 ? [{ name: "Public total", color: COMMERCIAL_SERIES_COLORS[0], points: chartRows.map(r => ({ v: r.total, label: r.label })) }] : [])
+            : indexed.map(x => ({
+                name: x.v.brand + (x.i === 0 ? "" : " (analog)") + (x.points[0].launchPredatesData ? " — already selling before the data starts" : ""),
+                color: COMMERCIAL_SERIES_COLORS[x.i % COMMERCIAL_SERIES_COLORS.length],
+                points: x.points.map(p => ({ v: p.spending, label: (views.length > 1 ? "Y" + (p.periodsSinceFirst + 1) : p.label) }))
+              }));
           return h("div", null,
-            h(ExportableBlock, { title: primary.brand + " — Medicare spending" },
-              h(RevenueChart, {
-                xPrefix: "", xAxisPrefix: "",
-                series: indexed.map(x => ({
-                  name: x.result.brand + (x.i === 0 ? "" : " (analog)") + (x.points[0].launchPredatesData ? " — already selling before the data starts" : ""),
-                  color: COMMERCIAL_SERIES_COLORS[x.i % COMMERCIAL_SERIES_COLORS.length],
-                  points: x.points.map(p => ({ v: p.spending, label: (rows.length > 1 ? "Y" + (p.periodsSinceFirst + 1) : p.label) }))
-                })),
-                height: 220, showLegend: true
-              })),
+            h(ExportableBlock, { title: primary.brand + " — " + payerName + " spending" },
+              h(RevenueChart, { xPrefix: "", xAxisPrefix: "", series, height: 220, showLegend: true })),
+            left.length > 0 && h("div", { style: { fontSize: 10.5, fontFamily: "var(--sans)", color: "var(--ink-3)", lineHeight: 1.6, marginTop: 6 } },
+              "Left off the chart because part of the total cannot be read yet: " + left.join(", ") + " (see the table)."),
             predating.length > 0 && h("div", { style: { fontSize: 10.5, fontFamily: "var(--sans)", color: "var(--warn)", lineHeight: 1.6, marginTop: 6 } },
-              predating.map(x => x.result.brand).join(" and ") + (predating.length === 1 ? " was" : " were")
-                + " already selling when this dataset begins, so “year 1” here is the first year CMS covers, not the launch year. "
+              predating.map(x => x.v.brand).join(" and ") + (predating.length === 1 ? " was" : " were")
+                + " already selling when this record begins, so “year 1” here is the first year CMS covers, not the launch year. "
                 + (predating.length === 1 ? "That curve is a plateau" : "Those curves are plateaus")
-                + " sitting where a ramp should be, which makes the comparison read backwards — use an analog launched inside the data window for a like-for-like ramp.")
+                + " sitting where a ramp should be, which makes the comparison read backwards — use an analog launched inside the data window for a like-for-like ramp."),
+            views.some(v => v.series.some(p => p.floor)) && h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--warn)", marginTop: 4 } },
+              "One or more points is a floor — part of it hidden under CMS's small-count rule — so the line is at least that high there.")
           );
         })(),
-        rows.length > 1 && h("div", { className: "prose", style: { fontSize: 10, fontFamily: "var(--sans)", color: "var(--ink-3)", lineHeight: 1.6, marginTop: 6 } },
-          h(LaunchShapeRows, { rows, activeCase, updateCase }),
-          "Indexed to each drug's first year of Medicare spending, so launches from different years sit on the same axis. Year 1 is almost never a full commercial year — a drug approved in March shows nine months of it — so the first point understates every curve by a different amount depending on approval date. A mature analog's later years are its plateau, not its ramp."),
-        rows.some(r => r.found && r.series.some(p => !p.isFullYear)) && h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--warn)", marginTop: 4 } },
+        views.length > 1 && h("div", { className: "prose", style: { fontSize: 10, fontFamily: "var(--sans)", color: "var(--ink-3)", lineHeight: 1.6, marginTop: 6 } },
+          h(LaunchShapeRows, { rows: views.map(v => Object.assign({}, v, { series: v.series.filter(p => !p.floor) })), activeCase, updateCase, sourceLabel: payerName }),
+          "Indexed to each drug's first year of " + payerName + " spending, so launches from different years sit on the same axis. Year 1 is almost never a full commercial year — a drug approved in March shows nine months of it — so the first point understates every curve by a different amount depending on approval date. A mature analog's later years are its plateau, not its ramp."),
+        views.some(v => v.found && v.series.some(p => !p.isFullYear)) && h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--warn)", marginTop: 4 } },
           "One or more points is a partial period plotted at its reported value, not annualized — the line dips there for a reporting reason, not a commercial one.")
       ])
     )
@@ -407,7 +533,7 @@ function ExclusivityTool({ cases, updateCase, activeCase }) {
 // Copy an analog's launch SHAPE into the open case (October 2026): the
 // closest published curve and years to peak, never its dollars; offered for a
 // Full revenue build, on confirmation, with the source kept on the curve.
-function LaunchShapeRows({ rows, activeCase, updateCase }) {
+function LaunchShapeRows({ rows, activeCase, updateCase, sourceLabel }) {
   const h = React.createElement;
   const [confirm, setConfirm] = React.useState(null);
   const shapes = (rows || []).filter(r => r.found && r.series && r.series.length).map(r => ({ r, m: matchLaunchShape(indexToLaunch(r.series, r.dataStartYear)) }));
@@ -421,13 +547,13 @@ function LaunchShapeRows({ rows, activeCase, updateCase }) {
   return h("div", { className: "launch-shapes", style: { margin: "6px 0 10px", fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-2)", lineHeight: 1.6 } },
     shapes.map(({ r, m }, i) => h("div", { key: i, style: { marginBottom: 4 } },
       h("b", null, r.brand + ": "),
-      m.ok ? "closest launch shape is the " + m.profileLabel + " curve, " + m.yearsToPeak + " year" + (m.yearsToPeak === 1 ? "" : "s") + " to peak" + (m.stillRising ? " — still rising in its last full year, so that is a lower bound" : "") + " (" + m.fullYears + " full years of Medicare spending)." : "no shape to copy — " + m.reason + ".",
+      m.ok ? "closest launch shape is the " + m.profileLabel + " curve, " + m.yearsToPeak + " year" + (m.yearsToPeak === 1 ? "" : "s") + " to peak" + (m.stillRising ? " — still rising in its last full year, so that is a lower bound" : "") + " (" + m.fullYears + " full years of " + (sourceLabel || "Medicare") + " spending)." : "no shape to copy — " + m.reason + ".",
       m.ok && prog && updateCase && (full
         ? (confirm === i
             ? h("span", { "data-no-export": "" }, " Set " + (prog.drugName || prog.name) + "'s launch curve to " + m.profileLabel + ", " + ytp(m) + " years" + (ytp(m) !== m.yearsToPeak ? " (the curves' " + (m.yearsToPeak < 3 ? "shortest" : "longest") + ")" : "") + " (now " + (rb.launchCurve.profile || "median") + ", " + rb.launchCurve.yearsToPeak + ")? Timing moves the value. ",
-                h("button", { type: "button", className: "link-btn", onClick: () => { updateCase({ ...activeCase, programs: [{ ...prog, revenueBuild: { ...rb, launchCurve: { ...rb.launchCurve, yearsToPeak: String(ytp(m)), profile: m.profile, source: "shape of " + r.brand + ", CMS Medicare spending, " + localDateStamp() } } }], updatedAt: Date.now() }); setConfirm(null); } }, "Confirm"), " ",
+                h("button", { type: "button", className: "link-btn", onClick: () => { updateCase({ ...activeCase, programs: [{ ...prog, revenueBuild: { ...rb, launchCurve: { ...rb.launchCurve, yearsToPeak: String(ytp(m)), profile: m.profile, source: "shape of " + r.brand + ", CMS " + (sourceLabel || "Medicare") + " spending, " + localDateStamp() } } }], updatedAt: Date.now() }); setConfirm(null); } }, "Confirm"), " ",
                 h("button", { type: "button", className: "link-btn", onClick: () => setConfirm(null) }, "Cancel"))
             : h("button", { type: "button", className: "link-btn", "data-no-export": "", style: { marginLeft: 6 }, onClick: () => setConfirm(i) }, "Use this shape for " + (prog.drugName || prog.name)))
         : h("span", { style: { color: "var(--ink-3)" } }, " (a Quick revenue build has no launch curve to receive it)")))),
-    h("div", { style: { color: "var(--ink-3)", fontSize: 10 } }, "A shape, not a level: copying it changes the launch curve and years to peak only, never price or patients. Medicare spending is gross of rebates and about a quarter behind, and a children's drug barely appears in it."));
+    h("div", { style: { color: "var(--ink-3)", fontSize: 10 } }, "A shape, not a level: copying it changes the launch curve and years to peak only, never price or patients. The spending is gross of rebates and about a quarter behind; a children's drug barely appears in Medicare, so read it from Medicaid or the public total."));
 }

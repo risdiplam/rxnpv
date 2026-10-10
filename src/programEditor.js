@@ -95,6 +95,66 @@ function PricePerDoseHelper({ onUse }) {
       h("div", { style: { ...UI.caption, flex: "1 1 100%", lineHeight: 1.5 } }, "A year on drug, not a course — how long patients stay on it goes in Step 1 (years each patient is treated). For a real-world check, Tools → Commercial → Launch & Actuals shows Medicare's spend per patient a year: about $79K for Keytruda in 2024, against ~$194K for a full year at Medicare's own rate ($55.72 a mg, 200 mg every three weeks), because most patients are not on it all year.")));
 }
 
+// What payers actually pay (October 2026): CMS's Medicare and Medicaid
+// spending for an approved drug — this one if it is on the market, or an
+// analog — turned into a price per patient a year. Each figure is a year of
+// real spending over the patients (Medicare) or prescriptions (Medicaid)
+// behind it, so it is what was paid per patient IN a year, part-year patients
+// included, before rebates. "Use" writes the figure, sets the basis it is on
+// and records where it came from (pricing.priceSource); nothing else moves.
+function PayerPriceHelper({ onUse, defaultBrand, adherencePct }) {
+  const h = React.createElement;
+  const [open, setOpen] = React.useState(false);
+  const [brand, setBrand] = React.useState(defaultBrand || "");
+  const [fills, setFills] = React.useState("");
+  const [res, setRes] = React.useState(null);
+  const [loading, setLoading] = React.useState(false);
+  const seq = React.useRef(0);
+  const look = async (name) => {
+    const n = String(name != null ? name : brand).trim();
+    if (!n) return;
+    if (name != null) setBrand(n);
+    const mine = ++seq.current;
+    setLoading(true); setRes(null);
+    const r = await fetchPublicPayerSpending(n).catch(e => ({ ok: false, error: e.message }));
+    if (mine !== seq.current) return;
+    setRes(r); setLoading(false);
+  };
+  const figures = res && res.ok && res.found ? payerPriceFigures(res, fills) : [];
+  const medicaid = figures.find(f => f.key === "medicaid");
+  const adherence = adherencePct !== "" && adherencePct != null ? Number(adherencePct) : 100;
+  const btn = (enabled) => ({ padding: "6px 12px", borderRadius: 6, border: "1px solid var(--teal)", background: "var(--teal-bg)", color: "var(--teal)", fontFamily: "var(--mono)", fontSize: 11, fontWeight: 700, cursor: enabled ? "pointer" : "default", opacity: enabled ? 1 : 0.5, minHeight: 28 });
+  return h("div", { style: { flex: "1 1 100%" } },
+    h("button", { type: "button", className: "link-btn", "aria-expanded": open, onClick: () => setOpen(!open), style: { fontSize: 11 } }, (open ? "▾ " : "▸ ") + "From what Medicare and Medicaid pay"),
+    open && h("div", { style: { marginTop: 6, padding: "8px 10px", borderRadius: 7, background: "var(--surface-2)" } },
+      h("div", { style: { display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" } },
+        h("input", { type: "text", value: brand, placeholder: "an approved drug — this one or an analog, e.g. Evrysdi", "aria-label": "Drug to price from",
+          onChange: e => setBrand(e.target.value), onKeyDown: e => { if (e.key === "Enter") look(); },
+          style: { ...UI.input, flex: "1 1 220px", width: "auto" } }),
+        h("button", { type: "button", onClick: () => look(), disabled: loading || !brand.trim(), style: btn(!loading && !!brand.trim()) }, loading ? "Reading CMS…" : "Look up prices")),
+      res && res.ok === false && h("div", { style: { ...UI.warnNote, marginTop: 8 } }, res.error + " — a connection problem, not a finding."),
+      res && res.ok && !res.found && h("div", { style: { ...UI.caption, marginTop: 8, lineHeight: 1.6 } },
+        "No Medicare or Medicaid record for “" + brand.trim() + "”.",
+        (res.candidates || []).length > 0 && h("span", null, " Did you mean: ",
+          res.candidates.map((c, i) => h("button", { key: c.brand, type: "button", className: "link-btn", style: { marginLeft: i ? 8 : 4 }, onClick: () => look(c.brand) }, c.brand)))),
+      res && res.ok && res.found && !figures.length && h("div", { style: { ...UI.caption, marginTop: 8, lineHeight: 1.6 } },
+        "Found " + res.brand + ", but no full year with a readable figure per patient or per prescription — every year is partial or hidden under CMS's small-count rule."),
+      figures.length > 0 && h("div", { style: { marginTop: 8, display: "grid", gap: 8 } },
+        figures.map(f => h("div", { key: f.key, style: { display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-2)", lineHeight: 1.5 } },
+          h("div", { style: { flex: "1 1 320px" } },
+            h("b", { style: { color: "var(--ink-1)" } }, f.source + ", " + f.period + ": "),
+            f.key === "medicaid"
+              ? fmtMoney(f.perClaim) + " a prescription" + (f.value != null ? " × " + f.fills.toFixed(1) + " a year" + (f.fillsFrom === "Medicare Part D" ? " (Medicare Part D's own prescriptions per patient)" : "") + " = " + fmtMoney(f.value) : "")
+              : fmtMoney(f.value) + " a patient" + (f.key === "partB" ? " at ASP (" + fmtMoney(f.raw) + " paid ÷ 1.06)" : "") + (f.patients ? ", " + f.patients.toLocaleString() + " patients" : ""),
+            h("span", { style: { color: "var(--ink-3)" } }, " · " + f.basis + " basis")),
+          f.key === "medicaid" && h(BenchField, { label: "Prescriptions a year", value: fills, onChange: setFills, placeholder: f.fillsFrom === "Medicare Part D" ? f.fills.toFixed(1) : "e.g. 12 (monthly)" }),
+          h("button", { type: "button", disabled: !(f.value > 0), onClick: () => onUse(f), style: btn(f.value > 0) }, f.value > 0 ? "Use " + fmtMoney(f.value) : "Use"))),
+        h("div", { style: { ...UI.caption, lineHeight: 1.55 } },
+          "Each is a year's spending over the patients or prescriptions behind it — what was paid per patient in that year, including patients who started or stopped part way, so it already sits below a full year at list. Before rebates: Medicare Part D and Medicaid pay the pharmacy's price, close to list (WAC); Part B pays ASP + 6%. The basis is set with the price, so the model's gross-to-net step still applies — and Medicaid's own rebate (at least 23.1% of list) is not in any of these.",
+          medicaid && medicaid.fillsFrom === "Medicare Part D" ? " Medicaid counts prescriptions, not patients; Medicare's prescriptions per patient stand in until you type your own — a children's dose or schedule can differ." : "",
+          adherence < 100 ? h("span", { style: { color: "var(--warn)" } }, " Your adherence step is " + adherence + "%: these figures already include patients who stop, so using one with adherence below 100% counts the drop-off twice.") : null))));
+}
+
 function ProgramEditor({ program, onChange, onDelete, discountRatePct, terminalValue, valuationMethod, basePosAdjustmentPct, onNavigateToTools, part, theCase }) {
   const h = React.createElement;
   // Which Workspace tab this instance draws: "inputs" (Assumptions),
@@ -410,7 +470,25 @@ function ProgramEditor({ program, onChange, onDelete, discountRatePct, terminalV
     h(SectionCard, { nav: "price", title: "Step 5 of 5 · Pricing", subtitle: "US annual price per patient — and which price basis that number is on" },
       h(BenchField, { label: "US annual price per patient", value: rb.pricing.usAnnualPrice, onChange: v => set("revenueBuild.pricing.usAnnualPrice", v), suffix: "$/yr", placeholder: "e.g. 150000",
         help: "Whatever number you have — list or net. Tell the model which basis it's on below and it converts." }),
+      (() => {
+        // Shown while the price is still the figure written from CMS.
+        const ps = rb.pricing.priceSource;
+        if (!ps || String(ps.value) !== String(rb.pricing.usAnnualPrice)) return null;
+        return h("div", { style: { ...UI.caption, flex: "1 1 100%", marginTop: -4, lineHeight: 1.5 } },
+          "From " + ps.source + ": " + ps.brand + ", " + ps.period + " — " + ps.measure + ", looked up " + ps.at + ". Before rebates; the basis below was set to " + ps.basis + " with it.");
+      })(),
       h(PricePerDoseHelper, { onUse: v => set("revenueBuild.pricing.usAnnualPrice", v) }),
+      h(PayerPriceHelper, { defaultBrand: (program.currentPhase === "approved" || program.currentPhase === "filed") ? (program.drugName || "") : "", adherencePct: rb.adherencePct,
+        onUse: f => {
+          const next = JSON.parse(JSON.stringify(program));
+          const cur = getRevenueBuild(next);
+          const value = String(Math.round(f.value));
+          next.revenueBuild = { ...cur, pricing: { ...cur.pricing, usAnnualPrice: value, priceBasis: f.basis,
+            priceSource: { source: f.source, brand: f.brand, period: f.period, value, basis: f.basis,
+              measure: f.measure + (f.key === "medicaid" ? " (" + f.fills.toFixed(1) + " a year" + (f.fillsFrom === "Medicare Part D" ? ", from Medicare Part D" : "") + ")" : ""),
+              at: localDateStamp() } } };
+          onChange(next);
+        } }),
       h("div", { style: { flex: "1 1 220px" } },
         h("div", { style: UI.fieldLabel }, "That price is on a…"),
         h("select", { "aria-label": "Price basis", value: rb.pricing.priceBasis || "ASP", onChange: e => set("revenueBuild.pricing.priceBasis", e.target.value),
