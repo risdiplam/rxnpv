@@ -251,7 +251,7 @@ app.whenReady().then(async () => {
     }
     await js(`document.getElementById("casetab-overview").click()`);
     await click("Tools", 700);
-    const tools = [["Trial", ["Trial Decoder", "Compare Trials", "Asset Program", "Trial Explorer", "FDA Lookup"]], ["Science", ["Target Dossier", "Literature"]],
+    const tools = [["Trial", ["Trial Decoder", "Compare Trials", "Press-Release Reader", "Asset Program", "Trial Explorer", "FDA Lookup"]], ["Science", ["Target Dossier", "Literature"]],
       ["Company", ["Company Lookup", "Catalyst Calendar", "Cash Runway", "Runway vs. Catalyst"]], ["Commercial", ["Launch & Actuals", "Exclusivity / LOE"]],
       ["Valuation", ["Sensitivity", "Binary Event", "Diluted Market Cap"]], ["Benchmarks", ["M&A Premium", "Peak Sales Comps", "Licensing Comps"]]];
     for (const [bench, names] of tools) for (const n of names) {
@@ -265,12 +265,13 @@ app.whenReady().then(async () => {
         await js(`__t.setVal(document.querySelector('input[aria-label="ClinicalTrials.gov IDs to compare"]'), "NCT06872125, NCT02682927, NCT02091375")`); await sleep(200); await click("Compare 3 trials", 300);
         await waitFor(`!!document.querySelector(".cmp-table")`, 45000);
       }
+      if (n === "Press-Release Reader") { await js(`(() => { const t = document.querySelector('textarea[aria-label="Press release text"]'); if (!t) return false; Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value").set.call(t, "The drug showed a positive trend in overall survival without achieving statistical significance, hazard ratio 0.79 (95% CI: 0.62 – 1.01; p=0.057); in an updated analysis the HR was 0.76 (95% CI: 0.61 – 0.95; nominal p=0.0151), with a clinically meaningful benefit across subgroups."); t.dispatchEvent(new Event("input", { bubbles: true })); return true; })()`); await sleep(200); await click("Read it", 400); }
       await stop("Tools " + n);
     }
     await click("Simulation", 900);
     for (const t of ["Trial Outcome / PoS", "Phase 2→3 Translator", "Meta-Analysis", "Peak Sales", "PK/PD"]) { await click(t, 600); await run(); await stop("Simulation " + t); }
     await click("Trial Statistics", 600);
-    for (const t of ["Fragility Index", "Sample Size / Power", "P-value ↔ CI", "Single-Arm CI", "2×2 Outcome Analysis", "Non-Inferiority", "Multiplicity Adjustment"]) { await click(t, 600); await run(); await stop("Simulation " + t); }
+    for (const t of ["Fragility Index", "Sample Size / Power", "P-value ↔ CI", "Single-Arm CI", "2×2 Outcome Analysis", "Non-Inferiority", "Multiplicity Adjustment", "Subgroup Check", "Interim Analysis"]) { await click(t, 600); await run(); await stop("Simulation " + t); }
     await click("Reference Sheet", 700);
     for (const t of ["How This Works", "Revenue Build", "Cost Structure", "R&D & Timeline", "Probability of Success", "Discount Rate", "Valuation & Dilution", "M&A Comps", "Trial Glossary"]) { await click(t, 500); await stop("Reference " + t); }
     await click("Portfolio", 700); await stop("Portfolio");

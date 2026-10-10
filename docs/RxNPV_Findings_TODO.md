@@ -20,6 +20,9 @@ Two of the four were settled by the methodology review (`RxNPV_rNPV_Methodology_
 ### 🔵 One manual click
 The packaged-app harness replaces only the native save sheet. Clicking **Export as PDF** once in the real app and choosing a location is the single step it cannot perform. **Last done 2026-10-02** (October audit, Phase 6): the installed app on a throwaway profile, Stoke sample → Generate Report → Export as PDF → the native sheet → Save; a 4-page vector report, every page rendered and looked at.
 
+### 🟢 Spark handoff and the Summit (SMMT) oncology sample (2026-10-09)
+Spark's 98 book-sourced specs were reviewed and built or declined in seven batches (`RxNPV_Build_Workflow_Oct2026.md`; build log, Phase 56). Summit is the third full sample and the first multi-program, in-licensed, filed case; what it exposed is in `RxNPV_Oncology_Gap_Review.md`. Declined, with reasons in the workflow: outcome-switching and amendment screens (CT.gov's version history is an internal API, 403), a comps percentile (the comps are hand-picked winners), any composite press-release score. Found on the way and fixed: two test runs against a stale build (now a rule: `node build.js` before `npm test`).
+
 ### 🟢 Full audit after the product pass (2026-10-05)
 Every changed line of the pass read; four real defects found and fixed — every runway ran long by the months since the filing (now read from today), the options card read a market cap as a share price, Runway vs. Catalyst kept closed-out catalysts and listed ended windows as funded, impossible dates rolled into the next month — plus two Monte Carlo checks that could fail by chance (now seeded / four standard errors). Build log, Phase 53. Re-verified on the installed build, including the user's own two cases (on a copy).
 

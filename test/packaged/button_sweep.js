@@ -146,14 +146,14 @@ app.whenReady().then(async () => {
     const stops = [];
     for (const t of ["overview", "assumptions", "scenarios", "evidence", "calibration", "saved"])
       stops.push({ name: "Workspace · " + t, go: async () => { await click("Workspace", 400); await js(openCase); await sleep(400); await js(`document.getElementById("casetab-${t}").click()`); await sleep(500); } });
-    const tools = [["Trial", ["Trial Decoder", "Compare Trials", "Asset Program", "Trial Explorer", "FDA Lookup"]], ["Science", ["Target Dossier", "Literature"]],
+    const tools = [["Trial", ["Trial Decoder", "Compare Trials", "Press-Release Reader", "Asset Program", "Trial Explorer", "FDA Lookup"]], ["Science", ["Target Dossier", "Literature"]],
       ["Company", ["Company Lookup", "Catalyst Calendar", "Cash Runway", "Runway vs. Catalyst"]], ["Commercial", ["Launch & Actuals", "Exclusivity / LOE"]],
       ["Valuation", ["Sensitivity", "Binary Event", "Diluted Market Cap"]], ["Benchmarks", ["M&A Premium", "Peak Sales Comps", "Licensing Comps"]]];
     for (const [bench, names] of tools) for (const n of names)
       stops.push({ name: "Tools · " + n, go: async () => { await click("Workspace", 300); await js(openCase); await sleep(300); await click("Tools", 500); await click(bench, 300); await click(n, 700); } });
     for (const t of ["Trial Outcome / PoS", "Phase 2→3 Translator", "Meta-Analysis", "Peak Sales", "PK/PD"])
       stops.push({ name: "Simulation · " + t, go: async () => { await click("Simulation", 700); await click(t, 600); } });
-    for (const t of ["Fragility Index", "Sample Size / Power", "P-value ↔ CI", "Single-Arm CI", "2×2 Outcome Analysis", "Non-Inferiority", "Multiplicity Adjustment"])
+    for (const t of ["Fragility Index", "Sample Size / Power", "P-value ↔ CI", "Single-Arm CI", "2×2 Outcome Analysis", "Non-Inferiority", "Multiplicity Adjustment", "Subgroup Check", "Interim Analysis"])
       stops.push({ name: "Simulation · " + t, go: async () => { await click("Simulation", 700); await click("Trial Statistics", 500); await click(t, 600); } });
     for (const t of ["How This Works", "Revenue Build", "Cost Structure", "R&D & Timeline", "Probability of Success", "Discount Rate", "Valuation & Dilution", "M&A Comps", "Trial Glossary"])
       stops.push({ name: "Reference · " + t, go: async () => { await click("Reference Sheet", 600); await click(t, 500); } });

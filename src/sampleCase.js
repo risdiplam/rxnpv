@@ -853,7 +853,7 @@ function sampleCaseSummit() {
       "HARMONi-2 OS by PD-L1: high 0.58 (0.38–0.89), low 0.85 (0.61–1.18), descriptive (8-K 2026-09-13); four subgroups were shown. The high group's interval excludes 1 and the low group's does not, but the interaction test finds no evidence they differ (p = 0.16) — the trap the tool exists for. HARMONi-7 tests PD-L1-high alone, so this matters for the non-squamous program."),
     sim("HARMONi-3 squamous: what an interim OS result must show", "trialStats", "interim", "Trial Statistics · Interim Analysis",
       [["imEvents", "160"], ["imTotal", "400"], ["imFamily", "obf"], ["imAlpha", "0.05"], ["imAlloc", "1"]], "Calculate",
-      "Illustrative: the squamous cohort's OS event counts are not disclosed. At 40% of the information (160 of 400 deaths) under O'Brien–Fleming-type spending, stopping for benefit needs z ≥ 3.10 — a hazard ratio of about 0.61 — and the final analysis then needs 2.00 rather than 1.96. Summit splits its alpha between PFS and OS as well, so the real bar is higher still. Not crossing at the early look is the expected outcome.")
+      "Illustrative: the squamous cohort's OS event counts are not disclosed. At 40% of the information (160 of 400 deaths) under O'Brien–Fleming-type spending, stopping for benefit needs z ≥ 3.10 — a hazard ratio of about 0.61 — and the final analysis then needs 1.97 rather than 1.96. Summit splits its alpha between PFS and OS as well, so the real bar is higher still. Not crossing at the early look is the expected outcome.")
   ];
 
   return Object.assign(base, {

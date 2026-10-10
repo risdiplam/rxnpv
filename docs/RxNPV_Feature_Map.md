@@ -229,16 +229,16 @@ Decided with the user on October 9, 2026; the full verdicts, reasons and done te
 | Batch | Item | Status |
 |---|---|---|
 | 0 | Spark's verified textbook examples as independent math checks (Lachin, Schoenfeld, Lehr, Friedman power, Fisher); the fragility example excluded — Walsh's method gives 1, the handoff's 2 | **BUILT** |
-| 1 | Program labels when two programs share a drug name; simulator program picker height | planned |
-| 1 | Convertible preferred that converts to common (counted as shares at any price, never as debt) | planned |
-| 1 | Incidence mode labelled as time on treatment; price-per-dose helper | planned |
-| 1 | "Who reads out first" and the competitor scan by rival drug names | planned |
-| 2 | What each catalyst is worth (multi-program), with optional same-drug read-across; Binary Event program picker | planned |
-| 2 | Range of endings (seeded success/failure simulation, read-across; mean equals Base) | planned |
-| 2 | Drug-level licence: royalty (optional marginal tiers) and sales milestones on the drug's total sales | planned |
-| 3 | Dead or underpowered; subgroup check; false-positive chance; interim boundaries; safety exposure; results-overdue, enrolment-shortfall and dropout-asymmetry flags; regression-to-the-mean caution; NI margin as a share; Zia response haircut preset; peak vs comps red flag; press-release reader (no score) | planned |
-| 4 | FDA decision date from the submission date; patent term extension estimate | planned |
-| 5 | Trial Glossary additions (cluster randomisation, enrichment, blinding, seamless designs, 3+3, composites, ITT vs per-protocol, comparator quality, LOCF, crossover dilution, publication bias) | planned |
-| 6 | Summit Therapeutics as the third full sample | planned |
+| 1 | Program labels when two programs share a drug name; simulator program picker height | **BUILT** |
+| 1 | Convertible preferred that converts to common (counted as shares at any price, never as debt) | **BUILT** |
+| 1 | Incidence mode labelled as time on treatment; price-per-dose helper | **BUILT** |
+| 1 | "Who reads out first" by rival drug names (Trial Explorer; Company Lookup's sponsor landscape left as it is) | **BUILT** |
+| 2 | What each catalyst is worth (multi-program), with optional same-drug read-across; Binary Event program picker | **BUILT** |
+| 2 | Range of endings (built as exact enumeration rather than a seeded simulation — every launch-or-fail combination, capped at 2,000; read-across; mean equals Base with no G&A or tax) | **BUILT** |
+| 2 | Drug-level licence: royalty (optional marginal tiers) and sales milestones on the drug's total sales | **BUILT** |
+| 3 | Dead or underpowered; nominal p; false-positive chance; Subgroup Check; Interim Analysis with conditional power; safety exposure; stopped-for-benefit and regression-to-the-mean notes (results-overdue and dropout-asymmetry flags already existed); silent completed trials in Asset Program; NI margin as a share; Zia check; peak above every area comp (not a percentile — the comps are hand-picked winners); Press-Release Reader (no score) | **BUILT** |
+| 4 | FDA decision date from the submission date; patent term extension estimate | **BUILT** |
+| 5 | Trial Glossary additions (cluster randomisation, enrichment, blinding, seamless designs, 3+3, composites, ITT vs per-protocol, comparator quality, LOCF, crossover dilution, publication bias) | **BUILT** |
+| 6 | Summit Therapeutics as the third full sample | **BUILT** |
 
 **Declined from the handoff, with reasons in the workflow document:** V5 discount-rate ladder (double counts risk), V7 real options and V8 sales-path simulation (an unsourceable volatility), V11 value-share ladder, V12 two-party option valuation, V13 platform feed-rate value, V3 market-growth compounding, F4 event health check, M1/M6/M7 (covered), M15, R10/R11/R19 curve fitting, P1/P8 tables (no data), P3, P6, P7, G1, G2, D3, E5 (registry history is not public), E9, E10's risk tiers.

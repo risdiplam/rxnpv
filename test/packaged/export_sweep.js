@@ -235,6 +235,7 @@ app.whenReady().then(async () => {
   await tool("Trial", "Compare Trials", async () => {
     await js(`__t.setVal(document.querySelector('input[aria-label="ClinicalTrials.gov IDs to compare"]'), "NCT06872125, NCT02682927, NCT02091375")`); await sleep(200); await click("Compare 3 trials", 300);
     await waitFor(`!!document.querySelector(".cmp-table")`, 45000); });
+  await tool("Trial", "Press-Release Reader", async () => { await js(`(() => { const t = document.querySelector('textarea[aria-label="Press release text"]'); if (!t) return false; Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value").set.call(t, "The drug showed a positive trend in overall survival without achieving statistical significance, hazard ratio 0.79 (95% CI: 0.62 – 1.01; p=0.057); in an updated analysis the HR was 0.76 (95% CI: 0.61 – 0.95; nominal p=0.0151), with a clinically meaningful benefit across subgroups."); t.dispatchEvent(new Event("input", { bubbles: true })); return true; })()`); await sleep(200); await click("Read it", 400); });
   await tool("Trial", "Asset Program", async () => {
     await js(`__t.setVal(__t.ph("drug or intervention name"), "dapagliflozin")`); await sleep(200);
     await js(`(() => { const i = __t.ph("drug or intervention name"); const b = i && [...i.parentElement.querySelectorAll("button")][0]; if (b) b.click(); return !!b; })()`);
@@ -275,7 +276,7 @@ app.whenReady().then(async () => {
   const run = async () => { await js(`(() => { document.querySelectorAll("#ts-root .runbtn").forEach(b => b.click()); return true; })()`); await sleep(2500); };
   for (const t of ["Trial Outcome / PoS", "Phase 2→3 Translator", "Meta-Analysis", "Peak Sales", "PK/PD"]) { await click(t, 700); await run(); await sweep("Simulation · " + t); }
   await click("Trial Statistics", 700);
-  for (const t of ["Fragility Index", "Sample Size / Power", "P-value ↔ CI", "Single-Arm CI", "2×2 Outcome Analysis", "Non-Inferiority", "Multiplicity Adjustment"]) {
+  for (const t of ["Fragility Index", "Sample Size / Power", "P-value ↔ CI", "Single-Arm CI", "2×2 Outcome Analysis", "Non-Inferiority", "Multiplicity Adjustment", "Subgroup Check", "Interim Analysis"]) {
     await click(t, 700);
     // Multiplicity ships with no p-values (it needs the user's endpoints), so
     // give it three to draw its chart.

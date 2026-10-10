@@ -455,7 +455,7 @@
    "value": "450"
   },
   {
-   "set": "Disease duration (yrs pt lives w/ disease) (yrs)",
+   "set": "Years each patient is treated (yrs)",
    "value": "55"
   },
   {
