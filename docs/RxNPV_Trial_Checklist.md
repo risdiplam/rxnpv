@@ -100,9 +100,46 @@ Work top to bottom over a few sessions; tick as you go. Part 1 builds **Spruce (
 - [ ] **Offline** (Wi-Fi off): Workspace, Reference and Simulation work; live lookups say they could not connect.
 - [ ] Quit and reopen: everything is where you left it.
 
-## 3. Known and expected — not bugs
+## 3. New in the October 2026 build — use the Summit sample (Load sample case → Summit — lung cancer, filed)
+
+Figures to expect are in [`RxNPV_SMMT_Reference.md`](RxNPV_SMMT_Reference.md).
+
+### Several programs of one drug
+- [ ] **Program tabs, section list, sum-of-the-parts, revenue legend:** five different names, not "ivonescimab" five times.
+- [ ] **What each catalyst is worth** (Overview): five rows in date order, the FDA decision (2026-11-14, pinned) first; pass and fail values per share. Set the read-across to 0, then back to 30: the swings narrow and widen, Base does not move.
+- [ ] **Range of endings:** the histogram, the five most likely endings, the share below today's price. The reading should say the mean sits at Base.
+- [ ] **Owed to a licensor:** HARMONi carries Akeso's terms with "These terms cover every ivonescimab program" ticked; the other four say they are covered and take only an approval milestone. Add a royalty tier (e.g. 10% up to $2,000M, 12% above) and watch Base move; delete it (two clicks).
+- [ ] **Convertible preferred** (Capital structure → Detailed): 108,955,369. Clear it and type the same number into the convertible-note fields with a $18.36 conversion price: the value drops by about $2.20 (the note is treated as debt below conversion). Put it back.
+- [ ] **Binary Event** (Tools → Valuation): a Program picker; switch to the squamous program and the three numbers change.
+- [ ] **Report → Sections:** "What each catalyst is worth" (on) and "Range of endings" (off by default); the decision memo lists each catalyst.
+- [ ] **On SPRB** (one program), none of this appears; the outcome tree and failure floor do, as before.
+
+### Revenue and the market
+- [ ] **Years each patient is treated** (incidence mode): the help text says time on drug for cancer. Open **From a price per dose** under the price: $11,144 × 17.4 → the button offers about $194K a year and fills the price.
+- [ ] **Trial Explorer → Who reads out first:** condition "non-small cell lung cancer", Phase 3, Intervention "pumitamig, BNT327, PF-08634404, SSGJ-707" — a handful of rival trials instead of hundreds; the left-out count is explained.
+- [ ] **Company Lookup** on a company with preferred stock outstanding: the amber note about preferred shares; and on every lookup, the reminder to check 8-Ks for placements after the filing.
+
+### Reading a readout (Simulation → Trial Statistics)
+- [ ] **P-value ↔ CI:** CI → P, ratio, 0.79 (0.62–1.01), smallest effect that matters 0.80 → "Not definitive". Switch the analysis to "nominal" → the nominal-p reading. Add a prior of 30% → the false-positive reading (only when p < 0.05: try 0.76, 0.61–0.95).
+- [ ] **Subgroup Check** (new): the defaults (HARMONi-2 PD-L1 high vs low) → p ≈ 0.16, "No evidence the two subgroups differ".
+- [ ] **Interim Analysis** (new): 160 of 400 events, O'Brien–Fleming → z ≥ 3.10, HR ≤ ~0.61; type an interim HR of 0.80 and a design HR of 0.75 → conditional power both ways.
+- [ ] **Single-Arm CI:** 0 events in 800, "Adverse events" → "cannot rule out … 1 in 268".
+- [ ] **Non-Inferiority:** add the comparator's effect (e.g. 0.70) → how much of it the margin gives away.
+- [ ] **Phase 2→3 Translator** (binary): the Zia absolute check appears beside the ratio.
+
+### Tools
+- [ ] **Press-Release Reader** (Tools → Trial, new): paste a real release; phrases, p-values near 0.05 and ratios whose interval includes 1 are quoted, each with what it usually means, and there is no score.
+- [ ] **Catalyst Calendar → FDA decision date from a submission:** 2025-11-14, NME/original BLA, standard → 2026-11-13; priority → 8 months. On SPRB, pin a date (asks for the program on a multi-program case).
+- [ ] **Exclusivity / LOE → Patent term extension estimate:** 2039-12-31, IND 2023-01-15, submitted 2025-11-14, approval 2026-11-14 → extended to ~2040-11, the 14-year cap binding; floors listed.
+- [ ] **Trial Decoder:** a trial stopped for benefit now says early stops overstate; a single-arm trial mentions regression to the mean. **Asset Program** counts completed trials with no results after a year.
+- [ ] **Reference Sheet → Trial Glossary:** two new groups (design details; reading a result honestly).
+- [ ] **Red flags:** a program peak above every comp in its area is flagged (try a $40B oncology Napkin peak).
+
+## 4. Known and expected — not bugs
 
 - The samples are dated (Stoke 2026-09-25, PepGen 2026-09-29); their freshness line goes amber after a week. That's correct.
 - Runways count from today: a filing's cash ages until the next 10-Q (Stoke and PepGen file in November).
 - Registry "Phase 4" for an unapproved drug, and completion dates, are shown as registered.
 - Short text-only sections export with more margin than the screen; that's by design.
+- Summit's price sits above most of its endings: the market is pricing close to everything going right. That is the case's finding, not an error.
+- Summit's catalyst rows weighted back come to about Base, not exactly: G&A and tax depend on the whole company.

@@ -592,56 +592,315 @@ function sampleCasePepGen() {
   });
 }
 
-// ── Summit Therapeutics (SMMT) — DRAFT, the oncology sample (October 2026).
-// One molecule, ivonescimab (PD-1 x VEGF bispecific, in-licensed from Akeso),
-// across several indications at different stages: modelled as one program
-// per indication. Researched 2026-10-09 from the Q2 2026 10-Q, the FY2025
-// 10-K, 8-Ks through September 2026 and ClinicalTrials.gov.
+// ── Summit Therapeutics (SMMT) — the oncology sample (October 2026) ────────
+// One molecule, ivonescimab (a PD-1 × VEGF bispecific in-licensed from Akeso),
+// in several indications at different stages, modelled as one program per
+// indication plus a Napkin program for the further tumour types. Unlike the
+// other two samples it is multi-program, so it shows what each catalyst is
+// worth, the range of endings, one licence shared across a drug's programs
+// and convertible preferred (docs/RxNPV_Oncology_Gap_Review.md). Researched
+// 2026-10-09 from the Q2 2026 10-Q, the FY2025 10-K, 8-Ks through 2026-09-29,
+// ClinicalTrials.gov, ACS Cancer Facts & Figures 2026 and Medicare Part B
+// spending data; every judgment call has an Evidence Log entry.
 const SAMPLE_SUMMIT_AS_OF = "2026-10-09";
 
 function sampleCaseSummit() {
   const base = newCase();
-  const pricing = o => Object.assign({ usAnnualPrice: "183000", priceBasis: "ASP", netPriceRealizationPct: "", usAnnualGrowthPct: "2", includeExUS: true, exUSPriceFactorPct: "45", exUSAnnualGrowthPct: "0", exUSPatientMultiplierPct: "150", exUSLaunchLagYears: "1.5" }, o || {});
+  const ev = (label, classification, confidence, source, thesis) =>
+    ({ id: newId("ev"), label, classification, confidence, source, date: SAMPLE_SUMMIT_AS_OF, thesis });
+  const cal = (catalystLabel, catalystDate, yourPoS, pin, notes) => ({ id: newId("cal"), catalystLabel, catalystDate, yourPoS, marketImpliedPoS: null, outcome: "pending", pin: pin || undefined, notes });
+  // Price parity with pembrolizumab, per patient-year on drug, at Medicare's
+  // own 2024 rate (Part B: $55.72 a mg × 200 mg every 3 weeks = $11,144 a
+  // dose; ÷ 1.06 for ASP; × 17.4 doses a year = $183K ASP).
+  const pricing = { usAnnualPrice: "183000", priceBasis: "ASP", netPriceRealizationPct: "", usAnnualGrowthPct: "2", includeExUS: true, exUSPriceFactorPct: "45", exUSAnnualGrowthPct: "0", exUSPatientMultiplierPct: "150", exUSLaunchLagYears: "1.5" };
   const excl = y => ({ yearsToLOE: y, modality: "biologic", volumeRetainedPct: "", priceDeclinePct: "" });
   const cost = { cogsPct: "12", reps: { primaryCare: "0", specialty: "0", hospital: "0" }, marketingPctOfPeak: "4" };
-  // One licence for the molecule: the royalty and sales milestones on total
-  // ivonescimab sales sit on the lead program; the others carry only their
-  // own approval milestones.
-  const lic = (approvalM, sales) => sales ? ({ enabled: true, shared: true, name: "Akeso Inc.", royaltyPct: "11", tiers: [], sublicensePct: "", approvalMilestoneM: approvalM, salesMilestones: sales, note: "" })
-    : ({ enabled: false, shared: false, name: "", royaltyPct: "", tiers: [], sublicensePct: "", approvalMilestoneM: approvalM, salesMilestones: [], note: "" });
-  const prog = (o, rb) => { const p = newProgram(); Object.assign(p.revenueBuild, rb || {}); return Object.assign(p, o); };
-  const pop = (incidence, years, treatedPct) => ({ mode: "incidence", prevalence: "", incidence, diseaseDurationYears: years, diagnosisRatePct: "100", treatmentRatePct: treatedPct, eligiblePct: "100" });
+  const covered = approvalM => ({ enabled: false, shared: false, name: "", royaltyPct: "", tiers: [], sublicensePct: "", approvalMilestoneM: approvalM, salesMilestones: [], note: "" });
+  // The IRA clock runs from the molecule's first licensure (2026): about 13
+  // years, so ~year 13 for HARMONi (launch 2027) and correspondingly fewer for
+  // indications that launch later.
+  const ira = years => ({ enabled: true, reductionPct: "20", effectiveYears: years });
+  const pop = (incidence, years, treatedPct, eligiblePct) => ({ mode: "incidence", prevalence: "", incidence, diseaseDurationYears: years, diagnosisRatePct: "100", treatmentRatePct: treatedPct, eligiblePct });
   const share = (n, order, pct) => ({ numDrugs: n, orderOfEntry: order, peakShareOverridePct: pct });
-  const common = { drugName: "ivonescimab", therapeuticArea: "Oncology", modality: "biologic", target: "PDCD1", revenueMode: "full", costStructure: cost };
-  const programs = [
-    prog(Object.assign({}, common, { name: "HARMONi — 2L+ EGFRm NSCLC", indication: "EGFR-mutant non-squamous NSCLC after a 3rd-generation TKI, with chemotherapy",
-      currentPhase: "filed", posOverridePct: "75", posBiomarkerUse: "selection", trialIds: "NCT06396065", launchYearOffset: "1", licensor: lic("100", [{ thresholdM: "1000", paymentM: "250" }, { thresholdM: "3000", paymentM: "500" }]) }),
-      { population: pop("14000", "0.6", "85"), marketShare: share(4, 3, "25"), launchCurve: { yearsToPeak: "4", profile: "median" }, pricing: pricing(), exclusivity: excl("13") }),
-    prog(Object.assign({}, common, { name: "HARMONi-3 — 1L squamous NSCLC", indication: "First-line metastatic squamous NSCLC, with chemotherapy, against pembrolizumab + chemotherapy",
-      currentPhase: "phase3", posOverridePct: "55", trialIds: "NCT05899608", launchYearOffset: "2", licensor: lic("50") }),
-      { population: pop("26800", "0.85", "85"), marketShare: share(3, 1, "35"), launchCurve: { yearsToPeak: "5", profile: "median" }, pricing: pricing(), exclusivity: excl("12") }),
-    prog(Object.assign({}, common, { name: "HARMONi-3 / -7 — 1L non-squamous NSCLC", indication: "First-line metastatic non-squamous NSCLC without an actionable driver",
-      currentPhase: "phase3", posOverridePct: "45", trialIds: "NCT05899608, NCT06767514", launchYearOffset: "3",
-      licensor: lic("50") }),
-      { population: pop("56300", "0.85", "85"), marketShare: share(3, 1, "25"), launchCurve: { yearsToPeak: "5", profile: "median" }, pricing: pricing(), exclusivity: excl("11") }),
-    prog(Object.assign({}, common, { name: "HARMONi-GI3 — 1L metastatic CRC", indication: "First-line unresectable metastatic colorectal cancer, against bevacizumab + FOLFOX",
-      currentPhase: "phase3", posOverridePct: "35", trialIds: "NCT07228832", launchYearOffset: "4", licensor: lic("50") }),
-      { population: pop("47500", "0.75", "70"), marketShare: share(3, 1, "20"), launchCurve: { yearsToPeak: "5", profile: "median" }, pricing: pricing(), exclusivity: excl("10") })
+  const prog = (o, rb) => { const p = newProgram(); Object.assign(p.revenueBuild, rb || {}); return Object.assign(p, { drugName: "ivonescimab", therapeuticArea: "Oncology", modality: "biologic", target: "PDCD1", revenueMode: "full", costStructure: cost, prv: { enabled: false, valueM: "150" }, rndOverride: { totalYears: "", totalCostM: "" } }, o); };
+
+  const harmoni = prog({
+    name: "HARMONi — 2L+ EGFRm NSCLC",
+    indication: "EGFR-mutant non-squamous NSCLC after a 3rd-generation EGFR TKI, with chemotherapy",
+    currentPhase: "filed", posOverridePct: "75", posBiomarkerUse: "selection", posDiseaseType: "",
+    trialIds: "NCT06396065", launchYearOffset: "1", ira: ira("13"),
+    licensor: { enabled: true, shared: true, name: "Akeso Inc.", royaltyPct: "11", tiers: [], sublicensePct: "", approvalMilestoneM: "150",
+      salesMilestones: [{ id: newId("lm"), thresholdM: "1000", paymentM: "250" }, { id: newId("lm"), thresholdM: "2000", paymentM: "500" }, { id: newId("lm"), thresholdM: "3000", paymentM: "750" }, { id: newId("lm"), thresholdM: "5000", paymentM: "1000" }, { id: newId("lm"), thresholdM: "7500", paymentM: "1005" }],
+      note: "FY2025 10-K: low-double-digit royalties on net sales; up to $1.05B regulatory and $3.505B commercial milestones; thresholds not disclosed" },
+    evidenceLog: [
+      ev("The asset and the licence", "fact", "high", "Summit FY2025 10-K (filed 2026-02-23), License Agreement with Akeso; Q2 2026 results release (2026-07-23)",
+        "Ivonescimab (SMT112, AK112 at Akeso) is a tetravalent PD-1 × VEGF bispecific antibody engineered by Akeso. Summit licensed it in January 2023 for the US, Canada, Europe and Japan ($474.9M cash plus 10M shares, $500M in all), adding Latin America, the Middle East and Africa in June 2024 ($15M). Akeso keeps China and the rest of the world, and is eligible for up to $1.05B of regulatory and $3.505B of commercial milestones and low-double-digit royalties on net sales. Approved in China since 2024 (HARMONi-A, then HARMONi-2); over 100,000 patients treated commercially there, per Akeso."),
+      ev("The BLA: filed in Q4 2025, decision November 14, 2026", "fact", "high", "8-K Ex. 99.2, 2026-01-12 (submission); 8-K Ex. 99.1, 2026-01-29 (FDA acceptance)",
+        "Summit submitted a BLA for ivonescimab plus chemotherapy in EGFR-mutant non-squamous NSCLC after a third-generation TKI in Q4 2025; the FDA accepted it with a PDUFA goal date of November 14, 2026 — a standard review (an original BLA: the 60-day filing date plus 10 months). The FDA said it would hold mid-cycle and wrap-up meetings. The company puts the eligible US population at over 14,000 a year."),
+      ev("HARMONi: PFS hit, OS missed its planned test, then improved", "fact", "high", "8-K Ex. 99.1, 2025-09-07 (WCLC 2025) and 2026-09-15 (WCLC 2026); NCT06396065",
+        "438 patients (219 a side), ivonescimab + platinum doublet against placebo + the doublet. PFS by blinded central review: HR 0.52 (0.41–0.66), p<0.00001, 6.8 vs 4.4 months. OS at the primary analysis (April 2025): HR 0.79 (0.62–1.01), p = 0.057 against the 0.0448 the plan required — a miss. Later cuts with longer follow-up of Western patients: 0.78 (0.62–0.98), nominal p = 0.0332 (September 2025); 0.76 (0.61–0.95), nominal p = 0.0151 (June 2026). Those p-values are nominal: the analyses were not part of the error-controlled plan. Median OS 16.8 vs 14.0 months throughout. ORR 45% vs 34%."),
+      ev("Western patients: the subgroup the BLA turns on", "fact", "high", "8-K Ex. 99.1, 2026-09-15",
+        "Western-patient OS HR at each cut: 0.98 (0.55–1.73) at 9.2 months' median follow-up, 0.84 (0.53–1.32) at 13.7, 0.76 (0.52–1.10) at 23.2; Asian patients 0.76, locked at the April 2025 cut. North America alone 0.70 in September 2025. The Western interval still includes 1 at every cut, and the subgroup was too small to settle the question either way — the Subgroup Check (Simulation → Trial Statistics) is the honest test, not whether each subgroup's own interval excludes 1."),
+      ev("Safety in HARMONi", "fact", "high", "8-K Ex. 99.1, 2025-09-07",
+        "Grade 3+ treatment-related adverse events 50.0% vs 42.2%; discontinuation for them 7.3% vs 5.0%; treatment-related deaths 4 (1.8%) vs 5 (2.3%); grade 3+ immune-related 9.6% vs 6.0%; grade 3+ possibly VEGF-related 7.3% vs 3.2%; grade 3+ bleeding under 1%. More toxicity, as expected of adding a PD-1/VEGF agent to chemotherapy, without a mortality signal."),
+      ev("FDA approval odds: 75%", "inference", "moderate", "Judgment; app benchmark (Oncology, filed: Thomas 2016 / Hay 2014); HARMONi data above",
+        "The benchmark for a filed oncology application is about 85–90%. Cut to 75% for the OS miss at the planned analysis and the FDA's stated attention to overall survival in this setting, against a clear PFS benefit, an OS trend that has firmed with follow-up and the FDA accepting the file as submitted. A narrow label or a post-marketing OS requirement is the likelier shape of a yes than a refusal."),
+      ev("US population: 14,000 a year; on drug about 0.6 years", "inference", "moderate", "Summit 8-K, 2026-01-29 (over 14,000 eligible); ACS Cancer Facts & Figures 2026 (229,410 new lung cancers); HARMONi PFS and DoR",
+        "Summit's 14,000 is a company figure; a cross-check — 229,410 lung cancers × ~85% NSCLC × ~13% EGFR-mutant in the US × ~70% reaching metastatic disease and second-line treatment after osimertinib — gives about 18,000 before excluding the unfit, so 14,000 is plausible. 85% of those treated in this line. Time on drug: median PFS 6.8 months, responses lasting a median 7.6, so about 0.6 years on average — entered as years each patient is treated (incidence mode)."),
+      ev("Competition after osimertinib: third of four, 25% share", "inference", "low", "Judgment; FDA approvals of amivantamab + chemotherapy (MARIPOSA-2, 2024) and datopotamab deruxtecan (2025) in this setting",
+        "Amivantamab plus chemotherapy and Dato-DXd are already approved after osimertinib, and chemotherapy (with or without bevacizumab) remains common. Ivonescimab would enter third or fourth; the order-of-entry benchmark is overridden to 25% for a regimen with a PFS HR of 0.52 against chemotherapy alone but no head-to-head against amivantamab."),
+      ev("Price: parity with pembrolizumab, $183K ASP a patient-year", "inference", "moderate", "CMS Medicare Part B Spending by Drug, 2024: Keytruda $55.72 per mg, $79,464 per beneficiary",
+        "No US price exists. Parity per dose with pembrolizumab, the drug it means to replace: Medicare paid $55.72 a mg in 2024, $11,144 for a 200 mg dose every three weeks; less the 6% Part B add-on, about $10,513 ASP; × 17.4 doses = $183K a patient-year on drug. Medicare's own spend per Keytruda patient was $79K in 2024 — most patients are not on it all year, which the years-on-treatment input carries. Ivonescimab is dosed by weight (20 mg/kg), so per-dose parity is itself a judgment. Ex-US at 45% of the US price, 150% of US patients (Europe, Japan and Summit's other territories), 1.5 years later."),
+      ev("Patents, the biologic floor and loss of exclusivity: ~2040", "inference", "moderate", "Summit FY2025 10-K, Intellectual property (patents expire 2039–2040); 35 U.S.C. §156; BPCIA 12-year exclusivity",
+        "The ivonescimab patents expire 2039–2040 before any extension. An extension cannot run past 14 years after approval (2040-11 for a November 2026 approval), and any IND in effect before mid-2024 gets there — HARMONi was enrolling in the US in 2023 (Tools → Commercial → Exclusivity / LOE estimates it). The 12-year biologic floor ends 2038-11. Loss of exclusivity ~2040: 14 years from HARMONi's 2027 launch, fewer for later indications. Biologic erosion (biosimilars) at the app's benchmark."),
+      ev("IRA negotiation: 20% off US sales from year 13 after licensure", "inference", "low", "Inflation Reduction Act, biologics 13 years from licensure; CMS negotiated prices for 2026 and 2027",
+        "A broad oncology biologic is not exempt (no orphan-only label). The negotiated price would apply about 13 years after the first licensure in 2026 — 2039, close to loss of exclusivity — so the clock barely matters. Entered as a 20% cut to US sales (Medicare is roughly half of US NSCLC use; negotiated discounts have run 38–79% off list) from year 13 for HARMONi and correspondingly earlier program years for indications launched later."),
+      ev("Balance sheet: $2.76B pro forma, 906.7M shares with AstraZeneca's preferred", "fact", "high", "Q2 2026 10-Q (filed 2026-07-23); 8-K, 2026-09-29 (AstraZeneca purchase agreement)",
+        "$690.7M of cash and short-term investments at June 30, 2026; $68.4M more from the ATM after June (about $67.2M net); and AstraZeneca's $2.0B for 108,955.37 shares of Class A convertible preferred, each converting into 1,000 common shares at $18.3561 (closed in October). 797,749,602 common shares at July 17, 2026, plus the 108,955,369 the preferred converts into. No debt. Options 118,367,815 at a $4.45 weighted strike (deep in the money at $17.17); 730,000 RSUs, entered as zero-strike warrants. Federal NOLs $93.2M."),
+      ev("AstraZeneca's preferred is entered as shares, not as a convertible note", "inference", "high", "8-K, 2026-09-29, Item 5.03 (Certificate of Designation)",
+        "The preferred takes dividends as if converted, shares pro rata with common in a liquidation and has no redemption right — economically common stock. Entered under Convertible preferred (counted as its 108,955,369 as-converted shares at any price). As a convertible note it would count as $2.0B of debt while the price sits below $18.36, about $2.20 a share. Conversion waits on HSR clearance and a vote to raise the authorised share count (1.0B authorised against ~1.03B needed with options)."),
+      ev("Burn: $43.9M a month", "fact", "high", "Q2 2026 10-Q, statement of cash flows",
+        "Cash used in operations $263.4M in H1 2026, $43.9M a month; non-GAAP operating expenses $151.8M in Q2 ($133.6M R&D, $18.2M G&A). Four global Phase 3s are enrolling or running, so it rises. Cash is used as the filings report it (June 30 plus the AstraZeneca money and ATM sales since); rolling it forward would take about $150M off."),
+      ev("Undrawn ATM $380M; an automatic shelf", "fact", "high", "8-K, 2026-07-23 (J.P. Morgan distribution agreement, up to $380M); S-3ASR filed 2026-06-09",
+        "A new $380M ATM from July 23, 2026; any Q3 sales will show in the Q3 10-Q (due in late October). Summit is a well-known seasoned issuer with an automatic (unlimited) shelf, left blank because it has no dollar cap. A $500M underwritten offering marketed in June 2026 at $14.11 does not appear to have priced: Q2 financing was the ATM alone."),
+      ev("Share price $17.17", "fact", "high", "Close on 2026-10-08",
+        "Market capitalisation about $17B on the 906.7M shares plus in-the-money options (~995M diluted), against $2.76B of cash pro forma — an enterprise value near $14B for ivonescimab. AstraZeneca paid $18.36, a 10% premium to the prior week's average, on September 28."),
+      ev("Discount rate 12%", "inference", "moderate", "docs/RxNPV_rNPV_Methodology_Review.md; app guidance (12–15% for clinical-stage biotech)",
+        "A large, funded company with a filed asset sits at the low end of the clinical-stage range; the odds carry the risk of failure, so the rate is the cost of capital and Bear and Bull keep it."),
+      ev("Corporate G&A $80M a year", "inference", "moderate", "Q2 2026 results release (non-GAAP G&A $18.2M)",
+        "Non-GAAP G&A runs about $73M a year and is rising with launch preparation; $80M. Sales and marketing are modelled per program (4% of each program's peak), not here."),
+      ev("Bear and Bull", "inference", "moderate", "Judgment",
+        "Bull: share and odds at 130% of Base (HARMONi-3 squamous beats pembrolizumab clearly, the class follows ivonescimab rather than leading it). Bear: 70% of each (a narrow HARMONi label, pumitamig and PF-08634404 reaching first-line NSCLC alongside, Keytruda biosimilars from 2028 making the comparator regimen far cheaper). The discount rate is 12% in both."),
+      ev("Read-across between the programs: 30%", "inference", "low", "Judgment; HARMONi-2 and HARMONi-6 results by histology",
+        "One molecule in several indications: a failure in one says something about the others, but not everything — PFS benefit held across squamous and non-squamous and PD-L1 levels in HARMONi-2 and HARMONi-6, while CRC and the other tumour types rest on different biology. Entered as 30% (What each catalyst is worth): a failure cuts the other ivonescimab programs' odds by 30%; a success raises them just enough to keep their average. It widens the swings and never moves Base."),
+      ev("Owed to Akeso: 11% royalty, $3.5B of sales milestones on total sales", "inference", "moderate", "Summit FY2025 10-K, License Agreement",
+        "A licence is per molecule, so the terms sit on this program and cover every ivonescimab program (one licence across the drug): the royalty and the sales milestones run on total ivonescimab sales in Summit's territories. Royalty: \"low double digits\", entered as 11%. Sales milestones: $3.505B in all, thresholds undisclosed; spread as $250M at $1B of annual sales, $500M at $2B, $750M at $3B, $1.0B at $5B and $1.005B at $7.5B. Regulatory milestones: $1.05B in all across approvals and territories; entered as $150M for this first US approval and $75M for each later US indication ($450M) — EU and Japan approvals are not modelled separately, so this understates the regulatory total by up to $600M."),
+      ev("What the model says (snapshot)", "inference", "moderate", "This case, 2026-10-09",
+        "At $17.17: Base ~$8.35, Bear ~$5.13, Bull ~$12.79 (995M diluted shares, after the royalty and milestones owed to Akeso). If every program works — all five, the further tumour types included — a share is worth ~$18.06, just above the price: the market is close to paying for everything going right, or for more than these programs, a premium price or wider share. Even five times the case's odds (each capped at 99%) does not reach the price. By catalyst: the FDA decision moves Base to ~$9.19 or ~$5.81; the squamous readout to ~$11.03 or ~$4.99. Range of endings: 214 ways to end, median ~$7.05, 92.5% of them below today's price; the most likely outcome is two of five programs reaching market (25.8%). Most sensitive: the discount rate ($6.70–10.81), peak share ($6.45–10.30) and the odds ($6.46–10.24)."),
+      ev("Worked examples: what is and is not included", "inference", "high", "This case's Saved tab",
+        "Every Tools tool has an example on real ivonescimab or NSCLC data. Left out: PK/PD (only a half-life of 6–7 days rising to about 10 at steady state is published; no volume of distribution or clearance to put in honestly) and Non-Inferiority (no ivonescimab trial uses one). The options move (Binary Event → What the options price) is empty: type the at-the-money straddle for the November 14 expiry from your own broker.")
+    ],
+    calibrationLog: [
+      cal("FDA decision on the HARMONi BLA (PDUFA goal date)", "2026-11-14", 75, { type: "pdufa", source: "Summit 8-K, 2026-01-29 (FDA acceptance of the BLA)", at: SAMPLE_SUMMIT_AS_OF },
+        "Standard review of an original BLA; the date is the FDA's, not an estimate. Your figure is the case's 75% odds of approval. A market-implied figure for one program of several needs the others held fixed, so it is left blank; Binary Event (Tools → Valuation) gives it for this program.")
+    ]
+  }, { population: pop("14000", "0.6", "85", "100"), marketShare: share(4, 3, "25"), launchCurve: { yearsToPeak: "4", profile: "median" }, pricing, exclusivity: excl("14") });
+
+  const sq = prog({
+    name: "HARMONi-3 — 1L squamous NSCLC",
+    indication: "First-line metastatic squamous NSCLC, with chemotherapy, against pembrolizumab + chemotherapy",
+    currentPhase: "phase3", posOverridePct: "55", trialIds: "NCT05899608", launchYearOffset: "2", ira: ira("12"), licensor: covered("75"),
+    evidenceLog: [
+      ev("HARMONi-3 and the squamous cohort", "fact", "high", "ClinicalTrials.gov NCT05899608; Summit Q2 2026 results release (2026-07-23)",
+        "Randomised, double-blind, ivonescimab + chemotherapy against pembrolizumab + chemotherapy in first-line metastatic NSCLC, about 1,600 patients in two separately powered cohorts (squamous and non-squamous), started October 2023. Co-primary endpoints: PFS (investigator-assessed) and OS. Squamous enrolment is complete; the PFS events for its primary analysis are expected in H2 2026, with an early interim look at OS alongside and an OS interim independent of PFS in H1 2027."),
+      ev("HARMONi-6: the China trial this cohort repeats", "fact", "high", "8-K Ex. 99.3, 2025-10-19 (ESMO 2025, Lancet); Q2 2026 results release (ASCO 2026 plenary)",
+        "Akeso's HARMONi-6, 532 Chinese patients with squamous NSCLC, ivonescimab + chemotherapy against tislelizumab (a PD-1 antibody) + chemotherapy: PFS HR 0.60 (0.46–0.78), 11.1 vs 6.9 months; OS HR 0.66 (0.50–0.87), p = 0.0017 — the first phase 3 to beat a PD-(L)1 regimen on survival in first-line NSCLC. Benefit across PD-L1 levels."),
+      ev("Odds 55%: a China result, then a global trial against pembrolizumab", "inference", "moderate", "Judgment; app benchmark (Oncology Phase 3 ~40% to launch); HARMONi-A → HARMONi translation",
+        "Above the oncology Phase 3 benchmark because a near-identical trial has already won on PFS and OS; below a coin-flip-plus because China-only results have not always translated, and the comparator here is pembrolizumab, with Western patients. The EGFR-mutant pair is the best guide: HARMONi-A (China) OS HR 0.74 became HARMONi (global) 0.79 — about 7% weaker, matching the Phase 2→3 Translator's 1.09 factor (HARMONi-6's PFS 0.60 → about 0.65)."),
+      ev("US population: 29,200 a year; 80% treated; 0.85 years on drug", "inference", "moderate", "ACS Cancer Facts & Figures 2026 (229,410 lung cancers); NSCLC ~85%, squamous ~25% of NSCLC; HARMONi-6 PFS",
+        "229,410 × 85% × 25% = ~48,700 squamous NSCLC a year; about 60% present with or progress to metastatic disease = 29,200; 80% get first-line systemic therapy. On drug about 0.85 years: HARMONi-6 median PFS 11.1 months, with PD-1 treatment capped at two years."),
+      ev("Share 35%: first of three bispecific-class entrants", "inference", "low", "Judgment; Who reads out first (rival PD-1/VEGF drugs, ClinicalTrials.gov, read 2026-10-09)",
+        "A win over pembrolizumab + chemotherapy would make ivonescimab + chemotherapy a new standard in squamous NSCLC, first of the PD-1 × VEGF class: BMS/BioNTech's pumitamig and Pfizer's PF-08634404 (SSGJ-707) have first-line NSCLC Phase 3s completing 2029–2031. Capped at 35% because pembrolizumab regimens are entrenched, cheap biosimilar pembrolizumab arrives around 2028 and the class will crowd in.")
+    ],
+    calibrationLog: [
+      cal("HARMONi-3 squamous cohort: PFS primary analysis (early OS look alongside)", "H2 2026", 55, { type: "topline", source: "Summit Q2 2026 results release, 2026-07-23", at: SAMPLE_SUMMIT_AS_OF },
+        "\"The number of PFS events needed in the squamous cohort for the primary analysis is expected to be reached in the second half of 2026\" — the readout follows that, so the window may run into early 2027. Your figure is the case's 55% odds of launch."),
+      cal("HARMONi-3 squamous cohort: interim OS analysis independent of PFS", "H1 2027", null, null,
+        "Guided as H1 2027. An interim OS look must clear a far stricter boundary than the final (Simulation → Trial Statistics → Interim Analysis); not crossing it is the usual outcome even for a drug that works.")
+    ]
+  }, { population: pop("29200", "0.85", "80", "100"), marketShare: share(3, 1, "35"), launchCurve: { yearsToPeak: "5", profile: "median" }, pricing, exclusivity: excl("13") });
+
+  const nsq = prog({
+    name: "HARMONi-3 / -7 — 1L non-squamous NSCLC",
+    indication: "First-line metastatic non-squamous NSCLC without an actionable driver (with chemotherapy; monotherapy in PD-L1 high)",
+    currentPhase: "phase3", posOverridePct: "45", trialIds: "NCT05899608, NCT06767514", launchYearOffset: "3", ira: ira("11"), licensor: covered("75"),
+    evidenceLog: [
+      ev("Two trials, one market: HARMONi-3 non-squamous and HARMONi-7", "fact", "high", "Summit Q2 2026 results release; 8-K Ex. 99.1, 2026-09-13; ClinicalTrials.gov NCT06767514",
+        "HARMONi-3's non-squamous cohort (ivonescimab + chemotherapy vs pembrolizumab + chemotherapy) expects its PFS events in H1 2027. HARMONi-7 tests ivonescimab alone against pembrolizumab alone in PD-L1-high (≥50%) first-line NSCLC, 780 patients, co-primary PFS and OS, primary completion 2028-04 as registered. Both sell into first-line non-squamous NSCLC, so they are one program here; HARMONi-7's PD-L1-high patients are inside this population, not added to it."),
+      ev("HARMONi-2: monotherapy beat pembrolizumab in China", "fact", "high", "8-K Ex. 99.1, 2026-09-13 (WCLC 2026)",
+        "398 Chinese PD-L1-positive patients: PFS HR 0.51 (0.38–0.69); OS HR 0.73 (0.57–0.95), p = 0.009, 30.8 vs 22.6 months. Descriptive subgroups: PD-L1 high 0.58 (0.38–0.89), low 0.85 (0.61–1.18); squamous 0.65 (0.45–0.95), non-squamous 0.79 (0.55–1.14). An interaction test finds no evidence the PD-L1 subgroups differ (p = 0.16; Simulation → Subgroup Check) — but the non-squamous interval includes no effect, and that is this program's population."),
+      ev("Odds 45%", "inference", "moderate", "Judgment; HARMONi-2 non-squamous subgroup",
+        "Below the squamous program: non-squamous patients already do well on pembrolizumab with pemetrexed, HARMONi-2's non-squamous OS interval included 1, and no non-squamous head-to-head has read out yet. Above the oncology Phase 3 benchmark because two separate trials test it."),
+      ev("US population: 57,300 eligible a year, 80% treated, share 25%", "inference", "low", "ACS 2026; NSCLC non-squamous ~70%; actionable drivers (EGFR, ALK, ROS1 and others) ~30% of non-squamous",
+        "229,410 × 85% × 70% = ~136,500 non-squamous NSCLC; 60% metastatic = 81,900; 70% without an actionable driver = 57,300; 80% treated. Share 25%, below squamous: pembrolizumab–pemetrexed is the most entrenched regimen in oncology, and the PD-L1-high monotherapy market is contested by every PD-(L)1 drug.")
+    ],
+    calibrationLog: [
+      cal("HARMONi-3 non-squamous cohort: PFS events reached", "H1 2027", 45, { type: "topline", source: "Summit Q2 2026 results release, 2026-07-23", at: SAMPLE_SUMMIT_AS_OF },
+        "\"For the non-squamous cohort, the number of events needed to conduct the PFS analysis is expected to be reached in the first half of 2027.\" Your figure is the case's 45% odds of launch.")
+    ]
+  }, { population: pop("81900", "0.85", "80", "70"), marketShare: share(3, 1, "25"), launchCurve: { yearsToPeak: "5", profile: "median" }, pricing, exclusivity: excl("12") });
+
+  const crc = prog({
+    name: "HARMONi-GI3 — 1L metastatic CRC",
+    indication: "First-line unresectable metastatic colorectal cancer, against bevacizumab + FOLFOX",
+    currentPhase: "phase3", posOverridePct: "30", trialIds: "NCT07228832", launchYearOffset: "4", ira: ira("10"), licensor: covered("75"),
+    evidenceLog: [
+      ev("HARMONi-GI3", "fact", "high", "ClinicalTrials.gov NCT07228832; Summit Q2 2026 results release",
+        "Ivonescimab or bevacizumab, each with FOLFOX, in first-line metastatic colorectal cancer; about 600 patients; enrolling since Q4 2025; primary completion 2028-05 as registered. Encouraging Phase 2 data were shown at ASCO 2026."),
+      ev("Odds 30%", "inference", "low", "Judgment; app benchmark (Oncology Phase 3)",
+        "Below the oncology Phase 3 benchmark: PD-1 antibodies have not worked in microsatellite-stable colorectal cancer, most of this market, and the VEGF half has to beat bevacizumab, which it contains the mechanism of. The randomised Phase 2 evidence is thin."),
+      ev("US population: 63,500 a year, 85% eligible, 75% treated, share 20%", "inference", "low", "ACS 2026 (158,850 colorectal cancers); ~40% reach metastatic disease",
+        "158,850 × 40% = 63,500 metastatic a year; 85% eligible (not MSI-high, which goes to immunotherapy alone, nor otherwise targeted); 75% fit for FOLFOX-based first-line treatment. 0.75 years on drug. Share 20%: replacing bevacizumab in a standard backbone is a smaller step for prescribers than a new regimen, but the evidence bar is high.")
+    ],
+    calibrationLog: [
+      cal("HARMONi-GI3: primary completion (registry estimate)", "2028", null, null,
+        "ClinicalTrials.gov estimates primary completion in May 2028. A registry date is when data collection ends, not a readout; entered as the year.")
+    ]
+  }, { population: pop("63500", "0.75", "75", "85"), marketShare: share(3, 1, "20"), launchCurve: { yearsToPeak: "5", profile: "median" }, pricing, exclusivity: excl("11") });
+
+  // Napkin: the tumour types beyond these four, valued as one option.
+  const ftt = prog({
+    name: "Further tumour types (Napkin)", indication: "Head and neck, bladder, biliary tract, breast and others in Summit's territories",
+    currentPhase: "phase2", posOverridePct: "15", trialIds: "NCT07264075, NCT07815665", launchYearOffset: "5", ira: ira("9"), licensor: covered("75"),
+    revenueMode: "quick",
+    quickRevenue: { peakRevenue: String(4e9), yearsToPeak: "6", profile: "median", scenarioOverrides: { bear: { peakRevenue: "" }, bull: { peakRevenue: "" } } },
+    evidenceLog: [
+      ev("Beyond lung and colon: one program at Napkin depth", "inference", "low", "Summit 8-K, 2026-09-29 (16 Phase III studies across the molecule); 8-K 2026-08-05 (HARMONi-GU1); ILLUMINE (NCT07264075); HARMONi-GI1 (8-K 2026-08-25)",
+        "Sixteen Phase 3s are announced or running across the molecule — five Summit-sponsored global trials, one cooperative-group trial (ILLUMINE, head and neck, vs pembrolizumab) and ten Akeso trials in China (biliary tract — positive on OS against durvalumab in August 2026 — breast, head and neck, small-cell lung, pancreatic and others). Summit has started HARMONi-GU1 in first-line bladder cancer (Phase 2/3, ~800 patients). Valued together as one Napkin program: $4B of peak sales at 15% odds, launching around 2031. China results do not carry the territory: each needs its own global trial."),
+      ev("Why this program exists", "inference", "moderate", "This case",
+        "Without it the case values four indications of a molecule the company is taking into many more, and reads cheap for a reason the model leaves out. With it the gap to the price is still large — so the price is paying for more than breadth.")
+    ],
+    calibrationLog: []
+  });
+
+  const tool = (title, toolId, workbench, label, inputs, run, note) => ({
+    id: newId("pin"), kind: "example", title, source: "Tools · " + workbench + " · " + label, note,
+    capturedAt: Date.parse(SAMPLE_SUMMIT_AS_OF + "T12:00:00"), included: false, savedTo: "case",
+    reopen: { view: "tools", tool: toolId, inputs: inputs.map(([l, v]) => ({ label: l, value: v })), run: run || undefined }
+  });
+  const sim = (title, simTab, simSub, label, inputs, run, note) => ({
+    id: newId("pin"), kind: "example", title, source: "Simulation · " + label, note,
+    capturedAt: Date.parse(SAMPLE_SUMMIT_AS_OF + "T12:00:00"), included: false, savedTo: "case",
+    reopen: { view: "simulation", simTab, simSub: simSub || null, inputs: inputs.map(([id, v]) => ({ id, value: v })), run }
+  });
+  const rivals = "pumitamig, BNT327, PF-08634404, SSGJ-707, MK-2010, LM-299";
+  const examples = [
+    tool("HARMONi, decoded", "decoder", "Trial", "Trial Decoder", [["ClinicalTrials.gov ID", "NCT06396065"]], "Decode",
+      "The trial behind the BLA. Randomised against placebo plus the same chemotherapy, double-blind, PFS and OS as primary endpoints. No results are posted on ClinicalTrials.gov yet — everything known comes from company releases and the WCLC presentations, which is why the Evidence Log quotes them."),
+    tool("HARMONi-3, -7 and -GI3 beside HARMONi", "compare", "Trial", "Compare Trials", [["ClinicalTrials.gov IDs to compare", "NCT05899608, NCT06767514, NCT07228832, NCT06396065"]], "Compare",
+      "The three Phase 3s the rest of the case rests on beside the one already filed. What to notice: the comparator (pembrolizumab in HARMONi-3 and -7, bevacizumab in GI3, placebo in HARMONi) — every later trial must beat an active drug, not nothing."),
+    tool("Reading Summit's own HARMONi wording", "prReader", "Trial", "Press-Release Reader",
+      [["Press release text", "Ivonescimab in combination with chemotherapy showed a positive trend in OS without achieving a statistically significant benefit, with a hazard ratio of 0.79 (95% CI: 0.62 – 1.01; p=0.057). In an updated analysis with longer follow-up of western patients, the hazard ratio was 0.76 (95% CI: 0.61 – 0.95; nominal p=0.0151). A clinically meaningful benefit was observed across subgroups, and the PFS analysis was pre-specified."]], "Read it",
+      "Summit's HARMONi language from its 2025 and 2026 releases, condensed (the figures are the Evidence Log's). The reader finds what matters: the planned OS analysis has an interval that includes 1 and a p-value that missed, the later improvement is a nominal p-value from an updated analysis, and \"clinically meaningful\" sits beside a subgroup claim. It also credits \"pre-specified\" — the PFS result was."),
+    tool("Every registered ivonescimab trial", "asset", "Trial", "Asset Program", [["Drug or intervention name", "ivonescimab, SMT112, AK112"]], "Build the program",
+      "All three names, because Akeso's trials register the drug as AK112 and Summit's as SMT112 or ivonescimab. The evidence-base checklist counts what is registered; the many investigator-sponsored Phase 2s (over 65) dominate the count, and the randomised Phase 3s are a handful of them."),
+    tool("Who reads out first: the rival PD-1/VEGF bispecifics in lung cancer", "trialwatch", "Trial", "Trial Explorer", [["Condition", "non-small cell lung cancer"], ["Phase", "PHASE3"], ["Intervention", rivals]], "Search ClinicalTrials.gov",
+      "Searching NSCLC Phase 3s returns hundreds; naming the rival drugs returns the five that matter (read 2026-10-09): 3SBio's SSGJ-707 China trial (completed July 2026), BioNTech's BNT327 (2029), Pfizer's Symbiotic-Lung-01 (2029), and BMS's pumitamig trials (2030–2031). Saved to the case for the Portfolio catalyst list. Summit's lead in the class is two to three years."),
+    tool("Keytruda's label — the drug ivonescimab must beat", "fdaLookup", "Trial", "FDA Lookup", [["Drug name", "Keytruda"]], "Search openFDA",
+      "Pembrolizumab: approved across dozens of indications since 2014, the comparator in HARMONi-3 and HARMONi-7 and the regimen ivonescimab must displace. Its adverse-event profile is the bar ivonescimab's (more grade 3+ events with chemotherapy in HARMONi) is read against."),
+    tool("PDCD1 — the PD-1 half of the target", "target", "Science", "Target Dossier", [["Gene symbol or target name", "PDCD1"]], "Look up target",
+      "PD-1 is among the best-validated targets in oncology, with several approved antibodies. The open question for ivonescimab is not whether PD-1 matters but whether adding VEGF blockade in one molecule beats a PD-1 antibody alone — which only trials answer."),
+    tool("What has been published about ivonescimab", "literature", "Science", "Literature", [["Literature search", "ivonescimab"], ["Sort order", "cited"]], "Search",
+      "Primary trial reports (HARMONi-A and HARMONi-2 in JAMA and the Lancet journals, HARMONi-6 in the Lancet) sit among many reviews and conference abstracts. Almost all primary data are from Chinese trials; the global HARMONi data are presentations so far."),
+    tool("Summit's filings and insiders", "lookup", "Company", "Company Lookup", [["Company name or ticker", "SMMT"], ["Indication or condition", "non-small cell lung cancer"]], "Search",
+      "EDGAR's figures are June 30's: they show neither AstraZeneca's $2.0B preferred (September 28) nor the ATM sales since — check the 8-Ks before exporting, as the lookup now says. The large option grants to the co-CEOs are why the diluted count matters here."),
+    tool("The FDA date, from the submission", "calendar", "Company", "Catalyst Calendar", [["Submission date", "2025-11-14"], ["Application type", "program"], ["Review type", "standard"]], "Pull events",
+      "Summit said only that it submitted in Q4 2025; the FDA then set November 14, 2026. An original BLA under standard review is the 60-day filing date plus 10 months — a mid-November 2025 submission gives 2026-11-13, a day from the announced date (the FDA counts the filing date inclusively). Use the helper when a company has filed but not announced a date."),
+    tool("Summit's cash runway", "runway", "Company", "Cash Runway", [["Cash & investments ($M)", "2757.9"], ["Monthly burn ($M)", "43.9"]], null,
+      "$2.76B pro forma against $43.9M a month: over five years at today's rate, though spending rises with four global Phase 3s and a launch. Funding is not the question for this case; the readouts are."),
+    tool("Does the cash reach the readouts?", "runwayCatalyst", "Company", "Runway vs. Catalyst", [["Cushion required at readout (months)", "6"]], null,
+      "Every pinned catalyst — the FDA decision, both HARMONi-3 readouts — is funded with years to spare."),
+    tool("Keytruda and the PD-(L)1s in Medicare", "commercial", "Commercial", "Launch & Actuals", [["Brand name", "Keytruda"], ["Medicare program", "Part B"], ["Analog brand names", "Opdivo, Tecentriq"]], "Track it",
+      "Ivonescimab would be billed under Part B like these. Keytruda's Medicare spend per patient ($79K in 2024) is the real-world anchor for this case's price per patient-year on drug: far below a full year at list, because patients are on it for months, not years."),
+    tool("Keytruda's exclusivity, and ivonescimab's patent extension", "exclusivity", "Commercial", "Exclusivity / LOE",
+      [["Brand name", "Keytruda"], ["Patent expiry before extension", "2039-12-31"], ["IND in effect", "2023-01-15"], ["NDA or BLA submitted", "2025-11-14"], ["Approval (or expected)", "2026-11-14"]], "Look up",
+      "Two questions. Keytruda (first licensed September 2014) has reached its 12-year floor; biosimilar pembrolizumab from around 2028 makes the comparator regimen far cheaper. And ivonescimab: patents to 2039–2040, an extension capped at 14 years after approval (2040-11) — reached for any IND in effect before mid-2024 (HARMONi enrolled in the US from 2023; the date entered is illustrative) — and a biologic floor to 2038-11. Loss of exclusivity ~2040, as the case assumes."),
+    tool("What moves this case most", "sensitivity", "Valuation", "Sensitivity", [], null,
+      "With five programs, peak share and the odds move the value most, and the discount rate matters more than in the single-asset samples because the cash flows run late."),
+    tool("The FDA decision as a binary bet", "binaryEvent", "Valuation", "Binary Event", [], null,
+      "Several programs: pick one. HARMONi by default — if it works is the case with HARMONi certain, if it fails HARMONi at zero, every other program at its own odds. The swing is small against the price, because HARMONi is the smallest indication; the price is about first-line lung cancer."),
+    tool("Fully diluted market cap", "fdmc", "Valuation", "Diluted Market Cap", [], null,
+      "797.7M common plus 109.0M as-converted preferred, plus the options by the treasury method (118.4M at $4.45: about 87.7M net at $17.17) and 0.73M RSUs: about 995M shares, $17.1B."),
+    tool("A takeout at an oncology precedent's premium", "ma", "Benchmarks", "M&A Premium", [["Assumed takeout premium (%)", "33"]], null,
+      "33% is what Pfizer paid for Seagen (2023). AstraZeneca's investment came with rights in the event of an acquisition proposal; the M&A comps show what oncology acquirers have paid, not whether anyone will."),
+    tool("What oncology drugs actually sell", "peaksales", "Benchmarks", "Peak Sales Comps", [["Filter peak sales comps", "Oncology"]], null,
+      "Keytruda ($31.7B in 2025) is the ceiling of this market and the drug ivonescimab is aimed at; Opdivo ($9.0B) is what a second PD-1 reached. The case's five programs add to well under Keytruda's peak."),
+    tool("Oncology licensing deals, PD-1/VEGF included", "licensing", "Benchmarks", "Licensing Comps", [["Filter licensing comps", "Oncology"]], null,
+      "Pfizer paid 3SBio $1.25B upfront for SSGJ-707 in 2025 and AbbVie paid RemeGen $650M for RC148 in 2026 — both PD-1 × VEGF bispecifics. Summit paid Akeso $500M upfront in 2023, before any global data: the class has repriced since."),
+
+    sim("HARMONi-3 squamous: the chance of a positive PFS result", "trialOutcome", null, "Trial Outcome / PoS",
+      [["endpointType", "timeToEvent"], ["nControl", "300"], ["nTreat", "300"], ["medianControl", "7"], ["accrualPeriod", "20"], ["followupPeriod", "12"], ["delayMonths", "0"], ["alpha", "0.05"], ["sided", "two"], ["priorType", "normal"], ["iterations", "10000"], ["priorMean", "0.66"], ["priorSd", "0.08"]], "Run simulation",
+      "About 300 a side (the squamous share of ~1,600 — a judgment; the split is not disclosed), control median PFS 7 months (HARMONi-6's tislelizumab arm 6.9; KEYNOTE-407's pembrolizumab arm about 8), 20 months' accrual and a year's follow-up. Prior HR 0.66: HARMONi-6's 0.60 × the Translator's 1.09 for a China result repeated globally, SD 0.08. No delay: PFS curves separated early in HARMONi-6."),
+    sim("From China to the global trial", "p2p3", null, "Phase 2→3 Translator", [["p2p3EndpointType", "timeToEvent"], ["p2p3ObservedHR", "0.60"]], "Translate to Phase 3",
+      "HARMONi-6's PFS HR 0.60 × 1.09 = 0.654. The same arithmetic described the EGFR-mutant pair: HARMONi-A's OS 0.74 in China became 0.79 in the global HARMONi — about 7% weaker."),
+    sim("HARMONi-A and HARMONi overall survival, pooled", "metaAnalysis", null, "Meta-Analysis",
+      [["metaModeSelect", "ciRatio"], ["meta_label_1", "HARMONi-A (China), final OS"], ["meta_point_1", "0.74"], ["meta_lower_1", "0.58"], ["meta_upper_1", "0.95"], ["meta_label_2", "HARMONi (global), primary OS"], ["meta_point_2", "0.79"], ["meta_lower_2", "0.62"], ["meta_upper_2", "1.01"]], "Pool studies",
+      "The two trials of the same regimen in the same setting: HARMONi-A's final OS 0.74 (0.58–0.95; 8-K 2025-11-07) and HARMONi's primary 0.79 (0.62–1.01). Pooled, the interval excludes 1 — evidence of an OS benefit across both, though a regulator weighs the planned test of the trial in front of it, which missed. Low heterogeneity: the two agree."),
+    sim("First-line squamous NSCLC peak sales, with the uncertainty in every input", "peakSales", null, "Peak Sales",
+      [["popType", "triangular"], ["popA", "24000"], ["popB", "29200"], ["popC", "33000"], ["dxType", "uniform"], ["dxA", "95"], ["dxB", "100"], ["txType", "uniform"], ["txA", "70"], ["txB", "85"],
+       ["shareType", "uniform"], ["shareA", "24.5"], ["shareB", "45.5"], ["priceType", "triangular"], ["priceA", "120000"], ["priceB", "155000"], ["priceC", "183000"], ["peakIterations", "10000"]], "Run simulation",
+      "Metastatic squamous NSCLC a year: 24,000–33,000 around the case's 29,200. Diagnosis 95–100% (incidence counts diagnosed cases). Treated 70–85%. Share: Bear to Bull (24.5–45.5%). Price per patient-year net of time on drug: $183K × 0.85 years = $155K most likely, $120K low (a lower launch price or shorter treatment), $183K high. US only."),
+    sim("HARMONi's response rates: how fragile is the difference?", "trialStats", "fragilityIndex", "Trial Statistics · Fragility Index",
+      [["fiLabelA", "Ivonescimab + chemo"], ["fiEventsA", "99"], ["fiNA", "219"], ["fiLabelB", "Placebo + chemo"], ["fiEventsB", "74"], ["fiNB", "219"], ["fiAlpha", "0.05"]], "Calculate",
+      "Responses 45% vs 34% of 219 a side (8-K 2025-09-07), counted back to 99 and 74 (the release gives percentages). A secondary endpoint; the point is how few patients a significant response difference turns on."),
+    sim("The smallest response difference HARMONi could detect", "trialStats", "sampleSizePower", "Trial Statistics · Sample Size / Power",
+      [["ssSolveMode", "minDetectableEffect"], ["ssEndpointType", "binary"], ["mdeControlRate", "0.34"], ["mdeN", "219"], ["ssPower", "0.8"], ["ssAlpha", "0.05"], ["ssSided", "two"], ["ssAllocation", "1"]], "Calculate",
+      "With 219 a side and a 34% control response rate, the smallest difference HARMONi could reliably detect is about 13 points — close to the 11 it saw. Response was never what this trial was powered for."),
+    sim("HARMONi's OS: dead, or just underpowered?", "trialStats", "pValueCI", "Trial Statistics · P-value ↔ CI",
+      [["pciDirection", "ciToP"], ["pciScale", "ratio"], ["pciPoint", "0.79"], ["pciLower", "0.62"], ["pciUpper", "1.01"], ["pciLevel", "0.95"], ["pciMeaningful", "0.80"], ["pciNominal", "planned"]], "Calculate",
+      "The planned OS analysis: HR 0.79 (0.62–1.01) gives p ≈ 0.057, as reported. With 0.80 as the smallest effect that matters, the reading is \"not definitive\": the interval includes no effect but also a meaningful benefit — a trial that could not tell, not a drug that failed. Run it again with 0.61–0.95 and \"nominal\" for the June 2026 update."),
+    sim("Treatment-related deaths: what 219 patients can rule out", "trialStats", "singleArmCI", "Trial Statistics · Single-Arm CI",
+      [["saEvents", "4"], ["saN", "219"], ["saConfidence", "0.95"], ["saKind", "safety"]], "Calculate",
+      "4 treatment-related deaths in 219 patients on ivonescimab + chemotherapy (1.8%; 5 on placebo + chemotherapy). As a safety read, the upper bound is what matters: the true rate could be as high as about 4.6%. A database of a few thousand patients across the program narrows it; rare events need far more."),
+    sim("Grade 3+ toxicity in HARMONi as a 2×2 table", "trialStats", "outcome2x2", "Trial Statistics · 2×2 Outcome Analysis",
+      [["o2LabelA", "Ivonescimab + chemo"], ["o2EventsA", "110"], ["o2NA", "219"], ["o2LabelB", "Placebo + chemo"], ["o2EventsB", "92"], ["o2NB", "219"], ["o2Confidence", "0.95"], ["o2HigherMeans", "worse"]], "Calculate",
+      "Grade 3+ treatment-related adverse events 50.0% vs 42.2% (8-K 2025-09-07), counted back to 110 and 92 of 219. About one extra patient in twelve has a serious treatment-related event: the cost side of the PFS benefit."),
+    sim("HARMONi's two primary endpoints, adjusted", "trialStats", "multiplicity", "Trial Statistics · Multiplicity Adjustment",
+      [["mpLabel0", "PFS (BICR)"], ["mpP0", "0.00001"], ["mpLabel1", "OS, primary analysis"], ["mpP1", "0.057"], ["mpAlpha", "0.05"]], "Adjust",
+      "PFS p<0.00001, OS p = 0.057. Under Holm, PFS passes and OS does not — the same answer as Summit's own plan, which split the 5% between the two and needed p<0.0448 for OS."),
+    sim("HARMONi-2: do PD-L1 high and low really differ?", "trialStats", "subgroup", "Trial Statistics · Subgroup Check",
+      [["sgScale", "ratio"], ["sgA", "0.58"], ["sgAl", "0.38"], ["sgAu", "0.89"], ["sgB", "0.85"], ["sgBl", "0.61"], ["sgBu", "1.18"], ["sgN", "4"], ["sgLevel", "0.95"]], "Test the difference",
+      "HARMONi-2 OS by PD-L1: high 0.58 (0.38–0.89), low 0.85 (0.61–1.18), descriptive (8-K 2026-09-13); four subgroups were shown. The high group's interval excludes 1 and the low group's does not, but the interaction test finds no evidence they differ (p = 0.16) — the trap the tool exists for. HARMONi-7 tests PD-L1-high alone, so this matters for the non-squamous program."),
+    sim("HARMONi-3 squamous: what an interim OS result must show", "trialStats", "interim", "Trial Statistics · Interim Analysis",
+      [["imEvents", "160"], ["imTotal", "400"], ["imFamily", "obf"], ["imAlpha", "0.05"], ["imAlloc", "1"]], "Calculate",
+      "Illustrative: the squamous cohort's OS event counts are not disclosed. At 40% of the information (160 of 400 deaths) under O'Brien–Fleming-type spending, stopping for benefit needs z ≥ 3.10 — a hazard ratio of about 0.61 — and the final analysis then needs 2.00 rather than 1.96. Summit splits its alpha between PFS and OS as well, so the real bar is higher still. Not crossing at the early look is the expected outcome.")
   ];
+
   return Object.assign(base, {
-    name: "Summit Therapeutics — sample case", ticker: "SMMT", valuationDate: SAMPLE_SUMMIT_AS_OF, currentPrice: "17.17", priceAsOf: "2026-10-08",
-    discountRatePct: "12", valuationMethod: "dcf",
+    name: "Summit Therapeutics — sample case",
+    ticker: "SMMT",
+    valuationDate: SAMPLE_SUMMIT_AS_OF,
+    currentPrice: "17.17",
+    priceAsOf: "2026-10-08",
+    competitorReads: { condition: "non-small cell lung cancer", phase: "PHASE3", intervention: rivals, at: SAMPLE_SUMMIT_AS_OF, rows: [
+      { nctId: "NCT06980272", sponsor: "Shenyang Sunshine Pharmaceutical Co., LTD.", phase: "PHASE3", date: "2026-07-30", which: "primary completion" },
+      { nctId: "NCT06712316", sponsor: "BioNTech SE", phase: "PHASE2/PHASE3", date: "2029-01", which: "primary completion" },
+      { nctId: "NCT07222566", sponsor: "Pfizer", phase: "PHASE3", date: "2029-02-27", which: "primary completion" },
+      { nctId: "NCT07361497", sponsor: "Bristol-Myers Squibb", phase: "PHASE3", date: "2030-09-18", which: "primary completion" },
+      { nctId: "NCT07361510", sponsor: "Bristol-Myers Squibb", phase: "PHASE3", date: "2031-10-14", which: "primary completion" }] },
+    memo: {
+      efficacy: "HARMONi-3's squamous PFS beating pembrolizumab + chemotherapy by close to HARMONi-6's margin (HR near 0.6), with OS not trending the wrong way in Western patients.",
+      safety: "A bleeding or VEGF-type toxicity in Western patients that HARMONi-6 and HARMONi-2 did not show in China.",
+      cash: "None near term ($2.76B pro forma). Watch whether ATM sales accelerate below AstraZeneca's $18.36.",
+      competitor: "Pumitamig or PF-08634404 beating pembrolizumab first in a global trial, or biosimilar pembrolizumab from 2028 making the comparator regimen far cheaper."
+    },
+    discountRatePct: "12",
+    valuationMethod: "dcf",
     corporateGA: { preCommercialAnnualM: "80", gaShareOfMatureSgaPct: "50", windDownYears: "1" },
     terminalValue: { enabled: false, method: "exitMultiple", growthPct: "0", exitMultiple: "4" },
     taxation: { enabled: true, effectiveRatePct: "21", startingNOLM: String(93.2e6) },
-    capitalStructure: { mode: "detailed", dilutedSharesSimple: "", basicShares: "797749602", prefShares: "108955369",
-      cash: String(690.7e6 + 2000e6 + 67.2e6), debt: "0", cashAsOf: "2026-06-30", monthlyBurn: String(43.9e6), carryCashForward: false,
+    capitalStructure: {
+      mode: "detailed", dilutedSharesSimple: String(797749602 + 108955369 + 87700000 + 730000),
+      basicShares: "797749602", prefShares: "108955369",
+      cash: String(690.7e6 + 67.2e6 + 2000e6), debt: "0",
+      cashAsOf: "2026-06-30", monthlyBurn: String(43.9e6), carryCashForward: false,
       opts: "118367815", optK: "4.45", war: "730000", warK: "0", convFace: "0", convPrice: "0",
-      cashSource: "Q2 2026 10-Q $690.7M + $68.4M ATM after June (net ~$67.2M) + AstraZeneca $2.0B preferred (closed Oct 2026)",
-      atmUndrawn: String(380e6), debtUndrawn: "", milestoneExpected: "", shelfRemaining: "", facilitiesNote: "$380M J.P. Morgan ATM (July 23, 2026); S-3ASR automatic shelf" },
+      cashSource: "Q2 2026 10-Q: $690.7M at June 30; + $67.2M net ATM sales after June; + AstraZeneca $2.0B preferred (8-K 2026-09-29, closed October)",
+      atmUndrawn: String(380e6), debtUndrawn: "", milestoneExpected: "", shelfRemaining: "",
+      facilitiesNote: "$380M J.P. Morgan ATM (8-K 2026-07-23), Q3 use not yet reported; S-3ASR automatic shelf (no dollar cap)"
+    },
     futureRaise: { enabled: false, amountM: "", priceMode: "discount", discountPct: "10", priceOverride: "" },
+    dilutionPath: { enabled: false, minCashBufferM: String(500e6), targetRunwayMonths: "24", discountToMarketPct: "10", sbcAnnualGrowthPct: "0" },
+    basePosAdjustmentPct: "100",
+    multipleAssumptions: { bear: "3", base: "4", bull: "5" },
+    scenarioOverrides: {
+      bear: { shareMultiplierPct: "70", posMultiplierPct: "70", discountRateAddPct: "0", exitMultiple: "3" },
+      bull: { shareMultiplierPct: "130", posMultiplierPct: "130", discountRateAddPct: "0", exitMultiple: "5" }
+    },
+    catalystLadder: { readAcrossPct: "30" },
+    failureFloor: { method: "stage" },
     modelYearZero: "2026",
-    programs,
-    pinnedResults: []
+    programs: [harmoni, sq, nsq, crc, ftt],
+    pinnedResults: examples
   });
 }

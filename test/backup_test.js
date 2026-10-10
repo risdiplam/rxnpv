@@ -91,6 +91,23 @@ function stub(obj) {
   const fx = JSON.parse(require("fs").readFileSync(__dirname + "/fixtures/pepgen_case.json", "utf8"));
   ok(JSON.stringify(fx.programs[0].revenueBuild) === JSON.stringify(pg.programs[0].revenueBuild) && JSON.stringify(fx.capitalStructure.basicShares) === JSON.stringify(pg.capitalStructure.basicShares), "PepGen sample: revenue build and shares match the typed-in fixture");
 
+  // ── The Summit sample (October 2026): five programs of one drug, a shared
+  // Akeso licence, convertible preferred. math_verification rebuilds its new
+  // parts from test/fixtures/summit_case.json and pins $5.1324 / $8.3527 / $12.7905. ──
+  const sm = w.sampleCaseSummit();
+  const smfx = JSON.parse(require("fs").readFileSync(__dirname + "/fixtures/summit_case.json", "utf8"));
+  const stripS = o => JSON.stringify(o, (k, v) => ["id", "createdAt", "updatedAt", "pinnedResults"].includes(k) ? undefined : v);
+  ok(stripS(smfx) === stripS(sm), "Summit sample: matches the fixture math_verification rebuilds");
+  ok(sm.ticker === "SMMT" && sm.programs.length === 5 && sm.programs.every(p => p.drugName === "ivonescimab"), "Summit sample: five ivonescimab programs");
+  ok(new Set(sm.programs.map(p => w.programLabel(p, sm.programs))).size === 5, "Summit sample: five distinct program labels");
+  ok(w.caseMissingInputs(sm).length === 0, "Summit sample: nothing required is missing (" + w.caseMissingInputs(sm).join(", ") + ")");
+  ok(sm.programs.every(p => p.evidenceLog.length >= 2 && p.evidenceLog.every(e => e.source && e.date && e.thesis && ["fact", "inference", "speculation"].includes(e.classification) && ["high", "moderate", "low"].includes(e.confidence))) && sm.programs.reduce((a, p) => a + p.evidenceLog.length, 0) >= 35, "Summit sample: every evidence entry has a source, date, reasoning and valid labels (" + sm.programs.reduce((a, p) => a + p.evidenceLog.length, 0) + ")");
+  ok(sm.programs[0].calibrationLog[0].catalystDate === "2026-11-14" && sm.programs[0].calibrationLog[0].pin && sm.programs[0].calibrationLog[0].pin.type === "pdufa", "Summit sample: the PDUFA date is pinned on HARMONi");
+  ok(sm.capitalStructure.prefShares === "108955369" && Number(sm.capitalStructure.convFace) === 0, "Summit sample: AstraZeneca's preferred entered as shares, not a note");
+  ok(sm.programs[0].licensor.shared && sm.programs.slice(1).every(p => !p.licensor.enabled && w.sharedLicenceFor(p, sm.programs)), "Summit sample: one Akeso licence covers every program");
+  const smv = k => w.computeCaseValuation(sm, w.getEffectiveScenarioPreset(sm, k), k, 12, sm.terminalValue).equity.perShare;
+  ok([["bear", 5.1324], ["base", 8.3527], ["bull", 12.7905]].every(([k, v]) => Math.abs(smv(k) - v) < 5e-5), "Summit sample: Bear/Base/Bull $5.1324 / $8.3527 / $12.7905 (" + ["bear", "base", "bull"].map(k => smv(k).toFixed(4)).join(" / ") + ")");
+
   // ── The sample case ──
   const sc = w.sampleCaseStoke();
   // math_verification rebuilds Stoke year by year from this fixture; it must

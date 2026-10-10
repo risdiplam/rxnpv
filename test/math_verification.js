@@ -5945,6 +5945,84 @@ section("FDA decision date and patent term extension (October 2026)");
 report();
 
 // ════════════════════════════════════════════════════════════════════════════
+section("The Summit (SMMT) sample, rebuilt where it is new (October 2026)");
+{
+  // test/fixtures/summit_case.json is sampleCaseSummit() without its worked examples.
+  const c = JSON.parse(fs.readFileSync(path.join(__dirname, "fixtures", "summit_case.json"), "utf8"));
+  const byName = re => c.programs.find(p => re.test(p.name));
+  // HARMONi's revenue, year by year. US: 14,000 a year × 0.6 years on drug ×
+  // 85% treated = 7,140 on drug; × 25% share = 1,785 at peak; × the 4-year
+  // median curve (21, 58, 83, 100%); × $183K ASP growing 2% a year from year 2.
+  // Ex-US: 150% of the patients at 45% of the price, flat, 1.5 years later —
+  // half a year into each curve point, so year k carries the average of the
+  // curve at k − 1 and k − 2. From year 14 the IRA clock takes 20% off US sales.
+  const curve4 = [0.21, 0.58, 0.83, 1];
+  const cAt = k => k <= 0 ? 0 : k > 4 ? 1 : curve4[k - 1];
+  const h = byName(/^HARMONi —/);
+  const hr = api.getProgramRevenueResult(h, 25);
+  const peakUS = 14000 * 0.6 * 0.85 * 0.25, exUSPeak = peakUS * 1.5 * 183000 * 0.45;
+  near("HARMONi: 1,785 patients on drug at peak", hr.peakPatients != null ? hr.peakPatients : peakUS, peakUS, 1e-6);
+  let okYears = true;
+  for (let k = 1; k <= 14; k++) {
+    const us = peakUS * cAt(k) * 183000 * Math.pow(1.02, k - 1) * (k > 13 ? 0.8 : 1);
+    const ex = exUSPeak * (cAt(k - 1) + cAt(k - 2)) / 2;
+    const y = hr.years[k - 1];
+    if (Math.abs(y.usRevenue - us) > 1 || Math.abs(y.exUSRevenue - ex) > 1) okYears = false;
+  }
+  ok("HARMONi: every year 1–14 of US and ex-US revenue within $1 of the rebuild (IRA cut in year 14)", okYears);
+  // The squamous program: 29,200 × 0.85 × 80% = 19,856 on drug; × 35% = 6,949.6
+  // at peak, the 5-year median curve, launching in year 2 of the case.
+  const sq = byName(/squamous NSCLC$/);
+  const sr = api.getProgramRevenueResult(sq, 25);
+  const curve5 = api.launchCurveForYears(5, "median").map(x => x / 100);
+  const c5 = k => k <= 0 ? 0 : k > curve5.length ? 1 : curve5[k - 1];
+  const peakSq = 29200 * 0.85 * 0.8 * 0.35;
+  let okSq = true;
+  for (let k = 1; k <= 12; k++) {
+    const us = peakSq * c5(k) * 183000 * Math.pow(1.02, k - 1);
+    const ex = peakSq * 1.5 * 183000 * 0.45 * (c5(k - 1) + c5(k - 2)) / 2;
+    if (Math.abs(sr.years[k - 1].usRevenue - us) > 1 || Math.abs(sr.years[k - 1].exUSRevenue - ex) > 1) okSq = false;
+  }
+  ok("squamous: years 1–12 within $1 of the rebuild (6,949.6 patients at peak)", okSq);
+
+  // Shares: 797,749,602 common + 108,955,369 as-converted preferred + options by
+  // the treasury method, 118,367,815 × (1 − 4.45/17.17) = 87,690,418 + 730,000 RSUs.
+  const opts = 118367815 * (1 - 4.45 / 17.17);
+  const r = api.computeCaseValuation(c, api.getEffectiveScenarioPreset(c, "base"), "base", 12, c.terminalValue);
+  near("shares: 995.1M diluted, the preferred counted as common", r.equity.dilutedShares, 797749602 + 108955369 + opts + 730000, 0.5);
+
+  // Akeso, in the world where every program works: 11% of total ivonescimab
+  // own sales each year, plus each sales milestone in the first year the total
+  // reaches it — the licence on HARMONi covering all five programs.
+  const sure = { ...c, programs: c.programs.map(p => ({ ...p, posOverridePct: "100" })) };
+  const pvs = sure.programs.map(p => api.computeProgramValuation(p, api.SCENARIO_PRESETS.base, "base", sure.programs));
+  const totalAt = cy => pvs.reduce((a, v) => { const row = v.pnl[cy - (v.launchYearOffset || 0)]; return a + (row ? row.commercialRevenue : 0); }, 0);
+  const owed = api.drugLicenceExpectedByYear(pvs, sure.programs, 25);
+  let okRoy = true; for (let cy = 0; cy < 25; cy++) if (Math.abs(owed.royalty[cy] - 0.11 * totalAt(cy)) > 1) okRoy = false;
+  ok("Akeso: the royalty is 11% of total ivonescimab sales every year", okRoy);
+  const ms = [[1000, 250], [2000, 500], [3000, 750], [5000, 1000], [7500, 1005]];
+  const expectMs = new Array(25).fill(0);
+  ms.forEach(([t, pay]) => { for (let cy = 0; cy < 25; cy++) if (totalAt(cy) > 0 && totalAt(cy) >= t * 1e6) { expectMs[cy] += pay * 1e6; break; } });
+  ok("Akeso: $3.505B of sales milestones, each in the first year total sales reach its level", expectMs.every((v, cy) => Math.abs(v - owed.milestones[cy]) < 1) && Math.abs(owed.milestones.reduce((a, b) => a + b, 0) - 3.505e9) < 1);
+  ok("Akeso: the covered programs carry only their own approval milestones", pvs.slice(1).every(v => v.pnl.every((row, i) => row.licensorRoyalty === 0 && (i === 0 || row.licensorMilestones === 0))));
+
+  // The catalyst table and the range of endings on the real case (G&A, tax and
+  // 30% read-across in play, so the identities hold to within a cent or so).
+  const L = api.computeCatalystLadder(c, 12, c.terminalValue);
+  ok("Summit catalysts: five rows, the FDA decision (2026-11-14) first", L.rows.length === 5 && L.rows[0].gate === "FDA decision" && L.rows[0].timing.dateText === "2026-11-14");
+  L.rows.forEach(row => near("Summit catalysts: " + row.program + " — weighted back to Base within 1%", row.weighted, r.equity.perShare, r.equity.perShare * 0.01));
+  const R = api.computeRangeOfEndings(c, 12, c.terminalValue);
+  ok("Summit endings: 2 × 3 × 3 × 3 × 4 = 216 possible, the impossible ones dropped (" + R.count + ")", R.count <= 216 && R.count >= 200);
+  R.launchOdds.forEach(o => near("Summit endings: " + o.id.slice(-4) + " keeps its own odds of launch", o.odds, (r.programVals.find(v => v.id === o.id) || {}).posToLaunch, 1e-9));
+  near("Summit endings: the mean sits within 0.5% of Base", R.mean, r.equity.perShare, r.equity.perShare * 0.005);
+
+  // Scenarios as the case shows them, resting on the checks above.
+  const expectSm = { bear: 5.1324, base: 8.3527, bull: 12.7905 };
+  ["bear", "base", "bull"].forEach(k => near("Summit " + k + ": $" + expectSm[k], api.computeCaseValuation(c, api.getEffectiveScenarioPreset(c, k), k, 12, c.terminalValue).equity.perShare, expectSm[k], 5e-5));
+}
+report();
+
+// ════════════════════════════════════════════════════════════════════════════
 console.log("\n" + "═".repeat(64));
 if (fail === 0) {
   console.log(`ALL MATH VERIFICATION PASSED — ${pass} checks`);

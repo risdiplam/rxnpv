@@ -23,7 +23,8 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
 const SIM_RESULT = {
   trialOutcome: /assurance/i, p2p3: /Phase 3/, metaAnalysis: /Pooled/, peakSales: /P50|median/i, pkpd: /Cmax|peak/i,
   fragilityIndex: /Fragility Index/, sampleSizePower: /detect/i, pValueCI: /implied two-sided P/, singleArmCI: /8 of 10|40\.0%|to 1\d\d?\.?\d*%|%/,
-  outcome2x2: /NNT|relative/i, multiplicity: /Holm|Bonferroni/
+  outcome2x2: /NNT|relative/i, multiplicity: /Holm|Bonferroni/,
+  subgroup: /interaction test/, interim: /needed to stop/
 };
 // Diluted Market Cap is skipped: jsdom's CSS parser throws cloning a style
 // with a background shorthand (a jsdom bug; the packaged app renders it with
@@ -102,6 +103,16 @@ const SKIP = new Set(["fdmc"]);
   ok(!!pg && pgEx.length >= 20 && pgEx.every(p => p.included === false && p.note && p.note.length > 80 && p.reopen), "the PepGen sample loads with its worked examples (" + pgEx.length + ")");
   ok(!!pg && pg.programs[0].evidenceLog.length >= 25 && pg.programs[0].calibrationLog.length === 2 && !!pg.programs[0].calibrationLog[0].pin, "and its evidence log and two calibration entries, the first pinned (the second is the H1 2027 window)");
   await openAll(pgEx);
+
+  // The Summit sample (October 2026, third in the chooser): five programs, so
+  // its examples include Subgroup Check, Interim Analysis and the Press-Release Reader.
+  click(btn("Workspace")); await wait(300);
+  click(btn("Load sample case")); await wait(200); click(btn("Summit — lung cancer, filed")); await wait(1200);
+  const sm = caseNamed(/^Summit.*sample case/);
+  const smEx = ((sm && sm.pinnedResults) || []).filter(p => p.kind === "example");
+  const smTools = new Set(smEx.filter(p => p.reopen.view === "tools").map(p => p.reopen.tool));
+  ok(!!sm && smEx.length >= 30 && all19.every(t => smTools.has(t)) && smEx.every(p => p.included === false && p.note && p.note.length > 80 && p.reopen), "the Summit sample loads with an example for every Tools tool (" + smEx.length + ")");
+  await openAll(smEx);
 
   console.log("\nErrors:", errors.length);
   [...new Set(errors)].forEach(e => console.log("  " + e));
