@@ -4396,7 +4396,13 @@ section("Medicare and Medicaid together — one drug, three spellings, and hidde
     { brand_name: "Humira", generic_name: "adalimumab", product_ndc: "0074-0554" },
     { brand_name: "Hadlima", generic_name: "adalimumab-bwwd", product_ndc: "0006-4133" },
     { brand_name: "Hyrimoz", generic_name: "adalimumab", product_ndc: "61314-454" }]);
-  ok("a generic with two brands picks neither, and offers both", ada.brand === null && ada.candidates.length === 2 && ada.products.length === 0);
+  ok("a generic with three brands picks none, and offers all three (a biosimilar's suffix counts)", ada.brand === null && ada.candidates.length === 3 && ada.products.length === 0);
+  const ada2 = api.pickDrugIdentity("adalimumab", [
+    { brand_name: "Humira", generic_name: "adalimumab", product_ndc: "0074-0554" },
+    { brand_name: "Adalimumab", generic_name: "adalimumab-adaz", product_ndc: "61314-455" }]);
+  ok("an unbranded biosimilar named like the molecule is not taken for the molecule", ada2.brand === null && ada2.candidates.length === 2);
+  const tru = api.pickDrugIdentity("Keytruda", [{ brand_name: "KEYTRUDA", generic_name: "pembrolizumab", product_ndc: "0006-3026" }]);
+  ok("a brand typed is still the brand", tru.brand === "KEYTRUDA" && tru.matchedBy === "brand");
   const exo = api.pickDrugIdentity("Exondys", [{ brand_name: "Exondys 51", generic_name: "eteplirsen", product_ndc: "60923-284" }]);
   ok("the one brand a partial name finds is taken, and says so", exo.brand === "Exondys 51" && exo.matchedBy === "partial");
   const brandHit = api.pickDrugIdentity("exondys-51", [{ brand_name: "Exondys 51", generic_name: "eteplirsen", product_ndc: "60923-284" }]);

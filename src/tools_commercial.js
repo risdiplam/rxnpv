@@ -183,6 +183,10 @@ function LaunchTrackerTool({ activeCase, updateCase }) {
           c.brand + (c.generic ? " (" + c.generic.toLowerCase() + ")" : ""))))
     ]),
 
+    primary && primary.found && primary.candidates.length > 1 && toolCard(h, h("div", { style: { fontSize: 11, fontFamily: "var(--mono)", color: "var(--warn)", lineHeight: 1.7, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" } },
+      "\u201c" + brand.trim() + "\u201d is also the generic name of " + primary.candidates.length + (primary.candidates.length >= 8 ? " or more" : "") + " brands, and what is shown is only the product CMS lists under that exact name. To track one brand:",
+      primary.candidates.map(c => h("button", { key: c.brand, type: "button", className: "link-btn", onClick: () => run(c.brand) }, c.brand)))),
+
     primary && primary.found && h("div", null,
       all && toolCard(h, [
         toolLabel(h, primary.brand + (primary.generic ? " (" + primary.generic + ")" : "") + " — Medicare and Medicaid"),
@@ -239,11 +243,14 @@ function LaunchTrackerTool({ activeCase, updateCase }) {
             v, i, points: indexToLaunch(v.series, v.dataStartYear)
           })).filter(x => x.points.length);
           const predating = indexed.filter(x => x.points[0].launchPredatesData);
-          // One drug in All: a line per payer and the total, over the periods
-          // every payer has a readable figure for.
+          // One drug in All: a line per payer and the total, over the whole
+          // years every payer has a readable figure for. A partial year or a
+          // floor is left off and named, rather than drawn as a dip.
           const byPayer = all && views.length === 1;
-          const chartRows = byPayer ? primary.result.combined.filter(r => r.complete) : [];
-          const left = byPayer ? primary.result.combined.filter(r => !r.complete).map(r => r.label) : [];
+          const chartRows = byPayer ? primary.result.combined.filter(r => r.complete && r.isFullYear) : [];
+          const left = byPayer ? primary.result.combined.filter(r => !(r.complete && r.isFullYear))
+            .map(r => r.label + (r.isFullYear ? " (part of its total cannot be read yet)" : " (a partial year)")) : [];
+          const predatingShown = byPayer ? [] : predating;
           const series = byPayer
             ? foundSources.map((s, i) => ({ name: s.label, color: COMMERCIAL_SERIES_COLORS[(i + 1) % COMMERCIAL_SERIES_COLORS.length],
                 points: chartRows.map(r => ({ v: r.values[s.key] ? r.values[s.key].spending || 0 : 0, label: r.label })) }))
@@ -251,27 +258,33 @@ function LaunchTrackerTool({ activeCase, updateCase }) {
             : indexed.map(x => ({
                 name: x.v.brand + (x.i === 0 ? "" : " (analog)") + (x.points[0].launchPredatesData ? " — already selling before the data starts" : ""),
                 color: COMMERCIAL_SERIES_COLORS[x.i % COMMERCIAL_SERIES_COLORS.length],
-                points: x.points.map(p => ({ v: p.spending, label: (views.length > 1 ? "Y" + (p.periodsSinceFirst + 1) : p.label) }))
-              }));
+                // Whole years only: a partial latest year drawn at its
+                // reported value reads as a collapse at the end of every line.
+                points: x.points.filter(p => p.isFullYear !== false).map(p => ({ v: p.spending, label: (views.length > 1 ? "Y" + (p.periodsSinceFirst + 1) : p.label) }))
+              })).filter(x => x.points.length);
+          const partialLeft = byPayer ? [] : Array.from(new Set(indexed.map(x => x.points.filter(p => p.isFullYear === false).map(p => p.label)).reduce((a, b) => a.concat(b), [])));
           return h("div", null,
-            h(ExportableBlock, { title: primary.brand + " — " + payerName + " spending" },
-              h(RevenueChart, { xPrefix: "", xAxisPrefix: "", series, height: 220, showLegend: true })),
+            series.length && series[0].points.length
+              ? h(ExportableBlock, { title: primary.brand + " — " + payerName + " spending" },
+                  h(RevenueChart, { xPrefix: "", xAxisPrefix: "", series, height: 220, showLegend: true }))
+              : h("div", { style: { fontSize: 11, fontFamily: "var(--sans)", color: "var(--ink-3)", lineHeight: 1.6 } },
+                  "No whole year with a readable figure yet, so there is nothing to draw — the periods there are sit in the table above."),
+            partialLeft.length > 0 && h("div", { style: { fontSize: 10.5, fontFamily: "var(--sans)", color: "var(--ink-3)", lineHeight: 1.6, marginTop: 6 } },
+              "Whole years only — the partial " + partialLeft.join(", ") + " is in the tables above, not drawn as a dip."),
             left.length > 0 && h("div", { style: { fontSize: 10.5, fontFamily: "var(--sans)", color: "var(--ink-3)", lineHeight: 1.6, marginTop: 6 } },
-              "Left off the chart because part of the total cannot be read yet: " + left.join(", ") + " (see the table)."),
-            predating.length > 0 && h("div", { style: { fontSize: 10.5, fontFamily: "var(--sans)", color: "var(--warn)", lineHeight: 1.6, marginTop: 6 } },
-              predating.map(x => x.v.brand).join(" and ") + (predating.length === 1 ? " was" : " were")
+              "Whole years only. Left off the chart: " + left.join(", ") + " — see the table."),
+            predatingShown.length > 0 && h("div", { style: { fontSize: 10.5, fontFamily: "var(--sans)", color: "var(--warn)", lineHeight: 1.6, marginTop: 6 } },
+              predatingShown.map(x => x.v.brand).join(" and ") + (predatingShown.length === 1 ? " was" : " were")
                 + " already selling when this record begins, so “year 1” here is the first year CMS covers, not the launch year. "
-                + (predating.length === 1 ? "That curve is a plateau" : "Those curves are plateaus")
+                + (predatingShown.length === 1 ? "That curve is a plateau" : "Those curves are plateaus")
                 + " sitting where a ramp should be, which makes the comparison read backwards — use an analog launched inside the data window for a like-for-like ramp."),
-            views.some(v => v.series.some(p => p.floor)) && h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--warn)", marginTop: 4 } },
+            !byPayer && views.some(v => v.series.some(p => p.floor)) && h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--warn)", marginTop: 4 } },
               "One or more points is a floor — part of it hidden under CMS's small-count rule — so the line is at least that high there.")
           );
         })(),
         views.length > 1 && h("div", { className: "prose", style: { fontSize: 10, fontFamily: "var(--sans)", color: "var(--ink-3)", lineHeight: 1.6, marginTop: 6 } },
           h(LaunchShapeRows, { rows: views.map(v => Object.assign({}, v, { series: v.series.filter(p => !p.floor) })), activeCase, updateCase, sourceLabel: payerName }),
-          "Indexed to each drug's first year of " + payerName + " spending, so launches from different years sit on the same axis. Year 1 is almost never a full commercial year — a drug approved in March shows nine months of it — so the first point understates every curve by a different amount depending on approval date. A mature analog's later years are its plateau, not its ramp."),
-        views.some(v => v.found && v.series.some(p => !p.isFullYear)) && h("div", { style: { fontSize: 10, fontFamily: "var(--mono)", color: "var(--warn)", marginTop: 4 } },
-          "One or more points is a partial period plotted at its reported value, not annualized — the line dips there for a reporting reason, not a commercial one.")
+          "Indexed to each drug's first year of " + payerName + " spending, so launches from different years sit on the same axis. Year 1 is almost never a full commercial year — a drug approved in March shows nine months of it — so the first point understates every curve by a different amount depending on approval date. A mature analog's later years are its plateau, not its ramp.")
       ])
     )
   );

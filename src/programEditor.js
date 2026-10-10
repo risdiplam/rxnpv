@@ -147,8 +147,10 @@ function PayerPriceHelper({ onUse, defaultBrand, adherencePct }) {
               ? fmtMoney(f.perClaim) + " a prescription" + (f.value != null ? " × " + f.fills.toFixed(1) + " a year" + (f.fillsFrom === "Medicare Part D" ? " (Medicare Part D's own prescriptions per patient)" : "") + " = " + fmtMoney(f.value) : "")
               : fmtMoney(f.value) + " a patient" + (f.key === "partB" ? " at ASP (" + fmtMoney(f.raw) + " paid ÷ 1.06)" : "") + (f.patients ? ", " + f.patients.toLocaleString() + " patients" : ""),
             h("span", { style: { color: "var(--ink-3)" } }, " · " + f.basis + " basis")),
-          f.key === "medicaid" && h(BenchField, { label: "Prescriptions a year", value: fills, onChange: setFills, placeholder: f.fillsFrom === "Medicare Part D" ? f.fills.toFixed(1) : "e.g. 12 (monthly)" }),
-          h("button", { type: "button", disabled: !(f.value > 0), onClick: () => onUse(f), style: btn(f.value > 0) }, f.value > 0 ? "Use " + fmtMoney(f.value) : "Use"))),
+          h("div", { style: { display: "flex", gap: 10, alignItems: "flex-end", flex: f.key === "medicaid" ? "0 1 340px" : "0 0 auto" } },
+            f.key === "medicaid" && h("div", { style: { flex: "1 1 160px", display: "flex" } },
+              h(BenchField, { label: "Prescriptions a year", value: fills, onChange: setFills, placeholder: f.fillsFrom === "Medicare Part D" ? f.fills.toFixed(1) : "e.g. 12 (monthly)" })),
+            h("button", { type: "button", disabled: !(f.value > 0), onClick: () => onUse(f), style: { ...btn(f.value > 0), marginBottom: f.key === "medicaid" ? 14 : 0 } }, f.value > 0 ? "Use " + fmtMoney(f.value) : "Use")))),
         h("div", { style: { ...UI.caption, lineHeight: 1.55 } },
           "Each is a year's spending over the patients or prescriptions behind it — what was paid per patient in that year, including patients who started or stopped part way, so it already sits below a full year at list. Before rebates: Medicare Part D and Medicaid pay the pharmacy's price, close to list (WAC); Part B pays ASP + 6%. The basis is set with the price, so the model's gross-to-net step still applies — and Medicaid's own rebate (at least 23.1% of list) is not in any of these.",
           medicaid && medicaid.fillsFrom === "Medicare Part D" ? " Medicaid counts prescriptions, not patients; Medicare's prescriptions per patient stand in until you type your own — a children's dose or schedule can differ." : "",

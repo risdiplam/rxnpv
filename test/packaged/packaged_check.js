@@ -347,6 +347,22 @@ async function live(win, js, click, text) {
   await click("Track it", 300);
   ok(await waitFor(`!/Reading CMS…/.test(document.body.innerText) && /Uptravi/i.test(document.body.innerText)`, 45000), "B-005: the launch tracker renders Uptravi");
   await shot(win, "launch-uptravi");
+  // Medicaid (October 2026): data.medicaid.gov has to be in the CSP's
+  // connect-src, which jsdom never enforces — only the packaged app can show
+  // the state file is reachable.
+  const mcd = await js(`(async () => { const r = await fetchPublicPayerSpending("Fintepla");
+    const row = (r.combined || []).find(c => c.year === 2024 && c.isFullYear);
+    const m = (r.sources || []).find(s => s.key === "medicaid");
+    const st = m && m.result && m.result.stateFile;
+    return { ok: r.ok, total: row && row.total, medicaidOk: !!(m && m.result && m.result.ok !== false && m.result.found),
+      matchedBy: st && st.matchedBy, stateErrors: st ? st.years.filter(y => y.error).map(y => y.error).join("; ") : "none" }; })()`);
+  ok(mcd.ok && mcd.medicaidOk && mcd.matchedBy === "package codes" && !mcd.stateErrors && mcd.total > 200e6,
+    "Medicaid: the packaged app reaches data.medicaid.gov (CSP) and matches the state file by the FDA's package codes", JSON.stringify(mcd));
+  await js(`__t.setVal(__t.byPlaceholder("brand name — e.g. Winrevair"), "Fintepla")`); await sleep(200);
+  await click("Track it", 300);
+  ok(await waitFor(`!/Reading CMS…/.test(document.body.innerText) && /Fintepla.*Medicare and Medicaid/i.test(document.body.innerText) && /Public total/.test(document.body.innerText)`, 60000),
+    "Medicaid: the launch tracker shows Fintepla across Medicare and Medicaid with a public total");
+  await shot(win, "launch-fintepla-all-payers");
 
   // B-006 — Open Targets, live schema.
   await click("Science", 400); await click("Target Dossier", 600);

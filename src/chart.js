@@ -87,7 +87,11 @@ function RevenueChart({ series, height, showLegend, xPrefix, xAxisPrefix, label 
   const allZero = allVals.every(v => v === 0);
   const axis = niceAxisTicks(scale.minV, allZero ? 1e6 : allVals.some(v => v > 0) ? scale.maxV : 0);
   const minV = axis.lo, maxV = axis.hi, range = (maxV - minV) || 1;
-  const nPoints = series[0].points.length;
+  // Series can differ in length (launch analogs indexed to their first year):
+  // the axis runs to the longest, takes its labels from it, and the hover
+  // reads only the series that reach that point.
+  const longest = series.reduce((a, s) => (s.points.length > a.points.length ? s : a), series[0]);
+  const nPoints = longest.points.length;
   const x = i => padL + (i / Math.max(1, nPoints - 1)) * plotW;
   const y = v => padT + plotH - ((v - minV) / range) * plotH;
 
@@ -135,13 +139,13 @@ function RevenueChart({ series, height, showLegend, xPrefix, xAxisPrefix, label 
         );
       }),
       // X-axis year labels (every ~3rd year)
-      series[0].points.map((p, i) => (i % Math.ceil(nPoints / 8) === 0) && h("text", {
+      longest.points.map((p, i) => (i % Math.ceil(nPoints / 8) === 0) && h("text", {
         key: i, x: x(i), y: H - 6, textAnchor: "middle", fontSize: 10, fontFamily: "var(--mono)", fill: "var(--ink-3)"
       }, (xAxisPrefix != null ? xAxisPrefix : "Y") + p.label)),
       // Hover guideline + point markers
       hoverIdx != null && h("g", null,
         h("line", { x1: x(hoverIdx), x2: x(hoverIdx), y1: padT, y2: padT + plotH, stroke: "var(--ink-3)", strokeWidth: 1, strokeDasharray: "2,2" }),
-        series.map((s, si) => h("circle", { key: si, cx: x(hoverIdx), cy: y(s.points[hoverIdx].v), r: 3.5, fill: s.color, stroke: "var(--bg)", strokeWidth: 1.5 }))
+        series.map((s, si) => s.points[hoverIdx] && h("circle", { key: si, cx: x(hoverIdx), cy: y(s.points[hoverIdx].v), r: 3.5, fill: s.color, stroke: "var(--bg)", strokeWidth: 1.5 }))
       )
     ),
     hoverIdx != null && h("div", {
@@ -154,8 +158,8 @@ function RevenueChart({ series, height, showLegend, xPrefix, xAxisPrefix, label 
         fontFamily: "var(--mono)", fontSize: 10, color: "var(--ink-2)", pointerEvents: "none", whiteSpace: "nowrap", boxShadow: "0 2px 8px rgba(0,0,0,0.15)"
       }
     },
-      h("div", { style: { color: "var(--ink-1)", fontWeight: 700, marginBottom: 2 } }, (xPrefix != null ? xPrefix : "Year ") + series[0].points[hoverIdx].label),
-      series.map((s, si) => h("div", { key: si, style: { color: s.color } }, s.name + ": " + fmtM(s.points[hoverIdx].v)))
+      h("div", { style: { color: "var(--ink-1)", fontWeight: 700, marginBottom: 2 } }, (xPrefix != null ? xPrefix : "Year ") + longest.points[hoverIdx].label),
+      series.map((s, si) => s.points[hoverIdx] && h("div", { key: si, style: { color: s.color } }, s.name + ": " + fmtM(s.points[hoverIdx].v)))
     ),
     showLegend && h("div", { style: { display: "flex", gap: 14, marginTop: 8, flexWrap: "wrap" } },
       series.map((s, i) => h("div", { key: i, style: { display: "flex", alignItems: "center", gap: 5, fontSize: 11, fontFamily: "var(--mono)", color: "var(--ink-2)" } },

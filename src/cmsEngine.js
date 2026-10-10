@@ -385,9 +385,12 @@ function ndcProductCodes(productNdc) {
   return { labeler: m[1].padStart(5, "0"), product: m[2].padStart(4, "0") };
 }
 
-// Which drug the user meant, from the FDA directory's rows: the brand typed,
-// else the one brand of the generic typed, else the only brand found. Two or
-// more possibilities are offered as candidates and none is chosen.
+// Which drug the user meant, from the FDA directory's rows. A generic name
+// with several brands behind it is never resolved to one of them — not even
+// to an unbranded biosimilar sold under the generic's own name ("adalimumab"
+// is a brand too, which once made a search for the molecule return a single
+// biosimilar): the brands are offered as candidates. Otherwise the brand
+// typed, else the one brand of the generic typed, else the only brand found.
 function pickDrugIdentity(query, ndcRows) {
   const q = String(query || "").trim();
   const key = drugNameKey(q);
@@ -401,9 +404,12 @@ function pickDrugIdentity(query, ndcRows) {
     if (codes && !g.products.some(x => x.labeler === codes.labeler && x.product === codes.product)) g.products.push(codes);
   });
   const list = Object.keys(groups).map(k => groups[k]);
-  const byGeneric = list.filter(g => drugNameKey(g.generic) === key);
+  // Brands whose generic is the name typed (a biosimilar's suffix allowed:
+  // "adalimumab-adaz" is adalimumab).
+  const byGeneric = key ? list.filter(g => drugNameKey(g.generic).indexOf(key) === 0) : [];
   let chosen = null, matchedBy = null;
-  if (groups[key]) { chosen = groups[key]; matchedBy = "brand"; }
+  if (byGeneric.length > 1) { chosen = null; }
+  else if (groups[key]) { chosen = groups[key]; matchedBy = "brand"; }
   else if (byGeneric.length === 1) { chosen = byGeneric[0]; matchedBy = "generic"; }
   else if (!byGeneric.length && list.length === 1) { chosen = list[0]; matchedBy = "partial"; }
   const pool = chosen ? [] : (byGeneric.length ? byGeneric : list);
